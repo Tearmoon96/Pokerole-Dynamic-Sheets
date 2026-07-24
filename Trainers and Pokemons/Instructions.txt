@@ -1,0 +1,5 @@
+Put your trainer .json files here.
+
+In trainer-license.html:  click the folder button (Open working folder) and
+pick THIS "Trainers and Pokemons" folder. Every trainer file in it loads at once, and
+"Save All" writes your changes back here. New trainers are saved here too.

@@ -1,0 +1,12 @@
+{
+    "Name": "White Herb",
+    "_id": "white-herb",
+    "Source": "Core 3.0",
+    "PMD": false,
+    "Pocket": "HeldItems",
+    "Category": "BattleItem",
+    "Description": "This Herb infuses a glowing energy. Restore any lowered Attribute/Trait. Single use.",
+    "OneUse": true,
+    "TrainerPrice": "Not for Sale",
+    "Image": "white-herb.png"
+}

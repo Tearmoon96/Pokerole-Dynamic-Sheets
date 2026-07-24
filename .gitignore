@@ -1,0 +1,21 @@
+# OS / editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+.vscode/
+.idea/
+
+# Maintenance scripts that hard-code a local machine path
+app-data/build/scratch/write_*.py
+
+# Personal campaign data — keep the sample structure, not real sheets
+Trainers and Pokemons/*.json
+Trainers and Pokemons/Custom Images/Trainers/*
+Trainers and Pokemons/Custom Images/Pokemons/*
+Trainers and Pokemons/Wild Pokemons/*
+
+# ...but keep the folder placeholders and the intentional sample image
+!Trainers and Pokemons/Custom Images/Trainers/.gitkeep
+!Trainers and Pokemons/Wild Pokemons/.gitkeep
+!Trainers and Pokemons/Custom Images/Pokemons/My Misdreavus <3 (is a she).png
