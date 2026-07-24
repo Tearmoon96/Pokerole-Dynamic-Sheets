@@ -1,0 +1,12 @@
+{
+    "Name": "Destiny Knot",
+    "_id": "destiny-knot",
+    "Source": "Core 3.0",
+    "PMD": false,
+    "Pocket": "HeldItems",
+    "Category": "BattleItem",
+    "Description": "The red string of fate may never break. If this Pokémon falls in love the foe will fall in love with them in return.",
+    "OneUse": false,
+    "TrainerPrice": "Not for Sale",
+    "Image": "destiny-knot.png"
+}

@@ -1,0 +1,12 @@
+{
+    "Name": "PokeDoll",
+    "_id": "pokedoll",
+    "Source": "Core 3.0",
+    "PMD": false,
+    "Pocket": "TrainerItems",
+    "Category": "",
+    "Description": "Life-size decoy used to escape wild Pokémon. Some people like to collect them.",
+    "OneUse": true,
+    "TrainerPrice": "1000",
+    "Image": "pokedoll.png"
+}

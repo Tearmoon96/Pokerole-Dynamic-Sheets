@@ -1,0 +1,18 @@
+{
+    "Name": "Gigavolt Havoc",
+    "Type": "Electric",
+    "Power": "Happiness + Loyalty",
+    "Damage1": "SameAsBasePower",
+    "Damage2": "",
+    "Accuracy1": "SameAsBaseMove",
+    "Accuracy2": "",
+    "Target": "Foe",
+    "Effect": "Single Target. Suggested effects: Paralyze, Attribute Increase, Damage Increase See p. 610 for more info.",
+    "Description": "",
+    "_id": "gigavolt_havoc",
+    "Attributes": {
+        "ZMove": true
+    },
+    "AddedEffects": {},
+    "Category": "Support/Physical/Special"
+}

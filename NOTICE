@@ -1,0 +1,35 @@
+Pokerole Dynamic Sheets
+Copyright (c) 2026 Tearmoon
+
+This software (the HTML apps and their code) is released under the MIT License;
+see the LICENSE file. The credits and third-party terms below are separate from
+that license and are provided for attribution.
+
+--------------------------------------------------------------------------------
+Author
+--------------------------------------------------------------------------------
+- Tearmoon — https://github.com/Tearmoon96/Pokerole-Dynamic-Sheets
+
+--------------------------------------------------------------------------------
+Game data
+--------------------------------------------------------------------------------
+The bundled game database (app-data/*-db.js) is built from the Pokerole-Data
+dataset by Willowlark and contributors:
+- https://github.com/Willowlark/Pokerole-Data
+Thanks to Willowlark and everyone who compiled and maintains that dataset.
+
+--------------------------------------------------------------------------------
+Game system
+--------------------------------------------------------------------------------
+Pokerole is a tabletop RPG created by the Pokerole Project:
+- https://www.pokeroleproject.com/
+All Pokerole rules, stats, and mechanics belong to the Pokerole design team.
+
+--------------------------------------------------------------------------------
+Trademarks
+--------------------------------------------------------------------------------
+Pokémon and all Pokémon character names are trademarks of Nintendo,
+The Pokémon Company, and Game Freak.
+
+This is a non-commercial, fan-made tool. It is not affiliated with, endorsed by,
+or sponsored by any of the above.

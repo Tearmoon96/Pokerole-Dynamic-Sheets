@@ -1,0 +1,12 @@
+{
+    "Name": "Pokeball",
+    "_id": "pokeball",
+    "Source": "Core 3.0",
+    "PMD": false,
+    "Pocket": "Pokeballs",
+    "Category": "",
+    "Description": "Seal potency of 4 dice. A basic ball used for catching Pokémon and carrying heavy items.",
+    "OneUse": true,
+    "TrainerPrice": "200",
+    "Image": "pokeball.png"
+}
