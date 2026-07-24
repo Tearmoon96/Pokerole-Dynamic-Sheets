@@ -20,7 +20,7 @@ The two are linked. Click a team slot on a trainer's license and it opens that P
 
 ## What you need
 
-- **A browser.** Chrome, Edge, or another Chromium browser is recommended, because they support the File System Access API. That's what lets the app open a folder and write changes straight back to your files ("Open working folder" plus "Save All"). Firefox and Safari can still open files, but they can't save directly — you load and save through the normal upload/download dialogs instead.
+- **A browser.** Chrome, Edge, or another Chromium browser is recommended, because they support the File System Access API. That's what lets the app open a folder and write changes straight back to your files ("Open working folder" plus "Save All"). Firefox and Safari can still open files, but they can't save.
 - **The `app-data/` folder.** It sits next to the two HTML files and holds the game database (Pokédex, moves, abilities, items) plus sprites. The apps won't run without it. Don't rename it — or if you really have to, update the single `DATA_BASE` line near the top of each HTML file.
 - **Internet is optional.** The apps work offline, but fonts and icons load from a CDN, and any sprite that isn't stored locally is fetched from the Pokerole-Data GitHub. Offline, everything still works; it just looks plainer.
 
