@@ -2057,6 +2057,19 @@
             flex-shrink: 0;
         }
 
+        /* The Pinned filter is a cross-cutting option, set off from the ranks above */
+        .filter-option.pinned-filter {
+            margin-top: 6px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .filter-option.pinned-filter .pinned-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
         /* Custom move picker */
         .custom-move-adder {
             display: flex;
@@ -2388,6 +2401,12 @@
            so it must sit above it or the click appears to do nothing */
         #poke-picker-modal {
             z-index: 250;
+        }
+
+        /* The "load another Pokémon" confirmation opens on top of the picker
+           (z-index 250), so it has to sit above it to be visible */
+        #load-warn-modal {
+            z-index: 300;
         }
 
         .modal-box {
@@ -3687,6 +3706,20 @@
             <div class="modal-actions">
                 <button class="form-btn cancel" onclick="closeEvolveWarn()">Cancel</button>
                 <button class="form-btn danger" id="evolve-warn-confirm-btn" onclick="confirmEvolveWarn()"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load another Pokémon: confirm before navigating away from the current card -->
+    <div class="modal-overlay" id="load-warn-modal" style="display: none;"
+        onclick="if (event.target === this) closeLoadWarn()">
+        <div class="modal-box">
+            <div class="modal-title"><i class="fa-solid fa-triangle-exclamation" style="color: #f43f5e;"></i>
+                Load another Pokémon</div>
+            <p class="modal-text" id="load-warn-text"></p>
+            <div class="modal-actions">
+                <button class="form-btn cancel" onclick="closeLoadWarn()">Cancel</button>
+                <button class="form-btn danger" onclick="confirmLoadWarn()">Load anyway</button>
             </div>
         </div>
     </div>
@@ -5225,11 +5258,41 @@
         }
 
         function pickPokemon(id) {
+            /* A Pokémon is already open on this card: loading another one
+               navigates away and replaces it, so confirm first — anything the
+               user built here and hasn't exported/kept is left behind. On the
+               blank landing (nothing loaded yet) there is nothing to lose. */
+            if (_params.get('pokemon')) {
+                pendingLoadId = id;
+                document.getElementById('load-warn-text').innerHTML = WILD_MODE
+                    ? 'Loading another Pokémon replaces the one on this card. If you haven\'t '
+                      + '<strong>exported this wild Pokémon</strong> yet, export it first so you don\'t '
+                      + 'lose the work you did here. Continue?'
+                    : 'Loading another Pokémon replaces the one currently on this card with a different '
+                      + 'species. Continue?';
+                document.getElementById('load-warn-modal').style.display = 'flex';
+                return;
+            }
+            doPickPokemon(id);
+        }
+
+        function doPickPokemon(id) {
             if (pickerWildMode) {
                 location.search = '?pokemon=' + encodeURIComponent(id) + '&wild=1';
             } else {
                 loadPokemonById(id);
             }
+        }
+
+        let pendingLoadId = null;
+        function confirmLoadWarn() {
+            const id = pendingLoadId;
+            closeLoadWarn();
+            if (id) doPickPokemon(id);
+        }
+        function closeLoadWarn() {
+            pendingLoadId = null;
+            document.getElementById('load-warn-modal').style.display = 'none';
         }
 
         function closePokePicker() {
@@ -5435,7 +5498,9 @@
             const target = ALL_POKEMON.find(p => p._id === targetId);
             const tname = target ? target.Name : 'its evolution';
             document.getElementById('evolve-warn-text').innerHTML =
-                'Evolving into <strong>' + tname + '</strong> is <strong>permanent and cannot be reversed</strong>. '
+                'Your <strong>trained stat distribution</strong> and everything else on the sheet carry over — '
+                + 'only the base stats, caps and ability change to the new form.<br><br>'
+                + 'Evolving into <strong>' + tname + '</strong> is <strong>permanent and cannot be reversed</strong>. '
                 + 'This Pokémon will not be able to return to its current stage — the only way back would be to '
                 + 'build a brand-new Pokémon from scratch. Continue?';
             document.getElementById('evolve-warn-confirm-btn').textContent = 'Evolve';
@@ -6216,17 +6281,27 @@
 
             const allMoves = getOrderedMoves();
 
-            const filteredMoves = activeFilters.length === 0
-                ? allMoves
-                : allMoves.filter(move => activeFilters.includes(move.Learned));
+            /* "Pinned" is a cross-cutting filter (show only pinned moves); the
+               rest of activeFilters are learn-ranks. They combine — e.g. Pinned
+               together with Ace shows only pinned Ace moves. */
+            const pinnedOnly = activeFilters.includes('Pinned');
+            const rankFilters = activeFilters.filter(r => r !== 'Pinned');
+            const pinnedSet = new Set(sheetState.pinnedMoves || []);
+
+            let filteredMoves = allMoves;
+            if (pinnedOnly) filteredMoves = filteredMoves.filter(move => pinnedSet.has(move.Name));
+            if (rankFilters.length > 0) filteredMoves = filteredMoves.filter(move => rankFilters.includes(move.Learned));
 
             // Update counter
             document.getElementById('moves-count').textContent = `${filteredMoves.length} / ${allMoves.length} Moves`;
 
             if (filteredMoves.length === 0) {
-                grid.innerHTML = activeFilters.length === 1 && activeFilters[0] === 'Custom'
-                    ? `<div class="no-moves-msg">No custom moves yet. Use the + button above to add one.</div>`
-                    : `<div class="no-moves-msg">No moves match the selected filters.</div>`;
+                let msg = 'No moves match the selected filters.';
+                if (pinnedOnly && pinnedSet.size === 0)
+                    msg = 'No pinned moves yet. Use the tack on a move to pin it to the top.';
+                else if (!pinnedOnly && rankFilters.length === 1 && rankFilters[0] === 'Custom')
+                    msg = 'No custom moves yet. Use the + button above to add one.';
+                grid.innerHTML = `<div class="no-moves-msg">${msg}</div>`;
                 return;
             }
 
@@ -6555,6 +6630,23 @@
                 };
                 menu.appendChild(option);
             });
+
+            /* "Pinned" is a separate cross-cutting filter (show only pinned
+               moves), so it sits below the ranks with a tack icon. */
+            const pinnedActive = sheetState.activeFilters.includes('Pinned');
+            const pinOption = document.createElement('div');
+            pinOption.className = 'filter-option pinned-filter';
+            const pinDot = document.createElement('span');
+            pinDot.className = 'dot ' + (pinnedActive ? 'filled' : 'empty');
+            const pinLabel = document.createElement('span');
+            pinLabel.className = 'pinned-label';
+            const pinIcon = document.createElement('i');
+            pinIcon.className = 'fa-solid fa-thumbtack';
+            pinIcon.style.fontSize = '0.78em';
+            pinLabel.append(pinIcon, document.createTextNode('Pinned'));
+            pinOption.append(pinDot, pinLabel);
+            pinOption.onclick = (e) => { e.stopPropagation(); toggleFilter('Pinned'); };
+            menu.appendChild(pinOption);
         }
 
         function toggleFilter(rank) {
@@ -6917,13 +7009,14 @@
 
         // Wild mode: show the export button and a green "wild" banner
         if (WILD_MODE) {
-            document.getElementById('wild-export-wrap').style.display = 'flex';
-            /* On a wild sheet the Evolve control sits above "Load another
-               Pokémon" (swapped from the default trainer-card order) */
-            const loadPicker = document.getElementById('load-picker');
+            const wildWrap = document.getElementById('wild-export-wrap');
+            wildWrap.style.display = 'flex';
+            /* On a wild sheet the Evolve control moves below the Export / Import
+               Wild Pokémon buttons, so the order reads: Load another Pokémon,
+               Export, Import, then Evolve. */
             const evolveControls = document.getElementById('evolve-controls');
-            if (loadPicker && evolveControls) {
-                loadPicker.parentNode.insertBefore(evolveControls, loadPicker);
+            if (wildWrap && evolveControls) {
+                wildWrap.parentNode.insertBefore(evolveControls, wildWrap.nextSibling);
             }
             const wb = document.createElement('div');
             wb.innerHTML = '<i class="fa-solid fa-paw"></i> Wild Pokémon — belongs to no trainer. '
