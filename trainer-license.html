@@ -4570,6 +4570,10 @@
                         title="Save all loaded trainers (and their Pokémon) back to their JSON files">
                         <i class="fa-solid fa-floppy-disk"></i>
                     </button>
+                    <button class="type-eff-btn" onclick="backupAllTrainers()"
+                        title="Download a backup copy of every loaded trainer's JSON — works in any browser, even alongside Save All on Chrome">
+                        <i class="fa-solid fa-download"></i>
+                    </button>
                     <button class="type-eff-btn" onclick="newTrainerCard()"
                         title="Open a fresh new trainer card">
                         <i class="fa-solid fa-file-circle-plus"></i>
@@ -7931,6 +7935,30 @@
             });
             updateSaveIndicator();
             flashToast('<i class="fa-solid fa-download"></i> Downloaded ' + trainers.length + ' trainer file(s)');
+        }
+
+        /* Manual backup: always download a copy of every loaded trainer's JSON,
+           regardless of the File System Access API. Unlike Save All, this never
+           writes to the working folder and does NOT clear the unsaved-changes
+           indicator — it's an extra copy to the browser's Downloads folder, not
+           the canonical save. Handy on Chrome, where Save All writes straight to
+           the folder and never hands you a downloadable file. */
+        function backupAllTrainers() {
+            syncFromWorkingSet();              // pull in Pokémon edits from card tabs
+            trainers[activeTrainer].data = sheetState;
+            trainers.forEach(t => {
+                const blob = new Blob([trainerJson(t)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = trainerFileName(t);
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            });
+            flashToast('<i class="fa-solid fa-download"></i> Backed up ' + trainers.length
+                + ' trainer file' + (trainers.length === 1 ? '' : 's'));
         }
 
         /* --- New trainer: saved to its own .json immediately so it is
