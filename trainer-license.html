@@ -1004,6 +1004,24 @@
             box-shadow: 0 0 6px #fbbf24;
         }
 
+        /* A newer release exists on GitHub: same corner dot as Save All, but in
+           the theme accent instead of amber (this is news, not a warning) */
+        .type-eff-btn.has-update {
+            position: relative;
+        }
+
+        .type-eff-btn.has-update::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--ghost-color);
+            box-shadow: 0 0 6px var(--ghost-color);
+        }
+
         /* Type effectiveness modal rows */
         .type-eff-box {
             max-width: 480px;
@@ -4902,6 +4920,14 @@
             background: #f59e0b2e;
         }
 
+        /* Same treatment for the update dot: --ghost-color is tuned for a dark
+           page, and the pale accents drop to ~1.5:1 on a light body (see
+           typeInk), so darken it rather than trust the raw theme color. */
+        :root.light-theme .type-eff-btn.has-update::after {
+            background: color-mix(in srgb, var(--ghost-color) 65%, #000);
+            box-shadow: 0 0 6px color-mix(in srgb, var(--ghost-color) 45%, transparent);
+        }
+
         :root.light-theme .type-eff-btn.has-unsaved::after {
             background: #d97706;
             box-shadow: 0 0 6px #d9770699;
@@ -5260,7 +5286,7 @@
                     <h1 class="license-title">Pokémon League<br>Trainer's License</h1>
                 </div>
                 <div class="license-tools">
-                    <button class="type-eff-btn" onclick="openInfoModal()"
+                    <button class="type-eff-btn" id="info-btn" onclick="openInfoModal()"
                         title="How saving & loading works, and how the folder should be organized">
                         <i class="fa-solid fa-circle-info"></i>
                     </button>
@@ -6131,6 +6157,26 @@
             <p class="modal-text" style="opacity: 0.7; font-size: 0.8rem;">Tip: works best in Google Chrome, and if you
                 ever rename the <strong>app-data</strong> folder, update the one <code>DATA_BASE</code> line inside both
                 HTML files.</p>
+
+            <!-- Version line. Always shows what you're running (handy to quote in
+                 a bug report); the update half stays hidden until a newer release
+                 is actually found on GitHub. -->
+            <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-color);
+                        display: flex; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <span class="modal-text" style="margin: 0; font-size: 0.8rem; opacity: 0.7;">
+                    Version <strong id="info-version">—</strong>
+                </span>
+                <span id="update-available" style="display: none; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <span class="modal-text" style="margin: 0; font-size: 0.8rem; color: var(--ghost-color);">
+                        <i class="fa-solid fa-circle-arrow-up"></i>
+                        <strong id="update-latest"></strong> is available
+                    </span>
+                    <a id="update-link" href="#" target="_blank" rel="noopener noreferrer"
+                        class="form-btn" style="text-decoration: none; font-size: 0.78rem; padding: 5px 12px;">
+                        View on GitHub
+                    </a>
+                </span>
+            </div>
         </div>
     </div>
 
@@ -6141,7 +6187,7 @@
     <script>
         window.DATA_BASE = 'app-data/';
         ['pokedex-db.js', 'items-db.js', 'equip-icons-db.js',
-            'equip-icons-mono-db.js'].forEach(function (f) {
+            'equip-icons-mono-db.js', 'version.js'].forEach(function (f) {
             document.write('<script src="' + DATA_BASE + f + '"><\/script>');
         });
     </script>
@@ -6190,6 +6236,91 @@
             const bundlesOk = typeof ALL_POKEMON !== 'undefined' && typeof ALL_ITEMS !== 'undefined';
             const assetOk = await checkAppDataAsset();
             if (bundlesOk && assetOk) hideDataWarning(); else showDataWarning();
+        }
+
+        /* ------------------------------------------------------------------
+           Update check — asks GitHub whether a newer release exists.
+           It never downloads anything; the user updates the folder by hand.
+
+           Ground rules, because this runs on a page people open offline:
+             - Failure is silent. Offline, a dead link, a rate limit, a 404
+               because no release has been published yet — all of it means
+               "no news", never an error message. The app works fine without
+               a network and must not imply otherwise.
+             - One request per day, cached in localStorage. GitHub allows 60
+               per hour per IP to anonymous callers, and someone reopening
+               sheets all evening must not burn through that.
+           ------------------------------------------------------------------ */
+        const UPDATE_KEY = 'pokerole_update_check';
+        const UPDATE_INTERVAL = 24 * 60 * 60 * 1000;
+
+        function readUpdateCache() {
+            try { return JSON.parse(localStorage.getItem(UPDATE_KEY)) || null; } catch (e) { return null; }
+        }
+        function writeUpdateCache(data) {
+            try { localStorage.setItem(UPDATE_KEY, JSON.stringify(data)); } catch (e) { /* private mode / full quota */ }
+        }
+
+        /* Paint the version line in the info modal, and dot the info button when
+           there's something newer. Safe to call with no update info at all. */
+        function renderUpdateState(info) {
+            const cur = document.getElementById('info-version');
+            if (cur) cur.textContent = (typeof APP_VERSION !== 'undefined') ? APP_VERSION : '—';
+
+            const newer = info && info.latest && typeof APP_VERSION !== 'undefined'
+                && compareVersions(info.latest, APP_VERSION) > 0;
+
+            const row = document.getElementById('update-available');
+            if (row) row.style.display = newer ? 'inline-flex' : 'none';
+            const btn = document.getElementById('info-btn');
+            if (btn) {
+                btn.classList.toggle('has-update', !!newer);
+                btn.title = newer
+                    ? 'Version ' + info.latest + ' is available — click for details'
+                    : 'How saving & loading works, and how the folder should be organized';
+            }
+            if (!newer) return;
+
+            const tag = document.getElementById('update-latest');
+            if (tag) tag.textContent = info.latest;
+            const link = document.getElementById('update-link');
+            if (link) link.href = info.url || ('https://github.com/' + APP_REPO + '/releases/latest');
+        }
+
+        async function checkForUpdate() {
+            if (typeof APP_VERSION === 'undefined' || typeof APP_REPO === 'undefined') return;
+
+            const cached = readUpdateCache();
+            // Fresh enough? Show what we already know and stay off the network.
+            if (cached && (Date.now() - (cached.lastCheck || 0)) < UPDATE_INTERVAL) {
+                renderUpdateState(cached);
+                return;
+            }
+            renderUpdateState(cached);   // paint the current version immediately either way
+
+            /* Don't let a captive portal leave the request hanging forever */
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 5000);
+            const stamp = { lastCheck: Date.now() };
+            try {
+                const res = await fetch('https://api.github.com/repos/' + APP_REPO + '/releases/latest',
+                    { headers: { 'Accept': 'application/vnd.github+json' }, signal: ctrl.signal });
+                /* 404 = the repo has no releases yet. Perfectly normal, not an error. */
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.tag_name) {
+                        stamp.latest = String(data.tag_name).replace(/^v/i, '');
+                        stamp.url = data.html_url;
+                    }
+                }
+            } catch (e) {
+                /* Offline, DNS failure, timeout, blocked by an extension — no news. */
+            } finally {
+                clearTimeout(timer);
+            }
+            // Stamp the time even on failure, so a week offline isn't a retry every load
+            writeUpdateCache(stamp);
+            renderUpdateState(stamp);
         }
 
         const GITHUB_RAW = 'https://raw.githubusercontent.com/Willowlark/Pokerole-Data/master';
@@ -10391,6 +10522,7 @@
         startBlank();
         openLanding();
         verifyAppData();   // warn (persistent banner) if the app-data folder is missing
+        checkForUpdate();  // quietly ask GitHub for a newer release; never awaited
 
         // Warn before leaving with changes not written to disk
         window.addEventListener('beforeunload', (e) => {
