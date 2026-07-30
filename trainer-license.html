@@ -3139,6 +3139,54 @@
             box-shadow: 0 0 8px var(--ghost-color-glow);
         }
 
+        /* Equipment shortcut: a pill between the two corner buttons. Unlike
+           them it doesn't need a photo, so it hangs off the plain arch hover. */
+        .photo-equip-btn {
+            position: absolute;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            height: 30px;
+            padding: 0 14px;
+            border-radius: 15px;
+            border: 1px solid #ffffff26;
+            background: #000000a6;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            white-space: nowrap;
+            display: none;
+            align-items: center;
+            gap: 7px;
+            transition: all 0.2s;
+            z-index: 2;
+        }
+
+        .photo-arch:hover .photo-equip-btn {
+            display: flex;
+        }
+
+        .photo-equip-btn:hover {
+            color: #fff;
+            border-color: var(--ghost-color);
+            box-shadow: 0 0 10px var(--ghost-color-glow);
+        }
+
+        /* A filled slot somewhere puts a dot on the pill so you can tell at a
+           glance that the trainer is carrying gear */
+        .photo-equip-btn.has-gear::after {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--ghost-color);
+            box-shadow: 0 0 6px var(--ghost-color);
+        }
+
         /* Mini arch-shaped preview inside the photo adjust modal */
         .photo-modal-preview {
             width: 160px;
@@ -3158,6 +3206,375 @@
             height: 100%;
             object-fit: contain;
             transform: translate(var(--photo-x, 0px), var(--photo-y, 0px)) scale(var(--photo-scale, 1));
+        }
+
+        /* ---------------- Trainer equipment window ---------------- */
+        /* Compound selector so it beats the base `.modal-box { max-width: 360px }` */
+        .modal-box.equipment-box {
+            /* Five grid columns and the bag beside them, editor underneath.
+               Roomy on purpose: at the old 470px the wells were shoulder to
+               shoulder and the artwork inside them had nowhere to breathe. */
+            max-width: 940px;
+            max-height: 92vh;
+            overflow-y: auto;
+        }
+
+        /* Worn on the left, carried on the right */
+        .equip-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+            gap: 18px;
+            align-items: start;
+        }
+
+        .equip-bag {
+            display: flex;
+            flex-direction: column;
+            /* The doll's own top margin, so the two columns start level */
+            margin-top: 10px;
+            padding: 10px 12px 12px;
+            border-radius: 10px;
+            background: #00000038;
+            border: 1px solid var(--border-color);
+        }
+
+        .equip-bag-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding-bottom: 7px;
+            margin-bottom: 2px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .equip-bag .bag-list {
+            /* Tall enough to look like a bag when empty, capped so a hoarder's
+               list scrolls instead of stretching the modal */
+            min-height: 150px;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        /* The gear icons are line art on a dark well, not sprites */
+        .equip-bag .line-item img {
+            width: 22px;
+            height: 22px;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+
+        /* The suggestion list is shared with the Pokémon item search, which
+           wants its sprites crisp-pixelled; vectors want the opposite */
+        #equip-bag-sugg img {
+            image-rendering: auto;
+        }
+
+        /* Below this the two columns stop fitting side by side */
+        @media (max-width: 760px) {
+            .equip-layout {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .equip-bag {
+                margin-top: 0;
+            }
+        }
+
+        /* Gear grid, arranged like Path of Exile 2's equipment panel minus the
+           belt: a weapon down each edge, helmet and amulet across the top, body
+           armour tall in the middle with a ring either side, gloves and boots
+           along the bottom. `grid-area` for each slot comes from EQUIP_SLOTS. */
+        #equip-slots {
+            display: grid;
+            grid-template-columns: 1fr 0.85fr 1.15fr 0.85fr 1fr;
+            gap: 12px;
+            margin: 10px 0 4px;
+            grid-template-areas:
+                "weapon quick  helmet necklace offhand"
+                "weapon ring1  armor  ring2    offhand"
+                "weapon gloves armor  boots    offhand";
+        }
+
+        /* Recessed well, same treatment as the team sprite circles */
+        .equip-slot {
+            position: relative;
+            min-height: 84px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px;
+            font-size: 1.15rem;
+            background: #00000059;
+            border: 1px dashed var(--border-color);
+            box-shadow: inset 0 0 10px #00000080;
+            color: var(--text-muted);
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .equip-slot:hover {
+            border-color: var(--ghost-color);
+            color: var(--text-primary);
+            box-shadow: inset 0 0 10px #00000080, 0 0 12px var(--ghost-color-glow);
+        }
+
+        .equip-slot.filled {
+            border-style: solid;
+            border-color: var(--ghost-color);
+            background: var(--primary-soft);
+            color: var(--ghost-color);
+        }
+
+        .equip-slot.selected {
+            border-style: solid;
+            border-color: var(--accent);
+            box-shadow: inset 0 0 10px #00000080, 0 0 0 1px var(--accent), 0 0 14px var(--border-glow);
+        }
+
+        /* The wells differ in size, so the art scales to whichever it sits in
+           rather than being pinned to one pixel size */
+        .equip-slot .equip-art {
+            max-width: 100%;
+            max-height: 100px;
+            object-fit: contain;
+        }
+
+        /* Flips the armour cell between armour and clothing */
+        .equip-face-toggle {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 21px;
+            height: 21px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.58rem;
+            background: #0000008c;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.15s;
+            z-index: 1;
+        }
+
+        .equip-face-toggle:hover,
+        .equip-face-toggle:focus-visible {
+            color: var(--text-primary);
+            border-color: var(--ghost-color);
+            box-shadow: 0 0 8px var(--ghost-color-glow);
+            outline: none;
+        }
+
+        /* A dot when the face you can't see is carrying something, so a filled
+           slot never hides without a trace */
+        .equip-face-toggle.has-other::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--ghost-color);
+            border: 1.5px solid var(--panel-strong);
+        }
+
+        /* Already worn on the other half of the armour cell */
+        .gear-choice.taken {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .gear-choice.taken:hover {
+            border-color: var(--border-color);
+            box-shadow: none;
+        }
+
+        /* ---------------- Gear catalogue ---------------- */
+        /* Opens from inside the equipment window, so it has to sit above it */
+        #gear-catalog-modal {
+            z-index: 260;
+        }
+
+        .modal-box.gear-catalog-box {
+            max-width: 560px;
+        }
+
+        /* Horizontal chip strip; it scrolls rather than wrapping to four rows */
+        .gear-cat-row {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+
+        .gear-cat-chip {
+            flex-shrink: 0;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            background: #00000033;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 0.72rem;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .gear-cat-chip:hover {
+            border-color: var(--ghost-color);
+            color: var(--text-primary);
+        }
+
+        .gear-cat-chip.active {
+            background: var(--primary-soft);
+            border-color: var(--ghost-color);
+            color: var(--text-primary);
+        }
+
+        .gear-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+            gap: 8px;
+            max-height: 46vh;
+            overflow-y: auto;
+            padding: 4px;
+        }
+
+        .gear-choice {
+            aspect-ratio: 1;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            background: #00000033;
+            padding: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+        }
+
+        .gear-choice:hover {
+            border-color: var(--ghost-color);
+            background: var(--primary-soft);
+            transform: translateY(-1px);
+        }
+
+        .gear-choice.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+
+        .gear-choice img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* The monochrome pack is solid black artwork with no background, which
+           would disappear against these dark wells — flip it to white. The
+           light theme puts them on a pale surface, so there they stay black
+           (see the light-theme block further down). */
+        .mono-art {
+            filter: invert(1);
+        }
+
+        .gear-grid-note {
+            font-size: 0.75rem;
+            font-style: italic;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        /* Editor for whichever slot is selected, docked under the grid */
+        .equip-editor {
+            border-top: 1px solid var(--border-color);
+            padding-top: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+        }
+
+        .equip-editor-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .equip-editor-head i {
+            color: var(--ghost-color);
+        }
+
+        .equip-field-label {
+            font-size: 0.66rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        /* Gear name: free text, so the trainer's own wording survives, but it
+           starts life as whatever was picked out of the catalogue */
+        .equip-name-input {
+            width: 100%;
+        }
+
+        .equip-notes {
+            width: 100%;
+            min-height: 62px;
+            resize: vertical;
+            background: #0000004c;
+            border: 1px solid #ffffff1a;
+            border-radius: 8px;
+            padding: 7px 12px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.8rem;
+            line-height: 1.45;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .equip-notes:focus {
+            border-color: var(--ghost-color);
+        }
+
+        /* Five columns get too cramped on a phone: fold the weapons in beside
+           the armour and drop to three. */
+        @media (max-width: 520px) {
+            #equip-slots {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8px;
+                grid-template-areas:
+                    "quick  helmet necklace"
+                    "weapon armor  offhand"
+                    "ring1  armor  ring2"
+                    "gloves .      boots";
+            }
+
+            .equip-slot {
+                min-height: 62px;
+                font-size: 1rem;
+            }
+
+            .equip-slot .equip-art {
+                max-height: 66px;
+            }
         }
 
         /* NAME / PLAYER underlined lines with a little pokeball bullet */
@@ -4020,6 +4437,27 @@
             text-align: center;
         }
 
+        /* Bare icon button, styled like the rulebook cards' delete. Without
+           these it falls back to the browser's default button chrome: a pale
+           grey-white fill and an arrow cursor instead of the pointing hand. */
+        .item-remove {
+            flex: none;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: inherit;
+            cursor: pointer;
+            opacity: 0.55;
+            transition: all 0.15s;
+        }
+
+        .item-remove:hover,
+        .item-remove:focus-visible {
+            color: #f43f5e;
+            opacity: 1;
+            outline: none;
+        }
+
         .line-item .item-remove {
             font-size: 0.7rem;
             padding: 2px 3px;
@@ -4188,13 +4626,19 @@
             padding: 0 4px;
         }
 
+        /* Unearned slot. The dashed outline and the ghost medal are the only
+           thing marking an empty slot, and they sit on a well that darkens the
+           panel under them, so the old #ffffff1a / #ffffff21 landed at 1.3:1 on
+           every theme — present in the markup, invisible on screen. These read
+           at roughly 2.5:1 / 3:1, clearly a slot without competing with the
+           earned badges beside them (those run 5:1 and up). */
         .badge-sq {
             width: 40px;
             height: 40px;
             border-radius: 11px;
-            border: 2px dashed #ffffff1a;
+            border: 2px dashed #ffffff47;
             background: #00000033;
-            color: #ffffff21;
+            color: #ffffff57;
             font-size: 1rem;
             display: flex;
             align-items: center;
@@ -4203,9 +4647,10 @@
             transition: all 0.25s;
         }
 
+        /* Hover has to stay a clear step above the new resting state */
         .badge-sq:hover {
-            border-color: #ffffff40;
-            color: #ffffff59;
+            border-color: #ffffff8c;
+            color: #ffffffa6;
         }
 
         .badge-sq.earned {
@@ -4222,7 +4667,6 @@
            theme. Most of the palette follows CSS variables already; these
            rules fix the hairline dividers and translucent fills that were
            written as white-alpha (invisible on a light background). */
-        :root.light-theme .badge-sq,
         :root.light-theme .team-slot,
         :root.light-theme .team-slot-header,
         :root.light-theme .team-field input,
@@ -4316,8 +4760,23 @@
         :root.light-theme .hwe-exp-input,
         :root.light-theme .tally-qty-input,
         :root.light-theme .team-sprite-circle,
+        :root.light-theme .equip-notes,
+        :root.light-theme .equip-slot,
+        :root.light-theme .gear-cat-chip,
+        :root.light-theme .gear-choice,
         :root.light-theme .photo-arch {
             background: #0000000d;
+        }
+
+        :root.light-theme .equip-slot.filled,
+        :root.light-theme .gear-cat-chip.active,
+        :root.light-theme .gear-choice:hover {
+            background: var(--primary-soft);
+        }
+
+        /* Pale wells here, so the monochrome icons read as-drawn */
+        :root.light-theme .mono-art {
+            filter: none;
         }
 
         /* HP / Will bars are too vivid on the light theme: mute the fills
@@ -4345,6 +4804,156 @@
         :root.light-theme .pool-bar-value {
             color: #2a2020;
             text-shadow: 0 1px 1px #ffffffcc;
+        }
+
+        /* ---- Buttons that were drawn for a dark page ----
+           Three separate failures, all invisible on a light background: a
+           white-alpha body, a near-black well, or near-black text sitting on
+           a mid-tone fill. Each hover state is restated because these
+           selectors outrank the plain `.class:hover` rules they override. */
+
+        /* Done / Save: `color: #0b0713` on --accent is black-on-crimson here
+           (and black-on-slate on the Normal theme). Solid themed body with
+           white text, matching the Add buttons above. */
+        :root.light-theme .form-btn.save {
+            background: var(--ghost-color);
+            color: #fff;
+        }
+
+        :root.light-theme .form-btn.save:hover {
+            background: var(--ghost-color);
+            box-shadow: 0 0 8px var(--ghost-color-glow);
+        }
+
+        /* Cancel's white-alpha body and border leave nothing but the label */
+        :root.light-theme .form-btn.cancel {
+            background: #0000000d;
+            border-color: #00000029;
+            color: var(--text-primary);
+        }
+
+        :root.light-theme .form-btn.cancel:hover {
+            background: #0000001a;
+        }
+
+        /* Reset's pale rose text needs to darken to hold its own pale fill */
+        :root.light-theme .form-btn.reset {
+            background: #f43f5e14;
+            border-color: #f43f5e4d;
+            color: #b12341;
+        }
+
+        :root.light-theme .form-btn.reset:hover {
+            background: #f43f5e2e;
+        }
+
+        /* Photo-arch corner controls (remove / resize) and the Equipment pill
+           are near-black chips with themed-secondary text — dark on dark once
+           the text goes dark. Flip to a light chip with a real border and a
+           drop shadow, since they float over whatever photo is behind them. */
+        :root.light-theme .photo-remove-btn,
+        :root.light-theme .photo-adjust-btn,
+        :root.light-theme .photo-equip-btn {
+            background: var(--panel-strong);
+            border-color: #00000038;
+            color: var(--text-primary);
+            box-shadow: 0 1px 5px #00000033;
+        }
+
+        :root.light-theme .photo-adjust-btn:hover,
+        :root.light-theme .photo-equip-btn:hover {
+            background: var(--ghost-color);
+            border-color: var(--ghost-color);
+            color: #fff;
+        }
+
+        :root.light-theme .photo-remove-btn:hover {
+            background: #f43f5e;
+            border-color: #f43f5e;
+            color: #fff;
+        }
+
+        /* Header tool buttons and the HP / Will / quantity steppers: same
+           white-alpha body, same disappearing act */
+        :root.light-theme .type-eff-btn,
+        :root.light-theme .pool-btn {
+            background: #0000000d;
+            border-color: #00000029;
+        }
+
+        :root.light-theme .type-eff-btn:hover,
+        :root.light-theme .pool-btn:hover {
+            background: var(--ghost-color);
+            border-color: var(--ghost-color);
+            color: #fff;
+        }
+
+        :root.light-theme .type-eff-btn.sheet-reset-btn:hover {
+            background: #f43f5e;
+            border-color: #f43f5e;
+        }
+
+        /* Save All's unsaved-changes tint: restated so the rule above doesn't
+           outrank it, and darkened, since #fbbf24 amber washes out on a pale
+           body. The corner dot keeps the brighter amber to stay a signal. */
+        :root.light-theme .type-eff-btn.has-unsaved {
+            color: #a3550a;
+            border-color: #d9770680;
+            background: #f59e0b2e;
+        }
+
+        :root.light-theme .type-eff-btn.has-unsaved::after {
+            background: #d97706;
+            box-shadow: 0 0 6px #d9770699;
+        }
+
+        /* Unearned gym badge slots: the white-alpha outline and glyph invert to
+           black-alpha, at the alphas that land on the same contrast the base
+           rule now targets (~2.5:1 outline, ~3:1 glyph). They run higher than
+           the dark theme's because dark ink on a pale field reads weaker than
+           the reverse at equal alpha. */
+        :root.light-theme .badge-sq {
+            background: #0000000f;
+            border-color: #00000061;
+            color: #0000006b;
+        }
+
+        :root.light-theme .badge-sq:hover {
+            border-color: #000000a6;
+            color: #000000bf;
+        }
+
+        /* Equipment window: the bag well and the slots' face-flip corner
+           button are both black-alpha, which reads as a dark hole in an
+           otherwise light modal */
+        :root.light-theme .equip-bag {
+            background: #0000000d;
+        }
+
+        :root.light-theme .equip-face-toggle {
+            background: #00000014;
+            color: var(--text-secondary);
+        }
+
+        :root.light-theme .equip-face-toggle:hover,
+        :root.light-theme .equip-face-toggle:focus-visible {
+            color: var(--text-primary);
+        }
+
+        /* Row delete in both bags (the trainer's and the Adventurer Bag in the
+           equipment window): --text-secondary at 55% opacity is a faint grey on
+           a pale row. Same weight, drawn from --text-primary instead, which
+           takes it from ~2.3:1 to ~4.8:1 without turning it into a loud button.
+           The red hover is restated because this selector outranks it. */
+        :root.light-theme .item-remove {
+            color: var(--text-primary);
+            opacity: 0.65;
+        }
+
+        :root.light-theme .item-remove:hover,
+        :root.light-theme .item-remove:focus-visible {
+            color: #f43f5e;
+            opacity: 1;
         }
 
         /* ---------------- Multi-trainer switcher ---------------- */
@@ -4527,6 +5136,102 @@
 
         .save-toast i {
             color: var(--ghost-color);
+        }
+
+        /* ---------------- Themed tooltip ----------------
+           Replaces the browser's native grey `title` square everywhere on the
+           page. The engine at the bottom of the script moves the text out of
+           the title attribute at hover time and renders it here, so the bubble
+           follows the palette like every other panel. Sits above the modals
+           (z 300) but under the missing-data warning bar (z 100000). */
+        #app-tooltip {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 99999;
+            width: max-content;
+            max-width: 280px;
+            padding: 8px 12px;
+            background: var(--panel-strong);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            box-shadow: 0 8px 24px #00000099, 0 0 18px 1px var(--border-glow);
+            color: var(--text-primary);
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.78rem;
+            line-height: 1.45;
+            text-align: left;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(4px);
+            transition: opacity 0.12s ease, transform 0.12s ease;
+        }
+
+        #app-tooltip.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Heading line of a two-part tooltip (everything before the first
+           newline); plain single-line tooltips never render one */
+        #app-tooltip .tt-head {
+            display: block;
+            color: var(--accent);
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            margin-bottom: 3px;
+        }
+
+        #app-tooltip .tt-body {
+            display: block;
+            color: var(--text-secondary);
+        }
+
+        /* Single-line tooltips have no heading, so the body is the main text */
+        #app-tooltip .tt-body:only-child {
+            color: var(--text-primary);
+        }
+
+        /* Rotated square sharing the panel's fill and hairline, with only the
+           two outward edges kept. --tt-arrow-x is set from JS so it keeps
+           pointing at the target's centre even after the bubble has been
+           clamped against a viewport edge. Default position is below the
+           bubble, i.e. the tooltip sits above its target. */
+        #app-tooltip::after {
+            content: '';
+            position: absolute;
+            left: var(--tt-arrow-x, 50%);
+            margin-left: -5px;
+            bottom: -5px;
+            width: 9px;
+            height: 9px;
+            background: var(--panel-strong);
+            border: 1px solid var(--border-color);
+            border-top: none;
+            border-left: none;
+            transform: rotate(45deg);
+        }
+
+        /* Flipped below the target (no room above) — arrow moves to the top */
+        #app-tooltip.below::after {
+            bottom: auto;
+            top: -5px;
+            border: 1px solid var(--border-color);
+            border-bottom: none;
+            border-right: none;
+        }
+
+        /* Tooltips are dark-assuming like the rest of the sheet; on the Light
+           License themes the shadow and hairline need the light treatment */
+        :root.light-theme #app-tooltip {
+            border-color: #00000024;
+            box-shadow: 0 8px 24px #0000002e, 0 0 14px 1px var(--border-glow);
+        }
+
+        :root.light-theme #app-tooltip::after {
+            border-color: #00000024;
         }
     </style>
 </head>
@@ -5055,6 +5760,76 @@
         </div>
     </div>
 
+    <!-- Trainer equipment: the worn slots, the carried bag beside them, and an
+         editor for whichever slot is picked -->
+    <div class="modal-overlay" id="equipment-modal" style="display: none;"
+        onclick="if (event.target === this) closeEquipment()">
+        <div class="modal-box equipment-box">
+            <button class="modal-close-btn" onclick="closeEquipment()" title="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="modal-title" style="color: var(--text-primary);">
+                <i class="fa-solid fa-shield-halved" style="color: var(--ghost-color);"></i>
+                <span>Trainer Equipment</span>
+            </div>
+            <p class="modal-text">Click a slot to equip something from the gear catalogue. Hover a slot
+                to see which one it is.</p>
+
+            <div class="equip-layout">
+                <!-- Slots are built by renderEquipDoll(); each one places itself
+                     with the grid-area named in EQUIP_SLOTS -->
+                <div id="equip-slots"></div>
+
+                <!-- Everything carried rather than worn. Same shape as the
+                     trainer sheet's Bag, stocked from the gear catalogue. -->
+                <div class="equip-bag">
+                    <div class="equip-bag-label">
+                        <i class="fa-solid fa-suitcase"></i> Adventurer Bag
+                    </div>
+                    <div class="bag-list" id="equip-bag-list"></div>
+                    <div class="bag-add">
+                        <div class="bag-add-wrap">
+                            <input type="text" id="equip-bag-input" class="specialty-input" autocomplete="off"
+                                placeholder="Add gear..." oninput="renderEquipBagSuggestions()"
+                                onfocus="renderEquipBagSuggestions()"
+                                onkeypress="if (event.key === 'Enter') addEquipBagItemFromInput()">
+                            <div class="move-suggestions" id="equip-bag-sugg" style="display: none;"></div>
+                        </div>
+                        <button class="specialty-add-btn" onclick="addEquipBagItemFromInput()">Add</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="equip-editor" id="equip-editor"></div>
+
+            <div class="modal-actions">
+                <button class="form-btn save" onclick="closeEquipment()">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gear catalogue: the bundled D&D item pack, and the only source of gear -->
+    <div class="modal-overlay" id="gear-catalog-modal" style="display: none;"
+        onclick="if (event.target === this) closeGearCatalog()">
+        <div class="modal-box gear-catalog-box">
+            <button class="modal-close-btn" onclick="closeGearCatalog()" title="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="modal-title" style="color: var(--text-primary);">
+                <i class="fa-solid fa-shapes" style="color: var(--ghost-color);"></i>
+                <span id="gear-catalog-title">Gear Catalogue</span>
+            </div>
+            <input type="text" id="gear-catalog-search" class="specialty-input" autocomplete="off"
+                placeholder="Search gear..." oninput="renderGearGrid()">
+            <div class="gear-cat-row" id="gear-cat-row"></div>
+            <div class="gear-grid" id="gear-grid"></div>
+            <div class="gear-grid-note" id="gear-grid-note"></div>
+            <div class="modal-actions">
+                <button class="form-btn cancel" onclick="closeGearCatalog()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Theme color picker -->
     <div class="modal-overlay" id="theme-picker-modal" style="display: none;"
         onclick="if (event.target === this) closeThemePicker()">
@@ -5365,7 +6140,8 @@
          bundles synchronously, in order, before the main script runs. -->
     <script>
         window.DATA_BASE = 'app-data/';
-        ['pokedex-db.js', 'items-db.js'].forEach(function (f) {
+        ['pokedex-db.js', 'items-db.js', 'equip-icons-db.js',
+            'equip-icons-mono-db.js'].forEach(function (f) {
             document.write('<script src="' + DATA_BASE + f + '"><\/script>');
         });
     </script>
@@ -5501,6 +6277,41 @@
             return Array.from({ length: 8 }, () => ({ earned: false, type: '' }));
         }
 
+        /* Equipment slots, laid out like Path of Exile 2's gear window (minus
+           the belt and flasks): helmet up top, the two weapon slots out at the
+           far edges, amulet beside the helmet, a ring either side of the body
+           armour, gloves bottom-left and boots bottom-right. `area` names the
+           grid-area the slot drops into — see the #equip-slots rule. */
+        /* `cat` is the gear-catalogue category the slot opens on. It's only a
+           starting point — every other category is one chip away — but it saves
+           scrolling past 800 icons to reach the dozen that fit the slot. The
+           quick slot takes anything, so it opens on the whole catalogue. */
+        const EQUIP_SLOTS = [
+            { key: 'helmet', label: 'Helmet', icon: 'fa-helmet-safety', area: 'helmet', cat: 'Helmets & Headwear' },
+            { key: 'necklace', label: 'Necklace', icon: 'fa-gem', area: 'necklace', cat: 'Necklaces & Amulets' },
+            { key: 'weapon', label: 'Weapon', icon: 'fa-hand-fist', area: 'weapon', cat: 'Weapons' },
+            { key: 'offhand', label: 'Shield / Off-hand', icon: 'fa-shield-halved', area: 'offhand', cat: 'Shields' },
+            { key: 'ring1', label: 'Ring I', icon: 'fa-ring', area: 'ring1', cat: 'Rings' },
+            { key: 'armor', label: 'Armor', icon: 'fa-shirt', area: 'armor', cat: 'Armour' },
+            /* Shares the armour cell — see EQUIP_FACES. Only one of the two is
+               on the grid at a time, but each keeps its own item. */
+            { key: 'clothing', label: 'Clothing', icon: 'fa-vest', area: 'armor', cat: 'Clothing' },
+            { key: 'ring2', label: 'Ring II', icon: 'fa-ring', area: 'ring2', cat: 'Rings' },
+            { key: 'gloves', label: 'Gloves', icon: 'fa-mitten', area: 'gloves', cat: 'Gloves & Bracers' },
+            { key: 'boots', label: 'Boots', icon: 'fa-shoe-prints', area: 'boots', cat: 'Boots' },
+            /* Not a worn slot — whatever the trainer keeps within reach */
+            { key: 'quick', label: 'Quick Slot', icon: 'fa-bolt', area: 'quick', cat: null }
+        ];
+
+        /* One entry per equipment slot; keys mirror EQUIP_SLOTS above.
+           `icon` is a path inside the D&D icon pack's Library folder, '' = use
+           the slot's default silhouette. */
+        function defaultEquipment() {
+            const eq = {};
+            EQUIP_SLOTS.forEach(s => { eq[s.key] = { name: '', notes: '', icon: '' }; });
+            return eq;
+        }
+
         function defaultState() {
             return {
                 id: genId(),
@@ -5547,6 +6358,10 @@
                 potionQty: { potion: 0, superPotion: 0, hyperPotion: 0 },
                 otherMeds: '',
                 badges: defaultBadges(),
+                equipment: defaultEquipment(),
+                /* Carried gear, as [{ name, icon, qty }] — the worn slots live
+                   in `equipment`, Pokémon items in bagOut/bagBattle */
+                equipBag: [],
                 notes: '',
                 /* User-added rulebook bookmarks, tied to this trainer and saved in
                    its JSON. Keyed by Core Book edition: { '1.25': [{label, page}] }.
@@ -5595,6 +6410,28 @@
                     return { earned: !!b, type: '' };
                 });
             }
+            /* Sheets saved before equipment existed (or with slots we've since
+               renamed) get a full set back, keeping whatever they did have */
+            const eqDefaults = defaultEquipment();
+            const eqParsed = (parsed.equipment && typeof parsed.equipment === 'object') ? parsed.equipment : {};
+            s.equipment = {};
+            Object.keys(eqDefaults).forEach(k => {
+                const e = eqParsed[k];
+                s.equipment[k] = {
+                    name: (e && typeof e.name === 'string') ? e.name : '',
+                    notes: (e && typeof e.notes === 'string') ? e.notes : '',
+                    icon: (e && typeof e.icon === 'string') ? e.icon : ''
+                };
+            });
+            /* Carried gear: hand-edited JSON shouldn't be able to hand the bag
+               a non-array, a nameless row or a zero count */
+            s.equipBag = (Array.isArray(parsed.equipBag) ? parsed.equipBag : [])
+                .map(e => ({
+                    name: (e && typeof e.name === 'string') ? e.name.trim() : '',
+                    icon: (e && typeof e.icon === 'string') ? e.icon : '',
+                    qty: Math.max(1, parseInt(e && e.qty, 10) || 1)
+                }))
+                .filter(e => e.name);
             if (!Array.isArray(s.extras) || !s.extras.length) s.extras = [{ name: '', value: 0 }, { name: '', value: 0 }];
             if (!s.manualBookmarks || typeof s.manualBookmarks !== 'object' || Array.isArray(s.manualBookmarks)) s.manualBookmarks = {};
             /* Editions moved to per-file storage in the Core Book folder; drop any
@@ -5983,19 +6820,36 @@
             return !!(custom && custom.light);
         }
 
+        /* typeColors is tuned for a dark page. Painted straight onto a light
+           panel the pale entries all but vanish — Steel and Normal land around
+           2:1, Flying / Fairy / Ice / Electric nearer 1.5:1 — so any border or
+           glyph drawn in the raw type color disappears. On the light themes,
+           ink them halfway to black instead, the same correction renderPills()
+           already applies to its stat labels. `onDark` is what the color should
+           stay while the page is dark. */
+        function typeInk(c, onDark) {
+            return isLightTheme() ? mixHex(c, '#000000', 0.5) : (onDark || c);
+        }
+
         function selectTheme(key) {
             sheetState.themeType = key;
             saveState();
             applyTheme();
             renderPills();
+            /* Badge colors are inline and light/dark dependent, so they have to
+               be repainted when the theme flips — not just when a badge changes */
+            renderBadges();
             closeThemePicker();
         }
 
         function themeChip(swatch, icon, label, key) {
             const chip = document.createElement('span');
             chip.className = 'type-badge theme-chip';
-            chip.style.cssText = `background: ${swatch}33; border: 1px solid ${swatch};
-                color: ${mixHex(swatch, '#ffffff', 0.55)}; box-shadow: 0 0 10px ${swatch}26; cursor: pointer;`;
+            const glow = isLightTheme() ? 'none' : `0 0 10px ${swatch}26`;
+            chip.style.cssText = `background: ${swatch}33;
+                border: 1px solid ${typeInk(swatch)};
+                color: ${typeInk(swatch, mixHex(swatch, '#ffffff', 0.55))};
+                box-shadow: ${glow}; cursor: pointer;`;
             chip.innerHTML = `<i class="fa-solid ${icon}"></i> ${label}`;
             chip.onclick = () => selectTheme(key);
             return chip;
@@ -6090,6 +6944,16 @@
                         <span>Click to add photo</span>
                     </div>`;
             }
+
+            /* Equipment has nothing to do with the portrait, so its button
+               rides on the arch whether or not a photo has been set */
+            const equip = document.createElement('button');
+            equip.className = 'photo-equip-btn';
+            if (equippedCount()) equip.classList.add('has-gear');
+            equip.title = 'Open the trainer equipment window';
+            equip.innerHTML = '<i class="fa-solid fa-shield-halved"></i><span>Equipment</span>';
+            equip.onclick = (e) => { e.stopPropagation(); openEquipment(); };
+            arch.appendChild(equip);
         }
 
         async function handlePhotoUpload(input) {
@@ -6206,6 +7070,671 @@
             updatePhotoModal();
             const archImg = document.getElementById('photo-arch-img');
             if (archImg) applyPhotoAdjust(archImg);
+        }
+
+        // ------------------------------------------------------------------
+        // Trainer equipment: ten gear slots plus the Adventurer Bag, opened from
+        // the photo arch. Gear comes from the bundled icon packs and nowhere
+        // else — picking from the catalogue is what fills a slot, bringing the
+        // name and the artwork together. Pokémon items live in the sheet's own
+        // Bag and stay out of this.
+        // ------------------------------------------------------------------
+        // Which slot the editor underneath the grid is currently pointed at
+        let equipSelected = EQUIP_SLOTS[0].key;
+
+        /* Armour and clothing share one cell on the doll and take turns in it:
+           a toggle in the corner of the tile flips which one is showing. Both
+           hold their own item at the same time — the hidden one is still worn,
+           just not on screen — so the only rule is that they can't both be the
+           same thing. Purely a view state, nothing saved with the sheet. */
+        const EQUIP_FACES = ['armor', 'clothing'];
+        let equipArmorFace = 'armor';
+
+        function equipFacePartner(key) {
+            const i = EQUIP_FACES.indexOf(key);
+            return i === -1 ? null : EQUIP_FACES[1 - i];
+        }
+
+        /* Open on whichever face has something on it, armour first */
+        function defaultArmorFace() {
+            return EQUIP_FACES.find(k => (equipEntry(k).name || '').trim()) || 'armor';
+        }
+
+        function equipSlotDef(key) {
+            return EQUIP_SLOTS.find(s => s.key === key) || EQUIP_SLOTS[0];
+        }
+
+        /* Tolerates sheets loaded before normalizeState ran over them */
+        function equipEntry(key) {
+            if (!sheetState.equipment || typeof sheetState.equipment !== 'object')
+                sheetState.equipment = defaultEquipment();
+            if (!sheetState.equipment[key]) sheetState.equipment[key] = { name: '', notes: '', icon: '' };
+            return sheetState.equipment[key];
+        }
+
+        /* Drives the "carrying something" dot on the photo pill, so a packed bag
+           counts every bit as much as a filled slot */
+        function equippedCount() {
+            const worn = !sheetState.equipment ? 0 : EQUIP_SLOTS.filter(s => {
+                const e = sheetState.equipment[s.key];
+                return e && (e.name || '').trim();
+            }).length;
+            return worn + equipBagItems().length;
+        }
+
+        function openEquipment() {
+            equipSelected = EQUIP_SLOTS[0].key;
+            equipArmorFace = defaultArmorFace();
+            renderEquipment();
+            document.getElementById('equipment-modal').style.display = 'flex';
+        }
+
+        function closeEquipment() {
+            const modal = document.getElementById('equipment-modal');
+            /* Escape fires this blind, so skip the photo rebuild when it's shut */
+            if (modal.style.display === 'none') return;
+            modal.style.display = 'none';
+            /* The pill's "carrying something" dot may have just changed */
+            renderPhoto();
+        }
+
+        function renderEquipment() {
+            renderEquipDoll();
+            renderEquipEditor();
+            renderEquipBag();
+        }
+
+        /* ---- Artwork for a slot ----------------------------------------
+           Either the icon of the gear equipped there, or the slot's own
+           silhouette when it's empty. */
+        const ICON_PACK_DIR = (typeof EQUIP_ICON_DIR !== 'undefined')
+            ? EQUIP_ICON_DIR : DATA_BASE + 'dnd-item-icons-by-gwill-main/Library/';
+        const ICON_PACK_MONO_DIR = (typeof EQUIP_ICON_MONO_DIR !== 'undefined')
+            ? EQUIP_ICON_MONO_DIR : DATA_BASE + 'dnd-monochrome-icons/';
+
+        /* Two packs, one catalogue. Monochrome paths carry a 'mono:' marker so
+           a saved sheet still records which pack its artwork came from; sheets
+           written before that pack existed have no marker and keep resolving
+           against the colour pack. */
+        const MONO_PREFIX = 'mono:';
+        const ICON_PACK = []
+            .concat(typeof EQUIP_ICONS !== 'undefined' ? EQUIP_ICONS : [])
+            .concat((typeof EQUIP_ICONS_MONO !== 'undefined' ? EQUIP_ICONS_MONO : [])
+                .map(ic => ({ n: ic.n, c: ic.c, f: MONO_PREFIX + ic.f })));
+
+        function isMonoIcon(file) {
+            return String(file || '').indexOf(MONO_PREFIX) === 0;
+        }
+
+        /* Icon paths hold spaces and commas, so they have to be escaped */
+        function equipIconUrl(file) {
+            const mono = isMonoIcon(file);
+            const path = mono ? file.slice(MONO_PREFIX.length) : file;
+            return (mono ? ICON_PACK_MONO_DIR : ICON_PACK_DIR)
+                + path.split('/').map(encodeURIComponent).join('/');
+        }
+
+        function normalizeIconName(s) {
+            return String(s || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        /* Gear and Pokémon items are separate things kept in separate places:
+           the bag holds Pokémon items, the slots below hold worn gear. A few
+           names sit in both the icon packs and items-db.js — those belong to
+           the bag, so the catalogue drops them and a Pokémon item can never
+           end up equipped on a trainer.
+
+           Spaces come out too, unlike the search key above: the two databases
+           word things differently, and the pack's "Moonstone" is the same
+           object as the Pokédex's "Moon Stone". */
+        function itemIdentityKey(s) {
+            return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+        }
+
+        const POKE_ITEM_KEYS = new Set(
+            (typeof ALL_ITEMS !== 'undefined' ? ALL_ITEMS : [])
+                .map(it => itemIdentityKey(it && it.Name)).filter(Boolean));
+
+        function isPokemonItemName(name) {
+            const q = itemIdentityKey(name);
+            return !!q && POKE_ITEM_KEYS.has(q);
+        }
+
+        /* Normalizing ~950 names on every keystroke adds up; do it once */
+        const ICON_PACK_NORM = ICON_PACK
+            .filter(ic => !isPokemonItemName(ic.n))
+            .map(ic => ({ f: ic.f, c: ic.c, n: ic.n, q: normalizeIconName(ic.n) }));
+
+        /* The other direction: what the gear catalogue offers must not be
+           addable to a bag of Pokémon items */
+        const GEAR_ONLY_KEYS = new Set(ICON_PACK_NORM.map(ic => itemIdentityKey(ic.n)));
+
+        function equipArtFor(slot, entry) {
+            if (entry.icon) {
+                const img = document.createElement('img');
+                img.loading = 'lazy';
+                img.alt = '';
+                img.className = 'equip-art' + (isMonoIcon(entry.icon) ? ' mono-art' : '');
+                img.src = equipIconUrl(entry.icon);
+                /* A missing file (pack removed or renamed) falls back quietly */
+                img.onerror = () => { img.replaceWith(equipSilhouette(slot)); };
+                return img;
+            }
+            return equipSilhouette(slot);
+        }
+
+        function equipSilhouette(slot) {
+            const i = document.createElement('i');
+            i.className = 'fa-solid ' + slot.icon;
+            return i;
+        }
+
+        function renderEquipDoll() {
+            const grid = document.getElementById('equip-slots');
+            grid.innerHTML = '';
+            EQUIP_SLOTS.forEach(slot => {
+                /* Armour and clothing share a cell; only the showing one is
+                   drawn, or the two would stack on top of each other */
+                if (equipFacePartner(slot.key) && slot.key !== equipArmorFace) return;
+                const entry = equipEntry(slot.key);
+                const name = (entry.name || '').trim();
+
+                const tile = document.createElement('button');
+                tile.type = 'button';
+                tile.className = 'equip-slot' + (name ? ' filled' : '') +
+                    (slot.key === equipSelected ? ' selected' : '');
+                tile.style.gridArea = slot.area;
+                /* Nothing is labelled on the grid itself, so the tooltip is
+                   what tells you which slot this is and what's in it */
+                tile.title = slot.label + '\n' + (name || 'empty');
+                tile.onclick = () => selectEquipSlot(slot.key);
+                tile.append(equipArtFor(slot, entry));
+
+                if (equipFacePartner(slot.key)) tile.append(equipFaceToggle(slot.key));
+
+                grid.appendChild(tile);
+            });
+        }
+
+        /* The armour/clothing flip, parked in the corner of whichever of the
+           two is currently on the grid. A span rather than a button because it
+           lives inside one, and nesting buttons is invalid. */
+        function equipFaceToggle(key) {
+            const otherKey = equipFacePartner(key);
+            const other = equipSlotDef(otherKey);
+            const otherName = (equipEntry(otherKey).name || '').trim();
+
+            const btn = document.createElement('span');
+            btn.className = 'equip-face-toggle' + (otherName ? ' has-other' : '');
+            btn.setAttribute('role', 'button');
+            btn.tabIndex = 0;
+            btn.title = 'Show ' + other.label + ' — ' + (otherName || 'empty');
+            btn.innerHTML = '<i class="fa-solid fa-right-left"></i>';
+
+            const flip = (e) => {
+                /* Without this the tile underneath would take the click too and
+                   select the face we're leaving */
+                e.stopPropagation();
+                e.preventDefault();
+                equipArmorFace = otherKey;
+                /* Keep the editor on the cell you're looking at, but don't yank
+                   it away from some other slot you were in the middle of */
+                if (EQUIP_FACES.indexOf(equipSelected) !== -1) equipSelected = otherKey;
+                renderEquipment();
+            };
+            btn.onclick = flip;
+            btn.onkeydown = (e) => {
+                if (e.key === 'Enter' || e.key === ' ') flip(e);
+            };
+            return btn;
+        }
+
+        function selectEquipSlot(key) {
+            equipSelected = key;
+            renderEquipDoll();
+            renderEquipEditor();
+            /* An empty slot has nothing worth editing yet, so go straight to
+               the catalogue rather than making you click a second button */
+            if (!(equipEntry(key).name || '').trim()) openGearCatalog();
+        }
+
+        function renderEquipEditor() {
+            const box = document.getElementById('equip-editor');
+            const slot = equipSlotDef(equipSelected);
+            const entry = equipEntry(slot.key);
+            box.innerHTML = '';
+
+            const head = document.createElement('div');
+            head.className = 'equip-editor-head';
+            head.innerHTML = '<i class="fa-solid ' + slot.icon + '"></i><span>' + slot.label + '</span>';
+            box.appendChild(head);
+
+            const equipped = !!(entry.name || '').trim();
+
+            /* Nothing equipped yet: one button, and no fields to fill in */
+            if (!equipped) {
+                const empty = document.createElement('p');
+                empty.className = 'modal-text';
+                empty.textContent = 'This slot is empty.';
+                box.appendChild(empty);
+
+                const pick = document.createElement('button');
+                pick.className = 'form-btn save';
+                pick.style.alignSelf = 'flex-start';
+                pick.innerHTML = '<i class="fa-solid fa-shapes"></i> Choose gear';
+                pick.onclick = () => openGearCatalog();
+                box.appendChild(pick);
+                return;
+            }
+
+            const nameLabel = document.createElement('div');
+            nameLabel.className = 'equip-field-label';
+            nameLabel.textContent = 'Item';
+            box.appendChild(nameLabel);
+
+            /* Free text so it can be renamed for flavour, but it always starts
+               out as whatever was picked from the catalogue */
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.id = 'equip-name-input';
+            input.className = 'specialty-input equip-name-input';
+            input.autocomplete = 'off';
+            input.placeholder = 'Name this piece of gear...';
+            input.value = entry.name || '';
+            input.oninput = () => {
+                entry.name = input.value;
+                saveState();
+                renderEquipDoll();
+            };
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    input.blur();
+                }
+            };
+            box.appendChild(input);
+
+            const notesLabel = document.createElement('div');
+            notesLabel.className = 'equip-field-label';
+            notesLabel.style.marginTop = '4px';
+            notesLabel.textContent = 'Effect / notes';
+            box.appendChild(notesLabel);
+
+            const notes = document.createElement('textarea');
+            notes.className = 'equip-notes';
+            notes.placeholder = 'What it does, where it came from, any bonus it grants...';
+            notes.value = entry.notes || '';
+            notes.oninput = () => {
+                entry.notes = notes.value;
+                saveState();
+            };
+            box.appendChild(notes);
+
+            const actions = document.createElement('div');
+            actions.className = 'modal-actions';
+            actions.style.justifyContent = 'flex-start';
+
+            const swap = document.createElement('button');
+            swap.className = 'form-btn cancel';
+            swap.innerHTML = '<i class="fa-solid fa-shapes"></i> Change gear';
+            swap.onclick = () => openGearCatalog();
+
+            const clear = document.createElement('button');
+            clear.className = 'form-btn cancel';
+            clear.textContent = 'Remove';
+            clear.onclick = () => {
+                entry.name = '';
+                entry.notes = '';
+                entry.icon = '';
+                saveState();
+                renderEquipment();
+            };
+
+            actions.append(swap, clear);
+            box.appendChild(actions);
+        }
+
+        // ------------------------------------------------------------------
+        // Gear catalogue over the two bundled icon packs — the only place gear
+        // comes from. Picking an entry equips it into whichever slot the editor
+        // is pointed at, name and artwork together. Both db files list only the
+        // pieces that suit a Pokémon setting and that a trainer could actually
+        // wear or carry, so magic items, spell foci, potions, siege engines and
+        // vehicles never show up here — nor does anything that is a Pokémon
+        // item, which belongs in the bag instead.
+        // ------------------------------------------------------------------
+        const GEAR_CAT_ALL = 'All';
+        let gearCatalogCat = GEAR_CAT_ALL;
+
+        function gearCategories() {
+            const seen = [];
+            ICON_PACK_NORM.forEach(ic => { if (!seen.includes(ic.c)) seen.push(ic.c); });
+            return [GEAR_CAT_ALL].concat(seen.sort());
+        }
+
+        function openGearCatalog() {
+            const slot = equipSlotDef(equipSelected);
+            document.getElementById('gear-catalog-title').textContent = 'Gear — ' + slot.label;
+            document.getElementById('gear-catalog-search').value = '';
+            /* Land on the slot's own category. If a pack edit ever removes that
+               category the chip would be gone, so fall back to the whole library
+               rather than filtering everything out. */
+            gearCatalogCat = (slot.cat && gearCategories().indexOf(slot.cat) !== -1)
+                ? slot.cat : GEAR_CAT_ALL;
+            /* Shown before the chips render so the strip can measure itself and
+               scroll the active chip into view */
+            document.getElementById('gear-catalog-modal').style.display = 'flex';
+            renderGearCats();
+            renderGearGrid();
+        }
+
+        function closeGearCatalog() {
+            document.getElementById('gear-catalog-modal').style.display = 'none';
+        }
+
+        function renderGearCats() {
+            const row = document.getElementById('gear-cat-row');
+            row.innerHTML = '';
+            let active = null;
+            gearCategories().forEach(cat => {
+                const chip = document.createElement('button');
+                chip.className = 'gear-cat-chip' + (cat === gearCatalogCat ? ' active' : '');
+                chip.textContent = cat;
+                chip.onclick = () => {
+                    gearCatalogCat = cat;
+                    renderGearCats();
+                    renderGearGrid();
+                };
+                if (cat === gearCatalogCat) active = chip;
+                row.appendChild(chip);
+            });
+            /* The strip scrolls sideways, and a slot's category can sit well off
+               the right edge — centre it so you can see what you're looking at */
+            if (active) row.scrollLeft = active.offsetLeft
+                - (row.clientWidth - active.offsetWidth) / 2;
+        }
+
+        function renderGearGrid() {
+            const grid = document.getElementById('gear-grid');
+            const note = document.getElementById('gear-grid-note');
+            const q = normalizeIconName(document.getElementById('gear-catalog-search').value);
+            const current = equipEntry(equipSelected).icon;
+
+            const matches = ICON_PACK_NORM.filter(ic =>
+                (gearCatalogCat === GEAR_CAT_ALL || ic.c === gearCatalogCat) &&
+                (!q || ic.q.includes(q)));
+            /* Names that start with the query read as the better match */
+            if (q) {
+                matches.sort((a, b) => {
+                    const aStarts = a.q.startsWith(q) ? 0 : 1;
+                    const bStarts = b.q.startsWith(q) ? 0 : 1;
+                    return aStarts - bStarts || a.n.localeCompare(b.n);
+                });
+            }
+
+            /* Every match is drawn, "All" included — the whole catalogue is
+               meant to be browsable by scrolling, not only by searching. The
+               tiles are cheap and their images load lazily. */
+            grid.innerHTML = '';
+            const frag = document.createDocumentFragment();
+            matches.forEach(ic => {
+                const btn = document.createElement('button');
+                /* Greyed out rather than hidden: it's clearer to show the piece
+                   and say where it already is than to have it vanish */
+                const clash = equippedOnPartner(equipSelected, ic);
+                btn.className = 'gear-choice' + (ic.f === current ? ' active' : '')
+                    + (clash ? ' taken' : '');
+                btn.title = clash
+                    ? ic.n + '\nAlready in the ' + clash.label + ' slot'
+                    : ic.n + '\n' + ic.c;
+                /* Left clickable on purpose: a disabled button shows no tooltip
+                   in Chrome, so the click falls through to equipGear and says
+                   why nothing happened */
+                btn.onclick = () => equipGear(ic);
+                const img = document.createElement('img');
+                img.loading = 'lazy';
+                img.alt = ic.n;
+                if (isMonoIcon(ic.f)) img.className = 'mono-art';
+                img.src = equipIconUrl(ic.f);
+                btn.appendChild(img);
+                frag.appendChild(btn);
+            });
+            grid.appendChild(frag);
+
+            if (!ICON_PACK.length) {
+                note.textContent = 'Gear packs not found in app-data — check that '
+                    + 'dnd-item-icons-by-gwill-main and dnd-monochrome-icons are still there.';
+            } else if (!matches.length) {
+                note.textContent = 'No gear matches that.';
+            } else {
+                note.textContent = matches.length + ' item' + (matches.length === 1 ? '' : 's');
+            }
+            return matches.length;
+        }
+
+        /* Is this exact piece already on the other half of the armour cell?
+           Matched on artwork first, then on name, so a renamed piece still
+           counts as the same thing. */
+        function equippedOnPartner(key, ic) {
+            const otherKey = equipFacePartner(key);
+            if (!otherKey) return null;
+            const other = equipEntry(otherKey);
+            const sameIcon = !!other.icon && other.icon === ic.f;
+            const sameName = !!(other.name || '').trim()
+                && itemIdentityKey(other.name) === itemIdentityKey(ic.n);
+            return (sameIcon || sameName) ? equipSlotDef(otherKey) : null;
+        }
+
+        /* Name and artwork arrive together; rename afterwards in the editor */
+        function equipGear(ic) {
+            /* The catalogue never lists Pokémon items, so this only trips if
+               something managed to call in from outside it */
+            if (isPokemonItemName(ic.n)) return;
+            /* Armour and clothing are worn at the same time, so the same piece
+               can't fill both */
+            const clash = equippedOnPartner(equipSelected, ic);
+            if (clash) {
+                flashToast('<i class="fa-solid fa-right-left"></i> '
+                    + escapeHtml(ic.n) + ' is already in the ' + clash.label + ' slot.');
+                return;
+            }
+            const entry = equipEntry(equipSelected);
+            entry.icon = ic.f;
+            entry.name = ic.n;
+            saveState();
+            closeGearCatalog();
+            renderEquipment();
+        }
+
+        // ------------------------------------------------------------------
+        // Adventurer Bag: what the trainer carries rather than wears. Built
+        // like the sheet's own Bag panel — a lined list with quantities — but
+        // stocked from the gear catalogue instead of items-db.js. The two
+        // never mix: potions and Pokéballs go in the Bag downstairs, rope and
+        // lanterns go in here.
+        // ------------------------------------------------------------------
+        const EQUIP_BAG_SUGGESTIONS = 8;
+
+        /* Tolerates sheets saved before the bag existed */
+        function equipBagItems() {
+            if (!Array.isArray(sheetState.equipBag)) sheetState.equipBag = [];
+            return sheetState.equipBag;
+        }
+
+        function findGear(name) {
+            const q = itemIdentityKey(name);
+            if (!q) return null;
+            return ICON_PACK_NORM.find(ic => itemIdentityKey(ic.n) === q) || null;
+        }
+
+        function equipBagArt(entry) {
+            const file = entry.icon || (findGear(entry.name) || {}).f;
+            if (!file) return null;
+            const img = document.createElement('img');
+            img.loading = 'lazy';
+            img.alt = '';
+            if (isMonoIcon(file)) img.className = 'mono-art';
+            img.src = equipIconUrl(file);
+            /* Pack renamed or removed: drop the image rather than show a
+               broken one, the name still says what it is */
+            img.onerror = () => { img.remove(); };
+            return img;
+        }
+
+        function renderEquipBag() {
+            const list = document.getElementById('equip-bag-list');
+            if (!list) return;
+            list.innerHTML = '';
+            const items = equipBagItems();
+
+            if (!items.length) {
+                const empty = document.createElement('span');
+                empty.className = 'bag-empty';
+                empty.textContent = 'Nothing packed yet.';
+                list.appendChild(empty);
+                return;
+            }
+
+            items.forEach((entry, idx) => {
+                const gear = findGear(entry.name);
+                const row = document.createElement('div');
+                row.className = 'line-item';
+                if (gear) row.title = gear.n + '\n' + gear.c;
+
+                const art = equipBagArt(entry);
+                if (art) row.appendChild(art);
+
+                const name = document.createElement('span');
+                name.className = 'line-item-name';
+                name.textContent = entry.name;
+                row.appendChild(name);
+
+                const minus = document.createElement('button');
+                minus.className = 'pool-btn';
+                minus.title = 'One fewer';
+                minus.innerHTML = '<i class="fa-solid fa-minus"></i>';
+                minus.onclick = () => {
+                    entry.qty = Math.max(1, entry.qty - 1);
+                    saveState();
+                    renderEquipBag();
+                };
+                const qty = document.createElement('span');
+                qty.className = 'line-item-qty';
+                qty.textContent = '×' + entry.qty;
+                const plus = document.createElement('button');
+                plus.className = 'pool-btn';
+                plus.title = 'One more';
+                plus.innerHTML = '<i class="fa-solid fa-plus"></i>';
+                plus.onclick = () => {
+                    entry.qty += 1;
+                    saveState();
+                    renderEquipBag();
+                };
+
+                const remove = document.createElement('button');
+                remove.className = 'item-remove';
+                remove.title = 'Drop it';
+                remove.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+                remove.onclick = () => {
+                    equipBagItems().splice(idx, 1);
+                    saveState();
+                    renderEquipBag();
+                };
+
+                row.append(minus, qty, plus, remove);
+                list.appendChild(row);
+            });
+        }
+
+        function addEquipBagItem(name) {
+            const clean = String(name || '').trim();
+            if (!clean) return;
+            /* Mirror of the guard on the sheet's Bag: that one turns gear away,
+               this one turns Pokémon items away. Free text is still fine for
+               homebrew neither database knows about. */
+            if (isPokemonItemName(clean)) {
+                flashToast('<i class="fa-solid fa-briefcase-medical"></i> '
+                    + escapeHtml(clean) + ' is a Pokémon item — it goes in the Bag.');
+                document.getElementById('equip-bag-input').value = '';
+                closeEquipBagSuggestions();
+                return;
+            }
+
+            const items = equipBagItems();
+            const gear = findGear(clean);
+            const existing = items.find(e =>
+                itemIdentityKey(e.name) === itemIdentityKey(clean));
+            if (existing) {
+                existing.qty += 1;
+            } else {
+                /* Take the catalogue's spelling and artwork when it knows the
+                   name, so a typed entry looks the same as a picked one */
+                items.push({
+                    name: gear ? gear.n : clean,
+                    icon: gear ? gear.f : '',
+                    qty: 1
+                });
+            }
+            saveState();
+            renderEquipBag();
+            document.getElementById('equip-bag-input').value = '';
+            closeEquipBagSuggestions();
+        }
+
+        function addEquipBagItemFromInput() {
+            addEquipBagItem(document.getElementById('equip-bag-input').value);
+        }
+
+        function renderEquipBagSuggestions() {
+            const input = document.getElementById('equip-bag-input');
+            const panel = document.getElementById('equip-bag-sugg');
+            const q = normalizeIconName(input.value);
+
+            const matches = ICON_PACK_NORM.filter(ic => !q || ic.q.includes(q));
+            matches.sort((a, b) => {
+                const aStarts = a.q.startsWith(q) ? 0 : 1;
+                const bStarts = b.q.startsWith(q) ? 0 : 1;
+                return aStarts - bStarts || a.n.localeCompare(b.n);
+            });
+
+            const shown = matches.slice(0, EQUIP_BAG_SUGGESTIONS);
+            if (!shown.length) {
+                panel.style.display = 'none';
+                return;
+            }
+
+            panel.innerHTML = '';
+            shown.forEach(ic => {
+                const row = document.createElement('div');
+                row.className = 'move-suggestion';
+                row.title = ic.n + '\n' + ic.c;
+                row.onclick = () => addEquipBagItem(ic.n);
+
+                const img = document.createElement('img');
+                img.loading = 'lazy';
+                img.alt = '';
+                if (isMonoIcon(ic.f)) img.className = 'mono-art';
+                img.src = equipIconUrl(ic.f);
+
+                const name = document.createElement('span');
+                name.className = 'item-suggestion-name';
+                name.textContent = ic.n;
+                row.append(img, name);
+                panel.appendChild(row);
+            });
+            if (matches.length > shown.length) {
+                const more = document.createElement('div');
+                more.className = 'move-suggestion-more';
+                more.textContent = '+ ' + (matches.length - shown.length)
+                    + ' more, keep typing...';
+                panel.appendChild(more);
+            }
+            panel.style.display = 'flex';
+        }
+
+        function closeEquipBagSuggestions() {
+            const panel = document.getElementById('equip-bag-sugg');
+            if (panel) panel.style.display = 'none';
         }
 
         // ------------------------------------------------------------------
@@ -6954,7 +8483,7 @@
                 const dbItem = findItem(entry.name);
                 const row = document.createElement('div');
                 row.className = 'line-item';
-                if (dbItem && dbItem.Description) row.title = dbItem.Description;
+                if (dbItem && dbItem.Description) row.title = dbItem.Name + '\n' + dbItem.Description;
 
                 const img = document.createElement('img');
                 img.loading = 'lazy';
@@ -7011,6 +8540,17 @@
         function addBagItem(key, name) {
             const clean = name.trim();
             if (!clean) return;
+            /* The bag carries Pokémon items. Free text is still welcome here,
+               for the homebrew the database doesn't know, but a name lifted
+               straight out of the gear catalogue is trainer equipment and
+               belongs in an equipment slot instead. */
+            if (!findItem(clean) && GEAR_ONLY_KEYS.has(itemIdentityKey(clean))) {
+                flashToast('<i class="fa-solid fa-shield-halved"></i> '
+                    + escapeHtml(clean) + ' is trainer gear — equip it from the Equipment window.');
+                document.getElementById('bag-input-' + key).value = '';
+                closeBagSuggestions();
+                return;
+            }
             const existing = sheetState[key].find(e => e.name.toLowerCase() === clean.toLowerCase());
             if (existing) {
                 existing.qty += 1;
@@ -7051,7 +8591,7 @@
             shown.forEach(it => {
                 const row = document.createElement('div');
                 row.className = 'move-suggestion';
-                if (it.Description) row.title = it.Description;
+                if (it.Description) row.title = it.Name + '\n' + it.Description;
                 row.onclick = () => addBagItem(key, it.Name);
 
                 const img = document.createElement('img');
@@ -7084,7 +8624,10 @@
         }
 
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('.bag-add-wrap')) closeBagSuggestions();
+            if (!e.target.closest('.bag-add-wrap')) {
+                closeBagSuggestions();
+                closeEquipBagSuggestions();
+            }
         });
 
         // ------------------------------------------------------------------
@@ -7176,10 +8719,12 @@
                     : 'Click to earn badge ' + (i + 1) + ' and pick its type';
                 if (earned) {
                     const c = typeColors[type] || '#9ca3af';
+                    const ink = typeInk(c);
                     sq.style.background = c + '33';
-                    sq.style.borderColor = c;
-                    sq.style.color = c;
-                    sq.style.boxShadow = '0 0 12px ' + c + '66';
+                    sq.style.borderColor = ink;
+                    sq.style.color = ink;
+                    /* The colored halo only reads on a dark page */
+                    sq.style.boxShadow = isLightTheme() ? 'none' : '0 0 12px ' + c + '66';
                 }
                 sq.onclick = () => openBadgePicker(i);
                 strip.appendChild(sq);
@@ -7199,9 +8744,16 @@
                 const chip = document.createElement('span');
                 chip.className = 'type-badge theme-chip';
                 const active = badge.earned && badge.type === type;
-                chip.style.cssText = 'background: ' + c + '33; border: 1px solid ' + c + ';'
-                    + ' color: ' + mixHex(c, '#ffffff', 0.55) + '; box-shadow: 0 0 10px ' + c + '26;'
-                    + ' cursor: pointer;' + (active ? ' outline: 2px solid #fff; outline-offset: 1px;' : '');
+                const light = isLightTheme();
+                /* The white "this is the current one" outline needs to invert
+                   too, or the selected chip loses its marker on a light modal */
+                const marker = light ? '#2a2020' : '#fff';
+                chip.style.cssText = 'background: ' + c + '33;'
+                    + ' border: 1px solid ' + typeInk(c) + ';'
+                    + ' color: ' + typeInk(c, mixHex(c, '#ffffff', 0.55)) + ';'
+                    + ' box-shadow: ' + (light ? 'none' : '0 0 10px ' + c + '26') + ';'
+                    + ' cursor: pointer;'
+                    + (active ? ' outline: 2px solid ' + marker + '; outline-offset: 1px;' : '');
                 chip.innerHTML = '<i class="fa-solid ' + TYPE_ICONS[type] + '"></i> ' + type;
                 chip.onclick = () => {
                     sheetState.badges[activeBadge] = { earned: true, type };
@@ -8205,6 +9757,13 @@
                 closeInfoModal();
                 closeCloseTrainerModal();
                 closeBadgePicker();
+                /* Innermost first: Escape in the gear catalogue shouldn't also
+                   shut the equipment window behind it */
+                if (document.getElementById('gear-catalog-modal').style.display !== 'none') {
+                    closeGearCatalog();
+                } else {
+                    closeEquipment();
+                }
             }
             /* Arrow keys switch trainers when several are loaded and no text
                field / editable is focused */
@@ -8274,6 +9833,7 @@
             renderAchievements();
             renderTrackers();
             renderTeam();
+            renderEquipment();
             Object.keys(BAGS).forEach(renderBag);
             renderPotions();
             renderBadges();
@@ -8615,6 +10175,211 @@
             if (loaded.length) finishFolderLoad(loaded);
             else startBlank();
         }
+
+        // ------------------------------------------------------------------
+        // Themed tooltips
+        // ------------------------------------------------------------------
+        /* Replaces the browser's native grey `title` square everywhere on the
+           page with the themed bubble styled as #app-tooltip. Deliberately
+           delegated: the text is read off the element at hover time, so static
+           markup, innerHTML templates and later `el.title = ...` assignments
+           are all covered without touching a single call site.
+
+           Convention: a newline in the title splits it into an accent heading
+           and a body paragraph; titles without one render as a single line. */
+        (function () {
+            const SHOW_DELAY = 350;     // beats the native bubble to the punch
+            const LONG_PRESS = 500;     // touch: press-and-hold to reveal
+            const TOUCH_LINGER = 3500;  // touch: auto-dismiss again
+            const GAP = 10;             // between target and bubble
+            const EDGE = 8;             // keep-inside-viewport margin
+
+            /* Hover only on real pointing devices — touch and pen go through
+               the long-press path so tooltips never interfere with taps */
+            const canHover = window.matchMedia('(hover: hover)').matches;
+
+            let box = null, head = null, body = null;
+            let target = null;          // element whose title we are holding
+            let showTimer = 0, hideTimer = 0;
+            let press = null;           // in-flight long press
+            let swallowClick = false;   // eat the click a long press would fire
+
+            function build() {
+                box = document.createElement('div');
+                box.id = 'app-tooltip';
+                head = document.createElement('span');
+                head.className = 'tt-head';
+                body = document.createElement('span');
+                body.className = 'tt-body';
+                document.body.appendChild(box);
+            }
+
+            function hintOwner(node) {
+                return node && node.closest ? node.closest('[title], [data-tt]') : null;
+            }
+
+            /* Take the text off the element. A live title attribute always
+               wins, so code that switches a hint off with `el.title = ''`
+               still works; removing the attribute is what suppresses the
+               native bubble. */
+            function claim(el) {
+                if (el.hasAttribute('title')) {
+                    const t = el.getAttribute('title');
+                    el.removeAttribute('title');
+                    dropAria(el);
+                    if (t && t.trim()) {
+                        el.dataset.tt = t;
+                        /* Keep the label reachable for screen readers while
+                           the title is parked, but never mask a real name */
+                        if (!el.hasAttribute('aria-label') && !el.hasAttribute('aria-labelledby')) {
+                            el.dataset.ttAria = '1';
+                            el.setAttribute('aria-label', t.replace(/\n/g, ' — '));
+                        }
+                    } else {
+                        delete el.dataset.tt;   // an emptied title means "no hint"
+                    }
+                }
+                return el.dataset.tt || '';
+            }
+
+            function dropAria(el) {
+                if (el.dataset.ttAria) {
+                    delete el.dataset.ttAria;
+                    el.removeAttribute('aria-label');
+                }
+            }
+
+            // Hand the title back so the DOM is left as it was found
+            function release(el) {
+                if (!el) return;
+                const t = el.dataset.tt;
+                delete el.dataset.tt;
+                dropAria(el);
+                /* A re-render may have assigned a fresh title while ours was
+                   parked — in that case the newer value wins */
+                if (t && !el.hasAttribute('title')) el.setAttribute('title', t);
+            }
+
+            function place(rect) {
+                box.classList.remove('below');
+                box.style.left = '0px';
+                box.style.top = '0px';
+                const w = box.offsetWidth, h = box.offsetHeight;
+
+                const below = rect.top - GAP - h < EDGE;
+                box.classList.toggle('below', below);
+                let top = below ? rect.bottom + GAP : rect.top - GAP - h;
+                top = Math.max(EDGE, Math.min(top, window.innerHeight - h - EDGE));
+
+                const centre = rect.left + rect.width / 2;
+                const left = Math.max(EDGE, Math.min(centre - w / 2, window.innerWidth - w - EDGE));
+
+                box.style.left = Math.round(left) + 'px';
+                box.style.top = Math.round(top) + 'px';
+                /* The arrow tracks the target, not the bubble's own centre, so
+                   it still points at the right thing after an edge clamp */
+                box.style.setProperty('--tt-arrow-x',
+                    Math.round(Math.max(12, Math.min(centre - left, w - 12))) + 'px');
+            }
+
+            function render(el, text) {
+                if (!el.isConnected) return;
+                if (!box) build();
+                const nl = text.indexOf('\n');
+                box.textContent = '';
+                if (nl > -1) {
+                    head.textContent = text.slice(0, nl).trim();
+                    body.textContent = text.slice(nl + 1).trim();
+                    box.append(head, body);
+                } else {
+                    body.textContent = text;
+                    box.append(body);
+                }
+                place(el.getBoundingClientRect());
+                box.classList.add('show');
+            }
+
+            function hide() {
+                clearTimeout(showTimer);
+                clearTimeout(hideTimer);
+                if (box) box.classList.remove('show');
+                release(target);
+                target = null;
+            }
+
+            document.addEventListener('pointerover', (e) => {
+                if (!canHover || e.pointerType !== 'mouse') return;
+                const el = hintOwner(e.target);
+                if (el === target) return;
+                hide();
+                if (!el) return;
+                const text = claim(el);   // strip now, draw after the delay
+                if (!text) return;
+                target = el;
+                showTimer = setTimeout(() => render(el, text), SHOW_DELAY);
+            }, true);   // capture, so a stopPropagation elsewhere can't blind us
+
+            document.addEventListener('pointerout', (e) => {
+                /* Sliding onto a child of the same target isn't leaving it;
+                   a genuine switch is handled by pointerover above */
+                if (!target || (e.relatedTarget && target.contains(e.relatedTarget))) return;
+                hide();
+            }, true);
+
+            document.addEventListener('pointerdown', (e) => {
+                hide();
+                swallowClick = false;
+                if (e.pointerType === 'mouse') return;
+                const el = hintOwner(e.target);
+                if (!el) return;
+                /* Never preventDefault here: taps, drags and the hold-to-repeat
+                   pool buttons have to keep working exactly as before */
+                press = { x: e.clientX, y: e.clientY };
+                showTimer = setTimeout(() => {
+                    const text = claim(el);
+                    if (!text) return;
+                    target = el;
+                    render(el, text);
+                    /* Reading a hint shouldn't also press the button, so the
+                       click this press ends in is dropped */
+                    swallowClick = true;
+                    hideTimer = setTimeout(hide, TOUCH_LINGER);
+                }, LONG_PRESS);
+            }, true);
+
+            document.addEventListener('click', (e) => {
+                if (!swallowClick) return;
+                swallowClick = false;
+                e.preventDefault();
+                e.stopPropagation();
+            }, true);
+
+            document.addEventListener('pointermove', (e) => {
+                /* A re-render can rip the hovered element out of the DOM
+                   without ever firing pointerout — drop the orphan */
+                if (target && !target.isConnected) hide();
+                if (!press) return;
+                if (Math.abs(e.clientX - press.x) > 8 || Math.abs(e.clientY - press.y) > 8) {
+                    press = null;
+                    clearTimeout(showTimer);   // turned into a scroll or drag
+                }
+            }, true);
+
+            const endPress = () => {
+                if (!press) return;
+                press = null;
+                clearTimeout(showTimer);   // released before the hold threshold
+            };
+            document.addEventListener('pointerup', endPress, true);
+            document.addEventListener('pointercancel', endPress, true);
+
+            window.addEventListener('scroll', hide, { capture: true, passive: true });
+            window.addEventListener('resize', hide);
+            window.addEventListener('blur', hide);
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') hide();
+            });
+        })();
 
         // ------------------------------------------------------------------
         // Init

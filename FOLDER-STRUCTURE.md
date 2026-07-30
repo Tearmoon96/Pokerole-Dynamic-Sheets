@@ -37,6 +37,12 @@ show, so things degrade rather than crash):
 - `Wild Pokemons/`
 - `app-data/` — required for the app to work at all. (If you really must rename it,
   update the one `DATA_BASE` line inside **both** HTML files.)
+- `app-data/dnd-item-icons-by-gwill-main/` and `app-data/dnd-monochrome-icons/` —
+  the two icon packs the trainer equipment window draws from: the colour set and
+  the monochrome one. Their paths are listed in `app-data/equip-icons-db.js` and
+  `app-data/equip-icons-mono-db.js`; if you rename a folder, update the
+  `EQUIP_ICON_DIR` / `EQUIP_ICON_MONO_DIR` line at the top of the matching file.
+  Without them the equipment slots simply fall back to plain symbols.
 
 ## Rule of thumb
 

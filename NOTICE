@@ -19,6 +19,52 @@ dataset by Willowlark and contributors:
 Thanks to Willowlark and everyone who compiled and maintains that dataset.
 
 --------------------------------------------------------------------------------
+Equipment icons
+--------------------------------------------------------------------------------
+The trainer equipment window draws on two icon packs. Both are used under the
+Creative Commons Attribution 3.0 Unported License (CC BY 3.0):
+- https://creativecommons.org/licenses/by/3.0/
+
+Only the subset that suits a Pokerole trainer is bundled; the picks are listed
+in app-data/equip-icons-db.js and app-data/equip-icons-mono-db.js.
+
+1. D&D Item Icons by Gwillewyn — the colour set
+   app-data/dnd-item-icons-by-gwill-main/
+   https://github.com/Gwillewyn/dnd-item-icons-by-gwill
+
+   The pack's own LICENSE file, reproduced here in full:
+
+     Most icons are adapted from artwork from game-icons.net licensed under a
+     CC 3.0 license.
+     https://creativecommons.org/licenses/by/3.0/
+     By extension the same license applies to any modifications by me.
+     No additional credit to me required.
+
+     ---
+
+     This work is licensed under the Creative Commons Attribution 3.0 Unported
+     License. To view a copy of this license, visit
+     http://creativecommons.org/licenses/by/3.0/ or send a letter to Creative
+     Commons, PO Box 1866, Mountain View, CA 94042, USA.
+
+   Gwillewyn asks for no additional credit, but thanks all the same.
+
+2. game-icons.net — the monochrome set
+   app-data/dnd-monochrome-icons/
+   https://game-icons.net
+
+   Icons are released under CC BY 3.0, or CC0 where the author has said so.
+   game-icons.net asks that derivative work mention "Icons made by {author}",
+   so: the icons bundled here are made by Lorc, Delapouite, Caro Asercion,
+   Skoll, DarkZaitzev, Lucas, Cathelineau, Faithtoken, Irongamer, Carl Olsen,
+   GeneralAce135, Rihlsul and Seregacthtuf, plus one credited to the site's
+   various artists.
+
+   That is the list of authors whose work this project actually ships. The
+   complete contributor roster for the pack, with links, is in
+   app-data/dnd-monochrome-icons/license.txt.
+
+--------------------------------------------------------------------------------
 Game system
 --------------------------------------------------------------------------------
 Pokerole is a tabletop RPG created by the Pokerole Project:
