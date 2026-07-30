@@ -1,0 +1,13 @@
+{
+    "Name": "Gardevoirite",
+    "_id": "gardevoirite",
+    "Source": "Core 3.0+",
+    "PMD": false,
+    "Pocket": "HeldItems",
+    "Category": "MegaStone",
+    "Description": "Makes Gardevoir Mega-evolve into Mega-Gardevoir",
+    "OneUse": false,
+    "TrainerPrice": "Not for Sale",
+    "ForPokemon": "gardevoir",
+    "Image": "gardevoirite.png"
+}

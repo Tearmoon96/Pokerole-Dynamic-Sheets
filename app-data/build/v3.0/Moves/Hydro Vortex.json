@@ -1,0 +1,18 @@
+{
+    "Name": "Hydro Vortex",
+    "Type": "Water",
+    "Power": "Happiness + Loyalty",
+    "Damage1": "SameAsBasePower",
+    "Damage2": "",
+    "Accuracy1": "SameAsBaseMove",
+    "Accuracy2": "",
+    "Target": "Foe",
+    "Effect": "Single Target. Suggested effects: Attribute Increase, Damage Increase See p. 610 for more info.",
+    "Description": "",
+    "_id": "hydro_vortex",
+    "Attributes": {
+        "ZMove": true
+    },
+    "AddedEffects": {},
+    "Category": "Support/Physical/Special"
+}

@@ -1,0 +1,13 @@
+{
+    "Name": "TR - Basic",
+    "_id": "tr---basic",
+    "Source": "Core 3.0",
+    "PMD": false,
+    "Pocket": "TechnicalMachine",
+    "Category": "",
+    "Description": "A Technical Machine that contains the guide on how to teach a basic Physical or Special to a single Pokémon.",
+    "OneUse": true,
+    "TrainerPrice": "10000",
+    "MaxMovePower": 3,
+    "Image": "tr---basic.png"
+}

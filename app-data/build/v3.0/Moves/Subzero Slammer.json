@@ -1,0 +1,18 @@
+{
+    "Name": "Subzero Slammer",
+    "Type": "Ice",
+    "Power": "Happiness + Loyalty",
+    "Damage1": "SameAsBasePower",
+    "Damage2": "",
+    "Accuracy1": "SameAsBaseMove",
+    "Accuracy2": "",
+    "Target": "Foe",
+    "Effect": "Single Target. Suggested effects: Roll 3 Chance Dice to inflict Frozen, Attribute Increase, Damage Increase See p. 610 for more info.",
+    "Description": "",
+    "_id": "subzero_slammer",
+    "Attributes": {
+        "ZMove": true
+    },
+    "AddedEffects": {},
+    "Category": "Support/Physical/Special"
+}

@@ -1,0 +1,13 @@
+# OS / editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+.vscode/
+.idea/
+
+# Maintenance scripts that hard-code a local machine path
+app-data/build/scratch/write_*.py
+
+# Release staging, built by tools/make-release.sh
+dist/
