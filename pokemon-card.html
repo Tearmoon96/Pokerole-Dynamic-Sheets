@@ -2985,6 +2985,91 @@
             border-radius: 12px;
             border: 1px dashed #ffffff14;
         }
+
+        /* ---------------- Themed tooltip ----------------
+           Replaces the browser's native grey `title` square everywhere on the
+           page. The engine at the bottom of the script moves the text out of
+           the title attribute at hover time and renders it here, so the bubble
+           follows the palette like every other panel. Sits above the modals
+           (z 300) but under the missing-data warning bar (z 100000). */
+        #app-tooltip {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 99999;
+            width: max-content;
+            max-width: 280px;
+            padding: 8px 12px;
+            background: var(--panel-strong);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            box-shadow: 0 8px 24px #00000099, 0 0 18px 1px var(--border-glow);
+            color: var(--text-primary);
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.78rem;
+            line-height: 1.45;
+            text-align: left;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(4px);
+            transition: opacity 0.12s ease, transform 0.12s ease;
+        }
+
+        #app-tooltip.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Heading line of a two-part tooltip (everything before the first
+           newline); plain single-line tooltips never render one */
+        #app-tooltip .tt-head {
+            display: block;
+            color: var(--accent);
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            margin-bottom: 3px;
+        }
+
+        #app-tooltip .tt-body {
+            display: block;
+            color: var(--text-secondary);
+        }
+
+        /* Single-line tooltips have no heading, so the body is the main text */
+        #app-tooltip .tt-body:only-child {
+            color: var(--text-primary);
+        }
+
+        /* Rotated square sharing the panel's fill and hairline, with only the
+           two outward edges kept. --tt-arrow-x is set from JS so it keeps
+           pointing at the target's centre even after the bubble has been
+           clamped against a viewport edge. Default position is below the
+           bubble, i.e. the tooltip sits above its target. */
+        #app-tooltip::after {
+            content: '';
+            position: absolute;
+            left: var(--tt-arrow-x, 50%);
+            margin-left: -5px;
+            bottom: -5px;
+            width: 9px;
+            height: 9px;
+            background: var(--panel-strong);
+            border: 1px solid var(--border-color);
+            border-top: none;
+            border-left: none;
+            transform: rotate(45deg);
+        }
+
+        /* Flipped below the target (no room above) — arrow moves to the top */
+        #app-tooltip.below::after {
+            bottom: auto;
+            top: -5px;
+            border: 1px solid var(--border-color);
+            border-bottom: none;
+            border-right: none;
+        }
     </style>
 </head>
 
@@ -5825,8 +5910,11 @@
             panel.innerHTML = shown.map(it => {
                 /* Image is resolved at build time to an existing sprite,
                    with pokeball.png standing in for items that have none */
+                /* &#10; is the newline the tooltip splits on: name becomes the
+                   heading, the description the body */
+                const desc = (it.Description || '').replace(/"/g, '&quot;');
                 return `<div class="move-suggestion" onclick="pickItemSuggestion(this.dataset.name)"
-                            data-name="${it.Name}" title="${(it.Description || '').replace(/"/g, '&quot;')}">
+                            data-name="${it.Name}" title="${desc ? it.Name + '&#10;' + desc : ''}">
                             <img loading="lazy" src="${IMG_BASE}ItemSprites/${it.Image}" alt=""
                                 onerror="this.onerror = null; this.src = '${IMG_BASE}ItemSprites/pokeball.png';">
                             <span class="item-suggestion-name">${it.Name}</span>
@@ -6955,6 +7043,211 @@
             setSprite('Home');
             if (oldFile) deleteCustomImage('Pokemons', oldFile);
         }
+
+        // ------------------------------------------------------------------
+        // Themed tooltips
+        // ------------------------------------------------------------------
+        /* Replaces the browser's native grey `title` square everywhere on the
+           page with the themed bubble styled as #app-tooltip. Deliberately
+           delegated: the text is read off the element at hover time, so static
+           markup, innerHTML templates and later `el.title = ...` assignments
+           are all covered without touching a single call site.
+
+           Convention: a newline in the title splits it into an accent heading
+           and a body paragraph; titles without one render as a single line. */
+        (function () {
+            const SHOW_DELAY = 350;     // beats the native bubble to the punch
+            const LONG_PRESS = 500;     // touch: press-and-hold to reveal
+            const TOUCH_LINGER = 3500;  // touch: auto-dismiss again
+            const GAP = 10;             // between target and bubble
+            const EDGE = 8;             // keep-inside-viewport margin
+
+            /* Hover only on real pointing devices — touch and pen go through
+               the long-press path so tooltips never interfere with taps */
+            const canHover = window.matchMedia('(hover: hover)').matches;
+
+            let box = null, head = null, body = null;
+            let target = null;          // element whose title we are holding
+            let showTimer = 0, hideTimer = 0;
+            let press = null;           // in-flight long press
+            let swallowClick = false;   // eat the click a long press would fire
+
+            function build() {
+                box = document.createElement('div');
+                box.id = 'app-tooltip';
+                head = document.createElement('span');
+                head.className = 'tt-head';
+                body = document.createElement('span');
+                body.className = 'tt-body';
+                document.body.appendChild(box);
+            }
+
+            function hintOwner(node) {
+                return node && node.closest ? node.closest('[title], [data-tt]') : null;
+            }
+
+            /* Take the text off the element. A live title attribute always
+               wins, so code that switches a hint off with `el.title = ''`
+               still works; removing the attribute is what suppresses the
+               native bubble. */
+            function claim(el) {
+                if (el.hasAttribute('title')) {
+                    const t = el.getAttribute('title');
+                    el.removeAttribute('title');
+                    dropAria(el);
+                    if (t && t.trim()) {
+                        el.dataset.tt = t;
+                        /* Keep the label reachable for screen readers while
+                           the title is parked, but never mask a real name */
+                        if (!el.hasAttribute('aria-label') && !el.hasAttribute('aria-labelledby')) {
+                            el.dataset.ttAria = '1';
+                            el.setAttribute('aria-label', t.replace(/\n/g, ' — '));
+                        }
+                    } else {
+                        delete el.dataset.tt;   // an emptied title means "no hint"
+                    }
+                }
+                return el.dataset.tt || '';
+            }
+
+            function dropAria(el) {
+                if (el.dataset.ttAria) {
+                    delete el.dataset.ttAria;
+                    el.removeAttribute('aria-label');
+                }
+            }
+
+            // Hand the title back so the DOM is left as it was found
+            function release(el) {
+                if (!el) return;
+                const t = el.dataset.tt;
+                delete el.dataset.tt;
+                dropAria(el);
+                /* A re-render may have assigned a fresh title while ours was
+                   parked — in that case the newer value wins */
+                if (t && !el.hasAttribute('title')) el.setAttribute('title', t);
+            }
+
+            function place(rect) {
+                box.classList.remove('below');
+                box.style.left = '0px';
+                box.style.top = '0px';
+                const w = box.offsetWidth, h = box.offsetHeight;
+
+                const below = rect.top - GAP - h < EDGE;
+                box.classList.toggle('below', below);
+                let top = below ? rect.bottom + GAP : rect.top - GAP - h;
+                top = Math.max(EDGE, Math.min(top, window.innerHeight - h - EDGE));
+
+                const centre = rect.left + rect.width / 2;
+                const left = Math.max(EDGE, Math.min(centre - w / 2, window.innerWidth - w - EDGE));
+
+                box.style.left = Math.round(left) + 'px';
+                box.style.top = Math.round(top) + 'px';
+                /* The arrow tracks the target, not the bubble's own centre, so
+                   it still points at the right thing after an edge clamp */
+                box.style.setProperty('--tt-arrow-x',
+                    Math.round(Math.max(12, Math.min(centre - left, w - 12))) + 'px');
+            }
+
+            function render(el, text) {
+                if (!el.isConnected) return;
+                if (!box) build();
+                const nl = text.indexOf('\n');
+                box.textContent = '';
+                if (nl > -1) {
+                    head.textContent = text.slice(0, nl).trim();
+                    body.textContent = text.slice(nl + 1).trim();
+                    box.append(head, body);
+                } else {
+                    body.textContent = text;
+                    box.append(body);
+                }
+                place(el.getBoundingClientRect());
+                box.classList.add('show');
+            }
+
+            function hide() {
+                clearTimeout(showTimer);
+                clearTimeout(hideTimer);
+                if (box) box.classList.remove('show');
+                release(target);
+                target = null;
+            }
+
+            document.addEventListener('pointerover', (e) => {
+                if (!canHover || e.pointerType !== 'mouse') return;
+                const el = hintOwner(e.target);
+                if (el === target) return;
+                hide();
+                if (!el) return;
+                const text = claim(el);   // strip now, draw after the delay
+                if (!text) return;
+                target = el;
+                showTimer = setTimeout(() => render(el, text), SHOW_DELAY);
+            }, true);   // capture, so a stopPropagation elsewhere can't blind us
+
+            document.addEventListener('pointerout', (e) => {
+                /* Sliding onto a child of the same target isn't leaving it;
+                   a genuine switch is handled by pointerover above */
+                if (!target || (e.relatedTarget && target.contains(e.relatedTarget))) return;
+                hide();
+            }, true);
+
+            document.addEventListener('pointerdown', (e) => {
+                hide();
+                swallowClick = false;
+                if (e.pointerType === 'mouse') return;
+                const el = hintOwner(e.target);
+                if (!el) return;
+                /* Never preventDefault here: taps, drags and the hold-to-repeat
+                   pool buttons have to keep working exactly as before */
+                press = { x: e.clientX, y: e.clientY };
+                showTimer = setTimeout(() => {
+                    const text = claim(el);
+                    if (!text) return;
+                    target = el;
+                    render(el, text);
+                    /* Reading a hint shouldn't also press the button, so the
+                       click this press ends in is dropped */
+                    swallowClick = true;
+                    hideTimer = setTimeout(hide, TOUCH_LINGER);
+                }, LONG_PRESS);
+            }, true);
+
+            document.addEventListener('click', (e) => {
+                if (!swallowClick) return;
+                swallowClick = false;
+                e.preventDefault();
+                e.stopPropagation();
+            }, true);
+
+            document.addEventListener('pointermove', (e) => {
+                /* A re-render can rip the hovered element out of the DOM
+                   without ever firing pointerout — drop the orphan */
+                if (target && !target.isConnected) hide();
+                if (!press) return;
+                if (Math.abs(e.clientX - press.x) > 8 || Math.abs(e.clientY - press.y) > 8) {
+                    press = null;
+                    clearTimeout(showTimer);   // turned into a scroll or drag
+                }
+            }, true);
+
+            const endPress = () => {
+                if (!press) return;
+                press = null;
+                clearTimeout(showTimer);   // released before the hold threshold
+            };
+            document.addEventListener('pointerup', endPress, true);
+            document.addEventListener('pointercancel', endPress, true);
+
+            window.addEventListener('scroll', hide, { capture: true, passive: true });
+            window.addEventListener('resize', hide);
+            window.addEventListener('blur', hide);
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') hide();
+            });
+        })();
 
         // Initial rendering; state first, since the theme and the ability
         // panels depend on the saved themeType / abilityInUse

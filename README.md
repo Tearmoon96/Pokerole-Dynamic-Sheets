@@ -63,11 +63,12 @@ You choose the working folder yourself, so you can name it whatever you like. Th
 
 ## Under the hood
 
-Plain HTML, CSS, and JavaScript — no framework, no build step, nothing to install. The game data lives in `app-data/` as pre-built JS bundles (`pokedex-db.js`, `moves-db.js`, `abilities-db.js`, `items-db.js`). Fonts are Outfit and Fira Code from Google Fonts; icons are FontAwesome 6.4.
+Plain HTML, CSS, and JavaScript — no framework, no build step, nothing to install. The game data lives in `app-data/` as pre-built JS bundles (`pokedex-db.js`, `moves-db.js`, `abilities-db.js`, `items-db.js`, `equip-icons-db.js`, `equip-icons-mono-db.js`). Fonts are Outfit and Fira Code from Google Fonts; icons are FontAwesome 6.4.
 
 ## Credits
 
 - Game data comes from the [Pokerole-Data](https://github.com/Willowlark/Pokerole-Data) dataset by [Willowlark](https://github.com/Willowlark) and contributors — the `app-data/*-db.js` bundles are built from it.
+- The trainer equipment icons come from two packs: [D&D Item Icons](https://github.com/Gwillewyn/dnd-item-icons-by-gwill) by Gwillewyn (the colour set), and the monochrome originals from [game-icons.net](https://game-icons.net/) by Lorc, Delapouite and others, used under CC BY 3.0 / CC0 — see `app-data/dnd-monochrome-icons/license.txt` for the full attribution list.
 - Pokerole is made by the [Pokerole Project](https://www.pokeroleproject.com/); the rules and mechanics are theirs.
 - Pokémon and its character names are trademarks of Nintendo, The Pokémon Company, and Game Freak.
 
