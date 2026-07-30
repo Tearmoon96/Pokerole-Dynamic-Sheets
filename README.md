@@ -44,7 +44,18 @@ Pokerole Dynamic Sheets/
 
 The Core Books version 1.25 and 3.0 already have pre-set bookmarks toward the most relevant parts of the book, however you can add other versions and other bookmarks. Just follow the naming scheme of the already existing ones.
 
-You choose the working folder yourself, so you can name it whatever you like. The folders the app creates inside it (`Custom Images/`, `Wild Pokemons/`) are looked up by name, so leave those as they are. There's more detail in [FOLDER-STRUCTURE.md](./FOLDER-STRUCTURE.md).
+### What's safe to rename
+
+**Safe:** the working folder itself (`Trainers and Pokemons/`) — you pick it through the browser's folder picker, so the app never cares what it's called. Name it `Trainers`, `MyCampaign`, whatever. Your trainer `.json` files can be renamed freely too.
+
+**Leave alone:** everything the app creates *inside* the working folder. These are looked up by their exact names, and renaming one doesn't crash the app — it silently recreates the folder it expected and loses track of the full-resolution images filed under the old name. The small embedded thumbnails still show, so it degrades quietly rather than failing loudly.
+
+- `Custom Images/`, and its `Trainers/` and `Pokemons/` subfolders
+- `Wild Pokemons/`
+- `app-data/` — required for the app to work at all. If you really must rename it, update the one `DATA_BASE` line inside **both** HTML files.
+- `app-data/dnd-item-icons-by-gwill-main/` and `app-data/dnd-monochrome-icons/` — the two icon packs the trainer equipment window draws from. If you rename either, update the matching `EQUIP_ICON_DIR` / `EQUIP_ICON_MONO_DIR` line at the top of `app-data/equip-icons-db.js` or `equip-icons-mono-db.js`. Without them the equipment slots fall back to plain symbols.
+
+> Rule of thumb: the working folder you select is yours to name. Everything the app creates inside it — keep those names exactly as they are.
 
 ## Using it
 
