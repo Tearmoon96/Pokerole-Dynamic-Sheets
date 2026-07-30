@@ -1,0 +1,12 @@
+{
+    "Name": "Old Pokeball",
+    "_id": "old-pokeball",
+    "Source": "Core 3.0",
+    "PMD": false,
+    "Pocket": "Pokeballs",
+    "Category": "",
+    "Description": "Rare. An old model of Pokéball, now a collector's item.",
+    "OneUse": true,
+    "TrainerPrice": "Not for Sale",
+    "Image": "old-pokeball.png"
+}

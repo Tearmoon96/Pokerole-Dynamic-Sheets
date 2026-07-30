@@ -1,0 +1,13 @@
+{
+    "Name": "Sablenite",
+    "_id": "sablenite",
+    "Source": "Core 3.0+",
+    "PMD": false,
+    "Pocket": "HeldItems",
+    "Category": "MegaStone",
+    "Description": "Makes Sableye Mega-evolve into Mega-Sableye",
+    "OneUse": false,
+    "TrainerPrice": "Not for Sale",
+    "ForPokemon": "sableye",
+    "Image": "sablenite.png"
+}
