@@ -6,8 +6,14 @@ desktop.ini
 .vscode/
 .idea/
 
-# Maintenance scripts that hard-code a local machine path
-app-data/build/scratch/write_*.py
+# The raw dataset and its build scripts live on the dev-data branch, not here.
+# Ignored rather than merely absent so a maintainer can drop the folder back in
+# place — git archive dev-data | tar -x — without cluttering git status.
+app-data/build/
+
+# Release staging, built by tools/make-release.sh on the dev-data branch. It has
+# to sit inside the project: gh runs on the host and cannot see the sandbox /tmp.
+dist/
 
 # Personal campaign data — keep the sample structure, not real sheets
 Trainers and Pokemons/*.json
