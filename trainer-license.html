@@ -6118,12 +6118,16 @@
                  is actually found on GitHub. Current version left, update info +
                  link right. Sits above the title, separated from it by the line
                  below rather than by its own border. -->
+            <!-- justify-content: flex-start (not space-between) on purpose — the
+                 close button sits absolutely positioned top-right of the modal,
+                 and right-aligning this row pushed "View on GitHub" straight
+                 under it -->
             <div style="margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border-color);
-                        display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+                        display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 18px;">
                 <span class="modal-text" style="margin: 0; font-size: 0.8rem; opacity: 0.7;">
                     Version <strong id="info-version">—</strong>
                 </span>
-                <span id="update-available" style="display: none; align-items: center; flex-wrap: wrap; gap: 14px;">
+                <span id="update-available" style="display: none; align-items: center; flex-wrap: wrap; gap: 16px;">
                     <span class="modal-text" style="margin: 0; font-size: 0.8rem; color: var(--ghost-color);">
                         <i class="fa-solid fa-circle-arrow-up"></i>
                         <strong id="update-latest"></strong> is available
