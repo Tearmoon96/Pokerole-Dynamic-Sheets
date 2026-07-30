@@ -65,6 +65,13 @@ You choose the working folder yourself, so you can name it whatever you like. Th
 
 Plain HTML, CSS, and JavaScript — no framework, no build step, nothing to install. The game data lives in `app-data/` as pre-built JS bundles (`pokedex-db.js`, `moves-db.js`, `abilities-db.js`, `items-db.js`, `equip-icons-db.js`, `equip-icons-mono-db.js`). Fonts are Outfit and Fira Code from Google Fonts; icons are FontAwesome 6.4.
 
+## Contact
+
+If you have any suggestion, bug to report, request to make or any funny idea:
+
+- Email: leggluca96@gmail.com
+- Discord: tearmoon_
+
 ## Credits
 
 - Game data comes from the [Pokerole-Data](https://github.com/Willowlark/Pokerole-Data) dataset by [Willowlark](https://github.com/Willowlark) and contributors — the `app-data/*-db.js` bundles are built from it.
