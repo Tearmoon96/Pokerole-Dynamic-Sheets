@@ -47,7 +47,9 @@ in app-data/equip-icons-db.js and app-data/equip-icons-mono-db.js.
      http://creativecommons.org/licenses/by/3.0/ or send a letter to Creative
      Commons, PO Box 1866, Mountain View, CA 94042, USA.
 
-   Gwillewyn asks for no additional credit, but thanks all the same.
+   Gwillewyn asks for no additional credit, but thanks all the same. The pack's
+   per-icon credits are kept by its author in a public spreadsheet:
+   https://docs.google.com/spreadsheets/d/1cR6EdYqG6zh0LHJNNZz8uLUgzssg9XxTcS48HDh8cfk/edit
 
 2. game-icons.net — the monochrome set
    app-data/dnd-monochrome-icons/
