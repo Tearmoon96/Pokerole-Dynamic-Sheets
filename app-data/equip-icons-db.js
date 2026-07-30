@@ -2,7 +2,7 @@
    app-data/dnd-item-icons-by-gwill-main/. One entry per SVG offered in the
    gear catalogue, `n` = display name, `c` = category, `f` = path inside
    Library/. Generated from the Library folder, then filtered twice. First
-   against EQUIPMENT-ICONS.md: the pack's magic items, spellcasting foci, magic
+   by theme: the pack's magic items, spellcasting foci, magic
    tomes/scrolls, potions and other fantasy-only pieces are left out, since
    this is a Pokémon setting. Only things that exist in the real world stay.
    Then again for the equipment window, which kits out one trainer: siege
