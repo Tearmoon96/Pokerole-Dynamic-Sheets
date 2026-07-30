@@ -5,7 +5,7 @@
 # Every release carries two zips:
 #
 #   Pokerole-Dynamic-Sheets-<tag>.zip            the app — what users want
-#   Pokerole-Dynamic-Sheets-<tag>-developer.zip  the app plus the raw dataset
+#   Pokerole-Dynamic-Sheets-<tag>_developer.zip  the app plus the raw dataset
 #                                                and the build scripts
 #
 # Both are built from git refs, never from the working tree. That is the whole
@@ -95,7 +95,12 @@ repo="$(git show main:app-data/version.js \
 dist="dist"
 prefix="Pokerole Dynamic Sheets/"
 clean_zip="$dist/Pokerole-Dynamic-Sheets-$tag.zip"
-dev_zip="$dist/Pokerole-Dynamic-Sheets-$tag-developer.zip"
+
+# The underscore is load-bearing. GitHub lists release assets sorted by name,
+# not by upload order, and "-" (0x2D) sorts before "." (0x2E) — so naming this
+# one "...-v1.0.8-developer.zip" puts the developer download ABOVE the one
+# people actually want. "_" (0x5F) sorts after ".", so the plain zip stays top.
+dev_zip="$dist/Pokerole-Dynamic-Sheets-${tag}_developer.zip"
 
 rm -rf "$dist"; mkdir -p "$dist"
 
@@ -137,7 +142,7 @@ body="$dist/notes.md"
 {
     printf '### Which download?\n\n'
     printf '**`Pokerole-Dynamic-Sheets-%s.zip`** — this is the one you want. Unzip it, open `trainer-license.html`, done.\n\n' "$tag"
-    printf '`Pokerole-Dynamic-Sheets-%s-developer.zip` additionally contains the raw Pokerole dataset and the Python scripts that compile it into the `app-data/*-db.js` bundles. Nothing in it is needed to use the app.\n\n' "$tag"
+    printf '`Pokerole-Dynamic-Sheets-%s_developer.zip` additionally contains the raw Pokerole dataset and the Python scripts that compile it into the `app-data/*-db.js` bundles. Nothing in it is needed to use the app.\n\n' "$tag"
     printf 'The "Source code" archives GitHub adds below are built from `main`, so they hold the same files as the clean zip.\n\n'
     printf -- '---\n\n'
     if [ -n "$notes_file" ]; then
@@ -149,9 +154,6 @@ body="$dist/notes.md"
 } > "$body"
 
 # ---- publish --------------------------------------------------------------
-#
-# The clean zip is listed first so it uploads first, which is the order the
-# release page shows assets in.
 
 set -- gh release create "$tag" \
         --repo "$repo" --target main --title "$tag" \
