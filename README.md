@@ -6,15 +6,16 @@ Character sheets and a wild-encounter builder for the [Pokerole](https://www.pok
 
 Two HTML files, each a standalone app:
 
-- **`trainer-license.html`** — a trainer's sheet: attributes, skills, the six-Pokémon team, bag and money, potions, badges, and achievements. A GM can point it at a folder full of players' sheets and flip between them during a session.
+- **`trainer-license.html`** — a trainer's sheet: attributes, skills, the six-Pokémon team, PC storage for the ones not being carried, bag and money, potions, badges, and achievements. A GM can point it at a folder full of players' sheets and flip between them during a session.
 - **`pokemon-card.html`** — a single Pokémon's sheet: stats, moves and their effects, ability, HP and Will tracking, status conditions, and evolutions. The page recolors itself to match the Pokémon's type; on a dual-type Pokémon you click the type badge to switch which one drives the palette. It's also where you build wild Pokémon.
 
-The two are linked. Click a team slot on a trainer's license and it opens that Pokémon's card; whatever you change there syncs back into the trainer's file.
+The two are linked. Click a team slot on a trainer's license and it opens that Pokémon's card; whatever you change there syncs back into the trainer's file. Stored Pokémon work the same way — being in the PC doesn't make one read-only.
 
 ## What it does
 
-- Keeps a full trainer and their whole team in a single file.
-- Lets a GM build wild Pokémon, export them, and lets a player "capture" one straight into an open team slot.
+- Keeps a full trainer, their whole team, and everything in their PC storage in a single file.
+- Gives each trainer six renameable PC boxes for Pokémon they own but aren't carrying, so freeing a team slot no longer means deleting a Pokémon. Deposit and withdraw by dragging, or with the box button on a team slot.
+- Lets a GM build wild Pokémon, export them, and lets a player "capture" one straight into an open team slot — or into PC storage when the team is full.
 - Stores full-resolution portraits on disk while embedding a small thumbnail inside the `.json`, so a file still shows its art when you hand it to someone else.
 - Autofills Pokédex, move, ability, and item data from a bundled database, so you pick from real Pokerole values instead of typing them by hand.
 
@@ -26,7 +27,7 @@ The two are linked. Click a team slot on a trainer's license and it opens that P
 
 ## Your files
 
-Everything you make is plain JSON on disk. There's one file per trainer, and that file already contains their six Pokémon, so sharing a character is just sending one `.json` over Discord, Drive, or a USB stick.
+Everything you make is plain JSON on disk. There's one file per trainer, and that file already contains their six Pokémon and their PC boxes, so sharing a character is just sending one `.json` over Discord, Drive, or a USB stick.
 
 ```
 Pokerole Dynamic Sheets/
@@ -35,7 +36,7 @@ Pokerole Dynamic Sheets/
 ├── app-data/                 # game database & sprites  (required)
 ├── Pokerole Core Book/       # rulebook PDFs (reference)
 └── Trainers and Pokemons/    # your working folder
-    ├── <name>.json           # one trainer + their team
+    ├── <name>.json           # one trainer + their team + their PC boxes
     ├── Custom Images/        # full-res portraits
     │   ├── Trainers/
     │   └── Pokemons/
@@ -64,17 +65,18 @@ The Core Books version 1.25 and 3.0 already have pre-set bookmarks toward the mo
 1. Open `trainer-license.html`.
 2. Click the folder button, choose "Open working folder," and pick your `Trainers and Pokemons` folder.
 3. Fill in your trainer. Click a team slot to open a Pokémon's card and edit it.
-4. Click "Save All" to write everything to disk. The button turns amber when you have unsaved changes.
-5. To share, send your `.json` from the working folder.
+4. Caught more than six? Hit **PC Storage** next to "Capture Wild Pokémon" and drag Pokémon between the six boxes and the team strip. Stored Pokémon keep their whole sheet and can still be opened and edited. Boxes can be renamed, and one button switches every sprite between the Home and Book art sets.
+5. Click "Save All" to write everything to disk. The button turns amber when you have unsaved changes.
+6. To share, send your `.json` from the working folder.
 
 **As a GM**
 
 - Point "Open working folder" at a directory that holds all your players' trainer files, then use the side arrows to move between sheets mid-session.
-- To make an encounter, open `pokemon-card.html`, create a wild Pokémon, and export it into `Wild Pokemons/`. Players capture it from their license into an open team slot.
+- To make an encounter, open `pokemon-card.html`, create a wild Pokémon, and export it into `Wild Pokemons/`. Players capture it from their license into an open team slot — or straight into PC storage if their team is already full.
 
 ## Under the hood
 
-Plain HTML, CSS, and JavaScript — no framework, no build step, nothing to install. The game data lives in `app-data/` as pre-built JS bundles (`pokedex-db.js`, `moves-db.js`, `abilities-db.js`, `items-db.js`, `equip-icons-db.js`, `equip-icons-mono-db.js`). Fonts are Outfit and Fira Code from Google Fonts; icons are FontAwesome 6.4.
+Plain HTML, CSS, and JavaScript — no framework, no build step, nothing to install. The game data lives in `app-data/` as pre-built JS bundles (`pokedex-db.js`, `moves-db.js`, `abilities-db.js`, `items-db.js`, `equip-icons-db.js`, `equip-icons-mono-db.js`, `sprite-frames-db.js`). Fonts are Outfit and Fira Code from Google Fonts; icons are FontAwesome 6.4.
 
 This branch carries the app and nothing else, so a download stays as small as it can while still working offline. The raw Pokerole dataset those bundles are compiled from, the Python scripts that compile it, and the two icon packs in full live on the **[`dev-data`](../../tree/dev-data)** branch — or in the developer zip attached to any release. None of it is needed to run the app.
 
