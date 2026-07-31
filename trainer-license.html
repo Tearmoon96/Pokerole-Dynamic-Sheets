@@ -4152,7 +4152,9 @@
         /* Six team frames */
         .team-capture-row {
             display: flex;
+            flex-wrap: wrap;
             justify-content: center;
+            gap: 10px;
             margin-top: 10px;
         }
 
@@ -4365,6 +4367,376 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+
+        /* ---------------- PC storage (boxes) ----------------
+           Named boxes of Pokémon the trainer owns but isn't carrying. The
+           window pairs the open box with the six team slots underneath, so a
+           deposit or a withdrawal is one drag (or one click) inside one view. */
+        .modal-box.box-storage-box {
+            max-width: 720px;
+            width: 94%;
+        }
+
+        /* Chip strip; scrolls sideways rather than wrapping, like the gear
+           catalogue's categories */
+        .box-tabs {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            overflow-x: auto;
+            /* Setting overflow on one axis makes the other compute to `auto`
+               too, so this strip clips vertically as well as horizontally —
+               and the drop-target ring is painted 2px OUTSIDE a chip's border
+               box. Without room inside the scroll container it gets shaved off
+               the top of every chip, and off the left of the first. Pad the
+               inside, then pull the row back by the same amount so the chips
+               stay aligned with the search field below. */
+            padding: 3px 3px 7px;
+            margin: -3px -3px -3px;
+        }
+
+        .box-tab {
+            flex-shrink: 0;
+            padding: 4px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            background: #00000033;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 0.72rem;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .box-tab:hover {
+            border-color: var(--ghost-color);
+            color: var(--text-primary);
+        }
+
+        .box-tab.active {
+            background: var(--primary-soft);
+            border-color: var(--ghost-color);
+            color: var(--text-primary);
+        }
+
+        .box-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Takes the leftover width, and is allowed to give it all back so the
+           controls beside it wrap to their own line rather than being squashed */
+        .box-toolbar .box-search {
+            flex: 1 1 180px;
+            min-width: 0;
+            margin: 0;
+        }
+
+        .box-count {
+            flex-shrink: 0;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .box-tool-btn {
+            flex-shrink: 0;
+            background: none;
+            border: none;
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            cursor: pointer;
+            padding: 4px 6px;
+            transition: all 0.2s;
+        }
+
+        .box-tool-btn:hover {
+            color: var(--text-primary);
+            background: var(--primary-soft);
+        }
+
+        .box-tool-btn.danger:hover {
+            color: #f43f5e;
+        }
+
+        /* Names the sprite set in use AND cycles it, so it has to read as a
+           button rather than a label — filled, outlined, with a cycle icon.
+           Styled off .team-edit-btn, the page's existing small action button. */
+        .box-sprite-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: var(--primary-soft);
+            border: 1px solid var(--ghost-color);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.62rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .box-sprite-btn:hover {
+            background: var(--ghost-color);
+            color: #fff;
+            box-shadow: 0 0 8px var(--ghost-color-glow);
+        }
+
+        .box-sprite-btn i {
+            font-size: 0.68rem;
+            opacity: 0.85;
+        }
+
+        /* The Custom switch shares the button shape but is two-state: filled
+           when uploaded art is showing, hollow and muted when it is not, so
+           its state reads at a glance without another label. */
+        .box-custom-btn.off {
+            background: none;
+            border-color: var(--border-color);
+            color: var(--text-muted);
+        }
+
+        .box-custom-btn.off:hover {
+            background: none;
+            border-color: var(--ghost-color);
+            color: var(--text-secondary);
+            box-shadow: none;
+        }
+
+        .box-grid {
+            display: flex;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            gap: 10px;
+            min-height: 172px;
+            max-height: 40vh;
+            overflow-y: auto;
+            padding: 6px;
+        }
+
+        /* One source for the recessed sprite-well fill: the storage tiles, the
+           team circles and the drag ghost all draw it, and the light theme
+           swaps it in a single place rather than three. */
+        :root {
+            --box-well: #00000059;
+        }
+
+        :root.light-theme {
+            --box-well: #0000000d;
+        }
+
+        /* The tile IS the sprite well — same round frame as a team slot. Name,
+           rank and gender are in the hover bubble (see monTipText), so the
+           grid reads as a wall of Pokémon rather than a wall of cards. */
+        .box-tile {
+            width: 62px;
+            height: 62px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            background: var(--box-well);
+            border: 1px solid var(--border-color);
+            box-shadow: inset 0 0 10px #00000080;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            cursor: grab;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .box-tile:hover {
+            border-color: var(--ghost-color);
+            box-shadow: inset 0 0 10px #00000080, 0 0 10px var(--ghost-color-glow);
+        }
+
+        .box-tile.selected {
+            border-color: var(--accent);
+            box-shadow: inset 0 0 10px #00000080, 0 0 0 2px var(--accent);
+        }
+
+        .box-tile.dragging {
+            opacity: 0.4;
+        }
+
+        /* The copy handed to setDragImage (see setCircleDragImage). It has to
+           be rendered for the browser to snapshot it, so it is pushed out of
+           sight rather than hidden — display:none or visibility:hidden would
+           snapshot nothing.
+
+           The well fill is translucent, and a drag bitmap is composited by the
+           browser over whatever is beneath it, so paint it over an opaque
+           panel first: that reproduces exactly how the tile looks sitting in
+           the window, instead of a washed-out or near-black disc. Everything
+           else (border, inset shadow, sprite transform) comes from the clone. */
+        .box-drag-ghost {
+            position: fixed;
+            left: -9999px;
+            top: 0;
+            /* No negative z-index: being off-screen already hides it, and
+               painting it behind the page risks a snapshot of an occluded
+               element rather than the tile itself. */
+            margin: 0;
+            opacity: 1;
+            pointer-events: none;
+            border-radius: 50%;
+            overflow: hidden;
+            /* The bitmap Chrome snapshots for the drag image is the element's
+               painted area, which is not the same as its clipped area: a sprite
+               scaled past the well still contributes ink, the bitmap comes out
+               bigger than the circle, and the hotspot handed to setDragImage
+               then lands somewhere other than the middle — the ghost trails the
+               cursor by tens of pixels. Containment makes the painted area the
+               border box, so the hotspot means what it says. */
+            contain: paint;
+            background-color: var(--panel-solid);
+            background-image: linear-gradient(var(--box-well), var(--box-well));
+        }
+
+        /* Fills the tile's content box (62 less the 1px border each side), so
+           the tile's own round clip cuts a true circle out of opaque uploaded
+           art. Do NOT round this element instead: border-radius clips in the
+           image's own coordinate space, i.e. *before* the transform below, so
+           a sprite scaled down would keep whatever the round mask had already
+           cut off and just shrink the hole along with it. Clipping has to
+           happen on the parent, after the scale — the same arrangement
+           .team-sprite-circle uses. */
+        .box-tile img {
+            width: 60px;
+            height: 60px;
+            object-fit: contain;
+            pointer-events: none;
+            transform: translate(var(--sprite-x, 0px), var(--sprite-y, 0px)) scale(var(--sprite-scale, 1));
+        }
+
+        /* No size rule of its own: the strip's wells are the same 62px as the
+           grid's, so one framing serves both. */
+
+        .box-empty {
+            flex: 1 1 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 12px;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-style: italic;
+            text-align: center;
+        }
+
+        .box-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            padding-top: 10px;
+            border-top: 1px solid #ffffff14;
+        }
+
+        .box-actions-name {
+            flex: 1;
+            min-width: 90px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .box-team-strip {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            padding-top: 10px;
+            border-top: 1px solid #ffffff14;
+        }
+
+        /* Pushed to the far end of the strip; wraps to its own right-aligned
+           line before the team circles are squashed */
+        .box-strip-tools {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+            margin-left: auto;
+        }
+
+        .box-team-label {
+            flex-shrink: 0;
+            font-size: 0.56rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+        }
+
+        .box-team-slots {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        /* The same 62px as .box-tile, and it has to stay that way. The Box set
+           zooms in whole screen pixels per source pixel, which is an absolute
+           step — so the same sprite in a smaller well lands on a different
+           whole number and comes out a different size. Houndoom took 2× in a
+           62px well and only 1× in a 52px one: the identical Pokémon, 40%
+           smaller in the strip than in the grid right above it. Matching the
+           wells is what keeps one board looking like one board. */
+        .box-team-slot {
+            width: 62px;
+            height: 62px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            background: var(--box-well);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .box-team-slot:hover {
+            border-color: var(--ghost-color);
+        }
+
+        /* Live target highlight while a Pokémon is dragged over it */
+        .box-tab.drop-hover,
+        .box-team-slot.drop-hover,
+        .box-grid.drop-hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent);
+        }
+
+        .box-grid.drop-hover {
+            border-radius: 12px;
+        }
+
+        .box-team-slot img {
+            width: 60px;   /* fills the slot; clipped round by the parent — see .box-tile img */
+            height: 60px;
+            object-fit: contain;
+            pointer-events: none;
+            transform: translate(var(--sprite-x, 0px), var(--sprite-y, 0px)) scale(var(--sprite-scale, 1));
+        }
+
+        .box-team-slot i {
+            color: var(--text-muted);
+            font-size: 0.9rem;
         }
 
         /* ---------------- Bag quadrant ---------------- */
@@ -4789,6 +5161,22 @@
         :root.light-theme .equip-slot.filled,
         :root.light-theme .gear-cat-chip.active,
         :root.light-theme .gear-choice:hover {
+            background: var(--primary-soft);
+        }
+
+        /* PC storage: the chips and the two divider rules are white-alpha,
+           which vanishes on a light body. (The sprite wells follow --box-well,
+           swapped where that variable is defined.) */
+        :root.light-theme .box-tab {
+            background: #0000000d;
+        }
+
+        :root.light-theme .box-actions,
+        :root.light-theme .box-team-strip {
+            border-color: #00000024;
+        }
+
+        :root.light-theme .box-tab.active {
             background: var(--primary-soft);
         }
 
@@ -5552,6 +5940,10 @@
                 </button>
                 <input type="file" id="wild-import-input" accept=".json,application/json"
                     style="display: none;" onchange="captureWildPokemon(this)">
+                <button class="pokemon-picker-btn" onclick="openBoxModal()"
+                    title="PC Storage — Pokémon this trainer owns but isn't carrying">
+                    <i class="fa-solid fa-box-archive"></i> PC Storage
+                </button>
             </div>
             <div class="team-grid6" id="team-grid"></div>
         </section>
@@ -5676,6 +6068,86 @@
             <input type="text" id="team-picker-search" class="specialty-input poke-picker-search"
                 placeholder="Search by name or number..." oninput="renderTeamPickerGrid()">
             <div class="poke-picker-grid" id="team-picker-grid"></div>
+        </div>
+    </div>
+
+    <!-- PC storage: named boxes of Pokémon this trainer owns but isn't carrying.
+         The team strip sits in the same window so a deposit or withdrawal is one
+         drag, or one click on a selected Pokémon. -->
+    <div class="modal-overlay" id="box-modal" style="display: none;"
+        onclick="if (event.target === this) closeBoxModal()">
+        <div class="modal-box box-storage-box">
+            <button class="modal-close-btn" onclick="closeBoxModal()" title="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="modal-title" style="color: var(--text-primary);">
+                <i class="fa-solid fa-box-archive" style="color: var(--ghost-color);"></i> PC Storage
+            </div>
+            <div class="box-tabs" id="box-tabs"></div>
+            <div class="box-toolbar">
+                <input type="text" id="box-search" class="specialty-input box-search"
+                    placeholder="Search every box by name or number..." oninput="renderBoxGrid()">
+                <span class="box-count" id="box-count"></span>
+                <button class="box-tool-btn" onclick="openBoxRename()" title="Rename this box">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+            </div>
+            <div class="box-grid" id="box-grid"></div>
+            <div class="box-actions" id="box-actions" style="display: none;">
+                <span class="box-actions-name" id="box-actions-name"></span>
+                <button class="form-btn save" onclick="withdrawSelected()">Withdraw</button>
+                <button class="form-btn cancel" onclick="openSelectedCard()">Open card</button>
+                <button class="form-btn danger" onclick="requestReleaseMon()">Release</button>
+            </div>
+            <div class="box-team-strip">
+                <span class="box-team-label">Team</span>
+                <div class="box-team-slots" id="box-team-slots"></div>
+                <!-- Both controls change how every sprite in the window is
+                     drawn, team strip included, so they sit with it -->
+                <div class="box-strip-tools">
+                    <button class="box-sprite-btn" id="box-sprite-btn" onclick="cycleBoxSprite()"></button>
+                    <button class="box-sprite-btn box-custom-btn" id="box-custom-btn"
+                        onclick="toggleBoxCustom()"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename the open box (sits above the storage window) -->
+    <div class="modal-overlay" id="box-rename-modal" style="display: none; z-index: 260;"
+        onclick="if (event.target === this) closeBoxRename()">
+        <div class="modal-box">
+            <button class="modal-close-btn" onclick="closeBoxRename()" title="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="modal-title" style="color: var(--text-primary);">
+                <i class="fa-solid fa-pen" style="color: var(--ghost-color);"></i> Rename box
+            </div>
+            <input type="text" id="box-rename-input" class="specialty-input" maxlength="24"
+                placeholder="Box name" onkeydown="if (event.key === 'Enter') confirmBoxRename()">
+            <div class="modal-actions">
+                <button class="form-btn cancel" onclick="closeBoxRename()">Cancel</button>
+                <button class="form-btn save" onclick="confirmBoxRename()">Rename</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shared confirm for the two destructive storage actions (release a
+         Pokémon, delete a box that still holds some) -->
+    <div class="modal-overlay" id="box-confirm-modal" style="display: none; z-index: 260;"
+        onclick="if (event.target === this) closeBoxConfirm()">
+        <div class="modal-box">
+            <button class="modal-close-btn" onclick="closeBoxConfirm()" title="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="modal-title" id="box-confirm-title">
+                <i class="fa-solid fa-triangle-exclamation"></i> <span></span>
+            </div>
+            <p class="modal-text" id="box-confirm-text"></p>
+            <div class="modal-actions">
+                <button class="form-btn cancel" onclick="closeBoxConfirm()">Cancel</button>
+                <button class="form-btn danger" id="box-confirm-ok" onclick="confirmBoxAction()">Confirm</button>
+            </div>
         </div>
     </div>
 
@@ -6196,7 +6668,7 @@
     <script>
         window.DATA_BASE = 'app-data/';
         ['pokedex-db.js', 'items-db.js', 'equip-icons-db.js',
-            'equip-icons-mono-db.js', 'version.js'].forEach(function (f) {
+            'equip-icons-mono-db.js', 'sprite-frames-db.js', 'version.js'].forEach(function (f) {
             document.write('<script src="' + DATA_BASE + f + '"><\/script>');
         });
     </script>
@@ -6205,7 +6677,8 @@
         // Shared base for every local sprite path (GitHub-raw onerror fallbacks stay absolute)
         const IMG_BASE = DATA_BASE + 'images/';
 
-        if (typeof ALL_POKEMON === 'undefined' || typeof ALL_ITEMS === 'undefined') {
+        if (typeof ALL_POKEMON === 'undefined' || typeof ALL_ITEMS === 'undefined'
+            || typeof SPRITE_FRAMES === 'undefined') {
             console.error('Webapp data bundles did not load from "' + DATA_BASE + '".');
         }
 
@@ -6242,7 +6715,8 @@
             if (bar) bar.remove();
         }
         async function verifyAppData() {
-            const bundlesOk = typeof ALL_POKEMON !== 'undefined' && typeof ALL_ITEMS !== 'undefined';
+            const bundlesOk = typeof ALL_POKEMON !== 'undefined' && typeof ALL_ITEMS !== 'undefined'
+                && typeof SPRITE_FRAMES !== 'undefined';
             const assetOk = await checkAppDataAsset();
             if (bundlesOk && assetOk) hideDataWarning(); else showDataWarning();
         }
@@ -6402,10 +6876,141 @@
             return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
         }
 
+        /* A Pokémon's own id, kept as it moves between the team and the PC
+           boxes. The Pokémon card used to be addressed by team slot index
+           alone, so anything that moved a Pokémon left an open card tab
+           writing into whatever had taken its place. */
+        function genUid() {
+            return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        }
+
+        /* Claim a uid for one Pokémon, unique within this trainer.
+           Sheets written before the PC box existed carry no uids, and those
+           get a *deterministic* one from where they sit ('t0', 'b1-4', …)
+           rather than a random draw. normalizeState() runs on both the
+           restored session and the copy on disk when a restore is verified,
+           and two random draws would make an untouched trainer look like it
+           had diverged from its own file. */
+        function takeUid(existing, fallback, pool) {
+            let uid = (typeof existing === 'string' && existing) ? existing : fallback;
+            while (pool.has(uid)) uid = genUid();   // hand-edited duplicates only
+            pool.add(uid);
+            return uid;
+        }
+
         function defaultTeam() {
             /* Each slot links a species (dexId) to its full Pokémon-card sheet,
                stored right here so one JSON per trainer holds everything */
             return Array.from({ length: 6 }, () => ({ dexId: '', sheet: null, preview: null }));
+        }
+
+        /* PC storage: named boxes of Pokémon this trainer owns but isn't
+           carrying. A stored Pokémon uses the same shape as a team slot, so
+           depositing and withdrawing are just a move between the two arrays.
+           Boxes are identified by their index — no ids to keep in sync, and
+           normalization stays deterministic (see takeUid).
+
+           The count is fixed: six boxes, always, renameable but never added or
+           removed. Nothing can be lost by deleting a box, and the tab strip is
+           a constant the eye can learn. */
+        const BOX_CAPACITY = 30;
+        const BOX_COUNT = 6;
+
+        /* Which stock sprite set the storage tiles draw from. One button in
+           the window cycles it; the choice is the trainer's, so it saves into
+           their JSON alongside the theme.
+
+           The Box set was here too and was withdrawn. Its art is 68×56 pixel
+           art, so it can only be enlarged by an exact pixel ratio without
+           turning to noise, and those ratios are a factor of two apart while
+           the well's usable size range is narrower than that — there is no
+           setting at which the whole set looks right. See
+           tools/sprite-framing-notes.md on the dev-data branch for the
+           measurements, in case it is ever worth another attempt. Trainers who
+           had Box selected fall back to Home on load (normalizeState). */
+        const BOX_SPRITE_CYCLE = ['Home', 'Book'];
+
+        /* Fallback framing, one number per set, used only when a sprite has no
+           measurement of its own: a species with no local copy (the app fetches
+           those from GitHub), or sprite-frames-db.js failing to load. These are
+           the per-set averages the window used before it framed each sprite
+           individually — serviceable for a handful of stragglers, wrong as a
+           blanket rule, which is what boxSpriteFrame() below exists to fix. */
+        const BOX_SPRITE_FRAME = {
+            Home: { scale: 0.95, offsetY: 0 },
+            Book: { scale: 0.72, offsetY: 0 }
+        };
+
+        /* Sprite files that exist but are not the Pokémon they claim to be, or
+           are missing from a pack outright. Filename → the sets to skip.
+
+           egg.png in BookSprites is a byte-for-byte copy of Alolan Exeggutor's
+           illustration — same MD5 — so the egg renders as a palm tree. Deleting
+           the file would not help: every sprite path falls back to the same
+           dataset on GitHub, which carries the identical copy. And
+           ShuffleTokens has no egg.png at all, so Token had nothing to draw.
+
+           Neither is a framing problem. The art itself is wrong upstream, so
+           the only fix here is to not draw those sets for that species. */
+        const SPRITE_SET_BLOCKED = { 'egg.png': ['Book', 'Shuffle'] };
+
+        /* The set actually drawn: the one asked for, unless that pack has
+           nothing usable for this species, in which case the first that does.
+           Shuffle is never a substitute — it is much the sparsest pack. */
+        function usableSpriteType(image, type) {
+            const blocked = image && SPRITE_SET_BLOCKED[image];
+            if (!blocked || blocked.indexOf(type) === -1) return type;
+            return ['Home', 'Book', 'Box'].filter(t => blocked.indexOf(t) === -1)[0] || 'Home';
+        }
+
+        /* How much of the well's RADIUS the art's own enclosing radius should
+           take up. sprite-frames-db.js measures that radius from the silhouette
+           rather than from a bounding box, so fitting it is exact for any shape
+           — a Braviary with its wings out and a Voltorb both end up touching
+           the well and neither is clipped. Just under 1 leaves a hair of room
+           so antialiased edges do not kiss the rim. */
+        const SPRITE_FIT_TARGET = 0.94;
+
+        /* Must match the CSS: the content box of .box-tile and of
+           .box-team-slot, 62px less the 1px border each side. The two wells are
+           deliberately the same size so a sprite is framed identically in the
+           grid and in the strip below it. */
+        const BOX_WELL = 60;
+
+        /* Per-sprite zoom and offset, from the measurements in
+           sprite-frames-db.js. Three numbers per sprite, in thousandths of the
+           square the canvas is drawn into: the art's centre offset, then the
+           radius of the circle around that centre holding the whole silhouette.
+
+           The sprite is object-fit: contain into the well, so the canvas's
+           longest side measures exactly `well` before the transform, and every
+           stored fraction is a fraction of that.
+
+           Offsets come out in final px because translate is applied after
+           scale. */
+        function boxSpriteFrame(image, type, well) {
+            const dflt = BOX_SPRITE_FRAME[type] || { scale: 1, offsetY: 0 };
+            const table = (typeof SPRITE_FRAMES !== 'undefined' && SPRITE_FRAMES[type]) || null;
+            const f = (table && image) ? table[image] : null;
+            if (!f) return { scale: dflt.scale, offsetX: 0, offsetY: dflt.offsetY };
+
+            const base = well;
+            const cx = f[0] / 1000, cy = f[1] / 1000;
+            /* the art's own radius, as a fraction of the well's radius, at 1× */
+            const reach = (f[2] / 1000) * base / (well / 2);
+            if (!(reach > 0)) return { scale: dflt.scale, offsetX: 0, offsetY: dflt.offsetY };
+
+            const scale = SPRITE_FIT_TARGET / reach;
+            return {
+                scale: scale,
+                offsetX: -cx * base * scale,
+                offsetY: -cy * base * scale
+            };
+        }
+
+        function defaultBoxes() {
+            return Array.from({ length: BOX_COUNT },
+                (_, i) => ({ name: 'Box ' + (i + 1), mons: [] }));
         }
 
         function defaultAchievements() {
@@ -6488,6 +7093,15 @@
                 age: '',
                 money: 1500,
                 team: defaultTeam(),
+                /* PC storage — Pokémon owned but not carried. Rides along in
+                   the trainer's JSON exactly like the team does. */
+                boxes: defaultBoxes(),
+                activeBox: 0,
+                /* Which sprite set the storage tiles draw from: Home / Book / Box */
+                boxSpriteType: 'Home',
+                /* On: a Pokémon with uploaded art shows it, whatever set is
+                   picked. Off: uploaded art is never drawn in storage. */
+                boxUseCustom: true,
                 bagOut: [],
                 bagBattle: [],
                 potionCharges: {
@@ -6513,19 +7127,65 @@
 
         /* Team entries migrate from the old {id,rank,item,chp} shape to the new
            {dexId, sheet} one (sheet = the Pokémon card's own saved state) */
-        function normalizeTeam(team) {
-            const out = (Array.isArray(team) ? team : []).slice(0, 6).map(e => {
+        function normalizeTeam(team, pool) {
+            pool = pool || new Set();
+            const out = (Array.isArray(team) ? team : []).slice(0, 6).map((e, i) => {
                 if (!e || typeof e !== 'object') return { dexId: '', sheet: null, preview: null };
                 const dexId = e.dexId !== undefined ? e.dexId : (e.id || '');
+                /* An occupied slot always carries a uid; an empty one is reset
+                   to the canonical shape, which also clears the legacy
+                   {id,rank,item,chp} leftovers a cleared slot used to get */
+                if (!dexId) return { dexId: '', sheet: null, preview: null };
                 /* preview = the trainer-side sprite override for this slot
                    (type/scale/position), independent of the Pokémon card's sheet */
                 return {
-                    dexId: dexId || '',
+                    uid: takeUid(e.uid, 't' + i, pool),
+                    dexId: dexId,
                     sheet: e.sheet !== undefined ? e.sheet : null,
                     preview: e.preview || null
                 };
             });
             while (out.length < 6) out.push({ dexId: '', sheet: null, preview: null });
+            return out;
+        }
+
+        /* Boxes come back from JSON that may be missing entirely (every sheet
+           written before this feature), hand-edited, short, or overfull.
+           Always returns exactly BOX_COUNT boxes. */
+        function normalizeBoxes(boxes, pool) {
+            pool = pool || new Set();
+            const src = Array.isArray(boxes) ? boxes : [];
+            const out = Array.from({ length: BOX_COUNT }, (_, bi) => {
+                const b = src[bi];
+                return {
+                    name: (b && typeof b.name === 'string' && b.name.trim())
+                        ? b.name.trim() : ('Box ' + (bi + 1)),
+                    mons: []
+                };
+            });
+            /* Anything past the sixth box, or past a box's capacity, is poured
+               into whatever room is left rather than dropped on the floor —
+               losing a Pokémon to a stale file would be unforgivable. */
+            const overflow = [];
+            src.forEach((b, bi) => {
+                ((b && Array.isArray(b.mons)) ? b.mons : [])
+                    .filter(m => m && typeof m === 'object' && (m.dexId || m.id))
+                    .forEach((m, mi) => {
+                        const mon = {
+                            uid: takeUid(m.uid, 'b' + bi + '-' + mi, pool),
+                            dexId: m.dexId || m.id,
+                            sheet: m.sheet !== undefined ? m.sheet : null,
+                            preview: m.preview || null
+                        };
+                        const home = bi < BOX_COUNT ? out[bi] : null;
+                        if (home && home.mons.length < BOX_CAPACITY) home.mons.push(mon);
+                        else overflow.push(mon);
+                    });
+            });
+            overflow.forEach(mon => {
+                const room = out.find(b => b.mons.length < BOX_CAPACITY);
+                if (room) room.mons.push(mon);   // all 180 full: nothing else to do
+            });
             return out;
         }
 
@@ -6539,7 +7199,18 @@
                 s[k] = { ...defaults[k], ...(parsed[k] || {}) };
             });
             s.id = parsed.id || defaults.id;
-            s.team = normalizeTeam(parsed.team);
+            /* One pool across both, so a Pokémon's uid stays unique to this
+               trainer whether it is in the team or in a box */
+            const uidPool = new Set();
+            s.team = normalizeTeam(parsed.team, uidPool);
+            s.boxes = normalizeBoxes(parsed.boxes, uidPool);
+            s.activeBox = Math.min(Math.max(0, parseInt(parsed.activeBox, 10) || 0),
+                s.boxes.length - 1);
+            s.boxSpriteType = BOX_SPRITE_CYCLE.indexOf(parsed.boxSpriteType) !== -1
+                ? parsed.boxSpriteType : 'Home';
+            /* Sheets written before this switch existed get it on, which is
+               the richer default — uploaded art is there to be seen */
+            s.boxUseCustom = parsed.boxUseCustom === undefined ? true : !!parsed.boxUseCustom;
             if (!Array.isArray(s.achievements) || s.achievements.length !== 5) s.achievements = defaultAchievements();
             if (!Array.isArray(s.badges) || s.badges.length !== 8) {
                 s.badges = defaultBadges();
@@ -6596,14 +7267,27 @@
             catch (e) { return null; }
         }
 
+        /* Warned once per session: a full quota fires on every keystroke after
+           it first trips, and a toast storm would bury the message it carries. */
+        let quotaWarned = false;
+
         function saveWorkingSet() {
             try {
                 localStorage.setItem(WORKING_KEY, JSON.stringify({
                     trainers: trainers.map(t => ({ id: t.id, name: t.data.name, fileName: t.fileName, data: t.data })),
                     active: activeTrainer
                 }));
+                quotaWarned = false;
             } catch (e) {
                 console.warn('Working set not saved (storage full?)', e);
+                /* Everything else here treats the working set as the source of
+                   truth, so a silent failure loses edits — and a Pokémon card
+                   in another tab would go on reading the stale copy. Say so. */
+                if (!quotaWarned) {
+                    quotaWarned = true;
+                    flashToast('<i class="fa-solid fa-triangle-exclamation"></i> Browser storage is '
+                        + 'full — changes are NOT being kept. Save All now, then close a trainer.');
+                }
             }
         }
 
@@ -6657,6 +7341,7 @@
             if (changed) {
                 sheetState = (trainers[activeTrainer] || trainers[0]).data;
                 renderTeam();
+                renderBoxAll();   // a card tab may have edited a stored Pokémon
                 updateSaveIndicator();
             }
         }
@@ -8283,9 +8968,25 @@
             const slot = sheetState.team[idx];
             if (!slot.dexId) { openTeamPicker(idx); return; }
             saveState();  // flush the working set so the card tab reads the latest
+            /* uid addresses the Pokémon itself, so the card still edits the
+               right one after it is boxed or moved; slot stays on the URL as
+               the fallback for a sheet whose uid somehow went missing */
             const url = 'pokemon-card.html?pokemon=' + encodeURIComponent(slot.dexId)
-                + '&trainer=' + encodeURIComponent(sheetState.id) + '&slot=' + idx;
+                + '&trainer=' + encodeURIComponent(sheetState.id)
+                + (slot.uid ? '&uid=' + encodeURIComponent(slot.uid) : '')
+                + '&slot=' + idx;
             window.open(url, '_blank');
+        }
+
+        /* Same, for a Pokémon sitting in a PC box: uid only, since it has no
+           team slot to fall back to */
+        function openBoxedPokemon(uid) {
+            const found = findMon(uid);
+            if (!found || !found.mon.dexId) return;
+            saveState();
+            window.open('pokemon-card.html?pokemon=' + encodeURIComponent(found.mon.dexId)
+                + '&trainer=' + encodeURIComponent(sheetState.id)
+                + '&uid=' + encodeURIComponent(uid), '_blank');
         }
 
         /* ---- Team sprite editor: pick sprite + resize + reposition, all kept
@@ -8309,6 +9010,19 @@
             const customBtn = document.getElementById('sprite-modal-custom-btn');
             customBtn.classList.toggle('disabled', !hasCustom);
             customBtn.title = hasCustom ? '' : 'No custom image uploaded on this Pokémon\'s card';
+
+            /* Sets with no usable art for this species — see SPRITE_SET_BLOCKED.
+               Offering a tab that silently draws a different Pokémon is worse
+               than not offering it. */
+            document.querySelectorAll('#sprite-modal-tabs .sprite-btn').forEach(b => {
+                const t = b.dataset.type;
+                if (!t || t === 'Custom') return;
+                const missing = usableSpriteType(p && p.Image, t) !== t;
+                b.classList.toggle('disabled', missing);
+                b.title = missing
+                    ? 'No ' + b.textContent.trim() + ' art for ' + (p ? p.Name : 'this Pokémon')
+                    : '';
+            });
 
             updateSpriteModal();
             document.getElementById('sprite-modal').style.display = 'flex';
@@ -8365,6 +9079,10 @@
                 && !(slot.sheet && (slot.sheet.customImage || slot.sheet.customImageFile))) {
                 return;   // disabled: no custom image to show
             }
+            const sp = slotPokemon(slot);
+            if (type !== 'Custom' && usableSpriteType(sp && sp.Image, type) !== type) {
+                return;   // disabled: that pack has no art for this species
+            }
             slot.preview.spriteType = type;
             saveState();
             updateSpriteModal();
@@ -8420,23 +9138,62 @@
             img.style.setProperty('--sprite-x', (preview.offsetX || 0) + 'px');
             img.style.setProperty('--sprite-y', (preview.offsetY || 0) + 'px');
 
+            /* Custom art needs a stock sprite to stand in while the full-res
+               copy is fetched (or if it never arrives). Callers can name which
+               set that should be — PC storage points it at whichever set the
+               window is showing — otherwise it falls back to Home. */
+            const stand = usableSpriteType(p && p.Image,
+                type === 'Custom' ? (preview.fallbackType || 'Home') : type);
+            const folder = SPRITE_FOLDERS[stand] || 'HomeSprites';
+
+
+            const showSpecies = () => {
+                img.onerror = () => {
+                    img.onerror = null;
+                    img.src = GITHUB_RAW + '/images/' + folder + '/' + p.Image;
+                };
+                img.src = IMG_BASE + folder + '/' + p.Image;
+            };
+
             if (type === 'Custom' && sheet && (sheet.customImage || sheet.customImageFile)) {
-                img.onerror = null;
-                if (sheet.customImage) img.src = sheet.customImage;   // thumbnail first (instant)
+                if (sheet.customImage) {
+                    img.onerror = null;
+                    img.src = sheet.customImage;   // thumbnail first (instant)
+                } else {
+                    /* Boxing a Pokémon drops the thumbnail when the full-res
+                       copy is on disk (see shedBoxThumbnail), so without one
+                       stand the species sprite in rather than leaving a broken
+                       image if the folder turns out to be unreachable */
+                    showSpecies();
+                }
                 if (sheet.customImageFile) {
                     readCustomImage('Pokemons', sheet.customImageFile).then(url => {
-                        if (url && img.isConnected) img.src = url;   // full-res when reachable
+                        if (url && img.isConnected) {
+                            img.onerror = null;
+                            img.src = url;   // full-res when reachable
+                        }
                     });
                 }
                 return;
             }
 
-            const folder = SPRITE_FOLDERS[type] || 'HomeSprites';
-            img.src = IMG_BASE + folder + '/' + p.Image;
-            img.onerror = () => {
-                img.onerror = null;
-                img.src = GITHUB_RAW + '/images/' + folder + '/' + p.Image;
-            };
+            showSpecies();
+        }
+
+        /* Shared by the team slots and the storage tiles: the nickname when the
+           preview asks for one and the card set one, else the species — mega
+           forms show the stone beside the base name instead of a "(Mega …)"
+           suffix. */
+        function monNameHtml(mon, p) {
+            const sheet = (mon && mon.sheet) || null;
+            const nick = ((sheet && sheet.nickname) || '').trim();
+            const useNick = !!(mon && mon.preview && mon.preview.useNickname && nick);
+            if (!p) return escapeHtml(useNick ? nick : ((mon && mon.dexId) || 'Unknown'));
+            const stone = megaStoneOf(p);
+            const shown = useNick ? nick : (stone ? stripMegaSuffix(p.Name) : p.Name);
+            return escapeHtml(shown)
+                + (!useNick && stone ? stoneIconHtml(stone) : '')
+                + teamGenderHtml(sheet);
         }
 
         function renderTeam() {
@@ -8455,18 +9212,12 @@
 
                 const name = document.createElement('span');
                 if (p) {
-                    /* Show the nickname instead of the species name when the slot's
-                       preview asks for it and the Pokémon card set one */
+                    /* Nickname / mega-stone handling is shared with the PC
+                       storage tiles — see monNameHtml */
                     const nick = (sheet && sheet.nickname || '').trim();
                     const useNick = !!(slot.preview && slot.preview.useNickname && nick);
-                    /* Mega forms: drop the "(Mega ...)" suffix and show the stone
-                       sprite beside the species name (not when a nickname is shown) */
-                    const stone = megaStoneOf(p);
-                    const shown = useNick ? nick : (stone ? stripMegaSuffix(p.Name) : p.Name);
                     name.className = 'team-slot-name linked';
-                    name.innerHTML = escapeHtml(shown)
-                        + (!useNick && stone ? stoneIconHtml(stone) : '')
-                        + teamGenderHtml(sheet);
+                    name.innerHTML = monNameHtml(slot, p);
                     name.title = useNick
                         ? nick + ' (' + p.Name + ') — opens the Pokémon card'
                         : 'Edit ' + p.Name + ' (opens the Pokémon card)';
@@ -8573,6 +9324,9 @@
                        (the old sprite choice/position won't fit a new Pokémon) */
                     if (slot.dexId !== p._id) { slot.sheet = null; slot.preview = null; }
                     slot.dexId = p._id;
+                    /* Every owned Pokémon carries a uid so its card tab and the
+                       PC box can both address it */
+                    if (!slot.uid) slot.uid = genUid();
                     saveState();
                     renderTeam();
                     closeTeamPicker();
@@ -8595,6 +9349,591 @@
                 grid.appendChild(tile);
             });
         }
+
+        // ------------------------------------------------------------------
+        // PC storage: named boxes of Pokémon this trainer owns but isn't
+        // carrying. A stored Pokémon uses the same { uid, dexId, sheet,
+        // preview } shape as a team slot, so every operation below is a move
+        // between sheetState.team and sheetState.boxes[n].mons — nothing is
+        // converted, and a Pokémon keeps its uid (and so its open card tab)
+        // wherever it ends up.
+        // ------------------------------------------------------------------
+        let boxSelectedUid = null;    // Pokémon picked out in the storage window
+        let boxDragUid = null;        // Pokémon currently being dragged
+        let boxPendingAction = null;  // what the shared confirm modal will run
+
+        function activeBoxIdx() {
+            if (!sheetState.boxes || !sheetState.boxes.length) sheetState.boxes = defaultBoxes();
+            return Math.min(Math.max(0, sheetState.activeBox || 0), sheetState.boxes.length - 1);
+        }
+
+        function activeBoxObj() {
+            return sheetState.boxes[activeBoxIdx()];
+        }
+
+        /* Where a Pokémon lives right now, by uid:
+           { mon, inBox, boxIdx, idx }. The team and the boxes share one uid
+           space, so this is the single lookup both sides use. */
+        function findMon(uid) {
+            if (!uid) return null;
+            const slot = sheetState.team.findIndex(s => s && s.uid === uid);
+            if (slot !== -1) return { mon: sheetState.team[slot], inBox: false, idx: slot };
+            for (let b = 0; b < sheetState.boxes.length; b++) {
+                const i = sheetState.boxes[b].mons.findIndex(m => m && m.uid === uid);
+                if (i !== -1) return { mon: sheetState.boxes[b].mons[i], inBox: true, boxIdx: b, idx: i };
+            }
+            return null;
+        }
+
+        /* A boxed Pokémon keeps its whole card sheet, and that sheet may carry
+           a 512px PNG data-URL — around 700 KB against the ~5 MB localStorage
+           budget every loaded trainer shares. Where the full-res copy already
+           sits in Custom Images/Pokemons the thumbnail is redundant, so drop
+           it: tiles fall back to the species sprite and upgrade from disk.
+           Never drop it without that file copy — then it is the only art. */
+        function shedBoxThumbnail(mon) {
+            if (mon.sheet && mon.sheet.customImage && mon.sheet.customImageFile) {
+                mon.sheet.customImage = '';
+            }
+        }
+
+        /* Same shape either way; a team slot that somehow lost its uid gets a
+           fresh one rather than becoming unaddressable */
+        function monEntry(src) {
+            return {
+                uid: src.uid || genUid(), dexId: src.dexId,
+                sheet: src.sheet || null, preview: src.preview || null
+            };
+        }
+
+        function firstBoxWithRoom() {
+            const start = activeBoxIdx();
+            if (sheetState.boxes[start].mons.length < BOX_CAPACITY) return start;
+            return sheetState.boxes.findIndex(b => b.mons.length < BOX_CAPACITY);
+        }
+
+        // Team slot -> box. `boxIdx` null means the open box, or the first with room.
+        function depositToBox(slotIdx, boxIdx) {
+            const slot = sheetState.team[slotIdx];
+            if (!slot || !slot.dexId) return false;
+            const target = (boxIdx == null) ? firstBoxWithRoom() : boxIdx;
+            if (target == null || target === -1 || !sheetState.boxes[target]) {
+                flashToast('<i class="fa-solid fa-triangle-exclamation"></i> Every box is full.');
+                return false;
+            }
+            if (sheetState.boxes[target].mons.length >= BOX_CAPACITY) {
+                flashToast('<i class="fa-solid fa-triangle-exclamation"></i> '
+                    + escapeHtml(sheetState.boxes[target].name) + ' is full.');
+                return false;
+            }
+            const mon = monEntry(slot);
+            shedBoxThumbnail(mon);
+            sheetState.boxes[target].mons.push(mon);
+            sheetState.team[slotIdx] = { dexId: '', sheet: null, preview: null };
+            saveState();
+            renderTeam();
+            return true;
+        }
+
+        /* Box -> team. With no slot given it takes the first empty one; dropped
+           onto an occupied slot the two trade places, so nothing is ever lost. */
+        function withdrawFromBox(uid, slotIdx) {
+            const found = findMon(uid);
+            if (!found || !found.inBox) return false;
+            let target = (slotIdx == null) ? sheetState.team.findIndex(s => !s.dexId) : slotIdx;
+            if (target == null || target === -1) {
+                flashToast('<i class="fa-solid fa-triangle-exclamation"></i> The team is full — '
+                    + 'drop this onto a team slot to swap instead.');
+                return false;
+            }
+            const slot = sheetState.team[target];
+            const mon = found.mon;
+            sheetState.boxes[found.boxIdx].mons.splice(found.idx, 1);
+            if (slot && slot.dexId) {
+                /* Swap: the displaced team member drops into the spot just
+                   vacated, so the box keeps its order */
+                const swapped = monEntry(slot);
+                shedBoxThumbnail(swapped);
+                sheetState.boxes[found.boxIdx].mons.splice(found.idx, 0, swapped);
+            }
+            sheetState.team[target] = monEntry(mon);
+            saveState();
+            renderTeam();
+            return true;
+        }
+
+        // Box -> another box (or team -> a named box, which is just a deposit)
+        function moveMonToBox(uid, boxIdx) {
+            const found = findMon(uid);
+            if (!found) return false;
+            if (!found.inBox) return depositToBox(found.idx, boxIdx);
+            if (found.boxIdx === boxIdx || !sheetState.boxes[boxIdx]) return false;
+            if (sheetState.boxes[boxIdx].mons.length >= BOX_CAPACITY) {
+                flashToast('<i class="fa-solid fa-triangle-exclamation"></i> '
+                    + escapeHtml(sheetState.boxes[boxIdx].name) + ' is full.');
+                return false;
+            }
+            sheetState.boxes[found.boxIdx].mons.splice(found.idx, 1);
+            sheetState.boxes[boxIdx].mons.push(found.mon);
+            saveState();
+            return true;
+        }
+
+        function swapTeamSlots(a, b) {
+            if (a === b) return;
+            const tmp = sheetState.team[a];
+            sheetState.team[a] = sheetState.team[b];
+            sheetState.team[b] = tmp;
+            saveState();
+            renderTeam();
+        }
+
+        function releaseMon(uid) {
+            const found = findMon(uid);
+            if (!found || !found.inBox) return;
+            sheetState.boxes[found.boxIdx].mons.splice(found.idx, 1);
+            if (boxSelectedUid === uid) boxSelectedUid = null;
+            saveState();
+        }
+
+        /* Step the storage tiles through the three stock sprite sets. Purely a
+           view setting, but it belongs to the trainer, so it is saved. */
+        function cycleBoxSprite() {
+            const cur = BOX_SPRITE_CYCLE.indexOf(sheetState.boxSpriteType);
+            sheetState.boxSpriteType =
+                BOX_SPRITE_CYCLE[(cur + 1) % BOX_SPRITE_CYCLE.length];
+            saveState();
+            renderBoxAll();
+        }
+
+        // Let uploaded art override the chosen set, or keep it out entirely
+        function toggleBoxCustom() {
+            sheetState.boxUseCustom = !boxUseCustom();
+            saveState();
+            renderBoxAll();
+        }
+
+        function boxUseCustom() {
+            return sheetState.boxUseCustom !== false;
+        }
+
+        // ---- Storage window ----
+        /* The grid element itself survives every re-render, so it is wired as a
+           drop target once — re-registering per render would stack listeners
+           and move a Pokémon several times on one drop. */
+        let boxGridWired = false;
+
+        function openBoxModal() {
+            boxSelectedUid = null;
+            if (!boxGridWired) {
+                registerBoxDropTarget(document.getElementById('box-grid'), null);
+                boxGridWired = true;
+            }
+            document.getElementById('box-search').value = '';
+            /* Shown before rendering so the tab strip can measure itself and
+               scroll the open box into view (same as the gear catalogue) */
+            document.getElementById('box-modal').style.display = 'flex';
+            renderBoxAll();
+        }
+
+        function closeBoxModal() {
+            document.getElementById('box-modal').style.display = 'none';
+            boxSelectedUid = null;
+            boxDragUid = null;
+        }
+
+        function boxModalOpen() {
+            return document.getElementById('box-modal').style.display !== 'none';
+        }
+
+        function renderBoxAll() {
+            if (!boxModalOpen()) return;
+            renderBoxTabs();
+            renderBoxGrid();
+            renderBoxTeamStrip();
+            document.getElementById('box-count').textContent =
+                activeBoxObj().mons.length + ' / ' + BOX_CAPACITY;
+
+            const type = boxSpriteType();
+            const next = BOX_SPRITE_CYCLE[(BOX_SPRITE_CYCLE.indexOf(type) + 1) % BOX_SPRITE_CYCLE.length];
+            const btn = document.getElementById('box-sprite-btn');
+            /* The icon says "this cycles", the label says what it is on now */
+            btn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> ' + escapeHtml(type);
+            btn.title = 'Sprite set\nShowing ' + type + ' art — click to switch to ' + next;
+
+            /* Filled = on, hollow = off, and the eye says which */
+            const on = boxUseCustom();
+            const cbtn = document.getElementById('box-custom-btn');
+            cbtn.classList.toggle('off', !on);
+            cbtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            cbtn.innerHTML = '<i class="fa-solid fa-' + (on ? 'eye' : 'eye-slash') + '"></i> Custom';
+            cbtn.title = 'Uploaded art\n' + (on
+                ? 'Shown ahead of the ' + type + ' set — click to hide it'
+                : 'Hidden; every Pokémon uses the ' + type + ' set — click to show it');
+        }
+
+        function boxSpriteType() {
+            return BOX_SPRITE_CYCLE.indexOf(sheetState.boxSpriteType) !== -1
+                ? sheetState.boxSpriteType : 'Home';
+        }
+
+        function renderBoxTabs() {
+            const row = document.getElementById('box-tabs');
+            row.innerHTML = '';
+            const cur = activeBoxIdx();
+            let active = null;
+            sheetState.boxes.forEach((b, bi) => {
+                const chip = document.createElement('button');
+                chip.className = 'box-tab' + (bi === cur ? ' active' : '');
+                chip.textContent = b.name;
+                /* The count lives in the hover text, not on the chip — six of
+                   them side by side turned into a row of numbers */
+                chip.title = b.name + '\n' + b.mons.length + ' of ' + BOX_CAPACITY
+                    + ' stored — drop a Pokémon here to move it in';
+                chip.onclick = () => {
+                    sheetState.activeBox = bi;
+                    document.getElementById('box-search').value = '';
+                    boxSelectedUid = null;
+                    saveState();
+                    renderBoxAll();
+                };
+                registerBoxDropTarget(chip, bi);
+                if (bi === cur) active = chip;
+                row.appendChild(chip);
+            });
+            /* Six fixed boxes fit the window, but a long rename can still push
+               the strip past the edge — keep the open one where it can be seen */
+            if (active) row.scrollLeft = active.offsetLeft
+                - (row.clientWidth - active.offsetWidth) / 2;
+        }
+
+        function renderBoxGrid() {
+            const grid = document.getElementById('box-grid');
+            const q = (document.getElementById('box-search').value || '').trim().toLowerCase();
+            const keepScroll = grid.scrollTop;
+            grid.innerHTML = '';
+
+            /* A query searches every box, so a Pokémon can be found without
+               remembering which one it went into; its tile then says where. */
+            let entries;
+            if (q) {
+                entries = [];
+                sheetState.boxes.forEach((b, bi) =>
+                    b.mons.forEach(m => entries.push({ mon: m, boxIdx: bi })));
+                entries = entries.filter(e => {
+                    const p = slotPokemon(e.mon);
+                    const nick = ((e.mon.sheet && e.mon.sheet.nickname) || '').toLowerCase();
+                    return (p && (p.Name.toLowerCase().includes(q) || p.DexID.includes(q)))
+                        || nick.includes(q) || String(e.mon.dexId).toLowerCase().includes(q);
+                });
+            } else {
+                entries = activeBoxObj().mons.map(m => ({ mon: m, boxIdx: null }));
+            }
+
+            if (!entries.length) {
+                const empty = document.createElement('div');
+                empty.className = 'box-empty';
+                empty.textContent = q
+                    ? 'No stored Pokémon matches that.'
+                    : 'This box is empty. Drag a Pokémon down from the team strip below, '
+                    + 'or use the box button on a team slot.';
+                grid.appendChild(empty);
+            } else {
+                const frag = document.createDocumentFragment();
+                entries.forEach(e => frag.appendChild(boxTile(e.mon, e.boxIdx)));
+                grid.appendChild(frag);
+            }
+            grid.scrollTop = keepScroll;
+            renderBoxActions();
+        }
+
+        /* A stored Pokémon is drawn as its sprite and nothing else, so the
+           name, rank and gender live in the hover bubble instead. The themed
+           tooltip splits on the first newline: heading, then body. */
+        function monTipText(mon, p, showBoxIdx) {
+            const nick = ((mon.sheet && mon.sheet.nickname) || '').trim();
+            const species = p ? (megaStoneOf(p) ? stripMegaSuffix(p.Name) : p.Name) : mon.dexId;
+            const g = mon.sheet && mon.sheet.gender;
+            const gender = g === 'M' ? '♂' : (g === 'F' ? '♀' : '');
+            /* A nickname takes the heading and the species drops into the body,
+               so a nicknamed Pokémon never becomes unidentifiable */
+            const parts = [];
+            if (nick) parts.push(species + (gender ? ' ' + gender : ''));
+            else if (gender) parts.push(gender);
+            if (mon.sheet && mon.sheet.rank) parts.push(mon.sheet.rank);
+            if (showBoxIdx != null) parts.push('in ' + sheetState.boxes[showBoxIdx].name);
+            return (nick || species) + (parts.length ? '\n' + parts.join(' · ') : '');
+        }
+
+        function boxTile(mon, showBoxIdx) {
+            const p = slotPokemon(mon);
+            const tile = document.createElement('div');
+            tile.className = 'box-tile' + (mon.uid === boxSelectedUid ? ' selected' : '');
+            tile.draggable = true;
+            tile.dataset.uid = mon.uid;
+            tile.title = monTipText(mon, p, showBoxIdx);
+
+            const img = document.createElement('img');
+            img.loading = 'lazy';
+            img.alt = '';
+            if (p) applyTeamSprite(img, p, mon.sheet, boxTilePreview(mon, p, BOX_WELL));
+            tile.appendChild(img);
+
+            tile.onclick = () => {
+                boxSelectedUid = (boxSelectedUid === mon.uid) ? null : mon.uid;
+                /* Toggle the class in place rather than re-rendering, so the
+                   grid doesn't jump back to the top under the click */
+                boxGridTiles().forEach(t =>
+                    t.classList.toggle('selected', t.dataset.uid === boxSelectedUid));
+                renderBoxActions();
+            };
+            tile.ondblclick = () => openBoxedPokemon(mon.uid);
+            tile.addEventListener('dragstart', e => {
+                boxDragUid = mon.uid;
+                /* Before the class goes on, so the ghost is cloned at rest */
+                setCircleDragImage(e, tile);
+                tile.classList.add('dragging');
+                try { e.dataTransfer.setData('text/plain', mon.uid); } catch (_) { }
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            tile.addEventListener('dragend', () => {
+                boxDragUid = null;
+                clearDragGhost();
+                tile.classList.remove('dragging');
+                clearDropHover();
+            });
+            return tile;
+        }
+
+        /* What a storage tile draws. The window's controls decide, not each
+           Pokémon's own team-side sprite choice, so the grid reads as one
+           board — except that the Custom switch, when on, lets uploaded art
+           win over the chosen set. Off, uploaded art is never drawn here.
+           A Pokémon's per-slot zoom/offset is dropped either way: it was tuned
+           against a different sprite and would sit off-centre in the round
+           well. The one exception is art that was already framed AS custom on
+           the team slot — that tuning still applies to the same image. */
+        function boxTilePreview(mon, p, well) {
+            const sheet = mon && mon.sheet;
+            if (boxUseCustom() && sheet && (sheet.customImage || sheet.customImageFile)) {
+                const pv = mon.preview;
+                const tuned = pv && pv.spriteType === 'Custom';
+                return {
+                    spriteType: 'Custom',
+                    scale: tuned ? (pv.scale || 1) : 1,
+                    offsetX: tuned ? (pv.offsetX || 0) : 0,
+                    offsetY: tuned ? (pv.offsetY || 0) : 0,
+                    /* Boxing sheds the embedded thumbnail when a full-res copy
+                       is on disk, so there is a moment (or a whole session, if
+                       the folder is unreachable) with nothing to draw. Stand in
+                       the set the window is showing rather than always Home. */
+                    fallbackType: boxSpriteType()
+                };
+            }
+            /* A species with no art in the chosen set borrows another, and has
+               to be framed with that set's numbers, not the chosen set's */
+            const type = usableSpriteType(p && p.Image, boxSpriteType());
+            const frame = boxSpriteFrame(p && p.Image, type, well);
+            return {
+                spriteType: type, scale: frame.scale,
+                offsetX: frame.offsetX, offsetY: frame.offsetY
+            };
+        }
+
+        function boxGridTiles() {
+            return Array.from(document.querySelectorAll('#box-grid .box-tile'));
+        }
+
+        function renderBoxActions() {
+            const bar = document.getElementById('box-actions');
+            const found = boxSelectedUid ? findMon(boxSelectedUid) : null;
+            if (!found || !found.inBox) {
+                boxSelectedUid = null;
+                bar.style.display = 'none';
+                return;
+            }
+            document.getElementById('box-actions-name').innerHTML =
+                monNameHtml(found.mon, slotPokemon(found.mon));
+            bar.style.display = 'flex';
+        }
+
+        function renderBoxTeamStrip() {
+            const wrap = document.getElementById('box-team-slots');
+            wrap.innerHTML = '';
+            const boxName = activeBoxObj().name;
+            sheetState.team.forEach((slot, i) => {
+                const p = slotPokemon(slot);
+                const cell = document.createElement('div');
+                cell.className = 'box-team-slot';
+                if (p) {
+                    cell.draggable = true;
+                    cell.title = p.Name + '\nClick or drag to deposit into ' + boxName;
+                    const img = document.createElement('img');
+                    img.alt = '';
+                    /* Same sprite set AND the same well as the tiles above, so
+                       the window reads as one board rather than two */
+                    applyTeamSprite(img, p, slot.sheet, boxTilePreview(slot, p, BOX_WELL));
+                    cell.appendChild(img);
+                    cell.onclick = () => { if (depositToBox(i, activeBoxIdx())) renderBoxAll(); };
+                    cell.addEventListener('dragstart', e => {
+                        boxDragUid = slot.uid;
+                        setCircleDragImage(e, cell);
+                        try { e.dataTransfer.setData('text/plain', slot.uid || ''); } catch (_) { }
+                        e.dataTransfer.effectAllowed = 'move';
+                    });
+                    cell.addEventListener('dragend', () => {
+                        boxDragUid = null;
+                        clearDragGhost();
+                        clearDropHover();
+                    });
+                } else {
+                    cell.title = 'Empty team slot — drop a stored Pokémon here to withdraw it';
+                    cell.innerHTML = '<i class="fa-solid fa-plus"></i>';
+                }
+                registerTeamDropTarget(cell, i);
+                wrap.appendChild(cell);
+            });
+        }
+
+        // ---- Drag and drop between the team strip, the grid and the tabs ----
+        /* Left to itself the browser drags a rectangular snapshot of the
+           element, so a round tile travels as a square with hard corners that
+           sits over the circles it passes. setDragImage takes a purpose-built
+           copy instead — same diameter, same sprite, no selection ring.
+           It has to be in the document and painted when setDragImage is
+           called, so it is parked off-screen and swept up on the next tick
+           (the browser snapshots it synchronously once the handler returns). */
+        let boxDragGhost = null;
+
+        function clearDragGhost() {
+            if (boxDragGhost && boxDragGhost.parentNode) boxDragGhost.remove();
+            boxDragGhost = null;
+        }
+
+        function setCircleDragImage(e, sourceEl) {
+            if (!e.dataTransfer || !e.dataTransfer.setDragImage) return;
+            clearDragGhost();
+            const size = Math.round(sourceEl.getBoundingClientRect().width) || 62;
+            const ghost = sourceEl.cloneNode(true);
+            /* Drop the transient states — a ghost should look like the tile at
+               rest, not like the one being dragged out from under the cursor */
+            ghost.classList.remove('selected', 'dragging', 'drop-hover');
+            ghost.classList.add('box-drag-ghost');
+            ghost.style.width = size + 'px';
+            ghost.style.height = size + 'px';
+            document.body.appendChild(ghost);
+            boxDragGhost = ghost;
+            try { e.dataTransfer.setDragImage(ghost, size / 2, size / 2); } catch (_) { }
+            setTimeout(clearDragGhost, 0);
+        }
+
+        function clearDropHover() {
+            document.querySelectorAll('#box-modal .drop-hover')
+                .forEach(el => el.classList.remove('drop-hover'));
+        }
+
+        function allowBoxDrop(el, e) {
+            if (!boxDragUid) return false;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            el.classList.add('drop-hover');
+            return true;
+        }
+
+        // Drop onto a box (a tab, or the grid itself = the open box)
+        function registerBoxDropTarget(el, boxIdx) {
+            el.addEventListener('dragover', e => allowBoxDrop(el, e));
+            el.addEventListener('dragleave', () => el.classList.remove('drop-hover'));
+            el.addEventListener('drop', e => {
+                e.preventDefault();
+                el.classList.remove('drop-hover');
+                const uid = boxDragUid;
+                boxDragUid = null;
+                if (uid && moveMonToBox(uid, (boxIdx == null) ? activeBoxIdx() : boxIdx)) {
+                    renderBoxAll();
+                }
+            });
+        }
+
+        function registerTeamDropTarget(el, slotIdx) {
+            el.addEventListener('dragover', e => allowBoxDrop(el, e));
+            el.addEventListener('dragleave', () => el.classList.remove('drop-hover'));
+            el.addEventListener('drop', e => {
+                e.preventDefault();
+                el.classList.remove('drop-hover');
+                const uid = boxDragUid;
+                boxDragUid = null;
+                const found = uid ? findMon(uid) : null;
+                if (!found) return;
+                if (found.inBox) { if (withdrawFromBox(uid, slotIdx)) renderBoxAll(); }
+                else { swapTeamSlots(found.idx, slotIdx); renderBoxAll(); }
+            });
+        }
+
+        // ---- Selected-Pokémon actions ----
+        function withdrawSelected() {
+            if (boxSelectedUid && withdrawFromBox(boxSelectedUid, null)) {
+                boxSelectedUid = null;
+                renderBoxAll();
+            }
+        }
+
+        function openSelectedCard() {
+            if (boxSelectedUid) openBoxedPokemon(boxSelectedUid);
+        }
+
+        // ---- Rename / delete a box, release a Pokémon ----
+        function openBoxRename() {
+            const input = document.getElementById('box-rename-input');
+            input.value = activeBoxObj().name;
+            document.getElementById('box-rename-modal').style.display = 'flex';
+            input.focus();
+            input.select();
+        }
+
+        function closeBoxRename() {
+            document.getElementById('box-rename-modal').style.display = 'none';
+        }
+
+        function confirmBoxRename() {
+            const v = document.getElementById('box-rename-input').value.trim();
+            activeBoxObj().name = v || ('Box ' + (activeBoxIdx() + 1));
+            saveState();
+            closeBoxRename();
+            renderBoxAll();
+        }
+
+        function openBoxConfirm(title, html, okLabel, action) {
+            document.querySelector('#box-confirm-title span').textContent = title;
+            document.getElementById('box-confirm-text').innerHTML = html;
+            document.getElementById('box-confirm-ok').textContent = okLabel;
+            boxPendingAction = action;
+            document.getElementById('box-confirm-modal').style.display = 'flex';
+        }
+
+        function closeBoxConfirm() {
+            boxPendingAction = null;
+            document.getElementById('box-confirm-modal').style.display = 'none';
+        }
+
+        function confirmBoxAction() {
+            const act = boxPendingAction;
+            closeBoxConfirm();
+            if (act) act();
+            renderBoxAll();
+        }
+
+        function requestReleaseMon() {
+            const found = boxSelectedUid ? findMon(boxSelectedUid) : null;
+            if (!found || !found.inBox) return;
+            const p = slotPokemon(found.mon);
+            const uid = found.mon.uid;
+            openBoxConfirm('Release Pokémon',
+                'Release <strong>' + escapeHtml(p ? p.Name : found.mon.dexId)
+                + '</strong>? Its sheet — trained stats, moves, notes and all — goes with it.',
+                'Release', () => releaseMon(uid));
+        }
+
 
         // ------------------------------------------------------------------
         // Bag: two lined columns backed by the shared items database
@@ -9396,18 +10735,33 @@
                 return;
             }
 
+            const p = ALL_POKEMON.find(x => x._id === data.dexId);
+            const caught = escapeHtml(p ? p.Name : data.dexId);
+            const mon = { uid: genUid(), dexId: data.dexId, sheet: data.sheet || null, preview: null };
+
             const idx = sheetState.team.findIndex(s => !s.dexId);
             if (idx === -1) {
-                alert('This trainer\'s team is full (6 Pokémon). Remove one before capturing another.');
+                /* Team full: the capture still succeeds, it just goes to
+                   storage — same as the games, and better than losing it */
+                const target = firstBoxWithRoom();
+                if (target === -1) {
+                    alert('This trainer\'s team is full (6 Pokémon) and every PC box is full too.\n\n'
+                        + 'Release something, or add a box, before capturing another.');
+                    return;
+                }
+                shedBoxThumbnail(mon);
+                sheetState.boxes[target].mons.push(mon);
+                saveState();
+                renderBoxAll();
+                flashToast('<i class="fa-solid fa-box-archive"></i> Captured ' + caught
+                    + ' — team was full, sent to ' + escapeHtml(sheetState.boxes[target].name) + '.');
                 return;
             }
 
-            sheetState.team[idx] = { dexId: data.dexId, sheet: data.sheet || null };
+            sheetState.team[idx] = mon;
             saveState();
             renderTeam();
-            const p = ALL_POKEMON.find(x => x._id === data.dexId);
-            flashToast('<i class="fa-solid fa-hand-sparkles"></i> Captured '
-                + escapeHtml(p ? p.Name : data.dexId) + '!');
+            flashToast('<i class="fa-solid fa-hand-sparkles"></i> Captured ' + caught + '!');
         }
 
         // ------------------------------------------------------------------
@@ -9420,7 +10774,9 @@
             const p = slotPokemon(sheetState.team[idx]);
             document.getElementById('remove-poke-text').innerHTML =
                 'Remove <strong>' + (p ? escapeHtml(p.Name) : 'this Pokémon')
-                + '</strong> from the team? Its rank, item and current HP notes will be cleared.';
+                + '</strong> from the team? Its whole sheet is deleted.'
+                + '<br><br>To free the slot but keep the Pokémon, open '
+                + '<strong>PC Storage</strong> instead and drag it into a box.';
             document.getElementById('remove-poke-modal').style.display = 'flex';
         }
 
@@ -9431,9 +10787,14 @@
 
         function confirmRemovePokemon() {
             if (pendingRemoveSlot !== null) {
-                sheetState.team[pendingRemoveSlot] = { id: '', rank: '', item: '', chp: '' };
+                /* The canonical empty-slot shape. This used to write the
+                   pre-dexId {id,rank,item,chp} one, which only read as empty
+                   by accident (slot.dexId came back undefined) and was
+                   repaired on the next load. */
+                sheetState.team[pendingRemoveSlot] = { dexId: '', sheet: null, preview: null };
                 saveState();
                 renderTeam();
+                renderBoxAll();   // the storage window's team strip, if it is open
             }
             closeRemovePokemon();
         }
@@ -9904,6 +11265,14 @@
                 } else {
                     closeEquipment();
                 }
+                /* Same rule for the two dialogs that open over PC storage */
+                if (document.getElementById('box-rename-modal').style.display !== 'none') {
+                    closeBoxRename();
+                } else if (document.getElementById('box-confirm-modal').style.display !== 'none') {
+                    closeBoxConfirm();
+                } else {
+                    closeBoxModal();
+                }
             }
             /* Arrow keys switch trainers when several are loaded and no text
                field / editable is focused */
@@ -9973,6 +11342,7 @@
             renderAchievements();
             renderTrackers();
             renderTeam();
+            renderBoxAll();   // no-op unless the storage window is open
             renderEquipment();
             Object.keys(BAGS).forEach(renderBag);
             renderPotions();

@@ -213,6 +213,19 @@
             box-shadow: 0 0 8px var(--ghost-color-glow);
         }
 
+        /* A set with no art for this species — see SPRITE_SET_BLOCKED.
+           Matches the same rule in trainer-license.html. */
+        .sprite-btn.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .sprite-btn.disabled:hover {
+            background: #00000000;
+            color: var(--text-secondary);
+            box-shadow: none;
+        }
+
         /* Top-right stack in the sprite box: gender toggle (always shown) and the
            custom-image controls (revealed only while viewing an uploaded image).
            Sits opposite the resize control in the top-left corner. */
@@ -4063,8 +4076,14 @@
         const _params = new URLSearchParams(location.search);
         const TRAINER_ID = _params.get('trainer');
         const TRAINER_SLOT = parseInt(_params.get('slot'), 10);
+        /* The Pokémon's own id, stable as it moves between the team and the
+           trainer's PC boxes. `slot` alone can't address a boxed Pokémon, and
+           it goes stale the moment anything moves, so `uid` wins when both are
+           present — `slot` stays as the fallback for links made before uids
+           existed (an already-open tab, a bookmark, a hand-typed URL). */
+        const MON_UID = _params.get('uid');
         const WORKING_KEY = 'pokerole_working';
-        const inTrainerMode = !!TRAINER_ID && !isNaN(TRAINER_SLOT);
+        const inTrainerMode = !!TRAINER_ID && (!!MON_UID || !isNaN(TRAINER_SLOT));
 
         /* Wild mode (?wild=1): a Pokémon that belongs to no trainer. Stored in
            its own localStorage key and exportable as a wild-Pokémon JSON that a
@@ -4085,10 +4104,29 @@
         function workingTrainer(w) {
             return (w && Array.isArray(w.trainers)) ? w.trainers.find(t => t.id === TRAINER_ID) : null;
         }
-        function trainerSlotEntry(w) {
+        /* Locate this card's Pokémon inside the trainer, wherever it now sits:
+           by uid across the team and every PC box, else by the legacy slot
+           index. Returns the live object out of `w`, so callers mutate it and
+           write `w` back. */
+        function trainerMonEntry(w) {
             const t = workingTrainer(w);
-            if (!t || !t.data || !Array.isArray(t.data.team)) return null;
-            return t.data.team[TRAINER_SLOT] || null;
+            if (!t || !t.data) return null;
+            const team = Array.isArray(t.data.team) ? t.data.team : [];
+            if (MON_UID) {
+                const hit = team.find(s => s && s.uid === MON_UID);
+                if (hit) return hit;
+                const boxes = Array.isArray(t.data.boxes) ? t.data.boxes : [];
+                for (const b of boxes) {
+                    const mon = (b && Array.isArray(b.mons) ? b.mons : [])
+                        .find(m => m && m.uid === MON_UID);
+                    if (mon) return mon;
+                }
+                /* Released while this tab was open: fall through to the slot
+                   index only if the URL carried one, otherwise write nothing
+                   rather than clobber whoever holds that slot now. */
+                if (isNaN(TRAINER_SLOT)) return null;
+            }
+            return team[TRAINER_SLOT] || null;
         }
 
         // Character sheet interactive state; persisted per-Pokémon in localStorage,
@@ -4201,7 +4239,7 @@
         function loadState() {
             let saved;
             if (inTrainerMode) {
-                const entry = trainerSlotEntry(readWorking());
+                const entry = trainerMonEntry(readWorking());
                 saved = (entry && entry.sheet) ? JSON.stringify(entry.sheet) : null;
             } else {
                 saved = localStorage.getItem(currentStorageKey());
@@ -4248,11 +4286,11 @@
         function saveState() {
             if (inTrainerMode) {
                 const w = readWorking();
-                const t = workingTrainer(w);
-                if (t && t.data && Array.isArray(t.data.team) && t.data.team[TRAINER_SLOT]) {
-                    t.data.team[TRAINER_SLOT].sheet = sheetState;
-                    /* Keep the trainer's slot species in sync if it was changed */
-                    t.data.team[TRAINER_SLOT].dexId = pokemonData.pokemon._id;
+                const entry = trainerMonEntry(w);
+                if (entry) {
+                    entry.sheet = sheetState;
+                    /* Keep the trainer's species in sync if it was changed */
+                    entry.dexId = pokemonData.pokemon._id;
                     try { localStorage.setItem(WORKING_KEY, JSON.stringify(w)); } catch (e) { }
                 }
             } else {
@@ -5410,7 +5448,11 @@
             p.set('pokemon', id);
             if (inTrainerMode) {
                 p.set('trainer', TRAINER_ID);
-                p.set('slot', String(TRAINER_SLOT));
+                /* Carry whichever addressing this card was opened with, so an
+                   evolve/transform reload still targets the same Pokémon
+                   whether it sits in the team or in a box */
+                if (MON_UID) p.set('uid', MON_UID);
+                if (!isNaN(TRAINER_SLOT)) p.set('slot', String(TRAINER_SLOT));
             }
             if (WILD_MODE) p.set('wild', '1');
             location.search = '?' + p.toString();
@@ -5551,10 +5593,10 @@
 
             if (inTrainerMode) {
                 const w = readWorking();
-                const t = workingTrainer(w);
-                if (t && t.data && Array.isArray(t.data.team) && t.data.team[TRAINER_SLOT]) {
-                    t.data.team[TRAINER_SLOT].sheet = adjusted;
-                    t.data.team[TRAINER_SLOT].dexId = targetId;
+                const entry = trainerMonEntry(w);
+                if (entry) {
+                    entry.sheet = adjusted;
+                    entry.dexId = targetId;
                     try { localStorage.setItem(WORKING_KEY, JSON.stringify(w)); } catch (e) { }
                 }
             } else {
@@ -6872,6 +6914,21 @@
             delete _customImgUrlCache[kind + '/' + name];
         }
 
+        /* Sprite files that are not the Pokémon they claim to be, or are absent
+           from a pack. Filename → the sets to skip. egg.png in BookSprites is a
+           byte-for-byte copy of Alolan Exeggutor's illustration, so the egg
+           draws a palm tree; ShuffleTokens has no egg.png at all. The art is
+           wrong in the dataset itself, and the GitHub fallback serves the same
+           copy, so the only fix is to not offer those sets for that species.
+           Mirrored in trainer-license.html as SPRITE_SET_BLOCKED. */
+        const SPRITE_SET_BLOCKED = { 'egg.png': ['Book', 'Shuffle'] };
+
+        function spriteSetBlocked(type) {
+            const image = pokemonData && pokemonData.pokemon && pokemonData.pokemon.Image;
+            const blocked = image && SPRITE_SET_BLOCKED[image];
+            return !!blocked && blocked.indexOf(type) !== -1;
+        }
+
         function setSprite(type, persist = true) {
             const img = document.getElementById('poke-sprite');
 
@@ -6879,6 +6936,9 @@
                 // Nothing uploaded yet: fall back rather than show a blank tab
                 type = 'Home';
             }
+            /* Includes sheets saved before this check, whose stored spriteType
+               may still name a set with no art */
+            if (spriteSetBlocked(type)) type = 'Home';
 
             /* Remember the choice so it survives a reload and so the trainer
                license can show this same sprite on the team slot. The initial
@@ -6895,6 +6955,15 @@
                     btn.classList.add('active');
                 } else {
                     btn.classList.remove('active');
+                }
+                /* Grey out a set that has no art for this species rather than
+                   letting it draw the wrong Pokémon */
+                const label = btn.textContent.trim();
+                const kind = label === 'Token' ? 'Shuffle' : label;
+                if (kind !== 'Custom' && ['Home', 'Book', 'Box', 'Shuffle'].indexOf(kind) !== -1) {
+                    const off = spriteSetBlocked(kind);
+                    btn.classList.toggle('disabled', off);
+                    btn.title = off ? 'No ' + label + ' art for this Pokémon' : '';
                 }
             });
             document.getElementById('sprite-panel').classList.toggle('showing-custom', type === 'Custom');
@@ -7281,11 +7350,17 @@
             // A team member's slot is fixed, so hide "Load another Pokémon"
             const _lp = document.getElementById('load-picker');
             if (_lp) _lp.style.display = 'none';
-            const _t = workingTrainer(readWorking());
+            const _w = readWorking();
+            const _t = workingTrainer(_w);
             const _tname = (_t && _t.data && _t.data.name) ? _t.data.name : 'a trainer';
+            /* Say where it actually lives — a stored Pokémon is not on the team */
+            const _inBox = !!(MON_UID && _t && _t.data && Array.isArray(_t.data.boxes)
+                && _t.data.boxes.some(b => b && Array.isArray(b.mons)
+                    && b.mons.some(m => m && m.uid === MON_UID)));
             const banner = document.createElement('div');
-            banner.innerHTML = '<i class="fa-solid fa-id-card"></i> Editing a Pokémon on '
-                + '<strong></strong>’s team — changes save to that trainer';
+            banner.innerHTML = '<i class="fa-solid ' + (_inBox ? 'fa-box-archive' : 'fa-id-card')
+                + '"></i> Editing a Pokémon in <strong></strong>’s '
+                + (_inBox ? 'PC storage' : 'team') + ' — changes save to that trainer';
             banner.querySelector('strong').textContent = _tname;
             banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:200;text-align:center;'
                 + 'padding:7px 14px;font-family:Outfit,sans-serif;font-size:0.82rem;font-weight:600;'
