@@ -1158,9 +1158,12 @@
             color: #ffffffb3;
         }
 
+        /* An active status is a solid chip in that ailment's own color -
+           the same fill its tile in the reference window uses - with the
+           glyph inked for whichever of white/near-black reads on it. Both
+           are set inline by renderStatusTracker(). */
         .status-icon.active {
-            background: #ffffff0d;
-            border: 1px solid #ffffff1a;
+            border: none;
         }
 
         /* Another mutually exclusive ailment is active: not selectable */
@@ -1170,6 +1173,8 @@
             pointer-events: none;
         }
 
+        /* The burn degree, drawn over the flame. It is inked in the chip's
+           own color so it knocks out of the glyph rather than sitting on it. */
         .status-burn-degree {
             position: absolute;
             inset: 0;
@@ -1181,8 +1186,19 @@
             font-family: 'Fira Code', monospace;
             font-size: 0.55rem;
             font-weight: 700;
-            color: #fff;
-            text-shadow: 0 0 3px #000, 0 1px 2px #000000cc;
+            pointer-events: none;
+        }
+
+        /* Aggravating stages - 3rd degree burn, badly poisoned - carry a pip
+           in the corner of their chip: at 24px the deeper color on its own is
+           easy to miss next to the milder stage it replaces. */
+        .status-aggravating-pip {
+            position: absolute;
+            right: 2px;
+            bottom: 2px;
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
             pointer-events: none;
         }
 
@@ -2253,6 +2269,58 @@
             box-shadow: inset 0 0 0 1px var(--border-glow);
         }
 
+        /* Disable button: like the pin, always visible so a Move can be
+           disabled straight from a collapsed card. It is not painted in the
+           Disable ailment's own color the way the status chips are - that
+           color is #292829, which on this page would be an invisible mark. */
+        .move-disable-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            cursor: pointer;
+            padding: 4px 6px;
+            margin-right: 2px;
+            opacity: 0.5;
+            transition: all 0.2s;
+        }
+
+        .move-disable-btn:hover {
+            color: #f43f5e;
+            opacity: 1;
+        }
+
+        .move-card.disabled .move-disable-btn {
+            color: #f43f5e;
+            opacity: 1;
+            text-shadow: 0 0 8px #f43f5e;
+        }
+
+        /* A disabled Move stays where it is and stays readable - the rules
+           only forbid performing it, and it comes back. So it is struck
+           through and faded rather than hidden. The fade goes on the header
+           only: putting it on the card would take the ban icon down with it,
+           and putting it on the body would make a card you deliberately
+           opened hard to read. */
+        .move-card.disabled .move-meta,
+        .move-card.disabled .move-rank-badge {
+            opacity: 0.42;
+        }
+
+        .move-card.disabled .move-name {
+            text-decoration: line-through;
+            text-decoration-thickness: 2px;
+        }
+
+        /* The type stripe down the left edge goes grey, so a disabled card
+           reads as off at a glance in a long list. A flat white tint rather
+           than a theme variable - every one of those is a saturated color,
+           and one of them replacing the type color would read as a highlight
+           instead of an absence. */
+        .move-card.disabled::before {
+            background: #ffffff2e;
+        }
+
         /* Move editor form inside the modal */
         .move-edit-box {
             max-width: 460px;
@@ -2482,46 +2550,126 @@
             color: #f43f5e;
         }
 
-        /* Ailments reference window */
+        /* Ailments reference window: one color-coded tile per status. Each
+           tile carries the four things the rules give a status - Effect,
+           Treatment, Duration and its modifier - and is painted in that
+           status's own color, the same one its icon under the HP bar uses.
+           --ail is that color, --ail-ink and --ail-wash it lightened for the
+           band labels and thinned for their background; all three set inline. */
         .ailments-box {
-            max-width: 520px;
+            /* Three tile columns on a full-screen window, two on a smaller one,
+               one on a narrow one - the grid below picks, no media queries */
+            max-width: 1180px;
         }
 
         .ailments-content {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            max-height: 65vh;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+            /* Every tile spans the seven rows its header and three label/text
+               pairs need and subgrids onto them, so a band sits at the same
+               height in every tile on the row rather than wherever the text
+               above it happened to end. That means tiles on a row share a
+               height too - align-items: start would shrink them back to their
+               own content and stagger the bands again. */
+            column-gap: 12px;
+            row-gap: 12px;
+            max-height: 72vh;
             overflow-y: auto;
             padding-right: 6px;
         }
 
-        .ailment-item {
+        .ail-tile {
+            grid-row: span 7;
+            display: grid;
+            grid-template-rows: subgrid;
+            /* A subgrid inherits its parent's gutters, which would open a 12px
+               seam between every band and its text. The 12px is wanted only
+               between one row of tiles and the next, and that gutter belongs
+               to the parent, so it survives. */
+            row-gap: 0;
             background: #00000026;
             border: 1px solid #ffffff08;
-            border-radius: 10px;
-            padding: 10px 12px;
+            border-radius: 12px;
+            overflow: hidden;
+            /* The banner's color carried on around the whole tile. An outline
+               rather than a border because an outline takes up no space, so
+               the tiles stay exactly the size they were; drawn inset so it
+               covers that 1px border and, being painted above the children,
+               sits over the full-width band backgrounds instead of under
+               them - an inset box-shadow would end up behind them. */
+            outline: 2px solid var(--ail);
+            outline-offset: -2px;
         }
 
-        .ailment-name {
-            font-weight: 700;
-            font-size: 0.9rem;
-            color: var(--text-primary);
+        /* No subgrid: tiles size themselves again and the bands stagger, which
+           is merely the old look rather than a collapsed one */
+        @supports not (grid-template-rows: subgrid) {
+            .ailments-content {
+                align-items: start;
+            }
+
+            .ail-tile {
+                display: block;
+                grid-row: auto;
+            }
+        }
+
+        /* Background and text color are the status color and its ink, set
+           inline, as is the hairline: Disable's #292829 is so close to the
+           tile behind it that without one the header has no visible edge. */
+        .ail-tile-head {
             display: flex;
             align-items: center;
             gap: 8px;
-            margin-bottom: 4px;
+            padding: 8px 10px;
         }
 
-        .ailment-desc {
-            font-size: 0.82rem;
+        .ail-tile-icons {
+            display: flex;
+            gap: 2px;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+
+        .ail-tile-name {
+            flex: 1;
+            min-width: 0;
+            font-weight: 700;
+            font-size: 0.88rem;
+            line-height: 1.2;
+        }
+
+        .ail-tile-mod {
+            flex-shrink: 0;
+            font-size: 0.58rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 2px 7px;
+            border-radius: 999px;
+        }
+
+        .ail-band {
+            font-size: 0.6rem;
+            font-weight: 800;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            padding: 4px 10px;
+            color: var(--ail-ink);
+            background: var(--ail-wash);
+        }
+
+        .ail-text {
+            font-size: 0.78rem;
             color: var(--text-primary);
             line-height: 1.45;
+            padding: 7px 10px 9px;
         }
 
-        .ailment-desc strong {
+        .ail-text strong {
             color: var(--accent);
         }
+
 
         .ailment-immune {
             font-size: 0.75rem;
@@ -2546,7 +2694,14 @@
             box-shadow: 0 0 8px #f43f5e66;
         }
 
-        /* Universal quick moves (Evasion / Clash), two on one line */
+        /* Universal quick moves: Evasion / Clash on the first line,
+           Initiative / Pain on the second */
+        .quick-moves-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
         .quick-moves-row {
             display: flex;
             gap: 10px;
@@ -2597,6 +2752,35 @@
         .quick-move-val strong {
             color: var(--accent);
             font-size: 0.9rem;
+        }
+
+        /* Pain penalty: hidden rather than removed, so the box keeps its slot
+           and Initiative stays lined up under Evasion whatever the HP is */
+        .pain-quick {
+            visibility: hidden;
+            cursor: help;
+            background: #fb923c14;
+            border-color: #fb923c40;
+        }
+
+        .pain-quick.on {
+            visibility: visible;
+        }
+
+        .pain-quick .quick-move-name i,
+        .pain-quick .quick-move-val strong {
+            color: #fb923c;
+        }
+
+        /* At 1 HP the penalty doubles */
+        .pain-quick.severe {
+            background: #f43f5e14;
+            border-color: #f43f5e40;
+        }
+
+        .pain-quick.severe .quick-move-name i,
+        .pain-quick.severe .quick-move-val strong {
+            color: #fb7185;
         }
 
         /* Moves Cards Grid */
@@ -3177,7 +3361,7 @@
                     onchange="handleCustomSpriteUpload(this)">
             </div>
 
-            <!-- Pools: Health, Willpower, Def/Sp.Def, EXP, Status -->
+            <!-- Pools: Health, Willpower, Def, Sp.Def, EXP, Status -->
             <div class="tracker-panel">
                 <div class="tracker-row">
                     <span class="tracker-label"><i class="fa-solid fa-heart-pulse" style="color: #f43f5e;"></i>
@@ -3191,8 +3375,13 @@
                 </div>
                 <div class="tracker-row">
                     <span class="tracker-label"><i class="fa-solid fa-shield-halved" style="color: #93c5fd;"></i>
-                        Def/Sp.Def</span>
+                        Def</span>
                     <span class="pool-static-val" id="defense-value" title="Equal to Vitality">0</span>
+                </div>
+                <div class="tracker-row">
+                    <span class="tracker-label"><i class="fa-solid fa-shield-halved" style="color: #c4b5fd;"></i>
+                        Sp.Def</span>
+                    <span class="pool-static-val" id="sp-defense-value" title="Equal to Insight">0</span>
                 </div>
                 <div class="tracker-row">
                     <span class="tracker-label"><i class="fa-solid fa-ranking-star" style="color: #f59e0b;"></i>
@@ -3672,19 +3861,34 @@
                 </div>
 
                 <!-- Universal quick moves, always visible in every category -->
-                <div class="quick-moves-row">
-                    <div class="quick-move" title="Dexterity + Evasion">
-                        <span class="quick-move-name"><i class="fa-solid fa-person-running"></i> Evasion</span>
-                        <span class="quick-move-val"><strong id="quick-evasion">0</strong></span>
+                <div class="quick-moves-stack">
+                    <div class="quick-moves-row">
+                        <div class="quick-move" title="Dexterity + Evasion">
+                            <span class="quick-move-name"><i class="fa-solid fa-person-running"></i> Evasion</span>
+                            <span class="quick-move-val"><strong id="quick-evasion">0</strong></span>
+                        </div>
+                        <div class="quick-move">
+                            <span class="quick-move-name"><i class="fa-solid fa-hand-fist"></i> Clash</span>
+                            <span class="quick-move-vals">
+                                <span class="quick-move-val" title="Strength + Clash">STR <strong
+                                        id="quick-clash-str">0</strong></span>
+                                <span class="quick-move-val" title="Special + Clash">SPE <strong
+                                        id="quick-clash-spe">0</strong></span>
+                            </span>
+                        </div>
                     </div>
-                    <div class="quick-move">
-                        <span class="quick-move-name"><i class="fa-solid fa-hand-fist"></i> Clash</span>
-                        <span class="quick-move-vals">
-                            <span class="quick-move-val" title="Strength + Clash">STR <strong
-                                    id="quick-clash-str">0</strong></span>
-                            <span class="quick-move-val" title="Special + Clash">SPE <strong
-                                    id="quick-clash-spe">0</strong></span>
-                        </span>
+                    <div class="quick-moves-row">
+                        <div class="quick-move" title="Dexterity + Alert">
+                            <span class="quick-move-name"><i class="fa-solid fa-bolt"></i> Initiative</span>
+                            <span class="quick-move-val"><strong id="quick-initiative">0</strong></span>
+                        </div>
+                        <!-- Only shown while the Pokémon is hurt enough to take the
+                             penalty; it keeps its slot so Initiative stays under Evasion -->
+                        <div class="quick-move pain-quick" id="pain-quick"
+                            title="Pain penalty. At half HP or less (rounded down) you lose 1 success on Skill, Accuracy and Damage rolls; at 1 HP you lose 2.">
+                            <span class="quick-move-name"><i class="fa-solid fa-heart-crack"></i> Pain</span>
+                            <span class="quick-move-val"><strong id="pain-value">0</strong></span>
+                        </div>
                     </div>
                 </div>
 
@@ -4135,10 +4339,17 @@
         let sheetState = {
             hp: pokemonData.pokemon.BaseHP,
             will: 5,
+            hpMaxBonus: 0,
+            /* Manual resize of the HP pool, stored as an offset from
+               Base HP + Vitality so the pool still follows Vitality (and the
+               new species' Base HP after an evolution) instead of freezing */
+            willMaxBonus: 0,
+            /* Same, as an offset from Insight + 3 */
             hpMax: null,
-            /* null = Base HP + Vitality until manually resized */
             willMax: null,
-            /* null = Insight + 3 until manually resized */
+            /* Pre-1.2.0 absolute pool sizes. Migrated to the *Bonus offsets on
+               load and never written again; kept null so an older copy of the
+               app reading a new file falls back to the derived value. */
             exp: 0,
             notes: '',
             heldItem: '',
@@ -4170,8 +4381,10 @@
                 major: null,
                 /* 'burn' | 'paralysis' | 'poison' | 'frozen' | 'sleep' — mutually exclusive */
                 burnDegree: 0,
+                /* 0 none, 1 Poisoned, 2 Badly Poisoned — the poison icon
+                   cycles them the way burn cycles its degrees */
+                poisonStage: 0,
                 confusion: false,
-                disable: false,
                 flinch: false,
                 inLove: false
             },
@@ -4196,6 +4409,10 @@
             pinnedMoves: [],
             /* Move names pinned to the very top of the list, in pin order,
                overriding both the rank sort and any drag arrangement */
+            disabledMove: null,
+            /* The one Move currently under Disable. A single name rather than
+               a list because the rules allow only one at a time — disabling
+               another simply moves the mark. */
             customBaseStats: {},
             customMaxStats: {},
             socialBaseZeroMigrated: true,
@@ -4252,6 +4469,17 @@
                     /* Sheets saved before the status tracker existed have no
                        status object; partial ones get the missing keys back */
                     sheetState.status = { ...defaultStatus, ...(parsed.status || {}) };
+                    /* Poison used to be a plain on/off toggle; it now cycles
+                       through Poisoned and Badly Poisoned, so a sheet saved
+                       poisoned before that has no stage to show. */
+                    if (sheetState.status.major === 'poison' && !sheetState.status.poisonStage) {
+                        sheetState.status.poisonStage = 1;
+                    }
+                    /* Disable used to sit among the status icons, but it
+                       afflicts a Move rather than the Pokémon; it is now a
+                       toggle on the move card. An old sheet has no way to say
+                       which Move it meant, so the flag is simply dropped. */
+                    delete sheetState.status.disable;
 
                     // Migrate old string-based specialties to object-based
                     if (sheetState.specialties && sheetState.specialties.length > 0) {
@@ -4276,6 +4504,20 @@
                         });
                     }
                     sheetState.socialBaseZeroMigrated = true;
+
+                    /* Pool sizes used to be stored as absolute numbers, which
+                       froze HP and Will the moment either was resized by hand —
+                       raising Vitality (or evolving) then changed nothing. Turn
+                       an old absolute into the offset it represents, measured
+                       against the pool the current attributes derive. */
+                    if (parsed.hpMax != null) {
+                        sheetState.hpMaxBonus = parsed.hpMax - derivedPoolMax('hp');
+                        sheetState.hpMax = null;
+                    }
+                    if (parsed.willMax != null) {
+                        sheetState.willMaxBonus = parsed.willMax - derivedPoolMax('will');
+                        sheetState.willMax = null;
+                    }
                 } catch (e) {
                     console.error("Error parsing saved state:", e);
                 }
@@ -4302,24 +4544,46 @@
         }
 
         // Render HP & Willpower Trackers as bars (pools have no size limit)
-        function getPoolMax(key) {
+
+        /* The pool sizes the rules derive: HP is Base HP + Vitality, Will is
+           Insight + 3. Both have to keep following their attribute, so a manual
+           resize is stored as an offset from these rather than replacing them. */
+        function derivedPoolMax(key) {
             if (key === 'hp') {
-                return sheetState.hpMax != null ? sheetState.hpMax
-                    : pokemonData.pokemon.BaseHP + (resolvePoolValue('Vitality') || 0);
+                return pokemonData.pokemon.BaseHP + (resolvePoolValue('Vitality') || 0);
             }
-            return sheetState.willMax != null ? sheetState.willMax
-                : (resolvePoolValue('Insight') || 0) + 3;
+            return (resolvePoolValue('Insight') || 0) + 3;
+        }
+
+        function getPoolMax(key) {
+            const bonus = (key === 'hp' ? sheetState.hpMaxBonus : sheetState.willMaxBonus) || 0;
+            return Math.max(1, derivedPoolMax(key) + bonus);
         }
 
         function setPoolMax(key, value) {
-            const newMax = Math.max(1, value);
+            const bonus = Math.max(1, value) - derivedPoolMax(key);
             if (key === 'hp') {
-                sheetState.hpMax = newMax;
+                sheetState.hpMaxBonus = bonus;
             } else {
-                sheetState.willMax = newMax;
+                sheetState.willMaxBonus = bonus;
             }
             saveState();
             renderTrackers();
+        }
+
+        /* Vitality and Insight feed the two pool maxes, so anything that moves
+           them has to say what happens to the current value: a pool that was
+           full stays full, anything below keeps the number it had. */
+        function withPoolsFollowingStats(mutate) {
+            const wasFull = {
+                hp: sheetState.hp >= getPoolMax('hp'),
+                will: sheetState.will >= getPoolMax('will')
+            };
+            mutate();
+            ['hp', 'will'].forEach(key => {
+                const max = getPoolMax(key);
+                sheetState[key] = wasFull[key] ? max : Math.min(sheetState[key], max);
+            });
         }
 
         function setPoolCurrent(key, value) {
@@ -4486,30 +4750,82 @@
             renderMiniTrackers();
             renderStatusTracker();
             document.getElementById('defense-value').textContent = resolvePoolValue('Vitality') || 0;
+            document.getElementById('sp-defense-value').textContent = resolvePoolValue('Insight') || 0;
+            updatePainPenalty();
         }
 
-        // Status ailments: same icons and colors as the Ailments & Conditions window
-        const STATUS_AILMENTS = [
-            { key: 'burn', name: 'Burn', icon: 'fa-fire', color: '#f97316', exclusive: true },
-            { key: 'paralysis', name: 'Paralysis', icon: 'fa-bolt', color: '#facc15', exclusive: true },
-            { key: 'poison', name: 'Poison', icon: 'fa-skull-crossbones', color: '#c026d3', exclusive: true },
-            { key: 'frozen', name: 'Frozen', icon: 'fa-snowflake', color: '#22d3ee', exclusive: true },
-            { key: 'sleep', name: 'Sleep', icon: 'fa-moon', color: '#a78bfa', exclusive: true },
-            { key: 'confusion', name: 'Confusion', icon: 'fa-arrows-spin', color: '#ec4899', exclusive: false },
-            { key: 'disable', name: 'Disable', icon: 'fa-ban', color: '#9ca3af', exclusive: false },
-            { key: 'flinch', name: 'Flinch', icon: 'fa-face-surprise', color: '#93c5fd', exclusive: false },
-            { key: 'inLove', name: 'In Love', icon: 'fa-heart', color: '#f472b6', exclusive: false }
+        /* Pain penalty: at half HP or less (rounded down) every Skill, Accuracy
+           and Damage roll loses a success, and at 1 HP it loses two. Read off
+           the HP pool, so it lives with the trackers that clamp it. */
+        function painPenalty() {
+            if (sheetState.hp <= 1) return 2;
+            if (sheetState.hp <= Math.floor(getPoolMax('hp') / 2)) return 1;
+            return 0;
+        }
+
+        function updatePainPenalty() {
+            const box = document.getElementById('pain-quick');
+            if (!box) return;
+            const penalty = painPenalty();
+            box.classList.toggle('on', penalty > 0);
+            box.classList.toggle('severe', penalty > 1);
+            document.getElementById('pain-value').textContent = '\u2212' + penalty;
+        }
+
+        /* The twelve statuses, one tile each in the Ailments & Conditions
+           window. This is the only place their colors are written down: the
+           icons under the HP bar read theirs back out of here, so the chip
+           you click and the tile you read can never drift apart. `pips` is
+           how many times the icon repeats in the tile header (the burns show
+           their degree as 1-3 flames, the way the core book page does). */
+        const AILMENTS = [
+            { key: 'burn1', name: '1st Degree Burn', color: '#f15a22', modifier: 'Fixed', icon: 'fa-fire', pips: 1, immune: ['Fire'] },
+            { key: 'burn2', name: '2nd Degree Burn', color: '#c5351c', modifier: 'Fixed', icon: 'fa-fire', pips: 2, immune: ['Fire'] },
+            { key: 'burn3', name: '3rd Degree Burn', color: '#9e1c0f', modifier: 'Aggravating', icon: 'fa-fire', pips: 3, immune: ['Fire'] },
+            { key: 'paralysis', name: 'Paralysis', color: '#eedc00', modifier: 'Fixed', icon: 'fa-bolt', immune: ['Electric'] },
+            { key: 'poison', name: 'Poison', color: '#956597', modifier: 'Fixed', icon: 'fa-skull-crossbones', immune: ['Steel', 'Poison'] },
+            { key: 'badlyPoison', name: 'Badly Poisoned', color: '#784387', modifier: 'Aggravating', icon: 'fa-skull-crossbones', immune: ['Steel', 'Poison'] },
+            { key: 'frozen', name: 'Frozen', color: '#87d1d1', modifier: 'Fixed', icon: 'fa-snowflake', immune: ['Ice'] },
+            { key: 'sleep', name: 'Sleep', color: '#b4b68b', modifier: 'Fixed', icon: 'fa-moon', immune: [] },
+            { key: 'confusion', name: 'Confusion', color: '#00b37d', modifier: 'Volatile', icon: 'fa-arrows-spin', immune: [] },
+            { key: 'disable', name: 'Disable', color: '#292829', modifier: 'Volatile', icon: 'fa-ban', immune: [] },
+            { key: 'flinch', name: 'Flinch', color: '#555d6a', modifier: 'Volatile', icon: 'fa-face-surprise', immune: [] },
+            { key: 'inLove', name: 'In Love', color: '#f05b7d', modifier: 'Volatile', icon: 'fa-heart', immune: [] }
+        ];
+
+        function ailmentByKey(key) {
+            return AILMENTS.find(a => a.key === key);
+        }
+
+        /* The eight icons under the HP bar: the exclusive ailments on the first
+           row, the freely stackable conditions on the second. Disable is not
+           among them - it afflicts one Move, so it lives on the move card
+           instead (see toggleDisableMove). A status with
+           more than one stage cycles through them on click and takes its color
+           from whichever stage it is on. */
+        const STATUS_ICONS = [
+            { key: 'burn', name: 'Burn', icon: 'fa-fire', exclusive: true, numbered: true,
+                stageField: 'burnDegree', stages: ['burn1', 'burn2', 'burn3'] },
+            { key: 'paralysis', name: 'Paralysis', icon: 'fa-bolt', exclusive: true, stages: ['paralysis'] },
+            { key: 'poison', name: 'Poison', icon: 'fa-skull-crossbones', exclusive: true,
+                stageField: 'poisonStage', stages: ['poison', 'badlyPoison'] },
+            { key: 'frozen', name: 'Frozen', icon: 'fa-snowflake', exclusive: true, stages: ['frozen'] },
+            { key: 'sleep', name: 'Sleep', icon: 'fa-moon', exclusive: true, stages: ['sleep'] },
+            { key: 'confusion', name: 'Confusion', icon: 'fa-arrows-spin', exclusive: false, stages: ['confusion'] },
+            { key: 'flinch', name: 'Flinch', icon: 'fa-face-surprise', exclusive: false, stages: ['flinch'] },
+            { key: 'inLove', name: 'In Love', icon: 'fa-heart', exclusive: false, stages: ['inLove'] }
         ];
 
         function toggleStatus(key) {
             const st = sheetState.status;
-            const ailment = STATUS_AILMENTS.find(a => a.key === key);
-            if (ailment.exclusive) {
+            const s = STATUS_ICONS.find(a => a.key === key);
+            if (s.exclusive) {
                 if (st.major && st.major !== key) return;
-                if (key === 'burn') {
-                    /* Burn cycles through its degrees: 1 -> 2 -> 3 -> off */
-                    st.burnDegree = (st.burnDegree + 1) % 4;
-                    st.major = st.burnDegree > 0 ? 'burn' : null;
+                if (s.stageField) {
+                    /* Cycles through its stages and then off: burn 1st -> 2nd
+                       -> 3rd -> none, poison -> badly poisoned -> none */
+                    st[s.stageField] = (st[s.stageField] + 1) % (s.stages.length + 1);
+                    st.major = st[s.stageField] > 0 ? key : null;
                 } else {
                     st.major = st.major === key ? null : key;
                 }
@@ -4529,27 +4845,41 @@
             const stackableRow = document.createElement('div');
             stackableRow.className = 'status-track-row';
             container.append(exclusiveRow, stackableRow);
-            STATUS_AILMENTS.forEach(a => {
-                const active = a.exclusive ? st.major === a.key : st[a.key];
-                const locked = a.exclusive && st.major && st.major !== a.key;
+            STATUS_ICONS.forEach(s => {
+                const active = s.exclusive ? st.major === s.key : st[s.key];
+                const locked = s.exclusive && st.major && st.major !== s.key;
+                /* Which stage is showing, 1-based; the single-stage statuses
+                   are simply on their only one */
+                const stage = s.stageField ? st[s.stageField] : (active ? 1 : 0);
+                const ailment = ailmentByKey(s.stages[Math.max(0, stage - 1)]);
                 const btn = document.createElement('div');
                 btn.className = 'status-icon' + (active ? ' active' : '') + (locked ? ' locked' : '');
-                btn.title = a.name + (a.key === 'burn' && st.burnDegree > 0 ? ` (${st.burnDegree}° degree)` : '');
+                btn.title = active ? ailment.name : s.name;
                 const icon = document.createElement('i');
-                icon.className = 'fa-solid ' + a.icon;
+                icon.className = 'fa-solid ' + s.icon;
                 if (active) {
-                    icon.style.color = a.color;
-                    icon.style.filter = `drop-shadow(0 0 4px ${a.color}99)`;
+                    /* Filled chip in the ailment's own color, the same fill its
+                       tile header uses, with the glyph inked to read on it */
+                    btn.style.background = ailment.color;
+                    btn.style.boxShadow = `0 0 6px ${ailment.color}66`;
+                    icon.style.color = inkOn(ailment.color);
                 }
                 btn.appendChild(icon);
-                if (a.key === 'burn' && st.burnDegree > 0) {
+                if (active && s.numbered) {
                     const degree = document.createElement('span');
                     degree.className = 'status-burn-degree';
-                    degree.textContent = st.burnDegree;
+                    degree.style.color = ailment.color;
+                    degree.textContent = stage;
                     btn.appendChild(degree);
                 }
-                btn.onclick = () => toggleStatus(a.key);
-                (a.exclusive ? exclusiveRow : stackableRow).appendChild(btn);
+                if (active && ailment.modifier === 'Aggravating') {
+                    const pip = document.createElement('span');
+                    pip.className = 'status-aggravating-pip';
+                    pip.style.background = inkOn(ailment.color);
+                    btn.appendChild(pip);
+                }
+                btn.onclick = () => toggleStatus(s.key);
+                (s.exclusive ? exclusiveRow : stackableRow).appendChild(btn);
             });
         }
 
@@ -4629,17 +4959,19 @@
         }
 
         function toggleTrainStat(key, trainedValue, base, maxVal) {
-            const currentTrained = sheetState.trainedStats[key] || 0;
-            const cappedTrained = Math.min(trainedValue, maxVal - base);
-            if (currentTrained === cappedTrained) {
-                sheetState.trainedStats[key] = cappedTrained - 1;
-            } else {
-                sheetState.trainedStats[key] = cappedTrained;
-            }
+            withPoolsFollowingStats(() => {
+                const currentTrained = sheetState.trainedStats[key] || 0;
+                const cappedTrained = Math.min(trainedValue, maxVal - base);
+                if (currentTrained === cappedTrained) {
+                    sheetState.trainedStats[key] = cappedTrained - 1;
+                } else {
+                    sheetState.trainedStats[key] = cappedTrained;
+                }
 
-            if (sheetState.trainedStats[key] < 0) {
-                sheetState.trainedStats[key] = 0;
-            }
+                if (sheetState.trainedStats[key] < 0) {
+                    sheetState.trainedStats[key] = 0;
+                }
+            });
             saveState();
             renderStats();
         }
@@ -4720,39 +5052,41 @@
         }
 
         function saveCustomStats() {
-            sheetState.customBaseStats = {
-                strength: parseInt(document.getElementById('edit-base-strength').value) || 1,
-                dexterity: parseInt(document.getElementById('edit-base-dexterity').value) || 1,
-                vitality: parseInt(document.getElementById('edit-base-vitality').value) || 1,
-                special: parseInt(document.getElementById('edit-base-special').value) || 1,
-                insight: parseInt(document.getElementById('edit-base-insight').value) || 1,
-                tough: parseInt(document.getElementById('edit-base-tough').value) || 1,
-                cool: parseInt(document.getElementById('edit-base-cool').value) || 1,
-                beauty: parseInt(document.getElementById('edit-base-beauty').value) || 1,
-                cute: parseInt(document.getElementById('edit-base-cute').value) || 1,
-                clever: parseInt(document.getElementById('edit-base-clever').value) || 1
-            };
+            withPoolsFollowingStats(() => {
+                sheetState.customBaseStats = {
+                    strength: parseInt(document.getElementById('edit-base-strength').value) || 1,
+                    dexterity: parseInt(document.getElementById('edit-base-dexterity').value) || 1,
+                    vitality: parseInt(document.getElementById('edit-base-vitality').value) || 1,
+                    special: parseInt(document.getElementById('edit-base-special').value) || 1,
+                    insight: parseInt(document.getElementById('edit-base-insight').value) || 1,
+                    tough: parseInt(document.getElementById('edit-base-tough').value) || 1,
+                    cool: parseInt(document.getElementById('edit-base-cool').value) || 1,
+                    beauty: parseInt(document.getElementById('edit-base-beauty').value) || 1,
+                    cute: parseInt(document.getElementById('edit-base-cute').value) || 1,
+                    clever: parseInt(document.getElementById('edit-base-clever').value) || 1
+                };
 
-            sheetState.customMaxStats = {
-                strength: parseInt(document.getElementById('edit-max-strength').value) || 1,
-                dexterity: parseInt(document.getElementById('edit-max-dexterity').value) || 1,
-                vitality: parseInt(document.getElementById('edit-max-vitality').value) || 1,
-                special: parseInt(document.getElementById('edit-max-special').value) || 1,
-                insight: parseInt(document.getElementById('edit-max-insight').value) || 1,
-                tough: parseInt(document.getElementById('edit-max-tough').value) || 1,
-                cool: parseInt(document.getElementById('edit-max-cool').value) || 1,
-                beauty: parseInt(document.getElementById('edit-max-beauty').value) || 1,
-                cute: parseInt(document.getElementById('edit-max-cute').value) || 1,
-                clever: parseInt(document.getElementById('edit-max-clever').value) || 1
-            };
+                sheetState.customMaxStats = {
+                    strength: parseInt(document.getElementById('edit-max-strength').value) || 1,
+                    dexterity: parseInt(document.getElementById('edit-max-dexterity').value) || 1,
+                    vitality: parseInt(document.getElementById('edit-max-vitality').value) || 1,
+                    special: parseInt(document.getElementById('edit-max-special').value) || 1,
+                    insight: parseInt(document.getElementById('edit-max-insight').value) || 1,
+                    tough: parseInt(document.getElementById('edit-max-tough').value) || 1,
+                    cool: parseInt(document.getElementById('edit-max-cool').value) || 1,
+                    beauty: parseInt(document.getElementById('edit-max-beauty').value) || 1,
+                    cute: parseInt(document.getElementById('edit-max-cute').value) || 1,
+                    clever: parseInt(document.getElementById('edit-max-clever').value) || 1
+                };
 
-            // Ensure base does not exceed max cap
-            const keys = ['strength', 'dexterity', 'vitality', 'special', 'insight',
-                'tough', 'cool', 'beauty', 'cute', 'clever'];
-            keys.forEach(k => {
-                if (sheetState.customBaseStats[k] > sheetState.customMaxStats[k]) {
-                    sheetState.customMaxStats[k] = sheetState.customBaseStats[k];
-                }
+                // Ensure base does not exceed max cap
+                const keys = ['strength', 'dexterity', 'vitality', 'special', 'insight',
+                    'tough', 'cool', 'beauty', 'cute', 'clever'];
+                keys.forEach(k => {
+                    if (sheetState.customBaseStats[k] > sheetState.customMaxStats[k]) {
+                        sheetState.customMaxStats[k] = sheetState.customBaseStats[k];
+                    }
+                });
             });
 
             saveState();
@@ -4762,9 +5096,11 @@
         }
 
         function resetStatsToDefault() {
-            sheetState.customBaseStats = {};
-            sheetState.customMaxStats = {};
-            sheetState.trainedStats = {}; // reset training too
+            withPoolsFollowingStats(() => {
+                sheetState.customBaseStats = {};
+                sheetState.customMaxStats = {};
+                sheetState.trainedStats = {}; // reset training too
+            });
             saveState();
             renderStats();
             renderTrackers();
@@ -4960,6 +5296,19 @@
             const b = hexB.match(/\w\w/g).map(x => parseInt(x, 16));
             return '#' + a.map((v, i) =>
                 Math.round(v + (b[i] - v) * t).toString(16).padStart(2, '0')).join('');
+        }
+
+        /* White or near-black, whichever reads better painted on the given
+           fill. The status chips and the ailment tile headers are painted in
+           the twelve ailment colors, which run from #eedc00 to #292829 - no
+           single ink serves both ends. 0.19 is the luminance where the two
+           contrast ratios cross, so this always picks the better of the two;
+           the worst any of the twelve lands at is 4.6:1. */
+        function inkOn(hex) {
+            const [r, g, b] = hex.match(/\w\w/g)
+                .map(x => parseInt(x, 16) / 255)
+                .map(v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+            return (0.2126 * r + 0.7152 * g + 0.0722 * b) > 0.19 ? '#12100f' : '#ffffff';
         }
 
         function hexToHsl(hex) {
@@ -5558,6 +5907,13 @@
         function buildEvolvedSheet(targetDex) {
             const s = JSON.parse(JSON.stringify(sheetState));
             s.trainedStats = s.trainedStats || {};
+            /* Read before the stats are rebased: a Pokémon evolving at full
+               health comes out of it at full health, one that was hurt keeps
+               exactly the HP it had. Same for Will. */
+            const wasFull = {
+                hp: sheetState.hp >= getPoolMax('hp'),
+                will: sheetState.will >= getPoolMax('will')
+            };
 
             const rebase = (key, newBase, newMax) => {
                 const oldBase = defaultStats[key].base;              // species base of current form
@@ -5577,6 +5933,17 @@
             const keepAbility = evoAbilities.includes(sheetState.abilityInUse)
                 || (sheetState.customAbility && sheetState.abilityInUse === sheetState.customAbility);
             s.abilityInUse = keepAbility ? sheetState.abilityInUse : '';
+
+            /* The pools are derived, so the new form's Base HP and rebased
+               Vitality / Insight resize them on their own; only the current
+               values need deciding. */
+            const newHpMax = Math.max(1, targetDex.BaseHP
+                + targetDex.Vitality + (s.trainedStats.vitality || 0)
+                + (s.hpMaxBonus || 0));
+            const newWillMax = Math.max(1, targetDex.Insight + (s.trainedStats.insight || 0)
+                + 3 + (s.willMaxBonus || 0));
+            s.hp = wasFull.hp ? newHpMax : Math.min(s.hp, newHpMax);
+            s.will = wasFull.will ? newWillMax : Math.min(s.will, newWillMax);
             return s;
         }
 
@@ -5823,65 +6190,147 @@
             document.getElementById('type-eff-modal').style.display = 'none';
         }
 
-        // Ailments reference: heal rolls use the sheet's current values
+        /* Ailments reference: a tile per status, colored from AILMENTS, with
+           the Effect / Treatment / Duration text and the modifier the rules
+           give it. Heal rolls use the sheet's current values. */
         function openAilments() {
             const types = [pokemonData.pokemon.Type1, pokemonData.pokemon.Type2].filter(Boolean);
             const burnHeal = (resolvePoolValue('Dexterity') || 0) + (resolvePoolValue('Athletic') || 0);
             const insight = resolvePoolValue('Insight') || 0;
             const loyalty = resolvePoolValue('Loyalty') || 0;
 
-            const ailments = [
-                {
-                    name: 'Burn', icon: 'fa-fire', color: '#f97316', immune: ['Fire'],
-                    desc: `Divided into 1st, 2nd and 3rd degree. Heal roll: <strong>Dexterity + Athletic = ${burnHeal} dice</strong>. Successes needed: <strong>4</strong> (1st degree), <strong>6</strong> (2nd), <strong>8</strong> (3rd). 2nd and 3rd degree burns can be lethal.`
-                },
-                {
-                    name: 'Paralysis', icon: 'fa-bolt', color: '#facc15', immune: ['Electric'],
-                    desc: `Heal roll: <strong>Strength + Medicine</strong>, out of battle only, rolled by someone else (use the healer's values, not this Pokémon's).`
-                },
-                {
-                    name: 'Poisoned / Badly Poisoned', icon: 'fa-skull-crossbones', color: '#c026d3', immune: ['Steel', 'Poison'],
-                    desc: `Healing requires an <strong>Antidote</strong>. Badly Poisoned is <strong>lethal</strong> and keeps working even while the Pokémon is inside its Poke Ball.`
-                },
-                {
-                    name: 'Frozen', icon: 'fa-snowflake', color: '#22d3ee', immune: ['Ice'],
-                    desc: `The ice block around the Pokémon has <strong>5 HP</strong> and <strong>2 Def/Sp.Def</strong>. Super-effective moves break it instantly.`
-                },
-                {
-                    name: 'Sleep', icon: 'fa-moon', color: '#a78bfa', immune: [],
-                    desc: `In battle roll <strong>Insight = ${insight} dice</strong>; the Pokémon wakes up after <strong>5</strong> total successes.`
-                },
-                {
-                    name: 'Confusion', icon: 'fa-arrows-spin', color: '#ec4899', immune: [],
-                    desc: `In battle roll <strong>Insight = ${insight} dice</strong> at the beginning of the round: with <strong>2</strong> successes the Pokémon acts normally. Out of battle it lasts 5 minutes.`
-                },
-                {
-                    name: 'Disable', icon: 'fa-ban', color: '#9ca3af', immune: [],
-                    desc: `Cannot be resisted. Out of battle it lasts 5 minutes.`
-                },
-                {
-                    name: 'Flinch', icon: 'fa-face-surprise', color: '#93c5fd', immune: [],
-                    desc: `Lasts until the next turn.`
-                },
-                {
-                    name: 'In Love', icon: 'fa-heart', color: '#f472b6', immune: [],
-                    desc: `In battle roll <strong>Loyalty = ${loyalty} dice</strong>: at least <strong>3</strong> successes are needed to be able to attack the beloved. Out of battle it lasts 24 hours.`
-                }
-            ];
+            const burnCure = need => `On the subject's turn roll
+                <strong>Dexterity + Athletic = ${burnHeal} dice</strong> until it reaches
+                <strong>${need}</strong> successes. This roll costs an action. Out of battle
+                others can help put the fire out. Being inside a Poké Ball prevents the
+                damage.`;
+            /* Both stages of poison are treated the same way */
+            const poisonCure = `This effect cannot be resisted. It is treated with items or
+                berries. Out of battle, if the subject lies down and doesn't move, damage will
+                be dealt once per hour instead of each Round. Being inside a Poké Ball does
+                NOT prevent the damage.`;
 
-            document.getElementById('ailments-content').innerHTML = ailments.map(a => {
-                const isImmune = a.immune.some(t => types.includes(t));
+            const text = {
+                burn1: {
+                    effect: `Deal <strong>1</strong> point of damage at the end of each Round.`,
+                    treatment: burnCure(4),
+                    duration: `Until the affected faints or is fully treated.`
+                },
+                burn2: {
+                    effect: `Deal <strong>2</strong> points of lethal damage at the end of each Round.`,
+                    treatment: burnCure(6),
+                    duration: `Until the affected faints, dies or is fully treated.`
+                },
+                burn3: {
+                    effect: `Deal <strong>3</strong> points of lethal damage at the end of each Round,
+                        increasing by <strong>1</strong> each Round that passes.`,
+                    treatment: burnCure(8),
+                    duration: `Until the affected faints or dies.`
+                },
+                paralysis: {
+                    effect: `The subject loses <strong>2</strong> points in Dexterity. Narratively it
+                        moves at half its speed or can barely move.`,
+                    treatment: `This effect cannot be resisted. In battle it can be healed with items
+                        or berries. Out of battle <u>others</u> can roll
+                        <strong>Strength + Medicine</strong> (not the Pokémon's) to massage the
+                        subject's muscles. Each success reduces the duration by
+                        <strong>1</strong> hour.`,
+                    duration: `Lasts <strong>12</strong> hours.`
+                },
+                poison: {
+                    effect: `Deals <strong>2</strong> points of damage at the end of each turn.`,
+                    treatment: poisonCure,
+                    duration: `Lasts for <strong>8</strong> hours or until the affected faints.`
+                },
+                badlyPoison: {
+                    effect: `Deals <strong>2</strong> points of damage at the end of each turn.
+                        Increase damage by <strong>2</strong> each Round that passes.`,
+                    treatment: poisonCure,
+                    duration: `Lasts until the affected faints or dies. If fainted, it takes
+                        <strong>1</strong> lethal damage per hour.`
+                },
+                frozen: {
+                    effect: `The subject cannot perform any action, as it is inside a block of ice.
+                        The block has <strong>5 HP</strong> with a <strong>Def/Sp.Def</strong> score
+                        of <strong>2</strong>.`,
+                    treatment: `At the end of the Round the subject or an ally may try to break the
+                        block with a Move. This Move costs an action. Super-effective Moves break
+                        the ice instantly.`,
+                    duration: `Until the ice block is destroyed. Out of battle the ice melts after a
+                        few hours if not treated, leaving the subject unconscious.`
+                },
+                sleep: {
+                    effect: `The subject falls into a deep slumber and cannot perform any action
+                        until it wakes up.`,
+                    treatment: `In battle or under stress roll <strong>Insight = ${insight} dice</strong>
+                        at the start of the subject's turn until it reaches <strong>5</strong>
+                        successes. This roll costs an action.`,
+                    duration: `Out of battle it lasts a few hours, unless the subject is under stress
+                        or aware of danger.`
+                },
+                confusion: {
+                    effect: `The subject removes a number of successes from all the action rolls
+                        according to their Rank. Starter to Standard removes <strong>1</strong>
+                        success, Advanced to Ace removes <strong>2</strong>, Master or higher removes
+                        <strong>3</strong>. If the action fails, the subject is dealt
+                        <strong>1</strong> damage.`,
+                    treatment: `At the beginning of all the next Rounds the subject rolls
+                        <strong>Insight = ${insight} dice</strong>, affected by the confusion malus.
+                        With <strong>2</strong> successes it can act normally that Round.`,
+                    duration: `Until treated with items or the Pokémon is switched out. Out of
+                        battle the subject is disoriented for about 5 minutes and may attack itself
+                        or its allies.`
+                },
+                disable: {
+                    effect: `The subject cannot perform a disabled Move. Only one Move can be disabled
+                        per subject at a time. If a new Move is disabled, the previous Move is no
+                        longer disabled.`,
+                    treatment: `This effect cannot be resisted or treated.`,
+                    duration: `Out of battle the effect lasts 5 minutes.`
+                },
+                flinch: {
+                    effect: `The subject cannot use actions or reactions until the end of its next
+                        turn. Only one Flinch can be inflicted per subject each Round.`,
+                    treatment: `This effect cannot be treated.`,
+                    duration: `Until the end of the subject's next turn.`
+                },
+                inLove: {
+                    effect: `The subject falls in heavy infatuation. The subject will
+                        “Hold Back” against the beloved.`,
+                    treatment: `The subject rolls <strong>Loyalty = ${loyalty} dice</strong> or
+                        <strong>Insight = ${insight} dice</strong>. If it scores <strong>3</strong>
+                        or higher it can attack the beloved at full power.`,
+                    duration: `In battle it is treated with a <strong>Full Heal</strong> only. Out of
+                        battle the subject removes all hostile intentions for about 24 hours.`
+                }
+            };
+
+            document.getElementById('ailments-content').innerHTML = AILMENTS.map(a => {
+                const t = text[a.key];
+                const ink = inkOn(a.color);
+                const isImmune = a.immune.some(type => types.includes(type));
                 const immuneNote = a.immune.length > 0
                     ? `<div class="ailment-immune${isImmune ? ' active' : ''}">
                            <i class="fa-solid fa-shield"></i>
-                           ${a.immune.join(' and ')}-type Pokémon are immune${isImmune ? ' - this Pokémon is immune!' : '.'}
+                           ${a.immune.join(' and ')}-type Pokémon are immune${isImmune ? ' - this one is immune!' : '.'}
                        </div>`
                     : '';
                 return `
-                    <div class="ailment-item">
-                        <div class="ailment-name"><i class="fa-solid ${a.icon}" style="color: ${a.color}"></i> ${a.name}</div>
-                        <div class="ailment-desc">${a.desc}</div>
-                        ${immuneNote}
+                    <div class="ail-tile" style="--ail: ${a.color};
+                        --ail-ink: ${mixHex(a.color, '#ffffff', 0.44)};
+                        --ail-wash: ${mixHex(a.color, '#ffffff', 0.1)}5c;">
+                        <div class="ail-tile-head" style="background: ${a.color}; color: ${ink};
+                            border-bottom: 1px solid ${ink}1f;">
+                            <span class="ail-tile-icons">${`<i class="fa-solid ${a.icon}"></i>`.repeat(a.pips || 1)}</span>
+                            <span class="ail-tile-name">${a.name}</span>
+                            <span class="ail-tile-mod" style="background: ${ink}1f;">${a.modifier}</span>
+                        </div>
+                        <div class="ail-band">Effect</div>
+                        <div class="ail-text">${t.effect}${immuneNote}</div>
+                        <div class="ail-band">Treatment</div>
+                        <div class="ail-text">${t.treatment}</div>
+                        <div class="ail-band">Duration</div>
+                        <div class="ail-text">${t.duration}</div>
                     </div>
                 `;
             }).join('');
@@ -6211,6 +6660,8 @@
             const clashSkill = resolvePoolValue('Clash') || 0;
             document.getElementById('quick-evasion').textContent =
                 (resolvePoolValue('Dexterity') || 0) + (resolvePoolValue('Evasion') || 0);
+            document.getElementById('quick-initiative').textContent =
+                (resolvePoolValue('Dexterity') || 0) + (resolvePoolValue('Alert') || 0);
             document.getElementById('quick-clash-str').textContent =
                 (resolvePoolValue('Strength') || 0) + clashSkill;
             document.getElementById('quick-clash-spe').textContent =
@@ -6399,6 +6850,14 @@
             renderMoves();
         }
 
+        /* Disable / re-enable a Move. Only one Move can be disabled at a
+           time, so disabling another just moves the mark off the first. */
+        function toggleDisableMove(name) {
+            sheetState.disabledMove = sheetState.disabledMove === name ? null : name;
+            saveState();
+            renderMoves();
+        }
+
         function renderMoves() {
             const grid = document.getElementById('moves-list-grid');
             /* Re-renders (saving a move edit, changing filters...) rebuild
@@ -6442,7 +6901,9 @@
                 // Create move card
                 const card = document.createElement('div');
                 const isPinned = (sheetState.pinnedMoves || []).includes(move.Name);
-                card.className = `move-card ${move.Category}${isPinned ? ' pinned' : ''}`;
+                const isDisabled = sheetState.disabledMove === move.Name;
+                card.className = `move-card ${move.Category}${isPinned ? ' pinned' : ''}`
+                    + (isDisabled ? ' disabled' : '');
                 card.dataset.moveName = move.Name;
                 card.style.setProperty('--type-color', typeColors[move.Type] || '#e5e7eb');
                 card.onclick = function () { toggleMove(this); };
@@ -6646,6 +7107,16 @@
                         ${attrTags ? `<div class="move-attr-tags">${attrTags}</div>` : ''}
                     </div>
                 `;
+
+                const disableBtn = document.createElement('button');
+                disableBtn.className = 'move-disable-btn';
+                disableBtn.title = isDisabled ? 'Re-enable this move' : 'Disable this move';
+                disableBtn.innerHTML = '<i class="fa-solid fa-ban"></i>';
+                disableBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleDisableMove(move.Name);
+                };
+                card.querySelector('.move-rank-badge').before(disableBtn);
 
                 const pinBtn = document.createElement('button');
                 pinBtn.className = 'move-pin-btn';

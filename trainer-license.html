@@ -4991,6 +4991,52 @@
             flex-shrink: 0;
         }
 
+        /* Healing Item pool (Clever + Medicine). A read-only derived value, so
+           it is a single slim bar above the satchel rather than another panel —
+           it sits with the potions because that is what it is rolled for. */
+        .heal-box {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: #0d09144c;
+            border: 1px solid #ffffff0d;
+            border-radius: 14px;
+            padding: 9px 14px;
+            cursor: help;
+        }
+
+        .heal-box-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.66rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--text-primary);
+        }
+
+        .heal-box-label i {
+            color: #4ade80;
+        }
+
+        .heal-box-val {
+            flex-shrink: 0;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            background: #00000033;
+            border: 1px solid #ffffff0d;
+            border-radius: 8px;
+            padding: 3px 12px;
+        }
+
+        .heal-box-val strong {
+            color: var(--accent);
+            font-size: 0.9rem;
+        }
+
         .other-textarea {
             flex: 1;
             width: 100%;
@@ -5069,6 +5115,8 @@
         :root.light-theme .line-item,
         :root.light-theme .bag-col-label,
         :root.light-theme .potion-tallies,
+        :root.light-theme .heal-box,
+        :root.light-theme .heal-box-val,
         :root.light-theme .other-box,
         :root.light-theme .tally-sq,
         :root.light-theme .ach-check,
@@ -5114,12 +5162,24 @@
         :root.light-theme .hwe-box,
         :root.light-theme .other-box,
         :root.light-theme .potion-tallies,
+        :root.light-theme .heal-box,
         :root.light-theme .achievements-box,
         :root.light-theme .team-slot,
         :root.light-theme .notepad-textarea,
         :root.light-theme .pokemon-picker-btn,
         :root.light-theme .ach-check {
             background: #00000012;
+        }
+
+        /* The Healing Item chip sits on an already-tinted box, so it needs a
+           lighter fill of its own to stay legible; the green kit icon is a
+           dark-page color and gets the same halfway-to-black ink as typeInk. */
+        :root.light-theme .heal-box-val {
+            background: #0000001f;
+        }
+
+        :root.light-theme .heal-box-label i {
+            color: #256f40;
         }
 
         :root.light-theme .notepad-textarea {
@@ -5832,7 +5892,9 @@
                         <span class="skill-group-label">Social</span>
                         <div class="skill-group-rows">
                             <div class="tower-skill">
-                                <span class="tower-skill-name">Charm</span>
+                                <!-- Label only. The key stays "charm" so trainer .json
+                                     files written before the rename still load. -->
+                                <span class="tower-skill-name">Etiquette</span>
                                 <div class="skill-dots" data-skill="charm"></div>
                             </div>
                             <div class="tower-skill">
@@ -5984,6 +6046,11 @@
             </div>
 
             <div class="potions-row">
+                <div class="heal-box"
+                    title="Healing Item = Clever + Medicine.&#10;Items and healing moves restore at most 3 HP per round.">
+                    <span class="heal-box-label"><i class="fa-solid fa-kit-medical"></i> Healing Item</span>
+                    <span class="heal-box-val"><strong id="heal-item-value">0</strong></span>
+                </div>
                 <div class="potion-tallies" id="potion-tallies"></div>
                 <div class="other-box">
                     <div class="hwe-label">Other Stuff</div>
@@ -7087,8 +7154,17 @@
                 rank: '',
                 hp: 5,
                 will: 4,
+                hpMaxBonus: 0,
+                /* Manual resize of the HP pool, stored as an offset from
+                   4 + Vitality so the pool still follows Vitality instead of
+                   freezing at whatever it was set to */
+                willMaxBonus: 0,
+                /* Same, as an offset from Insight + 3 */
                 hpMax: null,
                 willMax: null,
+                /* Pre-1.2.0 absolute pool sizes. Migrated to the *Bonus offsets
+                   in normalizeState and never written again; kept null so an
+                   older copy of the app reading a new file still derives them. */
                 exp: 0,
                 age: '',
                 money: 1500,
@@ -7245,6 +7321,18 @@
                 .filter(e => e.name);
             if (!Array.isArray(s.extras) || !s.extras.length) s.extras = [{ name: '', value: 0 }, { name: '', value: 0 }];
             if (!s.manualBookmarks || typeof s.manualBookmarks !== 'object' || Array.isArray(s.manualBookmarks)) s.manualBookmarks = {};
+            /* Pool sizes used to be stored as absolute numbers, which froze HP
+               and Will the moment either was resized by hand — raising Vitality
+               afterwards changed nothing. Turn an old absolute into the offset
+               it represents, measured against this sheet's own attributes. */
+            if (parsed.hpMax != null) {
+                s.hpMaxBonus = parsed.hpMax - derivedPoolMax('hp', s);
+                s.hpMax = null;
+            }
+            if (parsed.willMax != null) {
+                s.willMaxBonus = parsed.willMax - derivedPoolMax('will', s);
+                s.willMax = null;
+            }
             /* Editions moved to per-file storage in the Core Book folder; drop any
                edition list left behind in older trainer JSON so the file stays clean. */
             delete s.manualVersions;
@@ -8611,8 +8699,10 @@
                         dot.style.borderColor = c + (light ? '80' : '59');
                     }
                     dot.onclick = () => {
-                        /* Clicking the current value steps down; attributes never drop below 1 */
-                        sheetState.stats[key] = (value === i) ? Math.max(1, i - 1) : i;
+                        withPoolsFollowingStats(() => {
+                            /* Clicking the current value steps down; attributes never drop below 1 */
+                            sheetState.stats[key] = (value === i) ? Math.max(1, i - 1) : i;
+                        });
                         saveState();
                         renderPills();
                         /* HP and Will pools follow Vitality / Insight */
@@ -8621,6 +8711,8 @@
                     container.appendChild(dot);
                 }
             });
+            /* Healing Item follows Clever */
+            renderHealingItem();
         }
 
         // ------------------------------------------------------------------
@@ -8642,6 +8734,17 @@
                     container.appendChild(dot);
                 }
             });
+            /* Healing Item follows Medicine */
+            renderHealingItem();
+        }
+
+        /* Healing Item: the pool rolled when using a healing item, and a
+           read-only value — it is Clever + Medicine, nothing else. Lives with
+           the potion satchel in the Bag quadrant. */
+        function renderHealingItem() {
+            const el = document.getElementById('heal-item-value');
+            if (!el) return;
+            el.textContent = (sheetState.stats.clever || 0) + (sheetState.skills.medicine || 0);
         }
 
         const EXTRA_MAX_ROWS = 4;
@@ -8747,24 +8850,45 @@
         // ------------------------------------------------------------------
         // HP & Will pools (same bars as the Pokémon page)
         // ------------------------------------------------------------------
+        /* The pool sizes the rules derive: HP is 4 + Vitality, Will is Insight + 3.
+           Both have to keep following their attribute, so a manual resize is
+           stored as an offset from these rather than replacing them. Takes the
+           state explicitly because normalizeState migrates trainers that are not
+           the one on screen. */
+        function derivedPoolMax(key, state) {
+            const stats = (state || sheetState).stats;
+            return key === 'hp' ? 4 + stats.vitality : stats.insight + 3;
+        }
+
         function getPoolMax(key) {
-            if (key === 'hp') {
-                return sheetState.hpMax != null ? sheetState.hpMax
-                    : 4 + sheetState.stats.vitality;
-            }
-            return sheetState.willMax != null ? sheetState.willMax
-                : sheetState.stats.insight + 3;
+            const bonus = (key === 'hp' ? sheetState.hpMaxBonus : sheetState.willMaxBonus) || 0;
+            return Math.max(1, derivedPoolMax(key) + bonus);
         }
 
         function setPoolMax(key, value) {
-            const newMax = Math.max(1, value);
+            const bonus = Math.max(1, value) - derivedPoolMax(key);
             if (key === 'hp') {
-                sheetState.hpMax = newMax;
+                sheetState.hpMaxBonus = bonus;
             } else {
-                sheetState.willMax = newMax;
+                sheetState.willMaxBonus = bonus;
             }
             saveState();
             renderTrackers();
+        }
+
+        /* Vitality and Insight feed the two pool maxes, so anything that moves
+           them has to say what happens to the current value: a pool that was
+           full stays full, anything below keeps the number it had. */
+        function withPoolsFollowingStats(mutate) {
+            const wasFull = {
+                hp: sheetState.hp >= getPoolMax('hp'),
+                will: sheetState.will >= getPoolMax('will')
+            };
+            mutate();
+            ['hp', 'will'].forEach(key => {
+                const max = getPoolMax(key);
+                sheetState[key] = wasFull[key] ? max : Math.min(sheetState[key], max);
+            });
         }
 
         function setPoolCurrent(key, value) {
