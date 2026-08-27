@@ -6666,6 +6666,16 @@
                 <span class="modal-text" style="margin: 0; font-size: 0.8rem; opacity: 0.7;">
                     Version <strong id="info-version">—</strong>
                 </span>
+                <!-- Forces a check past the every-few-minutes floor. .cancel, not .save:
+                     bare .form-btn is shape only (see the note below), and .save is what
+                     "View on GitHub" wears — two accent buttons in one short row compete. -->
+                <span style="display: flex; align-items: center; gap: 10px;">
+                    <button type="button" id="update-check-btn" class="form-btn cancel"
+                        style="font-size: 0.72rem; padding: 4px 10px;"
+                        onclick="manualUpdateCheck()">Check now</button>
+                    <span id="update-status" class="modal-text"
+                        style="margin: 0; font-size: 0.78rem; opacity: 0.7;"></span>
+                </span>
                 <span id="update-available" style="display: none; align-items: center; flex-wrap: wrap; gap: 16px;">
                     <span class="modal-text" style="margin: 0; font-size: 0.8rem; color: var(--ghost-color);">
                         <i class="fa-solid fa-circle-arrow-up"></i>
@@ -6797,12 +6807,21 @@
                because no release has been published yet — all of it means
                "no news", never an error message. The app works fine without
                a network and must not imply otherwise.
-             - One request per day, cached in localStorage. GitHub allows 60
-               per hour per IP to anonymous callers, and someone reopening
-               sheets all evening must not burn through that.
-           ------------------------------------------------------------------ */
+             - A floor between requests, not a cache lifetime. GitHub allows 60
+               per hour per IP to anonymous callers, so back-to-back reloads
+               have to be absorbed — but only those.
+
+           UPDATE_FLOOR used to be a 24-hour TTL, and that was wrong in a way
+           worth recording. The timestamp is rewritten on every check, findings
+           or not, so someone who opens the sheet around the same time each
+           evening always meets a cache ~23h old — still "fresh" — and the check
+           is skipped, evening after evening. It only ever fired on a load that
+           happened to land more than a day after the previous one, which made a
+           new release take days to show up rather than a day. Whatever this
+           number becomes, it must stay short enough that a normal session gap
+           clears it. */
         const UPDATE_KEY = 'pokerole_update_check';
-        const UPDATE_INTERVAL = 24 * 60 * 60 * 1000;
+        const UPDATE_FLOOR = 5 * 60 * 1000;
 
         function readUpdateCache() {
             try { return JSON.parse(localStorage.getItem(UPDATE_KEY)) || null; } catch (e) { return null; }
@@ -6837,14 +6856,18 @@
             if (link) link.href = info.url || ('https://github.com/' + APP_REPO + '/releases/latest');
         }
 
-        async function checkForUpdate() {
-            if (typeof APP_VERSION === 'undefined' || typeof APP_REPO === 'undefined') return;
+        /* force=true skips the floor — that's the "Check now" button, which is a
+           deliberate act and shouldn't be told to come back in five minutes.
+           Returns the stamp it rendered, so a caller can say what happened.
+           Automatic callers ignore the return value and stay silent. */
+        async function checkForUpdate(force = false) {
+            if (typeof APP_VERSION === 'undefined' || typeof APP_REPO === 'undefined') return null;
 
             const cached = readUpdateCache();
-            // Fresh enough? Show what we already know and stay off the network.
-            if (cached && (Date.now() - (cached.lastCheck || 0)) < UPDATE_INTERVAL) {
+            // Asked too soon after the last one? Show what we know, stay off the network.
+            if (!force && cached && (Date.now() - (cached.lastCheck || 0)) < UPDATE_FLOOR) {
                 renderUpdateState(cached);
-                return;
+                return cached;
             }
             renderUpdateState(cached);   // paint the current version immediately either way
 
@@ -6852,25 +6875,68 @@
             const ctrl = new AbortController();
             const timer = setTimeout(() => ctrl.abort(), 5000);
             const stamp = { lastCheck: Date.now() };
+            /* Did GitHub actually answer? Set inside the try, because a 403 rate
+               limit and a 5xx are perfectly ordinary responses and never throw —
+               catching is not enough to tell a real answer from a failed one. */
+            let answered = false;
             try {
                 const res = await fetch('https://api.github.com/repos/' + APP_REPO + '/releases/latest',
                     { headers: { 'Accept': 'application/vnd.github+json' }, signal: ctrl.signal });
-                /* 404 = the repo has no releases yet. Perfectly normal, not an error. */
                 if (res.ok) {
                     const data = await res.json();
                     if (data && data.tag_name) {
                         stamp.latest = String(data.tag_name).replace(/^v/i, '');
                         stamp.url = data.html_url;
+                        answered = true;
                     }
+                } else if (res.status === 404) {
+                    /* The repo has no releases at all. Perfectly normal, not an
+                       error — and a real answer: there is nothing to report. */
+                    answered = true;
                 }
             } catch (e) {
                 /* Offline, DNS failure, timeout, blocked by an extension — no news. */
             } finally {
                 clearTimeout(timer);
             }
-            // Stamp the time even on failure, so a week offline isn't a retry every load
+            /* A failed check must not forget what the last good one found. At the
+               old 24h spacing that barely showed; at five minutes, one load on a
+               dropped connection would clear a dot the user was looking at a
+               minute ago. A clean 404 is exempt — it *is* the answer. */
+            if (!answered && cached && cached.latest) {
+                stamp.latest = cached.latest;
+                stamp.url = cached.url;
+            }
+            stamp.ok = answered;
+            // Stamp the time even on failure, so a spell offline isn't a retry every load
             writeUpdateCache(stamp);
             renderUpdateState(stamp);
+            return stamp;
+        }
+
+        /* The "Check now" button in the info modal. Unlike the automatic check
+           this one reports failure: silence on a button you just pressed reads
+           as broken, not as "no news". Disabling the button while the request is
+           in flight is the whole rate-limit guard — one click, one request, at
+           human pace. */
+        async function manualUpdateCheck() {
+            const btn = document.getElementById('update-check-btn');
+            const out = document.getElementById('update-status');
+            if (btn) btn.disabled = true;
+            if (out) out.textContent = 'Checking…';
+            let info = null;
+            try {
+                info = await checkForUpdate(true);
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+            if (!out) return;
+            const newer = info && info.latest && typeof APP_VERSION !== 'undefined'
+                && compareVersions(info.latest, APP_VERSION) > 0;
+            // When there's an update the row beside this says so already
+            out.textContent = newer ? ''
+                : (info && info.ok) ? 'You’re up to date'
+                    : 'Couldn’t reach GitHub';
         }
 
         const GITHUB_RAW = 'https://raw.githubusercontent.com/Willowlark/Pokerole-Data/master';
@@ -11038,7 +11104,12 @@
             openWorkingFolder();
         }
 
-        function openInfoModal() { document.getElementById('info-modal').style.display = 'flex'; }
+        function openInfoModal() {
+            // Don't leave last time's "up to date" sitting there as if it were news
+            const out = document.getElementById('update-status');
+            if (out) out.textContent = '';
+            document.getElementById('info-modal').style.display = 'flex';
+        }
         function closeInfoModal() { document.getElementById('info-modal').style.display = 'none'; }
 
         function finishFolderLoad(loaded, diag) {

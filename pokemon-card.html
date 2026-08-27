@@ -3348,7 +3348,10 @@
                     <span class="sprite-scale-val" id="sprite-scale-val">1.00×</span>
                     <button class="sprite-scale-reset" onclick="resetSpriteScale()">Reset</button>
                 </div>
-                <img id="poke-sprite" class="pokemon-sprite" src="" alt="Pokémon Sprite">
+                <!-- No src attribute on purpose: src="" resolves against the page URL and
+                     makes the browser fetch this HTML file as an image, erroring on every
+                     load. setSprite() fills it in as soon as the species is known. -->
+                <img id="poke-sprite" class="pokemon-sprite" alt="Pokémon Sprite">
                 <div class="sprite-selectors">
                     <button class="sprite-btn active" onclick="setSprite('Home')">Home</button>
                     <button class="sprite-btn" onclick="setSprite('Book')">Book</button>
