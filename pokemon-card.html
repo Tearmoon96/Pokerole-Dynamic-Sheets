@@ -448,9 +448,9 @@
             background-clip: text;
             -webkit-text-fill-color: #00000000;
             text-shadow: 0 0 20px var(--primary-soft);
-            /* Keep the whole title (name + number) on one line and let it shrink
-               inside the flex row so long names don't wrap or push the gender
-               toggle away; fitPokemonName() scales the font down to fit. */
+            /* Keep the title on one line and let it shrink inside the flex row
+               so long names don't wrap or push the gender toggle away;
+               fitPokemonName() scales the font down to fit. */
             white-space: nowrap;
             min-width: 0;
             max-width: 100%;
@@ -479,42 +479,110 @@
             color: #fff;
         }
 
+        /* The dex category and the #number share one line, but it is the
+           CATEGORY that has to land on the header's centre axis, with the
+           number hanging off its right. Three columns with the outer two at
+           1fr do that in flow: they stay equal whatever the number's width,
+           so the middle cell is centred while column 3 holds the badge. A
+           flex row centred as a pair would drift the text left by half the
+           badge; absolute-positioning the badge would let it escape the card. */
+        .pokemon-subline {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .pokemon-subline .pokemon-category { grid-column: 2; }
+
+        .pokemon-subline .pokemon-number {
+            grid-column: 3;
+            justify-self: start;
+        }
+
+        /* A hidden copy of the badge in column 1. 1fr columns still refuse to
+           shrink below their content, so on a cramped line column 3 would hold
+           the badge while column 1 collapsed to nothing and the category would
+           drift left. Reserving the same width on both sides keeps it centred
+           at any width. */
+        .pokemon-subline .pokemon-number.mirror {
+            grid-column: 1;
+            justify-self: end;
+            visibility: hidden;
+        }
+
+        /* A step smaller than the category beside it, so the line still reads
+           as one subtitle instead of two competing labels. letter-spacing is
+           reset because the row is uppercase-tracked around it. */
         .pokemon-number {
             font-family: 'Fira Code', monospace;
             background: var(--border-color);
-            padding: 2px 8px;
+            padding: 1px 7px;
             border-radius: 6px;
-            font-size: 0.9rem;
+            font-size: 0.7rem;
             color: var(--text-secondary);
             font-weight: 600;
-            /* Lives inside the h1: middle-aligns on the name's x-height,
-               which tracks the glyphs' visual center at any font size */
-            display: inline-block;
-            vertical-align: middle;
-            margin-left: 8px;
-            /* Undo inherited gradient-text styling from .pokemon-name */
-            -webkit-text-fill-color: var(--text-secondary);
             letter-spacing: normal;
-            text-shadow: none;
+            flex-shrink: 0;
         }
 
+        /* The dex category line ("Seed Pokémon"). 0.775rem is the 0.9rem it
+           used to be, 2px smaller — it is a subtitle, not a second title. */
         .pokemon-category {
-            font-size: 0.9rem;
+            font-size: 0.775rem;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 2px;
-            margin-top: 4px;
             opacity: 0.8;
         }
 
+        /* Two equal halves with the 10px gap dead centre, so on a dual-type
+           Pokémon the space *between* the badges sits on the same vertical
+           line as the name, the category, the middle tool button and Evolve.
+           Centring the pair as one group (justify-content: center) does not:
+           the badges are different widths, so the gap drifts off-axis by half
+           that difference — 3.7px on Grass/Poison.
+
+           The badges are grid items rather than children of #type-badges
+           because that span is display: contents; selectors still follow the
+           DOM, hence the descendant combinators below. */
         .types-row {
-            display: flex;
-            justify-content: center;
+            display: grid;
+            grid-auto-flow: column;
+            grid-auto-columns: 1fr;
             gap: 10px;
             margin-top: 10px;
         }
 
-        /* Button opening the themed Pokémon browser modal */
+        /* First badge ends at the gap, second starts after it */
+        .types-row .type-badge {
+            justify-self: end;
+        }
+
+        .types-row .type-badge:last-child {
+            justify-self: start;
+        }
+
+        /* A single type has no gap to centre, so centre the badge itself.
+           Must follow :last-child, which a lone badge also matches. */
+        .types-row .type-badge:only-child {
+            justify-self: center;
+        }
+
+        /* The row of round tool buttons under the types: type chart, ailments,
+           weather, sheet reset, load another. All are .type-eff-btn, so they
+           are one size and one shape; wrap is there for a narrow window. */
+        .header-tools {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        /* Wild mode only now that "Load another Pokémon" is a header tool:
+           the Export / Import pair below the header. */
         .pokemon-picker {
             display: flex;
             justify-content: center;
@@ -814,6 +882,15 @@
             image-rendering: pixelated;
         }
 
+        /* A hidden copy of the stone on the name's other side, same idea as
+           .pokemon-number.mirror on the subline: the visible stone alone would
+           push the name off the header's centre axis, so the title no longer
+           lined up with the lines under it. Reserving the same width on both
+           sides keeps the name itself centred. */
+        .pokemon-name .mega-stone-icon.mirror {
+            visibility: hidden;
+        }
+
         .type-badge {
             padding: 6px 16px;
             border-radius: 30px;
@@ -840,7 +917,11 @@
             width: 46px;
             height: 30px;
             padding: 0;
-            /* Fixed size so all header tool buttons match exactly */
+            /* Fixed size so all header tool buttons match exactly. flex-shrink
+               is off because .header-tools is a flex row: without it a cramped
+               column would squeeze the buttons to different widths instead of
+               wrapping them, and the row would stop looking like one set. */
+            flex-shrink: 0;
             border-radius: 30px;
             font-size: 0.85rem;
             cursor: pointer;
@@ -857,11 +938,12 @@
             box-shadow: 0 0 10px var(--ghost-color-glow);
         }
 
-        /* Full-sheet reset: destructive, so it glows red instead */
-        .type-eff-btn.sheet-reset-btn:hover {
-            background: #f43f5e;
-            border-color: #f43f5e;
-            box-shadow: 0 0 10px #f43f5e66;
+        /* Heal: the one restorative button in the row, so it glows green —
+           the same #10b981 the move effects use for a change for the better */
+        .type-eff-btn.heal-btn:hover {
+            background: #10b981;
+            border-color: #10b981;
+            box-shadow: 0 0 10px #10b98166;
         }
 
         /* Type effectiveness modal rows */
@@ -975,12 +1057,13 @@
             color: #fff;
         }
 
-        /* The FontAwesome +/- glyphs render optically high in these small
-           round buttons; nudge them onto the true center */
-        .pool-btn i,
-        #custom-adder-btn i {
-            transform: translateY(0.5px);
-        }
+        /* No nudge on the +/- glyphs. There used to be a translateY(0.5px)
+           here to "correct" them, but the font metrics say they need nothing:
+           measured against Font Awesome 6 Free at this size, the ink of both
+           fa-minus and fa-plus sits 37.5/100 em above the baseline, exactly
+           where the middle of the line box sits, so flex centring already
+           lands them true. Half a pixel is a twentieth of an 18px button, and
+           pushing them down by it is what made them look off. */
 
         .pool-track {
             display: flex;
@@ -1099,6 +1182,109 @@
             border: 1px solid #ffffff0d;
             padding: 3px 12px;
             border-radius: 8px;
+        }
+
+        /* A defence that has been nudged says so in its own colour. The pair is
+           the file's existing vocabulary for better / worse - the same two hexes
+           the move effects use on a stat-stage change - and both are fixed
+           rather than themed, so they read on every type's palette. */
+        .buffed {
+            color: #10b981;
+        }
+
+        .nerfed {
+            color: #f43f5e;
+        }
+
+        /* Def / Sp.Def offset popover. Opens on hovering anywhere in the row, so
+           the pointer never crosses dead space getting to it, and stays open
+           while the pointer is inside the popup itself. Right-aligned over the
+           value and pulled left into the panel: the value pill sits at the
+           panel's right edge, and a popup growing rightwards would hang off the
+           card. .tracker-panel sets no overflow, so it is free to overhang the
+           padding. Chrome is the documented target; this is plain CSS hover,
+           with no timers to get out of step with a re-render. */
+        /* The popup is anchored to the value pill, not to the row, and opens to
+           its left: anchored to the row it covered the very number being
+           edited, and the pill's width changes with the digits so a fixed
+           offset from the row's right edge would drift. */
+        .def-val-wrap {
+            position: relative;
+            display: inline-flex;
+        }
+
+        .def-offset-pop {
+            position: absolute;
+            right: calc(100% + 10px);
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 4;
+            display: none;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 7px;
+            background: #0d0914f2;
+            border: 1px solid var(--border-glow);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px #000000cc;
+        }
+
+        .def-row:hover .def-offset-pop,
+        .def-offset-pop:hover {
+            display: flex;
+        }
+
+        .def-offset-btn {
+            width: 17px;
+            height: 17px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            border-radius: 50%;
+            border: 1px solid #ffffff26;
+            background: #00000066;
+            color: var(--text-secondary);
+            font-size: 0.56rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .def-offset-btn:hover {
+            color: #fff;
+            border-color: var(--ghost-color);
+            box-shadow: 0 0 8px var(--ghost-color-glow);
+        }
+
+        /* Tabular figures and a fixed width so stepping through the values
+           doesn't shuffle the buttons left and right under the pointer */
+        .def-offset-val {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            min-width: 26px;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .def-offset-reset {
+            background: none;
+            border: none;
+            padding: 0 2px;
+            color: var(--text-muted);
+            font-family: inherit;
+            /* Its line box is what would set the popup's height if it grew;
+               kept under the 17px buttons so they stay the tallest thing in it */
+            line-height: 1.2;
+            font-size: 0.62rem;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .def-offset-reset:hover {
+            color: var(--text-primary);
         }
 
         /* Status ailment icons: exclusive ailments on the first row,
@@ -2601,6 +2787,18 @@
             outline-offset: -2px;
         }
 
+        /* Weather reuses the ailment tiles, but its entries may carry a
+           different number of bands each, so the subgrid row-matching has
+           nothing to match: let the tiles size themselves instead. */
+        #weather-content {
+            align-items: start;
+        }
+
+        #weather-content .ail-tile {
+            display: block;
+            grid-row: auto;
+        }
+
         /* No subgrid: tiles size themselves again and the bands stagger, which
            is merely the old look rather than a collapsed one */
         @supports not (grid-template-rows: subgrid) {
@@ -2754,28 +2952,34 @@
             font-size: 0.9rem;
         }
 
-        /* Pain penalty: hidden rather than removed, so the box keeps its slot
-           and Initiative stays lined up under Evasion whatever the HP is */
-        .pain-quick {
-            visibility: hidden;
-            cursor: help;
-            background: #fb923c14;
-            border-color: #fb923c40;
-        }
-
+        /* Pain penalty. Always on screen, even at 0 — an empty slot said
+           nothing, while a visible "0" says the rule exists and is not biting
+           yet. At 0 it inherits .quick-move untouched, so it reads as one of
+           the four; the colour only arrives with the penalty. No cursor: help
+           either — the blue question mark it draws beside the pointer is not
+           worth it when every other box here explains itself with a plain
+           tooltip and the default arrow. */
+        /* Measured identical to Evasion/Clash/Initiative — 280.25 x 49, same
+           padding, same 1px border. It only READ as bigger: those three carry
+           a 4%-white border that is all but invisible, so a 25% orange edge
+           around a lighter fill made this one bulge. The warning itself is
+           carried by the icon and the value, which stay full-strength orange. */
         .pain-quick.on {
-            visibility: visible;
+            background: #fb923c0d;
+            border-color: #fb923c26;
         }
 
-        .pain-quick .quick-move-name i,
-        .pain-quick .quick-move-val strong {
+        .pain-quick.on .quick-move-name i,
+        .pain-quick.on .quick-move-val strong {
             color: #fb923c;
         }
 
-        /* At 1 HP the penalty doubles */
+        /* At 1 HP the penalty doubles. One step louder than the orange state
+           so the escalation is felt, but nowhere near the old 40% edge — the
+           red hue and the doubled number already do the shouting. */
         .pain-quick.severe {
-            background: #f43f5e14;
-            border-color: #f43f5e40;
+            background: #f43f5e0f;
+            border-color: #f43f5e33;
         }
 
         .pain-quick.severe .quick-move-name i,
@@ -3073,6 +3277,75 @@
             color: var(--ghost-color);
         }
 
+        /* Small note under a field in the move editor */
+        .move-edit-hint {
+            font-size: 0.66rem;
+            line-height: 1.3;
+            color: var(--text-muted);
+        }
+
+        /* Why the total is not just the stat pool: one small glyph per reason,
+           sized off the status icons under EXP. Worded chips said the same
+           thing but ate the badge - three of them at once buried the number
+           they were annotating. Each glyph carries its own title instead. */
+        .total-flags {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-left: 6px;
+        }
+
+        /* Always in the markup so refreshMoveTotals() only has to fill it;
+           empty it must take no space, margin included */
+        .total-flags:empty {
+            display: none;
+        }
+
+        .total-flag {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 5px;
+            background: #00000040;
+            color: var(--text-secondary);
+            font-size: 0.6rem;
+            flex-shrink: 0;
+        }
+
+        .total-flag svg {
+            width: 11px;
+            height: 11px;
+            display: block;
+        }
+
+        /* A bonus points the same arrows the other way */
+        .total-flag.flag-up svg {
+            transform: rotate(180deg);
+        }
+
+        /* Combined selectors, not the bare .buffed / .nerfed: those are declared
+           further up the sheet, so at equal specificity the colour above would
+           win and the glyph would never change colour. */
+        .total-flag.nerfed {
+            color: #f43f5e;
+        }
+
+        .total-flag.buffed {
+            color: #10b981;
+        }
+
+        /* The same orange/red pair the Pain box uses, so the glyph and the box
+           it comes from are recognisably the same thing */
+        .total-flag.pain {
+            color: #fb923c;
+        }
+
+        .total-flag.pain.severe {
+            color: #fb7185;
+        }
+
         .move-total.power {
             background: #f9731614;
             border: 1px solid #f9731640;
@@ -3287,23 +3560,35 @@
                 </div>
                 <input type="text" id="nickname-input" class="nickname-input" maxlength="20"
                     placeholder="Give it a nickname…" onchange="setSheetField('nickname', this.value.trim())">
-                <div class="pokemon-category" id="pokemon-category"></div>
+                <div class="pokemon-subline">
+                    <span class="pokemon-number mirror" id="pokedex-number-mirror" aria-hidden="true"></span>
+                    <span class="pokemon-category" id="pokemon-category"></span>
+                    <span class="pokemon-number" id="pokedex-number"></span>
+                </div>
+                <!-- Types only. The tool buttons used to share this row; they have
+                     their own below so the typing reads as one line by itself. -->
                 <div class="types-row">
                     <span id="type-badges" style="display: contents;"></span>
+                </div>
+                <!-- Header tools, all the same pill. "Load another Pokémon" keeps
+                     id="load-picker" because trainer mode hides it by that id. -->
+                <div class="header-tools">
                     <button class="type-eff-btn" onclick="openTypeEffectiveness()" title="Type Effectiveness">
                         <i class="fa-solid fa-shield"></i>
                     </button>
                     <button class="type-eff-btn" onclick="openAilments()" title="Ailments & Conditions">
                         <i class="fa-solid fa-kit-medical"></i>
                     </button>
-                    <button class="type-eff-btn sheet-reset-btn" onclick="openSheetReset()"
-                        title="Reset the whole sheet to its default values">
-                        <i class="fa-solid fa-arrow-rotate-left"></i>
+                    <button class="type-eff-btn" onclick="openWeather()" title="Weather Conditions">
+                        <i class="fa-solid fa-cloud-sun-rain"></i>
                     </button>
-                </div>
-                <div class="pokemon-picker" id="load-picker">
-                    <button class="pokemon-picker-btn" onclick="openPokePicker()">
-                        <i class="fa-solid fa-magnifying-glass"></i> Load another Pokémon
+                    <button class="type-eff-btn heal-btn" onclick="openHeal()"
+                        title="Heal: full HP and Will, every status cleared">
+                        <i class="fa-solid fa-heart-circle-plus"></i>
+                    </button>
+                    <button class="type-eff-btn" id="load-picker" onclick="openPokePicker()"
+                        title="Load another Pokémon">
+                        <i class="fa-solid fa-magnifying-glass"></i>
                     </button>
                 </div>
                 <!-- Evolve / Mega buttons, filled by renderStaticInfo() -->
@@ -3376,15 +3661,40 @@
                         Willpower</span>
                     <div class="pool-track" id="will-tracker"></div>
                 </div>
-                <div class="tracker-row">
+                <!-- The two defences. The offset popup is static markup, built
+                     once: renderTrackers() only rewrites the numbers inside it, so
+                     it never vanishes from under the pointer mid-click. -->
+                <div class="tracker-row def-row">
                     <span class="tracker-label"><i class="fa-solid fa-shield-halved" style="color: #93c5fd;"></i>
                         Def</span>
+                    <span class="def-val-wrap">
                     <span class="pool-static-val" id="defense-value" title="Equal to Vitality">0</span>
+                    <div class="def-offset-pop">
+                        <button type="button" class="def-offset-btn" title="Lower by 1"
+                            onclick="stepDefence('def', -1)"><i class="fa-solid fa-minus"></i></button>
+                        <span class="def-offset-val" id="def-offset-val">±0</span>
+                        <button type="button" class="def-offset-btn" title="Raise by 1"
+                            onclick="stepDefence('def', 1)"><i class="fa-solid fa-plus"></i></button>
+                        <button type="button" class="def-offset-reset"
+                            onclick="clearDefence('def')">Reset</button>
+                    </div>
+                    </span>
                 </div>
-                <div class="tracker-row">
+                <div class="tracker-row def-row">
                     <span class="tracker-label"><i class="fa-solid fa-shield-halved" style="color: #c4b5fd;"></i>
                         Sp.Def</span>
+                    <span class="def-val-wrap">
                     <span class="pool-static-val" id="sp-defense-value" title="Equal to Insight">0</span>
+                    <div class="def-offset-pop">
+                        <button type="button" class="def-offset-btn" title="Lower by 1"
+                            onclick="stepDefence('spDef', -1)"><i class="fa-solid fa-minus"></i></button>
+                        <span class="def-offset-val" id="sp-def-offset-val">±0</span>
+                        <button type="button" class="def-offset-btn" title="Raise by 1"
+                            onclick="stepDefence('spDef', 1)"><i class="fa-solid fa-plus"></i></button>
+                        <button type="button" class="def-offset-reset"
+                            onclick="clearDefence('spDef')">Reset</button>
+                    </div>
+                    </span>
                 </div>
                 <div class="tracker-row">
                     <span class="tracker-label"><i class="fa-solid fa-ranking-star" style="color: #f59e0b;"></i>
@@ -3868,11 +4178,23 @@
                     <div class="quick-moves-row">
                         <div class="quick-move" title="Dexterity + Evasion">
                             <span class="quick-move-name"><i class="fa-solid fa-person-running"></i> Evasion</span>
-                            <span class="quick-move-val"><strong id="quick-evasion">0</strong></span>
+                            <!-- Pain costs a success on this roll too. The glyph sits to
+                                 the LEFT of the value: the number is the pool, and Pain
+                                 is not in it - it comes off the successes afterwards.
+                                 Shown and titled by updatePainPenalty(). -->
+                            <span class="quick-move-vals">
+                                <span class="total-flag pain quick-pain" style="display: none;"></span>
+                                <span class="quick-move-val"><strong id="quick-evasion">0</strong></span>
+                            </span>
                         </div>
-                        <div class="quick-move">
+                        <!-- Title on the box, like Evasion and Initiative: the two
+                             values had one each, so the tooltip only appeared over
+                             the numbers. The per-value titles below still win when
+                             the pointer is actually on one. -->
+                        <div class="quick-move" title="Strength or Special, + Clash">
                             <span class="quick-move-name"><i class="fa-solid fa-hand-fist"></i> Clash</span>
                             <span class="quick-move-vals">
+                                <span class="total-flag pain quick-pain" style="display: none;"></span>
                                 <span class="quick-move-val" title="Strength + Clash">STR <strong
                                         id="quick-clash-str">0</strong></span>
                                 <span class="quick-move-val" title="Special + Clash">SPE <strong
@@ -3883,7 +4205,10 @@
                     <div class="quick-moves-row">
                         <div class="quick-move" title="Dexterity + Alert">
                             <span class="quick-move-name"><i class="fa-solid fa-bolt"></i> Initiative</span>
-                            <span class="quick-move-val"><strong id="quick-initiative">0</strong></span>
+                            <span class="quick-move-vals">
+                                <span class="total-flag pain quick-pain" style="display: none;"></span>
+                                <span class="quick-move-val"><strong id="quick-initiative">0</strong></span>
+                            </span>
                         </div>
                         <!-- Only shown while the Pokémon is hurt enough to take the
                              penalty; it keeps its slot so Initiative stays under Evasion -->
@@ -4029,16 +4354,19 @@
         </div>
     </div>
 
-    <!-- Full sheet reset: two warnings before wiping the saved state -->
-    <div class="modal-overlay" id="sheet-reset-modal" style="display: none;"
-        onclick="if (event.target === this) closeSheetReset()">
+    <!-- Heal: one confirmation, because it discards the damage and the statuses
+         recorded so far and there is no undo -->
+    <div class="modal-overlay" id="heal-modal" style="display: none;"
+        onclick="if (event.target === this) closeHeal()">
         <div class="modal-box">
-            <div class="modal-title"><i class="fa-solid fa-triangle-exclamation" style="color: #f43f5e;"></i> Reset
-                Sheet</div>
-            <p class="modal-text" id="sheet-reset-text"></p>
+            <div class="modal-title"><i class="fa-solid fa-heart-circle-plus" style="color: #10b981;"></i>
+                Heal Pokémon</div>
+            <p class="modal-text">A visit to the Pokémon Center: Health and Willpower go back to full,
+                every status is cleared, the Disable is lifted off whichever Move carries it, and any
+                hand-set Def/Sp.Def offset resets to ±0.</p>
             <div class="modal-actions">
-                <button class="form-btn cancel" onclick="closeSheetReset()">Cancel</button>
-                <button class="form-btn danger" id="sheet-reset-confirm-btn" onclick="confirmSheetReset()"></button>
+                <button class="form-btn cancel" onclick="closeHeal()">Cancel</button>
+                <button class="form-btn save" onclick="confirmHeal()">Heal</button>
             </div>
         </div>
     </div>
@@ -4071,6 +4399,23 @@
             </div>
             <div class="ailments-content" id="ailments-content">
                 <!-- Rendered by openAilments() -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Weather conditions. Same tile chrome as the ailments window (the .ail-*
+         classes) because it is the same kind of reference card. -->
+    <div class="modal-overlay" id="weather-modal" style="display: none;"
+        onclick="if (event.target === this) closeWeather()">
+        <div class="modal-box ailments-box">
+            <button class="modal-close-btn" onclick="closeWeather()" title="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="modal-title" style="color: var(--text-primary);">
+                <i class="fa-solid fa-cloud-sun-rain" style="color: #38bdf8;"></i> Weather Conditions
+            </div>
+            <div class="ailments-content" id="weather-content">
+                <!-- Rendered by openWeather() from WEATHER_CONDITIONS -->
             </div>
         </div>
     </div>
@@ -4111,6 +4456,10 @@
                                 onclick="stepOffset('edit-move-acc-offset', -1)"><i class="fa-solid fa-chevron-down"></i></button>
                         </div>
                     </div>
+                    <!-- Filled by openMoveEditor when the move has a Low Accuracy of
+                         its own: without it, typing 0 here on a move that rolls at
+                         -1 looks like the field is broken. -->
+                    <span class="move-edit-hint" id="edit-move-acc-hint" style="display: none;"></span>
                 </label>
                 <label class="move-edit-field">
                     <span class="move-edit-label">Power Offset</span>
@@ -4338,7 +4687,6 @@
 
         // Character sheet interactive state; persisted per-Pokémon in localStorage,
         // or (in trainer mode) inside the trainer's working-set entry
-        const storageKey = 'pokerole_' + pokemonData.pokemon._id + '_sheet';
         let sheetState = {
             hp: pokemonData.pokemon.BaseHP,
             will: 5,
@@ -4348,6 +4696,13 @@
                new species' Base HP after an evolution) instead of freezing */
             willMaxBonus: 0,
             /* Same, as an offset from Insight + 3 */
+            defBonus: 0,
+            spDefBonus: 0,
+            /* Hand-set offsets on the two defences, for armour, an ability or a
+               GM ruling. Offsets and not absolutes, for the same reason as the
+               pools above: Def has to keep following Vitality (and Sp.Def
+               Insight) when a stat is raised or the Pokémon evolves.
+               Display-only — see defenceValue(). */
             hpMax: null,
             willMax: null,
             /* Pre-1.2.0 absolute pool sizes. Migrated to the *Bonus offsets on
@@ -4563,6 +4918,60 @@
             return Math.max(1, derivedPoolMax(key) + bonus);
         }
 
+        /* Def is Vitality and Sp.Def is Insight, each plus a hand-set offset.
+           The offset is DISPLAY ONLY and deliberately never reaches
+           resolvePoolValue(): Vitality and Insight feed real dice pools (Clash,
+           Initiative, the HP and Will maxes), while Def is a number the other
+           side of the table reads off this sheet. Folding the offset into the
+           attribute would quietly change every roll that uses it. */
+        function defenceValue(key) {
+            const base = resolvePoolValue(key === 'def' ? 'Vitality' : 'Insight') || 0;
+            const bonus = (key === 'def' ? sheetState.defBonus : sheetState.spDefBonus) || 0;
+            return { base, bonus, total: Math.max(0, base + bonus) };
+        }
+
+        // ±10 is far past anything the rules produce, and stops a stuck key running away
+        const DEFENCE_BONUS_CAP = 10;
+
+        function stepDefence(key, delta) {
+            const bonus = (key === 'def' ? sheetState.defBonus : sheetState.spDefBonus) || 0;
+            setDefenceBonus(key, bonus + delta);
+        }
+
+        function clearDefence(key) {
+            setDefenceBonus(key, 0);
+        }
+
+        function setDefenceBonus(key, value) {
+            const clamped = Math.max(-DEFENCE_BONUS_CAP, Math.min(DEFENCE_BONUS_CAP, value));
+            if (key === 'def') sheetState.defBonus = clamped;
+            else sheetState.spDefBonus = clamped;
+            saveState();
+            renderTrackers();
+        }
+
+        /* Writes one defence row: the total in its pill, the colour that says
+           whether it has been nudged, and the popup's own read-out. The row is
+           never rebuilt — only these three pieces of text change — so the popup
+           keeps the pointer's :hover while you click - and + inside it. */
+        function renderDefenceRow(key, valueId, offsetId) {
+            const { base, bonus, total } = defenceValue(key);
+            const el = document.getElementById(valueId);
+            el.textContent = total;
+            el.classList.toggle('buffed', bonus > 0);
+            el.classList.toggle('nerfed', bonus < 0);
+            const from = key === 'def' ? 'Vitality' : 'Insight';
+            el.title = bonus
+                ? `${from} ${base} ${bonus > 0 ? '+' : '\u2212'}${Math.abs(bonus)} = ${total}`
+                : `Equal to ${from}`;
+            const out = document.getElementById(offsetId);
+            if (out) {
+                out.textContent = (bonus > 0 ? '+' : bonus < 0 ? '\u2212' : '\u00b1') + Math.abs(bonus);
+                out.classList.toggle('buffed', bonus > 0);
+                out.classList.toggle('nerfed', bonus < 0);
+            }
+        }
+
         function setPoolMax(key, value) {
             const bonus = Math.max(1, value) - derivedPoolMax(key);
             if (key === 'hp') {
@@ -4752,8 +5161,8 @@
             renderPool('will', 'will-tracker', 'willpower');
             renderMiniTrackers();
             renderStatusTracker();
-            document.getElementById('defense-value').textContent = resolvePoolValue('Vitality') || 0;
-            document.getElementById('sp-defense-value').textContent = resolvePoolValue('Insight') || 0;
+            renderDefenceRow('def', 'defense-value', 'def-offset-val');
+            renderDefenceRow('spDef', 'sp-defense-value', 'sp-def-offset-val');
             updatePainPenalty();
         }
 
@@ -4772,7 +5181,19 @@
             const penalty = painPenalty();
             box.classList.toggle('on', penalty > 0);
             box.classList.toggle('severe', penalty > 1);
-            document.getElementById('pain-value').textContent = '\u2212' + penalty;
+            /* Evasion, Clash and Initiative are rolls too, so they carry the
+               same glyph. One per box - Clash shows a single one for its STR
+               and SPE pair, since the penalty is on the roll, not per value. */
+            document.querySelectorAll('.quick-pain').forEach(el => {
+                el.style.display = penalty ? '' : 'none';
+                el.classList.toggle('severe', penalty > 1);
+                el.title = painFlagTitle(-penalty);
+                el.innerHTML = '<i class="fa-solid fa-heart-crack"></i>';
+            });
+            /* Plain "0", not "\u22120": a signed zero reads as a penalty that
+               is being applied, which is the opposite of what it means here. */
+            document.getElementById('pain-value').textContent =
+                penalty ? '\u2212' + penalty : '0';
         }
 
         /* The twelve statuses, one tile each in the Ailments & Conditions
@@ -5524,8 +5945,8 @@
         }
 
         /* Long names (e.g. "Brambleghast") would wrap and shove the gender toggle
-           and #number out of place. Keep the title on one line and scale its font
-           down until the whole thing fits the space left beside the gender toggle. */
+           out of place. Keep the title on one line and scale its font down until
+           it fits the space left beside the gender toggle. */
         function fitPokemonName() {
             const el = document.getElementById('pokemon-name');
             const row = el && el.parentElement;
@@ -5558,8 +5979,14 @@
             const displayName = (!WILD_MODE && sheetState.nickname) ? sheetState.nickname : shownName;
             document.title = 'Pokerole Card - ' + displayName;
 
-            const numberHtml = `<span class="pokemon-number" id="pokedex-number">#${p.DexID || p.Number}</span>`;
-            const stoneHtml = stone ? stoneIconHtml(stone) + ' ' : '';
+            /* Leading space, not trailing: the icon used to sit between the name
+               and the #number, which has moved to the subline. The mirror copy
+               goes on the left so the name stays on the header's centre axis. */
+            const stoneHtml = stone ? ' ' + stoneIconHtml(stone) : '';
+            const stoneMirrorHtml = stone
+                ? stoneIconHtml(stone).replace('class="mega-stone-icon"',
+                    'class="mega-stone-icon mirror" aria-hidden="true"') + ' '
+                : '';
             const nameHtml = WILD_MODE
                 ? `<span class="pokemon-name-text">${escapeName(shownName)}</span>`
                 : `<span class="pokemon-name-text editable" id="pokemon-name-text" contenteditable="true"
@@ -5567,9 +5994,12 @@
                      onblur="commitNameEdit(this)"
                      onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}"
                      >${escapeName(displayName)}</span>`;
-            document.getElementById('pokemon-name').innerHTML = `${nameHtml} ${stoneHtml}${numberHtml}`;
+            document.getElementById('pokemon-name').innerHTML = `${stoneMirrorHtml}${nameHtml}${stoneHtml}`;
             fitPokemonName();
             document.getElementById('pokemon-category').textContent = p.DexCategory || '';
+            const dexNo = '#' + (p.DexID || p.Number);
+            document.getElementById('pokedex-number').textContent = dexNo;
+            document.getElementById('pokedex-number-mirror').textContent = dexNo;   // keeps the category centred
             renderGender();
             document.getElementById('type-badges').innerHTML =
                 [p.Type1, p.Type2].filter(Boolean).map(typeBadgeHtml).join('');
@@ -6345,6 +6775,46 @@
             document.getElementById('ailments-modal').style.display = 'none';
         }
 
+        /* Weather conditions, drawn with the same tiles as the ailments window.
+           Each entry brings its own bands as { label, html } pairs rather than
+           the fixed Effect / Treatment / Duration triple, so writing the rules
+           in later is only a matter of filling this array. */
+        const WEATHER_CONDITIONS = [
+            // { key: 'sunny', name: 'Harsh Sunlight', color: '#f59e0b', icon: 'fa-sun',
+            //   modifier: '', bands: [{ label: 'Effect', html: '…' }] }
+        ];
+
+        function openWeather() {
+            const grid = document.getElementById('weather-content');
+            grid.innerHTML = WEATHER_CONDITIONS.length
+                ? WEATHER_CONDITIONS.map(w => {
+                    const ink = inkOn(w.color);
+                    return `
+                    <div class="ail-tile" style="--ail: ${w.color};
+                        --ail-ink: ${mixHex(w.color, '#ffffff', 0.44)};
+                        --ail-wash: ${mixHex(w.color, '#ffffff', 0.1)}5c;">
+                        <div class="ail-tile-head" style="background: ${w.color}; color: ${ink};
+                            border-bottom: 1px solid ${ink}1f;">
+                            <span class="ail-tile-icons"><i class="fa-solid ${w.icon}"></i></span>
+                            <span class="ail-tile-name">${w.name}</span>
+                            ${w.modifier
+                            ? `<span class="ail-tile-mod" style="background: ${ink}1f;">${w.modifier}</span>`
+                            : ''}
+                        </div>
+                        ${(w.bands || []).map(b => `
+                            <div class="ail-band">${b.label}</div>
+                            <div class="ail-text">${b.html}</div>`).join('')}
+                    </div>`;
+                }).join('')
+                : `<p class="modal-text" style="grid-column: 1 / -1; margin: 0;">
+                       The weather rules haven't been filled in yet.</p>`;
+            document.getElementById('weather-modal').style.display = 'flex';
+        }
+
+        function closeWeather() {
+            document.getElementById('weather-modal').style.display = 'none';
+        }
+
         // Custom moves: names picked from the full window.ALL_MOVES database
         function getCustomMoveObjects() {
             if (typeof ALL_MOVES === 'undefined') return [];
@@ -6498,35 +6968,38 @@
             closeDeleteMoveModal();
         }
 
-        /* Full sheet reset: two warnings, then the saved state is wiped and
-           the page reloads with only the JSON defaults */
-        let sheetResetStage = 0;
-
-        function openSheetReset() {
-            sheetResetStage = 1;
-            document.getElementById('sheet-reset-text').textContent =
-                'This resets the whole sheet to its default values: stats, skills, pools, '
-                + 'status, filters, custom moves, move edits, items and notes will all be lost.';
-            document.getElementById('sheet-reset-confirm-btn').textContent = 'Reset Sheet';
-            document.getElementById('sheet-reset-modal').style.display = 'flex';
+        function openHeal() {
+            document.getElementById('heal-modal').style.display = 'flex';
         }
 
-        function closeSheetReset() {
-            sheetResetStage = 0;
-            document.getElementById('sheet-reset-modal').style.display = 'none';
+        function closeHeal() {
+            document.getElementById('heal-modal').style.display = 'none';
         }
 
-        function confirmSheetReset() {
-            if (sheetResetStage === 1) {
-                sheetResetStage = 2;
-                document.getElementById('sheet-reset-text').textContent =
-                    'Last warning: this cannot be undone. Really erase every saved change '
-                    + 'and go back to the default sheet?';
-                document.getElementById('sheet-reset-confirm-btn').textContent = 'Yes, Erase Everything';
-                return;
-            }
-            localStorage.removeItem(storageKey);
-            location.reload();
+        /* A visit to the Pokémon Center. The status object is rewritten whole
+           rather than key by key, so a stray flag left by an older sheet cannot
+           survive the cure. Disable goes too: out of battle it lasts five
+           minutes, long expired by the walk to the counter. Def/Sp.Def offsets
+           reset too — a hand-set nudge from armour or an ability shouldn't
+           outlive the fight that prompted it. */
+        function confirmHeal() {
+            sheetState.hp = getPoolMax('hp');
+            sheetState.will = getPoolMax('will');
+            sheetState.status = {
+                major: null,
+                burnDegree: 0,
+                poisonStage: 0,
+                confusion: false,
+                flinch: false,
+                inLove: false
+            };
+            sheetState.disabledMove = null;
+            sheetState.defBonus = 0;
+            sheetState.spDefBonus = 0;
+            saveState();
+            renderTrackers();
+            renderMoves();   // the Disable mark lives on the move card
+            closeHeal();
         }
 
         document.addEventListener('keydown', (e) => {
@@ -6535,7 +7008,8 @@
                 closeMoveEditor();
                 closeTypeEffectiveness();
                 closeAilments();
-                closeSheetReset();
+                closeWeather();
+                closeHeal();
                 closePokePicker();
                 closeAbilityPicker();
                 closeEvolveModal();
@@ -6562,6 +7036,18 @@
                 if (a.ChanceDice) s += ` (${a.ChanceDice} Chance Die/Dice)`;
                 return s;
             }).join('; ');
+        }
+
+        /* A move's own accuracy penalty — the rulebook's "Low Accuracy N".
+           Always a penalty: the field is named Reduction, every Effect string in
+           the dataset that mentions it says "Low Accuracy", and "High Accuracy"
+           appears nowhere in Pokerole. Three records (Head Smash, Bleakwind
+           Storm, Triple Axel) carry a positive number contradicting their own
+           text, so the magnitude is what counts — trusting the sign would hand
+           those three a bonus instead of the penalty they describe. */
+        function moveAccuracyPenalty(move) {
+            const n = move.Attributes && move.Attributes.AccuracyReduction;
+            return n ? -Math.abs(n) : 0;
         }
 
         function applyMoveOverrides(move) {
@@ -6639,23 +7125,113 @@
         }
 
         function computeMoveTotals(move) {
-            const accOffset = move.AccuracyOffset || 0;
+            /* Two separate things that both move the accuracy, and they stack:
+               the move's own Low Accuracy, and whatever the user typed into the
+               move editor. Kept apart in the return value so the card can say
+               which is which — the sum is all the arithmetic needs. */
+            const movePenalty = moveAccuracyPenalty(move);
+            const userOffset = move.AccuracyOffset || 0;
+            /* Pain is NOT in the totals. It takes a success off the result of
+               the roll, flat - it does not shrink the pool you roll, which is
+               what these numbers are. So it travels with the totals only as a
+               flag, to be drawn beside them and subtracted from the successes
+               once the dice are read. */
+            const pain = -painPenalty();
+            const accOffset = movePenalty + userOffset;
             const powOffset = move.PowerOffset || 0;
 
             let acc = null;
+            let accBase = 0;
             const accParts = [move.Accuracy1, move.Accuracy2, move.Accuracy3].filter(Boolean);
-            if (accParts.length > 0 || accOffset) {
+            if (accParts.length > 0 || movePenalty || userOffset) {
                 // Offset is a flat modifier added on top of the resolved stat pool,
                 // applied after the stat totals so it always reads as the final value.
                 const r = resolvePoolString(accParts.join(' + '));
+                accBase = r.total;
                 acc = formatPoolTotal(r, accOffset);
             }
             let pow = null;
+            let powBase = 0;
             if (move.Power > 0 || move.Damage1 || move.Damage2 || powOffset) {
                 const r = resolvePoolString([move.Damage1, move.Damage2].filter(Boolean).join(' + '));
+                powBase = r.total + (move.Power || 0);
                 pow = formatPoolTotal(r, (move.Power || 0) + powOffset);
             }
-            return { acc, pow, accOffset, powOffset };
+            return { acc, pow, accOffset, movePenalty, userOffset, pain, accBase, powBase, powOffset };
+        }
+
+        // Signed number with a real minus sign, for anything the reader has to add up
+        function signed(n) {
+            return (n > 0 ? '+' : '\u2212') + Math.abs(n);
+        }
+
+        /* Three stacked chevrons: the move's own built-in accuracy modifier.
+           Drawn rather than picked from FontAwesome, whose free set stops at
+           two (fa-angles-down) - and three is what reads as "a lot". Points
+           down as authored; .flag-up turns it over for a bonus. Laid out
+           inside 0..24 with room for the 3px stroke, so nothing clips. */
+        const FLAG_ARROWS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+            'stroke-width="3" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M5 2l7 5 7-5"/><path d="M5 9l7 5 7-5"/><path d="M5 16l7 5 7-5"/></svg>';
+
+        /* One wording and one glyph for Pain everywhere it appears - beside a
+           move's totals and beside the three universal rolls. It is flat, so
+           the tooltip counts successes, not pool dice: nothing on the sheet
+           has already subtracted it. */
+        function painFlagTitle(pain) {
+            return pain < -1 ? 'Severe Pain: \u22122 successes' : 'Pain: \u22121 success';
+        }
+
+        function painFlagHtml(pain) {
+            return `<span class="total-flag pain${pain < -1 ? ' severe' : ''}" ` +
+                `title="${painFlagTitle(pain)}"><i class="fa-solid fa-heart-crack"></i></span>`;
+        }
+
+        /* The glyphs after a total, one per reason it is not the bare pool:
+           the move's own modifier, the offset you typed in the editor, and
+           Pain. Each carries its own title, which is the point of splitting
+           them up - hovering one says what that one means, where the old
+           single worded chip could only restate the whole sum.
+
+           Returns the CONTENTS of .total-flags, not the wrapper: the wrapper
+           is always in the markup so refreshMoveTotals() can just refill it. */
+        function totalFlags(totals, kind) {
+            const out = [];
+
+            if (kind === 'acc' && totals.movePenalty) {
+                const down = totals.movePenalty < 0;
+                out.push(`<span class="total-flag ${down ? 'nerfed' : 'buffed flag-up'}" ` +
+                    `title="Default offset: ${signed(totals.movePenalty)}">${FLAG_ARROWS}</span>`);
+            }
+
+            const manual = kind === 'acc' ? totals.userOffset : totals.powOffset;
+            if (manual) {
+                out.push(`<span class="total-flag ${manual < 0 ? 'nerfed' : 'buffed'}" ` +
+                    `title="Manual offset: ${signed(manual)}">` +
+                    `<i class="fa-solid fa-hand"></i></span>`);
+            }
+
+            if (totals.pain) out.push(painFlagHtml(totals.pain));
+
+            return out.join('');
+        }
+
+        /* Spells the sum out on hover of the badge itself, so no glyph has to
+           carry the whole story. A title on a child wins over this one, which
+           is exactly what we want: on a glyph you get that glyph's meaning,
+           anywhere else in the badge you get the arithmetic. */
+        function totalTitle(totals, kind) {
+            const acc = kind === 'acc';
+            const own = acc ? totals.movePenalty : 0;
+            const manual = acc ? totals.userOffset : totals.powOffset;
+            if (!own && !manual) return '';
+            const base = acc ? totals.accBase : totals.powBase;
+            const bits = [(acc ? 'Accuracy pool ' : 'Power ') + base];
+            if (own) bits.push('default offset ' + signed(own));
+            if (manual) bits.push('manual offset ' + signed(manual));
+            /* Pain is absent on purpose: it is not part of this sum. Its own
+               glyph says what it costs, off the successes rather than the pool. */
+            return bits.join(' \u00b7 ') + ' = ' + (base + own + manual);
         }
 
         // Universal quick moves shown above the list for every Pokémon
@@ -6671,6 +7247,14 @@
                 (resolvePoolValue('Special') || 0) + clashSkill;
         }
 
+        // Rewrites one total badge in place, leaving the card itself untouched
+        function paintTotal(el, totals, kind, value) {
+            if (!el || value === null) return;
+            el.querySelector('strong').textContent = value;
+            el.querySelector('.total-flags').innerHTML = totalFlags(totals, kind);
+            el.title = totalTitle(totals, kind);
+        }
+
         // Update the totals in place so stat/skill edits never collapse open cards
         function refreshMoveTotals() {
             updateQuickMoves();
@@ -6683,10 +7267,10 @@
                 const base = findBaseMove(name);
                 if (!base) return;
                 const totals = computeMoveTotals(applyMoveOverrides(base));
-                const accEl = card.querySelector('.move-total.accuracy strong');
-                if (accEl && totals.acc !== null) accEl.textContent = totals.acc;
-                const powEl = card.querySelector('.move-total.power strong');
-                if (powEl && totals.pow !== null) powEl.textContent = totals.pow;
+                /* Not just the number: Pain comes and goes with HP, so the
+                   glyphs and the hover breakdown have to follow it too. */
+                paintTotal(card.querySelector('.move-total.accuracy'), totals, 'acc', totals.acc);
+                paintTotal(card.querySelector('.move-total.power'), totals, 'pow', totals.pow);
             });
         }
 
@@ -6750,6 +7334,12 @@
             populateStatSelect('edit-move-acc3', o.acc3 !== undefined ? o.acc3 : (base.Accuracy3 || ''));
             document.getElementById('edit-move-power').value = o.power !== undefined ? o.power : (base.Power || 0);
             document.getElementById('edit-move-acc-offset').value = o.accOffset !== undefined ? o.accOffset : 0;
+            const penalty = moveAccuracyPenalty(base);
+            const hint = document.getElementById('edit-move-acc-hint');
+            hint.textContent = penalty
+                ? `This move already has Low Accuracy ${Math.abs(penalty)}, counted separately.`
+                : '';
+            hint.style.display = penalty ? '' : 'none';
             document.getElementById('edit-move-power-offset').value = o.powOffset !== undefined ? o.powOffset : 0;
             populateDamageSelect('edit-move-damage', o.damage !== undefined ? o.damage : (base.Damage1 || ''));
             document.getElementById('edit-move-target').value = o.target !== undefined ? o.target : (base.Target || '');
@@ -6955,6 +7545,12 @@
                 let attrTags = '';
                 if (move.Attributes) {
                     Object.entries(move.Attributes).forEach(([key, val]) => {
+                        /* Skipped: the Total Accuracy line above states this
+                           properly now. Left in, it would print the raw JSON
+                           value, so the three records with the wrong sign would
+                           show "Accuracy Reduction: 2" directly under a
+                           "Low Accuracy 2" chip and contradict it. */
+                        if (key === 'AccuracyReduction') return;
                         if (val === true) {
                             const icon = attrIcons[key] || "fa-tag";
                             const formatted = key.replace(/([A-Z])/g, ' $1').trim();
@@ -7096,8 +7692,8 @@
 
                         ${(totals.acc !== null || totals.pow !== null) ? `
                         <div class="move-totals">
-                            ${totals.acc !== null ? `<div class="move-total accuracy"><i class="fa-solid fa-crosshairs"></i> Total Accuracy${totals.accOffset ? ` (${totals.accOffset > 0 ? '+' : ''}${totals.accOffset})` : ''}: <strong>${totals.acc}</strong></div>` : ''}
-                            ${totals.pow !== null ? `<div class="move-total power"><i class="fa-solid fa-burst"></i> Total Power${totals.powOffset ? ` (${totals.powOffset > 0 ? '+' : ''}${totals.powOffset})` : ''}: <strong>${totals.pow}</strong></div>` : ''}
+                            ${totals.acc !== null ? `<div class="move-total accuracy" title="${totalTitle(totals, 'acc')}"><i class="fa-solid fa-crosshairs"></i> Total Accuracy: <strong>${totals.acc}</strong><span class="total-flags">${totalFlags(totals, 'acc')}</span></div>` : ''}
+                            ${totals.pow !== null ? `<div class="move-total power" title="${totalTitle(totals, 'pow')}"><i class="fa-solid fa-burst"></i> Total Power: <strong>${totals.pow}</strong><span class="total-flags">${totalFlags(totals, 'pow')}</span></div>` : ''}
                         </div>` : ''}
 
                         <div class="move-desc-block">
