@@ -6716,6 +6716,14 @@
                 to disk. Wild Pokémon you build can be exported to the <strong>Wild Pokemons</strong> folder and
                 <em>Captured</em> onto a trainer later.</p>
 
+            <p class="modal-text"><strong style="color: var(--text-primary);">📦 PC Storage</strong><br>
+                Pokémon a trainer owns but isn't carrying live in the <i class="fa-solid fa-box-archive"></i>
+                <strong>PC Storage</strong> window — <strong>six boxes</strong> of 30, renameable, one set per
+                trainer. The team strip sits in the same window, so depositing or withdrawing is one drag — or
+                click a team slot to store it, and <strong>double-click</strong> a stored Pokémon to open its card.
+                Boxes are saved <strong>inside the same trainer .json</strong> as the team, and a stored Pokémon
+                stays fully editable.</p>
+
             <p class="modal-text"><strong style="color: var(--text-primary);">🖼️ Custom images</strong><br>
                 A small copy of each trainer photo / Pokémon art is embedded in the .json (so a shared file still shows
                 a picture). When a working folder is open, the full-resolution original is also saved under
@@ -6933,9 +6941,12 @@
             if (!out) return;
             const newer = info && info.latest && typeof APP_VERSION !== 'undefined'
                 && compareVersions(info.latest, APP_VERSION) > 0;
-            // When there's an update the row beside this says so already
-            out.textContent = newer ? ''
-                : (info && info.ok) ? 'You’re up to date'
+            /* When there's an update the row beside this says so already.
+               #16a34a rather than a brighter green: the check mark has to read
+               on the light theme too, where #22c55e drops to about 2:1. */
+            out.innerHTML = newer ? ''
+                : (info && info.ok)
+                    ? '<i class="fa-solid fa-circle-check" style="color: #16a34a;"></i> You’re up to date!'
                     : 'Couldn’t reach GitHub';
         }
 
