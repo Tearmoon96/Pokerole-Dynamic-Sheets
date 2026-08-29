@@ -904,6 +904,10 @@
             vertical-align: middle;
             margin-left: 2px;
             margin-right: -24px;
+            /* Repeated from .mega-stone-icon: .poke-tile img sets pixelated and
+               is more specific than the base rule, so without this the tiles keep
+               the staircase edge at an even harsher 0.275x. */
+            image-rendering: auto;
         }
 
         .poke-tile-num {
@@ -927,11 +931,15 @@
             opacity: 1;
         }
 
-        /* Mega form: the stone sprite replaces the "(Mega Form)" suffix */
+        /* Mega form: the stone sprite replaces the "(Mega Form)" suffix.
+           Interpolated, not pixelated, for the reason .line-item img gives: the
+           stones are 80px renders drawn at 34 here (22 in the picker tiles, 16
+           in a team slot), and nearest-neighbour turns the round edge into a
+           staircase. */
         .mega-stone-icon {
             height: 34px;
+            image-rendering: auto;
             vertical-align: middle;
-            image-rendering: pixelated;
         }
 
         .type-badge {
@@ -944,6 +952,60 @@
             display: flex;
             align-items: center;
             gap: 6px;
+        }
+
+        /* Page-theme picker rows. The two named License chips stack one per
+           row at the top; the 18 type chips below drop their label and render
+           as round icon buttons, so the whole picker stays a few rows tall
+           instead of a nine-row wall of names.
+
+           The named row is a single auto-width grid column rather than a flex
+           row: "Dark License" and "Light License" render a few pixels apart,
+           and the column takes the width of the wider chip so both fill it and
+           the pair reads as a matched set. */
+        .theme-named-row {
+            display: grid;
+            grid-template-columns: auto;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .theme-named-row .theme-chip {
+            justify-content: center;
+        }
+
+        .theme-type-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+
+        .theme-chip.icon-only {
+            width: 38px;
+            height: 38px;
+            padding: 0;
+            border-radius: 50%;
+            justify-content: center;
+            font-size: 1rem;
+            transition: transform 0.15s;
+            /* .type-badge sets letter-spacing for its label; on a chip whose
+               only child is one glyph that becomes 1px of trailing space, and
+               centering the content box then sits the icon half a pixel left. */
+            letter-spacing: 0;
+        }
+
+        /* Inline glyphs are centered by their line box — built from the font's
+           ascent/descent — not by the icon itself, which leaves some sitting
+           visibly high. As a block with line-height 1 the box is the glyph. */
+        .theme-chip.icon-only i {
+            display: block;
+            line-height: 1;
+        }
+
+        .theme-chip.icon-only:hover {
+            transform: scale(1.12);
         }
 
         .type-badge.ghost {
@@ -2195,11 +2257,12 @@
             width: 250px;
         }
 
+        /* Same 80px item sprites as the bag rows, same size, same reason */
         .move-suggestion img {
             width: 20px;
             height: 20px;
             object-fit: contain;
-            image-rendering: pixelated;
+            image-rendering: auto;
             flex-shrink: 0;
         }
 
@@ -2944,6 +3007,13 @@
             min-width: 0;
         }
 
+        /* Corner glow. `circle` sized itself off the farthest corner, which on a
+           wide panel is far taller than the box: the glow was still at full
+           strength where the box ended and `overflow: hidden` sliced it into a
+           hard horizontal edge across the panel (plainest behind the Notes
+           textarea). An ellipse on `closest-side` is the same width but reaches
+           transparent exactly at the box's own edges, so it fades out top to
+           bottom the way it already did left to right. */
         .panel::before {
             content: '';
             position: absolute;
@@ -2951,7 +3021,7 @@
             left: -25%;
             width: 60%;
             height: 60%;
-            background: radial-gradient(circle, var(--border-glow) 0%, transparent 70%);
+            background: radial-gradient(ellipse closest-side, var(--border-glow) 0%, transparent 100%);
             z-index: 0;
             pointer-events: none;
         }
@@ -3286,12 +3356,6 @@
             flex-shrink: 0;
         }
 
-        /* The suggestion list is shared with the Pokémon item search, which
-           wants its sprites crisp-pixelled; vectors want the opposite */
-        #equip-bag-sugg img {
-            image-rendering: auto;
-        }
-
         /* Below this the two columns stop fitting side by side */
         @media (max-width: 760px) {
             .equip-layout {
@@ -3595,29 +3659,47 @@
             }
         }
 
-        /* NAME / PLAYER underlined lines with a little pokeball bullet */
-        .license-lines {
+        /* CHARACTER / PLAYER data plate: one framed block, two rows, a drawn
+           pokeball at the head of each. It replaced two floating underlined
+           lines, whose 2px rule was a hardcoded white and so vanished on the
+           Light License theme. Everything here is a theme variable instead,
+           which is why the light theme needs no entry for it in the fix list
+           further down. */
+        .license-plate {
+            /* Same width and centring as .photo-arch above it */
             width: min(100%, 430px);
             margin: 20px auto 0;
-            display: flex;
-            flex-direction: column;
-            gap: 18px;
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            background: var(--primary-faint);
+            overflow: hidden;
         }
 
-        .license-line {
-            display: flex;
-            align-items: flex-end;
-            gap: 12px;
+        /* Fixed ball and label columns, so both rows' values start on the
+           same x however long the labels get */
+        .plate-row {
+            display: grid;
+            grid-template-columns: 44px 112px 1fr auto;
+            align-items: center;
+            min-height: 52px;
+            transition: background 0.15s;
+        }
+
+        .plate-row+.plate-row {
+            border-top: 1px solid var(--border-color);
         }
 
         .pokeball-dot {
             width: 26px;
             height: 26px;
             flex-shrink: 0;
+            justify-self: center;
             border-radius: 50%;
             border: 2px solid var(--ghost-color);
-            background: linear-gradient(to bottom, var(--ghost-color) 0%, var(--ghost-color) 42%,
-                    #f8fafc 42%, #f8fafc 100%);
+            /* Split at dead centre: the two halves are meant to read as equal,
+               and 42% left the white one visibly the taller of the two */
+            background: linear-gradient(to bottom, var(--ghost-color) 0%, var(--ghost-color) 50%,
+                    #f8fafc 50%, #f8fafc 100%);
             position: relative;
             box-shadow: 0 0 8px var(--border-glow);
         }
@@ -3632,27 +3714,53 @@
             border-radius: 50%;
             background: #f8fafc;
             border: 2px solid var(--bg-color);
-            transform: translate(-50%, -55%);
+            transform: translate(-50%, -50%);
         }
 
-        .license-line-value {
-            flex: 1;
+        .plate-label {
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-secondary);
+            padding: 0 14px;
+            border-right: 1px solid var(--border-color);
+            align-self: stretch;
+            display: flex;
+            align-items: center;
+        }
+
+        .plate-value {
             min-width: 0;
-            border-bottom: 2px solid #ffffff26;
-            padding: 2px 6px 4px;
+            padding: 14px;
             font-size: 1.15rem;
             font-weight: 600;
             color: var(--text-primary);
             outline: none;
             caret-color: var(--accent);
-            transition: border-color 0.2s;
             white-space: nowrap;
             overflow: hidden;
+            align-self: stretch;
+            display: flex;
+            align-items: center;
         }
 
-        .license-line-value:hover,
-        .license-line-value:focus {
-            border-bottom-color: var(--ghost-color);
+        /* A band rather than a border swap: the frame is already drawing every
+           line here, and one more would only be a line a theme could hide
+           again.
+
+           It is painted on the ROW, keyed off the value's state, not on the
+           value itself. The gender toggle is its own grid column, so a band on
+           .plate-value stopped dead at the toggle's edge on the Character row
+           while running the full width on the Player row below it — two rows
+           highlighting to different widths. Selecting the row covers the
+           toggle's column too, and the two rows match. */
+        .plate-row:has(> .plate-value:hover) {
+            background: var(--primary-faint);
+        }
+
+        .plate-row:has(> .plate-value:focus) {
+            background: var(--primary-soft);
         }
 
         [contenteditable][data-placeholder]:empty::before {
@@ -3660,16 +3768,6 @@
             opacity: 0.3;
             font-style: italic;
             font-weight: 400;
-        }
-
-        .license-line-label {
-            font-size: 0.7rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            color: var(--text-secondary);
-            padding-bottom: 6px;
-            flex-shrink: 0;
         }
 
         /* ♂/♀ gender toggle on the Name line: just the icon, no button chrome.
@@ -3686,6 +3784,12 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
+        }
+
+        /* In the plate the row centres it, so the 4px that used to lift it off
+           the underline just pushes it up; it needs the row's inset instead. */
+        .plate-row .gender-toggle {
+            padding: 0 14px 0 0;
         }
 
         .gender-toggle.unset {
@@ -4213,7 +4317,9 @@
             object-fit: contain;
             vertical-align: middle;
             margin: 0 2px;
-            image-rendering: pixelated;
+            /* 80px render at 16px — a fifth of the source. Nearest-neighbour is
+               at its worst here; see .mega-stone-icon. */
+            image-rendering: auto;
         }
 
         .team-slot-name.linked {
@@ -4790,11 +4896,15 @@
             padding: 4px 2px;
         }
 
+        /* ItemSprites are 80px renders, not pixel art. Drawn at 20px with
+           `pixelated` the browser samples one pixel in four, which chews the
+           anti-aliased edge into a staircase and drops thin highlights
+           altogether. Let it interpolate. */
         .line-item img {
             width: 20px;
             height: 20px;
             object-fit: contain;
-            image-rendering: pixelated;
+            image-rendering: auto;
             flex-shrink: 0;
         }
 
@@ -5769,19 +5879,19 @@
             <input type="file" id="photo-input" accept="image/*" style="display: none;"
                 onchange="handlePhotoUpload(this)">
 
-            <div class="license-lines">
-                <div class="license-line">
+            <div class="license-plate">
+                <div class="plate-row">
                     <span class="pokeball-dot"></span>
-                    <span class="license-line-value" id="trainer-name" contenteditable="true" spellcheck="false"
+                    <span class="plate-label">Character</span>
+                    <span class="plate-value" id="trainer-name" contenteditable="true" spellcheck="false"
                         data-placeholder="write your character's name" title="Click to edit"></span>
                     <button class="gender-toggle" id="trainer-gender-toggle" onclick="toggleTrainerGender()"></button>
-                    <span class="license-line-label">Name</span>
                 </div>
-                <div class="license-line">
+                <div class="plate-row">
                     <span class="pokeball-dot"></span>
-                    <span class="license-line-value" id="player-name" contenteditable="true" spellcheck="false"
+                    <span class="plate-label">Player</span>
+                    <span class="plate-value" id="player-name" contenteditable="true" spellcheck="false"
                         data-placeholder="write your name" title="Click to edit"></span>
-                    <span class="license-line-label">Player</span>
                 </div>
             </div>
 
@@ -6406,7 +6516,11 @@
                 <i class="fa-solid fa-palette" style="color: var(--ghost-color);"></i> Page Theme
             </div>
             <p class="modal-text">Pick the color the whole sheet is themed with.</p>
-            <div class="theme-grid" id="theme-grid" style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;"></div>
+            <!-- The named License themes keep their labels and stack at equal
+                 width; the 18 types below are icon-only so they fit on a
+                 couple of rows -->
+            <div class="theme-grid theme-named-row" id="theme-grid"></div>
+            <div class="theme-grid theme-type-row" id="theme-type-grid"></div>
         </div>
     </div>
 
@@ -7546,7 +7660,7 @@
             Normal: 'fa-circle', Fire: 'fa-fire', Water: 'fa-droplet', Electric: 'fa-bolt',
             Grass: 'fa-leaf', Ice: 'fa-snowflake', Fighting: 'fa-hand-fist', Poison: 'fa-skull-crossbones',
             Ground: 'fa-mountain', Flying: 'fa-dove', Psychic: 'fa-eye', Bug: 'fa-bug',
-            Rock: 'fa-hill-rockslide', Ghost: 'fa-ghost', Dragon: 'fa-dragon', Dark: 'fa-moon',
+            Rock: 'fa-gem', Ghost: 'fa-ghost', Dragon: 'fa-dragon', Dark: 'fa-circle-half-stroke',
             Steel: 'fa-shield-halved', Fairy: 'fa-wand-magic-sparkles'
         };
 
@@ -7832,28 +7946,37 @@
             closeThemePicker();
         }
 
-        function themeChip(swatch, icon, label, key) {
+        /* iconOnly drops the label and rounds the chip; the name moves to the
+           tooltip so the type row stays scannable at a glance. */
+        function themeChip(swatch, icon, label, key, iconOnly) {
             const chip = document.createElement('span');
-            chip.className = 'type-badge theme-chip';
+            chip.className = 'type-badge theme-chip' + (iconOnly ? ' icon-only' : '');
             const glow = isLightTheme() ? 'none' : `0 0 10px ${swatch}26`;
             chip.style.cssText = `background: ${swatch}33;
                 border: 1px solid ${typeInk(swatch)};
                 color: ${typeInk(swatch, mixHex(swatch, '#ffffff', 0.55))};
                 box-shadow: ${glow}; cursor: pointer;`;
-            chip.innerHTML = `<i class="fa-solid ${icon}"></i> ${label}`;
+            chip.innerHTML = iconOnly
+                ? `<i class="fa-solid ${icon}"></i>`
+                : `<i class="fa-solid ${icon}"></i> ${label}`;
+            chip.title = label;
             chip.onclick = () => selectTheme(key);
             return chip;
         }
 
         function openThemePicker() {
             const grid = document.getElementById('theme-grid');
+            const typeGrid = document.getElementById('theme-type-grid');
             grid.innerHTML = '';
-            // Named custom themes first (the Classic License look), then types
+            typeGrid.innerHTML = '';
+            // Named custom themes keep their labels, side by side on one row
             Object.entries(CUSTOM_THEMES).forEach(([key, theme]) => {
                 grid.appendChild(themeChip(theme.swatch, theme.icon, theme.label, key));
             });
+            // The 18 types below are icon-only
             Object.keys(typeColors).forEach(type => {
-                grid.appendChild(themeChip(typeColors[type], TYPE_ICONS[type], type, type));
+                typeGrid.appendChild(
+                    themeChip(typeColors[type], TYPE_ICONS[type], type, type, true));
             });
             document.getElementById('theme-picker-modal').style.display = 'flex';
         }
