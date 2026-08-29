@@ -1062,33 +1062,6 @@
             opacity: 1;
         }
 
-        /* Page-theme picker. Two rows of chips: the named License themes at the
-           top, this Pokémon's own type(s) below as the way back to type
-           theming. Each row is a single auto-width grid column, so the chips
-           come out the width of the widest one and read as a matched set.
-           The inactive ones dim, the same way the type badges in the header do. */
-        .theme-grid {
-            display: grid;
-            grid-template-columns: auto;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .theme-chip {
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .theme-chip:not(.theme-active) {
-            opacity: 0.55;
-            box-shadow: none !important;
-        }
-
-        .theme-chip:hover {
-            opacity: 1;
-        }
-
         /* Mega form: the stone sprite stands in for the "(Mega Form)" suffix. It
            sits in the sprite box next to the gender toggle and is sized to match
            it; in the title it shifted the name off the header's centre axis. */
@@ -1153,6 +1126,36 @@
         }
 
         .type-eff-btn:hover {
+            background: var(--ghost-color);
+            border-color: var(--ghost-color);
+            color: #fff;
+            box-shadow: 0 0 10px var(--ghost-color-glow);
+        }
+
+        /* Page theme, in the card's top-left padding. Same body and hover as the
+           header tool buttons, at the smaller size the corner wants. */
+        .theme-corner-btn {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            /* Over .card-container::before, the corner glow it sits in */
+            z-index: 2;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            border-radius: 50%;
+            background: #ffffff08;
+            border: 1px solid #ffffff14;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .theme-corner-btn:hover {
             background: var(--ghost-color);
             border-color: var(--ghost-color);
             color: #fff;
@@ -2299,13 +2302,19 @@
             margin-top: 5px;
         }
 
+        /* One chain per row, every row on the same five tracks — name, arrow,
+           method, arrow, name. Each row used to centre itself, so a long name
+           on one line pushed its method tag out of line with the one below it;
+           on a shared grid the tags sit in one column down the middle. The two
+           1fr edges take the slack, which centres the group, and the names
+           align inwards so they meet their arrows. */
         .evolution-flow {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-wrap: wrap;
+            display: grid;
             /* CRITICAL: Prevent horizontal layout expansion pushing columns */
-            gap: 8px;
+            grid-template-columns: 1fr auto auto auto 1fr;
+            align-items: center;
+            column-gap: 8px;
+            row-gap: 6px;
             font-size: 0.82rem;
             background: #00000033;
             padding: 8px 12px;
@@ -2313,14 +2322,56 @@
             border: 1px solid #ffffff05;
         }
 
-        /* One chain per line when a Pokémon has several evolution paths */
+        /* Each chain is its own row but borrows the parent's columns, so the
+           cells line up across rows without the steps being flattened away */
         .evolution-step {
+            display: grid;
+            grid-template-columns: subgrid;
+            grid-column: 1 / -1;
+            align-items: center;
+        }
+
+        .evolution-step .evo-name:first-child {
+            justify-self: end;
+        }
+
+        .evolution-step .evo-name:last-child {
+            justify-self: start;
+        }
+
+        /* The method, plus the gender badge on the evolutions that carry one:
+           one cell, so a chain with a badge still has the same five columns */
+        .evo-mid {
             display: flex;
             align-items: center;
             justify-content: center;
-            flex-wrap: wrap;
-            gap: 8px;
-            flex-basis: 100%;
+            gap: 6px;
+        }
+
+        /* "Does not evolve" has no chain to lay out */
+        .evo-empty {
+            grid-column: 1 / -1;
+            justify-self: center;
+        }
+
+        /* One column: a chain can be wider than the card is, and the grid's
+           name tracks will not shrink below their content. Back to the old
+           centred wrap there — with the panel that narrow there is nothing to
+           line up against anyway. */
+        @media (max-width: 900px) {
+
+            .evolution-flow,
+            .evolution-step {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .evolution-step {
+                flex-basis: 100%;
+            }
         }
 
         .evo-name {
@@ -2461,6 +2512,16 @@
             align-items: center;
             justify-content: center;
             transition: all 0.2s;
+        }
+
+        /* The + is not off-centre — measured against the font, it has 8.80px of
+           gap on all four sides of its 28px button. It is small: FontAwesome
+           draws fa-plus in a 416-unit box where fa-filter takes 512 and
+           fa-rotate-left 464, so at one font-size it renders 10.4px of ink
+           beside their 12.8 and 11.6, and the extra moat around it is what
+           reads as adrift. Scaled to land at 11.96px, in among the other two. */
+        #custom-adder-btn i {
+            font-size: 1.15em;
         }
 
         .filter-picker-btn:hover,
@@ -4006,28 +4067,18 @@
         :where(:root.light-theme) .poke-tile,
         :where(:root.light-theme) .type-eff-btn,
         :where(:root.light-theme) .type-eff-row + .type-eff-row,
-        :where(:root.light-theme) .tracker-panel,
         :where(:root.light-theme) .pool-btn,
         :where(:root.light-theme) .pool-bar,
         :where(:root.light-theme) .pool-static-val,
         :where(:root.light-theme) .exp-input,
         :where(:root.light-theme) .pool-text-input,
         :where(:root.light-theme) .def-offset-btn,
-        :where(:root.light-theme) .stats-panel,
-        :where(:root.light-theme) .stats-title,
         :where(:root.light-theme) .stats-edit-form,
         :where(:root.light-theme) .edit-input,
         :where(:root.light-theme) .form-btn.cancel,
         :where(:root.light-theme) .dot.locked,
-        :where(:root.light-theme) .skills-panel,
-        :where(:root.light-theme) .category-title,
-        :where(:root.light-theme) .specialties-section,
         :where(:root.light-theme) .specialty-input,
         :where(:root.light-theme) .ability-pick-row,
-        :where(:root.light-theme) .details-panel,
-        :where(:root.light-theme) .evolution-panel,
-        :where(:root.light-theme) .desc-panel,
-        :where(:root.light-theme) .moves-header,
         :where(:root.light-theme) .filter-picker-btn,
         :where(:root.light-theme) .move-edit-input,
         :where(:root.light-theme) .move-edit-textarea,
@@ -4037,7 +4088,6 @@
         :where(:root.light-theme) .move-rank-badge,
         :where(:root.light-theme) .move-effects-list,
         :where(:root.light-theme) .no-moves-msg,
-        :where(:root.light-theme) .notepad-panel,
         :where(:root.light-theme) .notepad-textarea {
             border-color: #00000024;
         }
@@ -4237,9 +4287,12 @@
             box-shadow: none;
         }
 
+        /* No halo: the muted fills below are pale enough for the dark ink to
+           carry on its own (5.5:1 on the health bar), and a white shadow under
+           it only softened the digits. */
         :where(:root.light-theme) .pool-bar-value {
             color: #2a2020;
-            text-shadow: 0 1px 1px #ffffffcc;
+            text-shadow: none;
         }
 
         /* ---- Buttons drawn for a dark page ----
@@ -4308,16 +4361,133 @@
             color: #047857;
         }
 
+        /* Pain, and Pain at 1 HP. The dark page tells them apart with #fb923c
+           and #fb7185; darkened for paper they both landed near a burnt
+           red-brown, 30 degrees of hue apart, and the broken-heart glyph was
+           the same colour either way. These pull back apart — a true orange at
+           27 degrees against a true red at 351, and a lightness gap on top of
+           the hue, so the escalation reads at a glance. Both hold over 4:1 on
+           the light panel. */
         :where(:root.light-theme) .total-flag.pain,
         :where(:root.light-theme) .pain-quick.on .quick-move-name i,
         :where(:root.light-theme) .pain-quick.on .quick-move-val strong {
-            color: #c2410c;
+            color: #cc5a00;
         }
 
         :where(:root.light-theme) .total-flag.pain.severe,
         :where(:root.light-theme) .pain-quick.severe .quick-move-name i,
         :where(:root.light-theme) .pain-quick.severe .quick-move-val strong {
-            color: #be123c;
+            color: #d10f2d;
+        }
+
+        /* The box's own wash follows the ink: at the dark page's alphas the
+           tint all but vanished against a pale panel */
+        :where(:root.light-theme) .pain-quick.on {
+            background: #cc5a0014;
+            border-color: #cc5a0059;
+        }
+
+        :where(:root.light-theme) .pain-quick.severe {
+            background: #d10f2d14;
+            border-color: #d10f2d59;
+        }
+
+        /* ---- The red the printed license is made of ----
+           The palette alone left the light page reading as plain paper. These
+           put the crimson back where the sheet has it: solid bars over each
+           panel, red rules and red small-caps labels, the way the official
+           form prints its HP / WILL headers. Dark-page equivalents already
+           carry the theme in their glows, so all of this is light-only. */
+
+        /* Section headings become solid bars. --ghost-color rather than a
+           literal so the bar tracks the theme if the crimson is ever retuned. */
+        :where(:root.light-theme) .stats-title {
+            background: var(--ghost-color);
+            color: #fff5f5;
+            border-bottom-color: transparent;
+            border-radius: 10px;
+            padding: 7px 12px;
+            box-shadow: 0 2px 8px var(--ghost-color-glow);
+        }
+
+        /* The collapse / edit chevrons sit on that bar now */
+        :where(:root.light-theme) .stats-title .edit-stats-btn {
+            color: #fff5f5;
+        }
+
+        :where(:root.light-theme) .stats-title .edit-stats-btn:hover,
+        :where(:root.light-theme) .stats-title .edit-stats-btn.active {
+            color: #fff;
+            text-shadow: 0 0 8px #ffffff80;
+        }
+
+        /* Move Learnset keeps its tall title line, so it takes a red rule under
+           it instead of a bar — a solid block that deep would swamp the column */
+        :where(:root.light-theme) .moves-header {
+            border-bottom: 2px solid var(--ghost-color);
+        }
+
+        :where(:root.light-theme) .moves-count {
+            background: var(--primary-soft);
+            color: var(--ghost-color);
+        }
+
+        /* Small-caps labels in the theme red: the skill categories, the
+           specialties heading, and Height / Weight / Evolutions */
+        :where(:root.light-theme) .category-title,
+        :where(:root.light-theme) .specialties-title,
+        :where(:root.light-theme) .detail-label {
+            color: var(--ghost-color);
+        }
+
+        :where(:root.light-theme) .category-title {
+            border-bottom-color: var(--accent-border);
+        }
+
+        /* Red rules where the panels divide themselves */
+        :where(:root.light-theme) .specialties-section,
+        :where(:root.light-theme) .evolution-panel {
+            border-top-color: var(--border-color);
+        }
+
+        /* Panel frames take the themed hairline rather than a neutral one, so
+           every box on the page is outlined in a wash of the same red */
+        :where(:root.light-theme) .tracker-panel,
+        :where(:root.light-theme) .stats-panel,
+        :where(:root.light-theme) .skills-panel,
+        :where(:root.light-theme) .details-panel,
+        :where(:root.light-theme) .desc-panel,
+        :where(:root.light-theme) .notepad-panel,
+        :where(:root.light-theme) .ability-panel {
+            border-color: var(--border-color);
+        }
+
+        /* The opening quote over the dex entry is --border-glow, near-invisible
+           on paper; at full crimson it becomes the flourish it was meant to be */
+        :where(:root.light-theme) .desc-panel::before {
+            color: var(--primary-soft);
+        }
+
+        /* Tracker row icons are inline pastels picked for a dark page — Def and
+           Sp.Def land under 2:1 on a pale row. Darkened through a filter, which
+           is not set inline, so it reaches them without !important. */
+        :where(:root.light-theme) .tracker-label i {
+            filter: brightness(0.62) saturate(1.3);
+        }
+
+        /* The corner sun keeps the same body as the tool buttons below it */
+        :where(:root.light-theme) .theme-corner-btn {
+            background: #0000000d;
+            border-color: #00000024;
+        }
+
+        /* One column: the card's padding drops to 24px, and a long centred name
+           shrunk to fit reaches almost to that edge — not enough to clear the
+           corner button, so the header starts lower down here. */
+        @media (max-width: 900px) {
+            .card-container {
+                padding-top: 56px;
+            }
         }
 
         /* Drop shadows: 60% black under a pale card is a bruise, not a lift */
@@ -4356,6 +4526,15 @@
 <body>
 
     <main class="card-container" id="pokerole-card">
+
+        <!-- Light / dark switch, in the card's own top-left padding rather than
+             the header tool row below, which was already five buttons wide.
+             The glyph says which page you are on: a sun under the Light
+             License, a moon under the dark one and under every type theme. -->
+        <button class="theme-corner-btn" id="theme-corner-btn" onclick="toggleLightDark()"
+            title="Switch to the light theme">
+            <i class="fa-solid fa-moon"></i>
+        </button>
 
         <!-- LEFT COLUMN: core info, sprite, pools, stats, skills -->
         <section class="left-column">
@@ -4399,10 +4578,6 @@
                     <button class="type-eff-btn heal-btn" onclick="openHeal()"
                         title="Heal: full HP and Will, every status cleared">
                         <i class="fa-solid fa-heart-circle-plus"></i>
-                    </button>
-                    <button class="type-eff-btn" onclick="openThemePicker()"
-                        title="Change the page theme">
-                        <i class="fa-solid fa-palette"></i>
                     </button>
                     <button class="type-eff-btn" id="load-picker" onclick="openPokePicker()"
                         title="Load another Pokémon">
@@ -5246,23 +5421,6 @@
                 <button class="form-btn cancel" onclick="closeHeal()">Cancel</button>
                 <button class="form-btn save" onclick="confirmHeal()">Heal</button>
             </div>
-        </div>
-    </div>
-
-    <!-- Page theme picker -->
-    <div class="modal-overlay" id="theme-picker-modal" style="display: none;"
-        onclick="if (event.target === this) closeThemePicker()">
-        <div class="modal-box">
-            <button class="modal-close-btn" onclick="closeThemePicker()" title="Close">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-            <div class="modal-title" style="color: var(--text-primary);">
-                <i class="fa-solid fa-palette" style="color: var(--ghost-color);"></i> Page Theme
-            </div>
-            <p class="modal-text">The two License themes match the trainer sheet. Pick a type instead to
-                theme the card from this Pokémon's own typing again.</p>
-            <div class="theme-grid" id="theme-named-grid"></div>
-            <div class="theme-grid" id="theme-type-grid"></div>
         </div>
     </div>
 
@@ -6911,7 +7069,13 @@
             Object.entries(vars).forEach(([k, v]) => root.setProperty(k, v));
             /* Light themes flip a root class so the white-alpha hairlines and
                the near-black wells switch to their light-appropriate values */
-            document.documentElement.classList.toggle('light-theme', !!(custom && custom.light));
+            const light = !!(custom && custom.light);
+            document.documentElement.classList.toggle('light-theme', light);
+            const corner = document.getElementById('theme-corner-btn');
+            if (corner) {
+                corner.querySelector('i').className = 'fa-solid ' + (light ? 'fa-sun' : 'fa-moon');
+                corner.title = light ? 'Switch to the dark theme' : 'Switch to the light theme';
+            }
         }
 
         function typeBadgeHtml(type) {
@@ -6953,52 +7117,15 @@
             repaintTheme();
         }
 
-        function setPageTheme(key) {
-            sheetState.pageTheme = key;
+        /* The corner button is a plain light/dark switch between the two
+           License themes — dark on the first press from a type theme, since
+           that is the page you are already on. Nothing here reaches the type
+           palette: a type badge in the header does that, and it stays
+           clickable while a License theme is up precisely so it can. */
+        function toggleLightDark() {
+            sheetState.pageTheme = isLightTheme() ? 'License' : 'LicenseLight';
             saveState();
             repaintTheme();
-            closeThemePicker();
-        }
-
-        /* One chip in the theme picker. `active` dims every other one, the same
-           way the header's type badges mark which type is driving the page. */
-        function themeChip(swatch, icon, label, active, onclick) {
-            const chip = document.createElement('span');
-            chip.className = 'type-badge theme-chip' + (active ? ' theme-active' : '');
-            const glow = isLightTheme() ? 'none' : `0 0 10px ${swatch}26`;
-            chip.style.cssText = `background: ${swatch}33;
-                border: 1px solid ${typeInk(swatch)};
-                color: ${typeInk(swatch, mixHex(swatch, '#ffffff', 0.55))};
-                box-shadow: ${glow};`;
-            chip.innerHTML = `<i class="fa-solid ${icon}"></i> ${label}`;
-            chip.title = label;
-            chip.onclick = onclick;
-            return chip;
-        }
-
-        function openThemePicker() {
-            const named = document.getElementById('theme-named-grid');
-            const typeGrid = document.getElementById('theme-type-grid');
-            named.innerHTML = '';
-            typeGrid.innerHTML = '';
-            Object.entries(CUSTOM_THEMES).forEach(([key, theme]) => {
-                named.appendChild(themeChip(theme.swatch, theme.icon, theme.label,
-                    sheetState.pageTheme === key, () => setPageTheme(key)));
-            });
-            /* Only this Pokémon's own type(s) — the card has never themed
-               itself from a type it does not have */
-            const p = pokemonData.pokemon;
-            const primary = sheetState.pageTheme ? null : currentThemeTypes().primary;
-            [p.Type1, p.Type2].filter(Boolean).forEach(type => {
-                typeGrid.appendChild(themeChip(typeColors[type] || '#e5e7eb',
-                    TYPE_ICONS[type] || 'fa-circle-question', type,
-                    primary === type, () => { setThemeType(type); closeThemePicker(); }));
-            });
-            document.getElementById('theme-picker-modal').style.display = 'flex';
-        }
-
-        function closeThemePicker() {
-            document.getElementById('theme-picker-modal').style.display = 'none';
         }
 
         /* Gender-locked evolutions the dex leaves untagged — the restriction
@@ -7242,15 +7369,19 @@
             const flow = document.getElementById('evolution-flow');
             const evos = p.Evolutions || [];
             flow.innerHTML = evos.length === 0
-                ? '<span class="evo-method">Does not evolve</span>'
+                ? '<span class="evo-method evo-empty">Does not evolve</span>'
                 : evos.map(evo => {
                     const gender = evoGender(evo);
+                    /* Exactly five children per row, gender badge or not — the
+                       grid above lines the rows up on them */
                     return `
                     <div class="evolution-step">
                         ${evoName(evo.From || p.Name)}
                         <i class="fa-solid fa-arrow-right evo-arrow"></i>
-                        <span class="evo-method">${evoMethodLabel(evo, true)}</span>
-                        ${gender ? genderBadge(gender) : ''}
+                        <span class="evo-mid">
+                            <span class="evo-method">${evoMethodLabel(evo, true)}</span>
+                            ${gender ? genderBadge(gender) : ''}
+                        </span>
                         <i class="fa-solid fa-arrow-right evo-arrow"></i>
                         ${evoName(evo.To || p.Name)}
                     </div>`;
