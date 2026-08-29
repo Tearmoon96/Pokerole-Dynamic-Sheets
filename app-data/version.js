@@ -13,7 +13,7 @@
    sees a dot on the info button. If the two drift apart, users either never
    get told about an update or get told about one forever. */
 
-window.APP_VERSION = '1.2.1';
+window.APP_VERSION = '1.3.0';
 window.APP_REPO = 'Tearmoon96/Pokerole-Dynamic-Sheets';
 
 /* Compare two dot-separated versions numerically. Returns 1 if a > b, -1 if
