@@ -242,6 +242,11 @@
            were faded out, which is most of the time. The two 1fr tracks fix that:
            in an auto-height grid they come out equal, so row 1 reserves exactly
            the height row 3 needs and the sprite lands dead centre. */
+        /* Translucent on purpose: the box takes its colour from the card under
+           it, .card-container::before glow included. That glow is a radial in
+           the card's top-left corner, clipped to a 60% x 60% box, so it lights
+           this well and cannot reach the move list opposite — which therefore
+           has to make the difference up. See .moves-scroll. */
         .sprite-panel {
             background: #0d091480;
             border: 1px solid var(--border-glow);
@@ -1352,6 +1357,18 @@
             color: #fff;
             text-shadow: 0 1px 2px #000000cc;
             cursor: pointer;
+            /* Digits sat a pixel high in the bar. Two things stack up: their
+               ink is 0.17px above the line box's middle, because digits have
+               no descender while the box still reserves room for one, and the
+               baseline then lands at 11.75px — a fraction the browser rounds
+               down, worth another 0.75px. Together that is the pixel you can
+               see on a 1 or a 5, which have long flat tops to read it off.
+
+               Unlike the half-pixel the +/- glyphs were once "corrected" with
+               (see the note by .pool-btn, where the metrics said zero), this
+               one is a whole pixel and stays crisp — no transform, no
+               resampling of 11px text. */
+            top: 1px;
         }
 
         .pool-max-input {
@@ -3374,13 +3391,21 @@
            worth it when every other box here explains itself with a plain
            tooltip and the default arrow. */
         /* Measured identical to Evasion/Clash/Initiative — 280.25 x 49, same
-           padding, same 1px border. It only READ as bigger: those three carry
-           a 4%-white border that is all but invisible, so a 25% orange edge
-           around a lighter fill made this one bulge. The warning itself is
-           carried by the icon and the value, which stay full-strength orange. */
+           padding, same 1px border. It only READS as bigger, and colouring the
+           border is what does it. Those three carry a 4%-white edge that is
+           invisible on a dark page, so their silhouette ends at the fill;
+           tinting THIS one's border put a visible ring at the one place where
+           they show nothing, and a ring around a shape reads as sitting
+           outside it. So the edge is drawn one way here and another on the
+           Dark License, and the split is not cosmetic: that is the only theme
+           whose panels are dark enough to swallow the #ffffff0a hairline the
+           quick-move boxes carry. Everywhere else — every type theme, and the
+           Light License — the neighbours show a real 1px outline, so Pain
+           takes a real 1px outline too, in its own colour, and the four boxes
+           end at the same pixel. The Dark License case is right below. */
         .pain-quick.on {
-            background: #fb923c0d;
-            border-color: #fb923c26;
+            background-color: #fb923c14;
+            border-color: #fb923c40;
         }
 
         .pain-quick.on .quick-move-name i,
@@ -3392,13 +3417,34 @@
            so the escalation is felt, but nowhere near the old 40% edge — the
            red hue and the doubled number already do the shouting. */
         .pain-quick.severe {
-            background: #f43f5e0f;
-            border-color: #f43f5e33;
+            background-color: #f43f5e17;
+            border-color: #f43f5e4d;
         }
 
         .pain-quick.severe .quick-move-name i,
         .pain-quick.severe .quick-move-val strong {
             color: #fb7185;
+        }
+
+        /* Dark License. Its neighbours' hairline is invisible, so an outline
+           in Pain's colour would be a ring at the one place the other three
+           show nothing, and a ring around a shape reads as sitting outside
+           it. The edge moves inside instead — and the border it vacates is
+           made transparent AND cut out of the fill, or the tint paints that
+           1px and leaves a band standing proud of the ring. Both halves are
+           needed: transparent alone still shows the fill through it.
+
+           Later in the file than the two rules above and at the same (0,2,0),
+           so it wins on order; .severe restates only the ring colour, and its
+           border stays transparent from .on, which is always set with it. */
+        :where(:root.dark-license) .pain-quick.on {
+            background-clip: padding-box;
+            border-color: transparent;
+            box-shadow: inset 0 0 0 1px #fb923c40;
+        }
+
+        :where(:root.dark-license) .pain-quick.severe {
+            box-shadow: inset 0 0 0 1px #f43f5e4d;
         }
 
         /* Moves Cards List. It fills the rows it spans - sprite box top to pools
@@ -3420,19 +3466,32 @@
                scroll edges, and that mask would eat the border and the shadow
                along with the cards. overflow:hidden trims the scrollbar to the
                rounded corners. */
-            /* Same #0d0914 at the same 50% as the sprite box, over the same
-               --border-glow the corner gradient lays under that one. Without
-               that second layer the two boxes are declared identically and
-               still do not match: .card-container::before is anchored to the
-               card's top-left at 60% x 60%, so it lights the sprite box in the
-               left column and stops well short of this one. The fill is
-               translucent, so the box ends up showing whatever it happens to
-               be sitting on — plain card-bg here, glow-lit card-bg there.
-               Layering the glow in makes this box's backdrop match, and keeps
-               it a theme variable rather than a literal that would be wrong on
-               every theme but the current one. */
+            /* Same fill, border and inset shadow as the sprite box, over a copy
+               of the glow this box never receives.
+
+               .card-container::before is clipped to a box 60% of the card wide
+               starting at -20%, so it stops around the left column's right edge:
+               the sprite box sits inside it, this one begins well past it. Both
+               fills are translucent, so the two wells end up different colours —
+               on a type theme --border-glow is the raw type colour at 15%, and
+               the gap is plain on Fire.
+
+               A flat wash of the average will not do it. The sprite box is lit
+               brightest at its top-left and falls off across its width, and a
+               large box in one even tone reads as a different colour however the
+               average is tuned. So this is the same radial, placed where the
+               sprite box sees it: 70px in from the left edge, because that box
+               starts at the card's 40px padding and the glow centres at 110.
+               The two boxes share a top edge — both start at grid-row 2 — so the
+               vertical offset carries over unchanged and they fall off in step.
+
+               The centre offset and radius follow the card's height, which the
+               gradient is sized from and CSS cannot read here; these are a full
+               sheet's. Being a little off only shifts where the falloff lands,
+               which is a far smaller error than tinting the box flat. */
             background: linear-gradient(#0d091480, #0d091480),
-                color-mix(in srgb, var(--border-glow) 55%, transparent);
+                radial-gradient(circle 620px at 70px 100px,
+                    var(--border-glow) 0%, transparent 100%);
             border: 1px solid var(--border-glow);
             border-radius: 20px;
             box-shadow: inset 0 0 20px #00000080;
@@ -4115,16 +4174,25 @@
         }
 
         /* The two recessed wells — the sprite box and the move list facing it —
-           keep their inset shadow, at an alpha that reads on a light ground */
-        :where(:root.light-theme) .sprite-panel {
+           keep their inset shadow, at an alpha that reads on a light ground,
+           and take it in the theme crimson rather than in black, so the hollow
+           they sit in is the same red the section banners are printed in.
+           Mixed rather than written as a literal, so it tracks --ghost-color
+           the way those banners do. One rule for both: they face each other
+           across the card and have to read as one material. */
+        :where(:root.light-theme) .sprite-panel,
+        :where(:root.light-theme) .moves-scroll {
             background: #0000000d;
-            box-shadow: inset 0 0 20px #00000014;
+            box-shadow: inset 0 0 20px
+                color-mix(in srgb, var(--ghost-color) 26%, transparent);
         }
 
+        /* The same copy of the corner glow as on the dark page, at the light
+           fill. Later than the rule above and at equal specificity. */
         :where(:root.light-theme) .moves-scroll {
             background: linear-gradient(#0000000d, #0000000d),
-                color-mix(in srgb, var(--border-glow) 55%, transparent);
-            box-shadow: inset 0 0 20px #00000014;
+                radial-gradient(circle 620px at 70px 100px,
+                    var(--border-glow) 0%, transparent 100%);
         }
 
         /* Pop-overs were near-opaque #0d0914; they become the light panel */
@@ -4381,14 +4449,16 @@
         }
 
         /* The box's own wash follows the ink: at the dark page's alphas the
-           tint all but vanished against a pale panel */
+           tint all but vanished against a pale panel. A plain outline here —
+           the light page shows its neighbours' hairline plainly, so Pain has
+           one in the same place. */
         :where(:root.light-theme) .pain-quick.on {
-            background: #cc5a0014;
+            background-color: #cc5a001f;
             border-color: #cc5a0059;
         }
 
         :where(:root.light-theme) .pain-quick.severe {
-            background: #d10f2d14;
+            background-color: #d10f2d1f;
             border-color: #d10f2d59;
         }
 
@@ -7071,6 +7141,10 @@
                the near-black wells switch to their light-appropriate values */
             const light = !!(custom && custom.light);
             document.documentElement.classList.toggle('light-theme', light);
+            /* The Dark License is the one theme whose panels sit dark enough
+               that the quick-move boxes' #ffffff0a hairline disappears; the
+               Pain box's edge is drawn differently there. See .pain-quick.on */
+            document.documentElement.classList.toggle('dark-license', !!custom && !light);
             const corner = document.getElementById('theme-corner-btn');
             if (corner) {
                 corner.querySelector('i').className = 'fa-solid ' + (light ? 'fa-sun' : 'fa-moon');
