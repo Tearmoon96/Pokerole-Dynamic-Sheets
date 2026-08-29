@@ -88,6 +88,15 @@
             background: var(--ghost-color);
         }
 
+        /* One grid for the whole sheet, not two independent columns: both sides
+           share the same six rows, so a panel on the right can be told to line
+           up with the panel beside it. The left stack is what sizes the rows;
+           every right-hand panel just names the row it belongs to.
+
+           minmax(0, ...) rather than plain 1fr: a grid track's minimum is its
+           content, so one wide move card would otherwise stretch the column and
+           push the layout past the card. This replaces the overflow:hidden the
+           two column wrappers used to carry. */
         .card-container {
             width: 100%;
             max-width: 1100px;
@@ -99,17 +108,116 @@
             box-shadow: 0 12px 40px 0 #00000099, 0 0 30px 2px var(--border-glow);
             padding: 40px;
             display: grid;
-            grid-template-columns: 1fr 1.4fr;
-            gap: 40px;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+            grid-template-rows: repeat(6, auto);
+            column-gap: 40px;
+            row-gap: 24px;
             position: relative;
             overflow: hidden;
         }
 
+        /* The two <section>s stay in the markup as grouping, but display:contents
+           lifts their panels out to become items of the grid above - that is what
+           lets a left and a right panel share a row. .moves-panel does the same so
+           its scrolling list can be placed apart from its header. */
+        .left-column,
+        .right-column,
+        .moves-panel {
+            display: contents;
+        }
+
+        .left-column > *,
+        .right-column > *,
+        .moves-panel > * {
+            /* Over .card-container::before, which the column wrappers used to
+               clear with a z-index of their own */
+            position: relative;
+            z-index: 1;
+            min-width: 0;
+        }
+
+        .left-column > * {
+            grid-column: 1;
+            /* Was .left-column's padding-right: keeps the gutter at 90px without
+               changing either track's width */
+            margin-right: 50px;
+        }
+
+        .right-column > *,
+        .moves-panel > * {
+            grid-column: 2;
+        }
+
+        /* The row map. Left first, since those panels are what give each row its
+           height; the right-hand ones stretch into whatever they are given. */
+        .pokemon-header { grid-row: 1; }
+        .sprite-panel { grid-row: 2; }
+        .tracker-panel.pools { grid-row: 3; }
+        .tracker-panel.condition { grid-row: 4; }
+        .stats-panel { grid-row: 5; }
+        .skills-panel { grid-row: 6; }
+
+        /* Both left-hand panels keep their own height. .side-details opposite
+           them spans rows 5 and 6, so whenever it is the taller of the two the
+           grid hands its slack to those two rows — and a stretched panel shows
+           that slack as blank space inside itself. Collapsing Skills is what
+           made it obvious: the row shrank, side-details became the taller
+           column, and both Base Stats and the collapsed Skills box grew empty
+           padding. Only in the two-column layout: below the breakpoint the
+           columns are flex again, where align-self would size them by content
+           width instead. */
+        @media (min-width: 901px) {
+
+            .stats-panel,
+            .skills-panel {
+                align-self: start;
+            }
+        }
+
+        .moves-head {
+            grid-row: 1;
+            /* Over .moves-scroll, a later sibling on the same z-index: the filter
+               popover hangs down out of this row and has to cover the cards. */
+            z-index: 3;
+        }
+        /* Sprite box top to pools box bottom */
+        .moves-scroll { grid-row: 2 / span 2; }
+        .notepad-panel { grid-row: 4; }
+        .side-details { grid-row: 5 / -1; }
+
+        /* Notes expanded: one row taller, which puts their bottom edge level with
+           Base Stats & Social and starts the abilities level with Skills. */
+        .card-container.notes-tall .notepad-panel { grid-row: 4 / span 2; }
+        .card-container.notes-tall .side-details { grid-row: 6 / -1; }
+
         @media (max-width: 900px) {
             .card-container {
                 grid-template-columns: 1fr;
+                /* Empty rows are 0 tall but their gaps are not, so the six-row
+                   map has to go, not just be ignored */
+                grid-template-rows: none;
                 padding: 24px;
                 gap: 30px;
+            }
+
+            /* One column over: back to two plain stacks. The grid-row rules above
+               go inert as soon as the parent is a flex container again. */
+            .left-column,
+            .right-column {
+                display: flex;
+                flex-direction: column;
+                gap: 24px;
+                min-width: 0;
+            }
+
+            .moves-panel {
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .left-column > * {
+                margin-right: 0;
             }
         }
 
@@ -126,63 +234,88 @@
             pointer-events: none;
         }
 
-        .left-column {
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-            z-index: 1;
-            min-width: 0;
-            padding-right: 50px;
-            /* CRITICAL: Prevent grid column track overflow expansion */
-        }
+        /* Sprite Viewer.
 
-        .right-column {
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-            z-index: 1;
-            overflow: hidden;
-            min-width: 0;
-            /* CRITICAL: Prevent grid column track overflow expansion */
-        }
-
-        /* Sprite Viewer */
+           Three rows, with the sprite in the middle one. The set tabs sit below
+           it and used to be the only thing in flow beside it, which pushed the
+           sprite ~23px above the box's centre line — visible whenever the tabs
+           were faded out, which is most of the time. The two 1fr tracks fix that:
+           in an auto-height grid they come out equal, so row 1 reserves exactly
+           the height row 3 needs and the sprite lands dead centre. */
         .sprite-panel {
             background: #0d091480;
             border: 1px solid var(--border-glow);
             border-radius: 20px;
             padding: 20px;
-            display: flex;
-            flex-direction: column;
+            display: grid;
+            grid-template-rows: 1fr auto 1fr;
+            justify-items: center;
             align-items: center;
-            justify-content: center;
             position: relative;
             box-shadow: inset 0 0 20px #00000080;
         }
 
-        .pokemon-sprite {
-            /* Base size scaled by the per-sprite user scale (default 1) */
-            width: calc(180px * var(--sprite-scale, 1));
-            height: calc(180px * var(--sprite-scale, 1));
+        /* Fixed stage for the sprite. Zoom and nudge are a transform on the image
+           inside it, never a change of size: the box has to stay put whatever the
+           sprite does, even when a big sprite spills out over its edges. The
+           float animation lives out here so it cannot fight that transform. */
+        .sprite-stage {
+            grid-row: 2;
+            width: 180px;
+            height: 180px;
             max-width: 100%;
-            object-fit: contain;
-            filter: drop-shadow(0 0 15px var(--ghost-color-glow));
+            display: flex;
+            align-items: center;
+            justify-content: center;
             animation: float 4s ease-in-out infinite;
         }
 
+        /* Three transforms, and the order matters. Rightmost runs first:
+
+             --sprite-frame-*  centres the ARTWORK, which is drawn low in its own
+                               canvas on most sets (a Home render is a standing
+                               pose with headroom above it). Inside the scale, so
+                               the correction grows with the zoom the way the
+                               off-centring itself does.
+             --sprite-scale    the user's zoom.
+             --sprite-*        the user's nudge, outside the scale so a slider
+                               step stays one screen pixel at any zoom.
+
+           Without the first one the box centres the <img>, not the Pokémon, and
+           every Home sprite sits ~25px low in a 180px stage. */
+        .pokemon-sprite {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 0 15px var(--ghost-color-glow));
+            transform: translate(var(--sprite-x, 0px), var(--sprite-y, 0px))
+                scale(var(--sprite-scale, 1))
+                translate(var(--sprite-frame-x, 0px), var(--sprite-frame-y, 0px));
+        }
+
+        /* Symmetric around the resting position: 0 -> -10px would have the sprite
+           sit at or above centre for the whole cycle, so the bob itself put it
+           off the box's middle. Same 10px of travel, half of it either side. */
         @keyframes float {
 
             0%,
             100% {
-                transform: translateY(0);
+                transform: translateY(5px);
             }
 
             50% {
-                transform: translateY(-10px);
+                transform: translateY(-5px);
             }
         }
 
+        /* The set tabs are chrome rather than content, so they fade in with the
+           pointer like the resize control. Faded and not hidden: display:none
+           would resize the box every time the pointer crossed it. */
         .sprite-selectors {
+            grid-row: 3;
+            /* Top of their track, so they stay tucked under the sprite when the
+               grid row stretches the panel taller than its own content */
+            align-self: start;
             display: flex;
             gap: 4px;
             margin-top: 15px;
@@ -191,6 +324,16 @@
             border-radius: 12px;
             border: 1px solid #ffffff0d;
             max-width: 100%;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .sprite-panel:hover .sprite-selectors,
+        /* Keyboard users never hover: keep them up while one has focus */
+        .sprite-selectors:focus-within {
+            opacity: 1;
+            pointer-events: auto;
         }
 
         .sprite-btn {
@@ -226,9 +369,8 @@
             box-shadow: none;
         }
 
-        /* Top-right stack in the sprite box: gender toggle (always shown) and the
-           custom-image controls (revealed only while viewing an uploaded image).
-           Sits opposite the resize control in the top-left corner. */
+        /* Top-right of the sprite box: the mega stone, when there is one, and the
+           gender toggle. Both always visible. */
         .sprite-top-right {
             position: absolute;
             top: 12px;
@@ -239,9 +381,21 @@
             z-index: 2;
         }
 
+        /* Top-left of the sprite box, stacked downwards: resize, then the two
+           custom-image controls under it. */
+        .sprite-top-left {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            z-index: 2;
+        }
+
         /* Custom-image buttons (pen / trash): only when the custom tab is showing
-           AND the sprite box is hovered (like the resize control). The gender
-           toggle beside them stays visible at all times.
+           AND the sprite box is hovered (like the resize control above them).
            NB: the selector is qualified with .sprite-custom-btn so this hide rule
            outweighs .sprite-custom-btn's own `display: flex` (equal specificity
            would otherwise lose on source order, leaving the buttons always shown). */
@@ -279,13 +433,9 @@
             border-color: #f43f5e;
         }
 
-        /* Resize (scale) control: a small button top-left of the sprite box,
-           revealed on hover over the whole panel, plus a slider popover */
+        /* Resize (scale) control: top of the .sprite-top-left stack, revealed on
+           hover over the whole panel, plus a slider popover */
         .sprite-scale-btn {
-            position: absolute;
-            top: 12px;
-            left: 12px;
-            /* Same size as the gender toggle in the opposite corner */
             width: 34px;
             height: 34px;
             border-radius: 50%;
@@ -314,15 +464,21 @@
             box-shadow: 0 0 8px var(--ghost-color-glow);
         }
 
+        /* Size / Horizontal / Vertical, the same three controls the trainer sheet
+           offers for a team sprite. It sits ABOVE the box, over the header's evolve
+           buttons: inside the box it covered the very sprite you are framing, which
+           made the sliders pointless. bottom:100% puts its foot on the box's top
+           edge, so it opens upwards into the header instead. */
         .sprite-scale-editor {
             position: absolute;
-            top: 52px;
-            left: 12px;
-            z-index: 3;
+            left: 0;
+            right: 0;
+            bottom: calc(100% + 8px);
+            z-index: 5;
             display: none;
-            align-items: center;
+            flex-direction: column;
             gap: 8px;
-            padding: 8px 10px;
+            padding: 10px 12px;
             background: #0d0914f2;
             border: 1px solid var(--border-glow);
             border-radius: 12px;
@@ -333,8 +489,26 @@
             display: flex;
         }
 
+        .sprite-scale-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sprite-scale-row > span:first-child {
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            /* Wide enough for "HORIZONTAL", the longest of the three; at 62px it
+               was being clipped mid-word */
+            width: 76px;
+            flex-shrink: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
         .sprite-scale-range {
-            width: 96px;
+            flex: 1;
+            min-width: 0;
             accent-color: var(--ghost-color);
             cursor: pointer;
         }
@@ -342,7 +516,8 @@
         .sprite-scale-val {
             font-size: 0.72rem;
             color: var(--text-secondary);
-            min-width: 40px;
+            width: 42px;
+            flex-shrink: 0;
             text-align: right;
             font-variant-numeric: tabular-nums;
         }
@@ -527,6 +702,13 @@
             flex-shrink: 0;
         }
 
+        /* Beside the 2.5rem title (the Egg's number lives up there) the subline's
+           0.7rem badge reads as a speck, so it gets a step up. */
+        .pokemon-title-row .pokemon-number {
+            font-size: 0.85rem;
+            padding: 3px 10px;
+        }
+
         /* The dex category line ("Seed Pokémon"). 0.775rem is the 0.9rem it
            used to be, 2px smaller — it is a subtitle, not a second title. */
         .pokemon-category {
@@ -571,7 +753,8 @@
         }
 
         /* The row of round tool buttons under the types: type chart, ailments,
-           weather, sheet reset, load another. All are .type-eff-btn, so they
+           weather and environments, sheet reset, load another. All are
+           .type-eff-btn, so they
            are one size and one shape; wrap is there for a narrow window. */
         .header-tools {
             display: flex;
@@ -852,6 +1035,10 @@
             vertical-align: middle;
             margin-left: 2px;
             margin-right: -24px;
+            /* Repeated from .mega-stone-icon: .poke-tile img sets pixelated and
+               is more specific than the base rule, so without this the tiles keep
+               the staircase edge at an even harsher 0.275x. */
+            image-rendering: auto;
         }
 
         .poke-tile-num {
@@ -875,20 +1062,54 @@
             opacity: 1;
         }
 
-        /* Mega form: the stone sprite replaces the "(Mega Form)" suffix */
-        .mega-stone-icon {
-            height: 34px;
-            vertical-align: middle;
-            image-rendering: pixelated;
+        /* Page-theme picker. Two rows of chips: the named License themes at the
+           top, this Pokémon's own type(s) below as the way back to type
+           theming. Each row is a single auto-width grid column, so the chips
+           come out the width of the widest one and read as a matched set.
+           The inactive ones dim, the same way the type badges in the header do. */
+        .theme-grid {
+            display: grid;
+            grid-template-columns: auto;
+            justify-content: center;
+            gap: 8px;
         }
 
-        /* A hidden copy of the stone on the name's other side, same idea as
-           .pokemon-number.mirror on the subline: the visible stone alone would
-           push the name off the header's centre axis, so the title no longer
-           lined up with the lines under it. Reserving the same width on both
-           sides keeps the name itself centred. */
-        .pokemon-name .mega-stone-icon.mirror {
-            visibility: hidden;
+        .theme-chip {
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .theme-chip:not(.theme-active) {
+            opacity: 0.55;
+            box-shadow: none !important;
+        }
+
+        .theme-chip:hover {
+            opacity: 1;
+        }
+
+        /* Mega form: the stone sprite stands in for the "(Mega Form)" suffix. It
+           sits in the sprite box next to the gender toggle and is sized to match
+           it; in the title it shifted the name off the header's centre axis. */
+        .mega-stone-icon {
+            /* 28px, not the toggle's 1.2rem font-size: the sprite has transparent
+               margin baked in, so at the toggle's own height the stone inside it
+               came out visibly smaller than the glyph. */
+            height: 28px;
+            vertical-align: middle;
+            /* Deliberately not pixelated, unlike the sprite rules around it: the
+               stones are 80px renders drawn at 28 (and at 22 in the picker tiles),
+               so skipping the interpolation drops two pixels in three and leaves
+               the round edge looking like a staircase. */
+            image-rendering: auto;
+            /* Legible over the sprite behind it, like .gender-toggle's shadow */
+            filter: drop-shadow(0 1px 3px #000000cc);
+        }
+
+        .mega-stone-slot {
+            display: inline-flex;
+            align-items: center;
         }
 
         .type-badge {
@@ -976,7 +1197,9 @@
             width: 56px;
             flex-shrink: 0;
             text-align: right;
-            padding-top: 3px;
+            /* Nudged to the middle of a 30px chip. The row stays flex-start so
+               the label tracks the FIRST chip row when the chips wrap. */
+            padding-top: 7px;
         }
 
         .type-eff-chips {
@@ -985,19 +1208,33 @@
             gap: 6px;
         }
 
+        /* Icon-only, matching the trainer sheet's theme picker: a bucket can
+           hold ten types, and at that count the names wrapped to three lines
+           and buried the row label. The type name is on the tooltip. */
         .type-eff-chip {
-            font-size: 0.72rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 3px 10px;
-            border-radius: 20px;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            border-radius: 50%;
             border: 1px solid;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.88rem;
+            letter-spacing: 0;
+        }
+
+        /* Inline glyphs center on their line box — built from the font's
+           ascent/descent — not on the icon, which leaves some sitting high.
+           As a block with line-height 1 the box is the glyph itself. */
+        .type-eff-chip i {
+            display: block;
+            line-height: 1;
         }
 
         .type-eff-none {
             color: var(--text-muted);
-            padding-top: 2px;
+            padding-top: 6px;
         }
 
         /* Tracker Panel: Health & Willpower */
@@ -2164,12 +2401,12 @@
             font-family: serif;
         }
 
-        /* Moves Header & Filter Tabs */
-        .moves-panel {
+        /* Moves Header & Filter Tabs. .moves-panel itself is display:contents -
+           see the grid at the top; only the stacked layout gives it a box. */
+        .moves-head {
             display: flex;
             flex-direction: column;
             gap: 15px;
-            width: 100%;
         }
 
         .moves-header {
@@ -2787,16 +3024,127 @@
             outline-offset: -2px;
         }
 
-        /* Weather reuses the ailment tiles, but its entries may carry a
-           different number of bands each, so the subgrid row-matching has
-           nothing to match: let the tiles size themselves instead. */
+        /* Weather reuses the ailment tiles and their subgrid row-matching, but
+           spans a different number of rows: a weather carries two bands (where
+           it's found, effects) and an environment one. Every tile within a tab
+           carries the same ones, which is what the matching needs - the class
+           on the grid says how many, set by renderWeather(). */
+        /* Three tiles to a row at most, so the five weathers fall as the book
+           groups them - Sunny, Rain, Snowy over Sandstorm, Hail. auto-fill
+           divides by the larger of 290px and 30%: on a wide window the 30%
+           caps it at three, on a narrow one the 290px still drops it to two
+           and then one. */
         #weather-content {
-            align-items: start;
+            grid-template-columns: repeat(auto-fill, minmax(max(290px, 30%), 1fr));
         }
 
-        #weather-content .ail-tile {
-            display: block;
-            grid-row: auto;
+        /* Left as they are, but centred in a bar that the equalizer may have
+           made taller than one line of text */
+        #weather-content .ail-band {
+            display: flex;
+            align-items: center;
+        }
+
+        #weather-content.wx-rows-5 .ail-tile {
+            grid-row: span 5;
+        }
+
+        #weather-content.wx-rows-3 .ail-tile {
+            grid-row: span 3;
+        }
+
+        /* Subgrid levels the bands of the tiles on one row against each other;
+           equalizeWeatherTiles() then levels one row against the next, so every
+           tile in the window ends up the height of the tallest. Until it runs -
+           and if it bails out - this is the row-by-row look, not a broken one. */
+
+        /* The book's preamble to the optional challenges. Outside the grid: a
+           full-width item in it would occupy a row of its own and throw the
+           tiles' rows out of step with the track cycle the equalizer sets. */
+        .wx-note {
+            margin: 0;
+            font-size: 0.78rem;
+            line-height: 1.45;
+            color: var(--text-secondary);
+        }
+
+        /* The book's icon badges, written out at the foot of an effect. Kept
+           inside the effect's own band rather than given one of their own, so
+           every environment tile carries the same rows. */
+        .wx-mods {
+            margin: 6px 0 0;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .wx-mods strong {
+            color: var(--ail-ink);
+        }
+
+        /* The three groups the weather window is split into. Chips lifted from
+           the PC storage strip in trainer-license.html (.box-tab), minus its
+           horizontal scroll: that padding/negative-margin dance was there to
+           keep a drag & drop ring from being clipped, and nothing here drags. */
+        .wx-tabs {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .wx-tab {
+            flex-shrink: 0;
+            padding: 4px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            background: #00000033;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 0.72rem;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .wx-tab:hover {
+            border-color: var(--ghost-color);
+            color: var(--text-primary);
+        }
+
+        .wx-tab.active {
+            background: var(--primary-soft);
+            border-color: var(--ghost-color);
+            color: var(--text-primary);
+        }
+
+        /* Name over a second line - the weather's flavor text, the
+           environment's subtitle - so one banner shape serves both, the way
+           the book draws them. .ail-tile-name gives up its flex here, since
+           this wrapper is what stretches now. */
+        .wx-head-text {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .wx-head-text .ail-tile-name {
+            flex: none;
+        }
+
+        .wx-sub {
+            font-size: 0.68rem;
+            font-style: italic;
+            line-height: 1.3;
+            opacity: 0.85;
+        }
+
+        .wx-list {
+            margin: 0;
+            padding-left: 1.05em;
+            display: grid;
+            gap: 5px;
         }
 
         /* No subgrid: tiles size themselves again and the bands stagger, which
@@ -2806,7 +3154,9 @@
                 align-items: start;
             }
 
-            .ail-tile {
+            .ail-tile,
+            #weather-content.wx-rows-5 .ail-tile,
+            #weather-content.wx-rows-3 .ail-tile {
                 display: block;
                 grid-row: auto;
             }
@@ -2898,6 +3248,9 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            /* Last thing in the header row, so any slack left by a short title
+               goes above it and the tiles sit right on top of the move list */
+            margin-top: auto;
         }
 
         .quick-moves-row {
@@ -2987,19 +3340,62 @@
             color: #fb7185;
         }
 
-        /* Moves Cards Grid */
+        /* Moves Cards List. It fills the rows it spans - sprite box top to pools
+           box bottom - and scrolls inside them, so it carries no max-height and
+           no margin of its own; either one would break that alignment.
+
+           The list is taken out of flow and the empty .moves-scroll is what the
+           grid stretches. An auto row grows to its content, and a full learnset
+           runs to thousands of pixels, so a list laid out in flow here would
+           stretch rows 2 and 3 and drag the sprite and pool boxes down with it.
+           Out of flow it contributes no height at all, the rows stay sized by
+           the panels on the left, and top/bottom:0 pins the list to the box
+           those rows produced. */
+        .moves-scroll {
+            position: relative;
+            min-height: 0;
+            /* Same recessed frame as the sprite box facing it. The chrome lives
+               out here rather than on the list itself: the list is masked at its
+               scroll edges, and that mask would eat the border and the shadow
+               along with the cards. overflow:hidden trims the scrollbar to the
+               rounded corners. */
+            /* Same #0d0914 at the same 50% as the sprite box, over the same
+               --border-glow the corner gradient lays under that one. Without
+               that second layer the two boxes are declared identically and
+               still do not match: .card-container::before is anchored to the
+               card's top-left at 60% x 60%, so it lights the sprite box in the
+               left column and stops well short of this one. The fill is
+               translucent, so the box ends up showing whatever it happens to
+               be sitting on — plain card-bg here, glow-lit card-bg there.
+               Layering the glow in makes this box's backdrop match, and keeps
+               it a theme variable rather than a literal that would be wrong on
+               every theme but the current one. */
+            background: linear-gradient(#0d091480, #0d091480),
+                color-mix(in srgb, var(--border-glow) 55%, transparent);
+            border: 1px solid var(--border-glow);
+            border-radius: 20px;
+            box-shadow: inset 0 0 20px #00000080;
+            overflow: hidden;
+        }
+
+        /* The page-wide track is #0d0914cc — the same ink as the box but at 80%
+           against the box's 50%, which drew a darker strip down this edge. Match
+           the box instead, and let the glow layer below show through it. */
+        .moves-grid::-webkit-scrollbar-track {
+            background: #0d091480;
+        }
+
         .moves-grid {
+            position: absolute;
+            inset: 0;
             display: flex;
             flex-direction: column;
             gap: 15px;
             overflow-y: auto;
-            max-height: 760px;
-            /* Safe scrollable max-height */
-            margin-top: 10px;
-            /* Keeps the faded scroll edge clear of the filter tabs */
-            padding: 20px 8px 20px 4px;
-            width: 100%;
-            max-width: 100%;
+            /* Wider on the left than it was: the cards now sit inside a frame
+               instead of running to the column edge. The 8px on the right is the
+               scrollbar's own width. */
+            padding: 20px 8px 20px 14px;
             /* Fade cards out at the scroll edges instead of hard clipping */
             -webkit-mask-image: linear-gradient(to bottom,
                     transparent 0,
@@ -3011,6 +3407,16 @@
                     #000 24px,
                     #000 calc(100% - 24px),
                     transparent 100%);
+        }
+
+        /* Stacked, there is no row to fill, so the list goes back in flow as a
+           capped scroller and the wrapper is just a passthrough */
+        @media (max-width: 900px) {
+            .moves-grid {
+                position: static;
+                max-height: 760px;
+                margin-top: 10px;
+            }
         }
 
         /* Collapsible Move Cards styling */
@@ -3424,11 +3830,15 @@
             flex-direction: column;
         }
 
+        /* Fills the panel rather than setting its height: the row is sized by the
+           box on the left, and the expand toggle is what makes it taller. Hence
+           no drag-resize either - it would fight the row. */
         .notepad-textarea {
-            min-height: 220px;
-            resize: vertical;
+            flex: 1;
+            min-height: 0;
+            resize: none;
             color-scheme: dark;
-            /* Native resize grip and scrollbar render dark instead of white */
+            /* Scrollbar renders dark instead of white */
             background: #00000033;
             border: 1px solid #ffffff0d;
             border-radius: 12px;
@@ -3443,6 +3853,27 @@
 
         .notepad-textarea:focus {
             border-color: var(--ghost-color);
+        }
+
+        /* Stacked, nothing sizes the row for it, so it carries its own height */
+        @media (max-width: 900px) {
+            .notepad-textarea {
+                flex: none;
+                min-height: 220px;
+                resize: vertical;
+            }
+        }
+
+        /* Abilities, height/weight, evolutions and the dex flavour. These used
+           to close out the left column under Skills & Specialties; they sit
+           beside it now, starting level with Base Stats & Social. */
+        .side-details {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            /* Natural height: it is the last thing in its column and has no box
+               of its own to stretch */
+            align-self: start;
         }
 
         /* Empty state helper */
@@ -3540,6 +3971,385 @@
             border-bottom: none;
             border-right: none;
         }
+
+        /* ---------------- Light theme adjustments ----------------
+           applyTheme() adds .light-theme to <html> for the Light License
+           theme. The palette variables carry most of the page on their own;
+           what is left is everything written as white-alpha (invisible on a
+           pale body) or as near-black ink (a dark hole in a light one).
+
+           Every selector below is wrapped in :where(:root.light-theme), which
+           contributes no specificity of its own: each rule then ties with the
+           base rule it replaces and wins on source order alone, so the
+           :hover / :focus / .active rules further up the sheet keep working
+           instead of being outranked by a longer selector. */
+
+        :root.light-theme {
+            /* Move-category inks: the dark-page trio drops to ~2.5:1 on a pale
+               badge, so each moves to a darker shade of itself */
+            --phys-color: #b45309;
+            --spec-color: #1d4ed8;
+            --supp-color: #047857;
+        }
+
+        :where(:root.light-theme) ::-webkit-scrollbar-track,
+        :where(:root.light-theme) .moves-grid::-webkit-scrollbar-track {
+            background: #00000012;
+        }
+
+        /* Hairlines: panel frames, dividers, inputs and buttons were all drawn
+           as white-alpha borders */
+        :where(:root.light-theme) .sprite-selectors,
+        :where(:root.light-theme) .sprite-custom-btn,
+        :where(:root.light-theme) .sprite-scale-btn,
+        :where(:root.light-theme) .sprite-scale-reset,
+        :where(:root.light-theme) .poke-tile,
+        :where(:root.light-theme) .type-eff-btn,
+        :where(:root.light-theme) .type-eff-row + .type-eff-row,
+        :where(:root.light-theme) .tracker-panel,
+        :where(:root.light-theme) .pool-btn,
+        :where(:root.light-theme) .pool-bar,
+        :where(:root.light-theme) .pool-static-val,
+        :where(:root.light-theme) .exp-input,
+        :where(:root.light-theme) .pool-text-input,
+        :where(:root.light-theme) .def-offset-btn,
+        :where(:root.light-theme) .stats-panel,
+        :where(:root.light-theme) .stats-title,
+        :where(:root.light-theme) .stats-edit-form,
+        :where(:root.light-theme) .edit-input,
+        :where(:root.light-theme) .form-btn.cancel,
+        :where(:root.light-theme) .dot.locked,
+        :where(:root.light-theme) .skills-panel,
+        :where(:root.light-theme) .category-title,
+        :where(:root.light-theme) .specialties-section,
+        :where(:root.light-theme) .specialty-input,
+        :where(:root.light-theme) .ability-pick-row,
+        :where(:root.light-theme) .details-panel,
+        :where(:root.light-theme) .evolution-panel,
+        :where(:root.light-theme) .desc-panel,
+        :where(:root.light-theme) .moves-header,
+        :where(:root.light-theme) .filter-picker-btn,
+        :where(:root.light-theme) .move-edit-input,
+        :where(:root.light-theme) .move-edit-textarea,
+        :where(:root.light-theme) .offset-steppers,
+        :where(:root.light-theme) .offset-step-btn:first-child,
+        :where(:root.light-theme) .quick-move-val,
+        :where(:root.light-theme) .move-rank-badge,
+        :where(:root.light-theme) .move-effects-list,
+        :where(:root.light-theme) .no-moves-msg,
+        :where(:root.light-theme) .notepad-panel,
+        :where(:root.light-theme) .notepad-textarea {
+            border-color: #00000024;
+        }
+
+        /* The fainter inner hairlines stay faint, or the cards and the little
+           stat boxes turn into a grid of hard outlines */
+        :where(:root.light-theme) .custom-specialty-row,
+        :where(:root.light-theme) .evolution-flow,
+        :where(:root.light-theme) .move-stats-grid,
+        :where(:root.light-theme) .effect-detail,
+        :where(:root.light-theme) .quick-move,
+        :where(:root.light-theme) .move-card,
+        :where(:root.light-theme) .ail-tile {
+            border-color: #00000014;
+        }
+
+        /* Panel bodies: #0d0914 at 30% is a dark hole on a pale card */
+        :where(:root.light-theme) .tracker-panel,
+        :where(:root.light-theme) .stats-panel,
+        :where(:root.light-theme) .skills-panel,
+        :where(:root.light-theme) .details-panel,
+        :where(:root.light-theme) .desc-panel,
+        :where(:root.light-theme) .notepad-panel {
+            background: #00000012;
+        }
+
+        /* The two recessed wells — the sprite box and the move list facing it —
+           keep their inset shadow, at an alpha that reads on a light ground */
+        :where(:root.light-theme) .sprite-panel {
+            background: #0000000d;
+            box-shadow: inset 0 0 20px #00000014;
+        }
+
+        :where(:root.light-theme) .moves-scroll {
+            background: linear-gradient(#0000000d, #0000000d),
+                color-mix(in srgb, var(--border-glow) 55%, transparent);
+            box-shadow: inset 0 0 20px #00000014;
+        }
+
+        /* Pop-overs were near-opaque #0d0914; they become the light panel */
+        :where(:root.light-theme) .sprite-scale-editor,
+        :where(:root.light-theme) .def-offset-pop {
+            background: var(--panel-strong);
+            box-shadow: 0 8px 24px #00000029;
+        }
+
+        :where(:root.light-theme) .move-card,
+        :where(:root.light-theme) .quick-move {
+            background: #00000010;
+        }
+
+        :where(:root.light-theme) .ability-panel {
+            background: linear-gradient(135deg, var(--primary-faint) 0%, #00000012 100%);
+        }
+
+        /* Recessed fills: inputs, wells and chips that were near-black */
+        :where(:root.light-theme) .nickname-input,
+        :where(:root.light-theme) .exp-input,
+        :where(:root.light-theme) .pool-text-input,
+        :where(:root.light-theme) .edit-input,
+        :where(:root.light-theme) .specialty-input,
+        :where(:root.light-theme) .move-edit-input,
+        :where(:root.light-theme) .move-edit-textarea,
+        :where(:root.light-theme) .def-offset-btn,
+        :where(:root.light-theme) .pokemon-picker-btn,
+        :where(:root.light-theme) .sprite-custom-btn,
+        :where(:root.light-theme) .sprite-scale-btn {
+            background: #0000000d;
+        }
+
+        :where(:root.light-theme) .nickname-input:hover,
+        :where(:root.light-theme) .nickname-input:focus {
+            background: #00000017;
+        }
+
+        :where(:root.light-theme) .pool-static-val,
+        :where(:root.light-theme) .stats-edit-form,
+        :where(:root.light-theme) .evolution-flow,
+        :where(:root.light-theme) .custom-specialty-row,
+        :where(:root.light-theme) .move-stats-grid,
+        :where(:root.light-theme) .effect-detail,
+        :where(:root.light-theme) .no-moves-msg,
+        :where(:root.light-theme) .ail-tile,
+        :where(:root.light-theme) .wx-tab,
+        :where(:root.light-theme) .quick-move-val,
+        :where(:root.light-theme) .sprite-selectors,
+        :where(:root.light-theme) .notepad-textarea,
+        :where(:root.light-theme) .total-flag {
+            background: #00000012;
+        }
+
+        :where(:root.light-theme) .pool-bar {
+            background: #0000001f;
+        }
+
+        /* Sits over the bar it replaces, so it needs a solid light body */
+        :where(:root.light-theme) .pool-max-input {
+            background: var(--panel-solid);
+            color: var(--text-primary);
+        }
+
+        /* White-alpha fills invert to black-alpha */
+        :where(:root.light-theme) .pool-btn,
+        :where(:root.light-theme) .moves-count,
+        :where(:root.light-theme) .move-attr-tag,
+        :where(:root.light-theme) .offset-step-btn,
+        :where(:root.light-theme) .ability-remove-btn,
+        :where(:root.light-theme) .sprite-scale-reset,
+        :where(:root.light-theme) .dot.locked,
+        :where(:root.light-theme) .filter-option:hover {
+            background: #00000012;
+        }
+
+        :where(:root.light-theme) .poke-tile,
+        :where(:root.light-theme) .ability-pick-row,
+        :where(:root.light-theme) .type-eff-btn,
+        :where(:root.light-theme) .filter-picker-btn,
+        :where(:root.light-theme) .form-btn.cancel,
+        :where(:root.light-theme) .pokemon-name-text.editable:hover {
+            background: #0000000d;
+        }
+
+        :where(:root.light-theme) .form-btn.cancel:hover,
+        :where(:root.light-theme) .status-icon:hover {
+            background: #0000001a;
+        }
+
+        :where(:root.light-theme) .pokemon-name-text.editable:focus {
+            background: #00000014;
+            -webkit-text-fill-color: var(--text-primary);
+            color: var(--text-primary);
+        }
+
+        /* The strike-through bar over a Disabled move */
+        :where(:root.light-theme) .move-card.disabled::before {
+            background: #00000038;
+        }
+
+        /* Text that was white, on surfaces that no longer are */
+        :where(:root.light-theme) .pokemon-name,
+        :where(:root.light-theme) .blank-landing h1 {
+            background: none;
+            -webkit-text-fill-color: var(--text-primary);
+            color: var(--text-primary);
+            text-shadow: none;
+        }
+
+        :where(:root.light-theme) .ability-effect,
+        :where(:root.light-theme) .effect-detail,
+        :where(:root.light-theme) .edit-input,
+        :where(:root.light-theme) .specialty-input,
+        :where(:root.light-theme) .move-edit-input,
+        :where(:root.light-theme) .move-edit-textarea {
+            color: var(--text-primary);
+        }
+
+        :where(:root.light-theme) select.move-edit-input option,
+        :where(:root.light-theme) select.move-edit-input optgroup {
+            background: var(--panel-solid);
+            color: var(--text-primary);
+        }
+
+        :where(:root.light-theme) .status-icon i {
+            color: #00000045;
+        }
+
+        :where(:root.light-theme) .status-icon:hover i {
+            color: #000000b3;
+        }
+
+        :where(:root.light-theme) .notepad-textarea {
+            color-scheme: light;
+        }
+
+        /* The gender glyph floats over the sprite, so its halo has to flip too */
+        :where(:root.light-theme) .gender-toggle {
+            text-shadow: 0 1px 3px #ffffffcc;
+        }
+
+        :where(:root.light-theme) .gender-toggle.male {
+            color: #2563eb;
+        }
+
+        :where(:root.light-theme) .gender-toggle.female {
+            color: #db2777;
+        }
+
+        /* HP / Will bars are too vivid on a pale page: mute the fills, drop the
+           saturated glow, and darken the number so it holds over the empty part */
+        :where(:root.light-theme) .pool-bar-fill.health {
+            background: #e07a84;
+            box-shadow: none;
+        }
+
+        :where(:root.light-theme) .pool-bar-fill.willpower {
+            background: #e0968f;
+            box-shadow: none;
+        }
+
+        :where(:root.light-theme) .pool-bar-value {
+            color: #2a2020;
+            text-shadow: 0 1px 1px #ffffffcc;
+        }
+
+        /* ---- Buttons drawn for a dark page ----
+           Two failures: near-black text on a mid-tone themed fill, and white
+           text on a hover that only changes the border. */
+        :where(:root.light-theme) .form-btn.save {
+            background: var(--ghost-color);
+            color: #fff;
+        }
+
+        :where(:root.light-theme) .form-btn.save:hover {
+            background: var(--ghost-color);
+            filter: none;
+            box-shadow: 0 0 8px var(--ghost-color-glow);
+        }
+
+        :where(:root.light-theme) .form-btn.reset {
+            background: #f43f5e14;
+            border-color: #f43f5e4d;
+            color: #b12341;
+        }
+
+        :where(:root.light-theme) .form-btn.reset:hover {
+            background: #f43f5e2e;
+        }
+
+        /* Its default body is --border-color, a pale crimson wash here */
+        :where(:root.light-theme) .specialty-add-btn {
+            background: var(--ghost-color);
+            border-color: var(--ghost-color);
+            color: #fff;
+        }
+
+        :where(:root.light-theme) .evolve-btn.mega:hover {
+            color: #fff;
+        }
+
+        :where(:root.light-theme) .evolve-btn.revert {
+            color: #a3550a;
+        }
+
+        /* Hovers that never fill, so #fff had nothing to sit on */
+        :where(:root.light-theme) .sprite-custom-btn:hover,
+        :where(:root.light-theme) .sprite-scale-btn:hover,
+        :where(:root.light-theme) .sprite-scale-reset:hover,
+        :where(:root.light-theme) .def-offset-btn:hover {
+            color: var(--text-primary);
+        }
+
+        :where(:root.light-theme) .move-edit-btn:hover {
+            color: var(--ghost-color);
+            text-shadow: none;
+        }
+
+        :where(:root.light-theme) .move-trash-btn:hover {
+            color: #b12341;
+            text-shadow: none;
+        }
+
+        :where(:root.light-theme) .ability-remove-btn:hover {
+            color: #b12341;
+        }
+
+        /* Small state glyphs: the dark-page brights wash out on a pale chip */
+        :where(:root.light-theme) .total-flag.buffed {
+            color: #047857;
+        }
+
+        :where(:root.light-theme) .total-flag.pain,
+        :where(:root.light-theme) .pain-quick.on .quick-move-name i,
+        :where(:root.light-theme) .pain-quick.on .quick-move-val strong {
+            color: #c2410c;
+        }
+
+        :where(:root.light-theme) .total-flag.pain.severe,
+        :where(:root.light-theme) .pain-quick.severe .quick-move-name i,
+        :where(:root.light-theme) .pain-quick.severe .quick-move-val strong {
+            color: #be123c;
+        }
+
+        /* Drop shadows: 60% black under a pale card is a bruise, not a lift */
+        :where(:root.light-theme) .card-container,
+        :where(:root.light-theme) .modal-box {
+            box-shadow: 0 12px 40px 0 #0000002e, 0 0 30px 2px var(--border-glow);
+        }
+
+        :where(:root.light-theme) .filter-picker-menu,
+        :where(:root.light-theme) .move-suggestions {
+            box-shadow: 0 8px 24px #00000029, 0 0 20px 2px var(--border-glow);
+        }
+
+        :where(:root.light-theme) #app-tooltip {
+            box-shadow: 0 8px 24px #00000029, 0 0 18px 1px var(--border-glow);
+        }
+
+        :where(:root.light-theme) .move-card:hover {
+            box-shadow: 0 4px 15px #00000014;
+        }
+
+        :where(:root.light-theme) .blank-btn {
+            box-shadow: 0 8px 24px #00000026;
+        }
+
+        :where(:root.light-theme) .blank-btn:hover {
+            box-shadow: 0 8px 24px #00000026, 0 0 18px var(--ghost-color-glow);
+        }
+
+        :where(:root.light-theme) .blank-btn.wild:hover {
+            box-shadow: 0 8px 24px #00000026, 0 0 18px #22c55e55;
+        }
     </style>
 </head>
 
@@ -3547,7 +4357,7 @@
 
     <main class="card-container" id="pokerole-card">
 
-        <!-- LEFT COLUMN: core info, sprite, stats, abilities -->
+        <!-- LEFT COLUMN: core info, sprite, pools, stats, skills -->
         <section class="left-column">
 
             <!-- Header -->
@@ -3557,6 +4367,10 @@
                          The gender toggle now lives in the sprite box (top-right)
                          so long/mega names can't overlap it. -->
                     <h1 class="pokemon-name" id="pokemon-name"></h1>
+                    <!-- Egg only: it has no dex category, so the subline below
+                         would be a blank line with a lone #0000 hanging off it.
+                         Shown here instead, and the subline is hidden. -->
+                    <span class="pokemon-number" id="pokedex-number-title" style="display: none;"></span>
                 </div>
                 <input type="text" id="nickname-input" class="nickname-input" maxlength="20"
                     placeholder="Give it a nickname…" onchange="setSheetField('nickname', this.value.trim())">
@@ -3579,12 +4393,16 @@
                     <button class="type-eff-btn" onclick="openAilments()" title="Ailments & Conditions">
                         <i class="fa-solid fa-kit-medical"></i>
                     </button>
-                    <button class="type-eff-btn" onclick="openWeather()" title="Weather Conditions">
+                    <button class="type-eff-btn" onclick="openWeather()" title="Weather and Environments">
                         <i class="fa-solid fa-cloud-sun-rain"></i>
                     </button>
                     <button class="type-eff-btn heal-btn" onclick="openHeal()"
                         title="Heal: full HP and Will, every status cleared">
                         <i class="fa-solid fa-heart-circle-plus"></i>
+                    </button>
+                    <button class="type-eff-btn" onclick="openThemePicker()"
+                        title="Change the page theme">
+                        <i class="fa-solid fa-palette"></i>
                     </button>
                     <button class="type-eff-btn" id="load-picker" onclick="openPokePicker()"
                         title="Load another Pokémon">
@@ -3608,9 +4426,19 @@
 
             <!-- Sprite View -->
             <div class="sprite-panel" id="sprite-panel">
-                <!-- Top-right stack: gender toggle (always visible) plus the
-                     custom-image controls (only while viewing an uploaded image) -->
+                <!-- Top-right: the mega stone (filled by renderStaticInfo, empty
+                     for anything that is not a Mega form) and the gender toggle -->
                 <div class="sprite-top-right">
+                    <span class="mega-stone-slot" id="mega-stone-slot"></span>
+                    <button class="gender-toggle" id="gender-toggle" onclick="toggleGender()"></button>
+                </div>
+                <!-- Top-left, downwards: resize (on hover), then the custom-image
+                     controls (only while viewing an uploaded image) -->
+                <div class="sprite-top-left">
+                    <button class="sprite-scale-btn" title="Resize this sprite"
+                        onclick="toggleScaleEditor(event)">
+                        <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
+                    </button>
                     <button class="sprite-custom-btn custom-only" title="Upload a different image"
                         onclick="triggerCustomSpriteUpload()">
                         <i class="fa-solid fa-pen"></i>
@@ -3619,24 +4447,39 @@
                         onclick="removeCustomSprite()">
                         <i class="fa-solid fa-trash-can"></i>
                     </button>
-                    <button class="gender-toggle" id="gender-toggle" onclick="toggleGender()"></button>
                 </div>
-                <!-- Resize control: shows on hover, tunes this sprite's zoom -->
-                <button class="sprite-scale-btn" title="Resize this sprite"
-                    onclick="toggleScaleEditor(event)">
-                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-                </button>
+                <!-- Size / Horizontal / Vertical, matching the trainer sheet's
+                     team-sprite controls -->
                 <div class="sprite-scale-editor" id="sprite-scale-editor">
-                    <input type="range" min="0.5" max="2" step="0.05" value="1"
-                        id="sprite-scale-range" class="sprite-scale-range"
-                        oninput="onSpriteScaleInput(this.value)">
-                    <span class="sprite-scale-val" id="sprite-scale-val">1.00×</span>
+                    <label class="sprite-scale-row">
+                        <span>Size</span>
+                        <input type="range" min="0.25" max="3" step="0.01" value="1"
+                            id="sprite-scale-range" class="sprite-scale-range"
+                            oninput="onSpriteAdjust('scale', this.value)">
+                        <span class="sprite-scale-val" id="sprite-scale-val">1.00×</span>
+                    </label>
+                    <label class="sprite-scale-row">
+                        <span>Horizontal</span>
+                        <input type="range" min="-50" max="50" step="1" value="0"
+                            id="sprite-x-range" class="sprite-scale-range"
+                            oninput="onSpriteAdjust('x', this.value)">
+                        <span class="sprite-scale-val" id="sprite-x-val">0</span>
+                    </label>
+                    <label class="sprite-scale-row">
+                        <span>Vertical</span>
+                        <input type="range" min="-50" max="50" step="1" value="0"
+                            id="sprite-y-range" class="sprite-scale-range"
+                            oninput="onSpriteAdjust('y', this.value)">
+                        <span class="sprite-scale-val" id="sprite-y-val">0</span>
+                    </label>
                     <button class="sprite-scale-reset" onclick="resetSpriteScale()">Reset</button>
                 </div>
                 <!-- No src attribute on purpose: src="" resolves against the page URL and
                      makes the browser fetch this HTML file as an image, erroring on every
                      load. setSprite() fills it in as soon as the species is known. -->
-                <img id="poke-sprite" class="pokemon-sprite" alt="Pokémon Sprite">
+                <div class="sprite-stage">
+                    <img id="poke-sprite" class="pokemon-sprite" alt="Pokémon Sprite">
+                </div>
                 <div class="sprite-selectors">
                     <button class="sprite-btn active" onclick="setSprite('Home')">Home</button>
                     <button class="sprite-btn" onclick="setSprite('Book')">Book</button>
@@ -3650,7 +4493,7 @@
             </div>
 
             <!-- Pools: Health, Willpower, Def, Sp.Def, EXP, Status -->
-            <div class="tracker-panel">
+            <div class="tracker-panel pools">
                 <div class="tracker-row">
                     <span class="tracker-label"><i class="fa-solid fa-heart-pulse" style="color: #f43f5e;"></i>
                         Health</span>
@@ -3716,7 +4559,7 @@
             </div>
 
             <!-- Condition & flavor fields -->
-            <div class="tracker-panel">
+            <div class="tracker-panel condition">
                 <div class="tracker-row">
                     <span class="tracker-label"><i class="fa-solid fa-shield-heart" style="color: #f472b6;"></i>
                         Loyalty</span>
@@ -4103,134 +4946,154 @@
                 </div>
             </div>
 
-            <!-- Ability panels, one per ability; filled by renderStaticInfo() -->
-            <span id="abilities-container" style="display: contents;"></span>
-            <!-- Pick any ability from the full list (non-standard abilities) -->
-            <button class="add-ability-btn" id="add-ability-btn" onclick="openAbilityPicker()"
-                title="Choose an ability from the full list">
-                <i class="fa-solid fa-plus"></i> Add a custom ability
-            </button>
-
-            <!-- Details: Height / Weight / Evolution -->
-            <div class="details-panel">
-                <div class="detail-item">
-                    <span class="detail-label">Height</span>
-                    <span class="detail-val" id="detail-height"></span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Weight</span>
-                    <span class="detail-val" id="detail-weight"></span>
-                </div>
-
-                <div class="evolution-panel">
-                    <span class="detail-label" style="display: block; margin-bottom: 6px;">Evolutions</span>
-                    <div class="evolution-flow" id="evolution-flow"></div>
-                </div>
-            </div>
-
-            <!-- Dex Flavor -->
-            <div class="desc-panel" id="desc-panel"></div>
-
         </section>
 
-        <!-- RIGHT COLUMN: Move lists with filter tabs -->
+        <!-- RIGHT COLUMN: moves, notes, and everything under the skills box.
+             The two columns share the grid's rows - see .card-container. -->
         <section class="right-column">
 
             <div class="moves-panel">
-                <header class="moves-header">
-                    <h2 class="moves-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Move Learnset</h2>
-                    <div class="moves-header-right">
-                        <button class="filter-picker-btn" title="Restore default move order"
-                            onclick="resetMoveOrder()">
-                            <i class="fa-solid fa-rotate-left"></i>
-                        </button>
-                        <button class="filter-picker-btn" id="custom-adder-btn" title="Add a custom move"
-                            onclick="toggleCustomAdder()">
-                            <i class="fa-solid fa-plus"></i>
-                        </button>
-                        <div class="filter-picker">
-                            <button class="filter-picker-btn" id="filter-picker-btn" title="Choose visible filters"
-                                onclick="toggleFilterPicker(event)">
-                                <i class="fa-solid fa-filter"></i>
+                <div class="moves-head">
+                    <header class="moves-header">
+                        <h2 class="moves-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Move Learnset</h2>
+                        <div class="moves-header-right">
+                            <button class="filter-picker-btn" title="Restore default move order"
+                                onclick="resetMoveOrder()">
+                                <i class="fa-solid fa-rotate-left"></i>
                             </button>
-                            <div class="filter-picker-menu" id="filter-picker-menu" style="display: none;">
-                                <!-- Checkboxes rendered by renderFilterMenu() -->
+                            <button class="filter-picker-btn" id="custom-adder-btn" title="Add a custom move"
+                                onclick="toggleCustomAdder()">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                            <div class="filter-picker">
+                                <button class="filter-picker-btn" id="filter-picker-btn" title="Choose visible filters"
+                                    onclick="toggleFilterPicker(event)">
+                                    <i class="fa-solid fa-filter"></i>
+                                </button>
+                                <div class="filter-picker-menu" id="filter-picker-menu" style="display: none;">
+                                    <!-- Checkboxes rendered by renderFilterMenu() -->
+                                </div>
+                            </div>
+                            <span class="moves-count" id="moves-count">0 Moves</span>
+                        </div>
+                    </header>
+
+                    <!-- Custom move picker (toggled by the + button in the header) -->
+                    <div class="custom-move-adder" id="custom-move-adder" style="display: none;">
+                        <div class="move-search-wrap">
+                            <input type="text" id="custom-move-input" class="specialty-input" autocomplete="off"
+                                placeholder="Search the full move list..." oninput="renderMoveSuggestions()"
+                                onfocus="renderMoveSuggestions()" onclick="renderMoveSuggestions()">
+                            <div class="move-suggestions" id="move-suggestions" style="display: none;"></div>
+                        </div>
+                        <button class="specialty-add-btn" onclick="addCustomMove()">Add</button>
+                        <span class="custom-move-status" id="custom-move-status"></span>
+                    </div>
+
+                    <!-- Universal quick moves, always visible in every category -->
+                    <div class="quick-moves-stack">
+                        <div class="quick-moves-row">
+                            <div class="quick-move" title="Dexterity + Evasion">
+                                <span class="quick-move-name"><i class="fa-solid fa-person-running"></i> Evasion</span>
+                                <!-- Pain costs a success on this roll too. The glyph sits to
+                                     the LEFT of the value: the number is the pool, and Pain
+                                     is not in it - it comes off the successes afterwards.
+                                     Shown and titled by updatePainPenalty(). -->
+                                <span class="quick-move-vals">
+                                    <span class="total-flag pain quick-pain" style="display: none;"></span>
+                                    <span class="quick-move-val"><strong id="quick-evasion">0</strong></span>
+                                </span>
+                            </div>
+                            <!-- Title on the box, like Evasion and Initiative: the two
+                                 values had one each, so the tooltip only appeared over
+                                 the numbers. The per-value titles below still win when
+                                 the pointer is actually on one. -->
+                            <div class="quick-move" title="Strength or Special, + Clash">
+                                <span class="quick-move-name"><i class="fa-solid fa-hand-fist"></i> Clash</span>
+                                <span class="quick-move-vals">
+                                    <span class="total-flag pain quick-pain" style="display: none;"></span>
+                                    <span class="quick-move-val" title="Strength + Clash">STR <strong
+                                            id="quick-clash-str">0</strong></span>
+                                    <span class="quick-move-val" title="Special + Clash">SPE <strong
+                                            id="quick-clash-spe">0</strong></span>
+                                </span>
                             </div>
                         </div>
-                        <span class="moves-count" id="moves-count">0 Moves</span>
-                    </div>
-                </header>
-
-                <!-- Custom move picker (toggled by the + button in the header) -->
-                <div class="custom-move-adder" id="custom-move-adder" style="display: none;">
-                    <div class="move-search-wrap">
-                        <input type="text" id="custom-move-input" class="specialty-input" autocomplete="off"
-                            placeholder="Search the full move list..." oninput="renderMoveSuggestions()"
-                            onfocus="renderMoveSuggestions()" onclick="renderMoveSuggestions()">
-                        <div class="move-suggestions" id="move-suggestions" style="display: none;"></div>
-                    </div>
-                    <button class="specialty-add-btn" onclick="addCustomMove()">Add</button>
-                    <span class="custom-move-status" id="custom-move-status"></span>
-                </div>
-
-                <!-- Universal quick moves, always visible in every category -->
-                <div class="quick-moves-stack">
-                    <div class="quick-moves-row">
-                        <div class="quick-move" title="Dexterity + Evasion">
-                            <span class="quick-move-name"><i class="fa-solid fa-person-running"></i> Evasion</span>
-                            <!-- Pain costs a success on this roll too. The glyph sits to
-                                 the LEFT of the value: the number is the pool, and Pain
-                                 is not in it - it comes off the successes afterwards.
-                                 Shown and titled by updatePainPenalty(). -->
-                            <span class="quick-move-vals">
-                                <span class="total-flag pain quick-pain" style="display: none;"></span>
-                                <span class="quick-move-val"><strong id="quick-evasion">0</strong></span>
-                            </span>
-                        </div>
-                        <!-- Title on the box, like Evasion and Initiative: the two
-                             values had one each, so the tooltip only appeared over
-                             the numbers. The per-value titles below still win when
-                             the pointer is actually on one. -->
-                        <div class="quick-move" title="Strength or Special, + Clash">
-                            <span class="quick-move-name"><i class="fa-solid fa-hand-fist"></i> Clash</span>
-                            <span class="quick-move-vals">
-                                <span class="total-flag pain quick-pain" style="display: none;"></span>
-                                <span class="quick-move-val" title="Strength + Clash">STR <strong
-                                        id="quick-clash-str">0</strong></span>
-                                <span class="quick-move-val" title="Special + Clash">SPE <strong
-                                        id="quick-clash-spe">0</strong></span>
-                            </span>
-                        </div>
-                    </div>
-                    <div class="quick-moves-row">
-                        <div class="quick-move" title="Dexterity + Alert">
-                            <span class="quick-move-name"><i class="fa-solid fa-bolt"></i> Initiative</span>
-                            <span class="quick-move-vals">
-                                <span class="total-flag pain quick-pain" style="display: none;"></span>
-                                <span class="quick-move-val"><strong id="quick-initiative">0</strong></span>
-                            </span>
-                        </div>
-                        <!-- Only shown while the Pokémon is hurt enough to take the
-                             penalty; it keeps its slot so Initiative stays under Evasion -->
-                        <div class="quick-move pain-quick" id="pain-quick"
-                            title="Pain penalty. At half HP or less (rounded down) you lose 1 success on Skill, Accuracy and Damage rolls; at 1 HP you lose 2.">
-                            <span class="quick-move-name"><i class="fa-solid fa-heart-crack"></i> Pain</span>
-                            <span class="quick-move-val"><strong id="pain-value">0</strong></span>
+                        <div class="quick-moves-row">
+                            <div class="quick-move" title="Dexterity + Alert">
+                                <span class="quick-move-name"><i class="fa-solid fa-bolt"></i> Initiative</span>
+                                <span class="quick-move-vals">
+                                    <span class="total-flag pain quick-pain" style="display: none;"></span>
+                                    <span class="quick-move-val"><strong id="quick-initiative">0</strong></span>
+                                </span>
+                            </div>
+                            <!-- Only shown while the Pokémon is hurt enough to take the
+                                 penalty; it keeps its slot so Initiative stays under Evasion -->
+                            <div class="quick-move pain-quick" id="pain-quick"
+                                title="Pain penalty. At half HP or less (rounded down) you lose 1 success on Skill, Accuracy and Damage rolls; at 1 HP you lose 2.">
+                                <span class="quick-move-name"><i class="fa-solid fa-heart-crack"></i> Pain</span>
+                                <span class="quick-move-val"><strong id="pain-value">0</strong></span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Move Cards List -->
-                <div class="moves-grid" id="moves-list-grid">
-                    <!-- Loaded dynamically via Javascript -->
+                <!-- Move Cards List. The wrapper is what the grid stretches; the
+                     list itself is laid over it - see .moves-scroll. -->
+                <div class="moves-scroll">
+                    <div class="moves-grid" id="moves-list-grid">
+                        <!-- Loaded dynamically via Javascript -->
+                    </div>
                 </div>
             </div>
 
-            <!-- Free-writing notepad, level with Skills & Specialties -->
+            <!-- Free-writing notepad, level with the condition box beside it.
+                 The toggle gives it one extra row, down to the bottom of Base
+                 Stats & Social. -->
             <div class="notepad-panel">
-                <h2 class="stats-title"><i class="fa-solid fa-note-sticky"></i> Notes</h2>
+                <h2 class="stats-title"
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <span><i class="fa-solid fa-note-sticky"></i> Notes</span>
+                    <button class="edit-stats-btn" id="notes-expand-btn" onclick="toggleNotesHeight()"
+                        title="Make the notes taller">
+                        <i class="fa-solid fa-angles-down"></i>
+                    </button>
+                </h2>
                 <textarea id="notes-area" class="notepad-textarea" placeholder="Freely write your notes here..."
                     oninput="saveNotes(this.value)"></textarea>
+            </div>
+
+            <!-- Everything that used to sit under Skills & Specialties.
+                 It lives on the right now, level with Base Stats & Social,
+                 and drops a row when the notes are expanded. -->
+            <div class="side-details">
+                <!-- Ability panels, one per ability; filled by renderStaticInfo() -->
+                <span id="abilities-container" style="display: contents;"></span>
+                <!-- Pick any ability from the full list (non-standard abilities) -->
+                <button class="add-ability-btn" id="add-ability-btn" onclick="openAbilityPicker()"
+                    title="Choose an ability from the full list">
+                    <i class="fa-solid fa-plus"></i> Add a custom ability
+                </button>
+
+                <!-- Details: Height / Weight / Evolution -->
+                <div class="details-panel">
+                    <div class="detail-item">
+                        <span class="detail-label">Height</span>
+                        <span class="detail-val" id="detail-height"></span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Weight</span>
+                        <span class="detail-val" id="detail-weight"></span>
+                    </div>
+
+                    <div class="evolution-panel">
+                        <span class="detail-label" style="display: block; margin-bottom: 6px;">Evolutions</span>
+                        <div class="evolution-flow" id="evolution-flow"></div>
+                    </div>
+                </div>
+
+                <!-- Dex Flavor -->
+                <div class="desc-panel" id="desc-panel"></div>
             </div>
 
         </section>
@@ -4340,6 +5203,21 @@
         </div>
     </div>
 
+    <!-- Mega Evolve / Revert: one confirm either way. Reversible, so a single
+         step - unlike the two-stage warning on a permanent evolution above. -->
+    <div class="modal-overlay" id="mega-confirm-modal" style="display: none;"
+        onclick="if (event.target === this) closeMegaConfirm()">
+        <div class="modal-box">
+            <div class="modal-title"><i class="fa-solid fa-atom" style="color: var(--ghost-color);"></i>
+                <span id="mega-confirm-title"></span></div>
+            <p class="modal-text" id="mega-confirm-text"></p>
+            <div class="modal-actions">
+                <button class="form-btn cancel" onclick="closeMegaConfirm()">Cancel</button>
+                <button class="form-btn save" id="mega-confirm-btn" onclick="confirmMega()"></button>
+            </div>
+        </div>
+    </div>
+
     <!-- Load another Pokémon: confirm before navigating away from the current card -->
     <div class="modal-overlay" id="load-warn-modal" style="display: none;"
         onclick="if (event.target === this) closeLoadWarn()">
@@ -4368,6 +5246,23 @@
                 <button class="form-btn cancel" onclick="closeHeal()">Cancel</button>
                 <button class="form-btn save" onclick="confirmHeal()">Heal</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Page theme picker -->
+    <div class="modal-overlay" id="theme-picker-modal" style="display: none;"
+        onclick="if (event.target === this) closeThemePicker()">
+        <div class="modal-box">
+            <button class="modal-close-btn" onclick="closeThemePicker()" title="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="modal-title" style="color: var(--text-primary);">
+                <i class="fa-solid fa-palette" style="color: var(--ghost-color);"></i> Page Theme
+            </div>
+            <p class="modal-text">The two License themes match the trainer sheet. Pick a type instead to
+                theme the card from this Pokémon's own typing again.</p>
+            <div class="theme-grid" id="theme-named-grid"></div>
+            <div class="theme-grid" id="theme-type-grid"></div>
         </div>
     </div>
 
@@ -4403,8 +5298,9 @@
         </div>
     </div>
 
-    <!-- Weather conditions. Same tile chrome as the ailments window (the .ail-*
-         classes) because it is the same kind of reference card. -->
+    <!-- Weather and environments. Same tile chrome as the ailments window (the
+         .ail-* classes) because it is the same kind of reference card; the tab
+         strip splits the 23 entries into three readable groups. -->
     <div class="modal-overlay" id="weather-modal" style="display: none;"
         onclick="if (event.target === this) closeWeather()">
         <div class="modal-box ailments-box">
@@ -4412,10 +5308,14 @@
                 <i class="fa-solid fa-xmark"></i>
             </button>
             <div class="modal-title" style="color: var(--text-primary);">
-                <i class="fa-solid fa-cloud-sun-rain" style="color: #38bdf8;"></i> Weather Conditions
+                <i class="fa-solid fa-cloud-sun-rain" style="color: #38bdf8;"></i> Weather and Environments
             </div>
+            <div class="wx-tabs" id="weather-tabs">
+                <!-- Rendered by renderWeather() from WEATHER_TABS -->
+            </div>
+            <p class="wx-note" id="weather-note" style="display: none;"></p>
             <div class="ailments-content" id="weather-content">
-                <!-- Rendered by openWeather() from WEATHER_CONDITIONS -->
+                <!-- Rendered by renderWeather() from WEATHER_CONDITIONS / ENVIRONMENTS -->
             </div>
         </div>
     </div>
@@ -4509,7 +5409,8 @@
          time and needs them ready). -->
     <script>
         window.DATA_BASE = 'app-data/';
-        ['moves-db.js', 'pokedex-db.js', 'abilities-db.js', 'items-db.js'].forEach(function (f) {
+        ['moves-db.js', 'pokedex-db.js', 'abilities-db.js', 'items-db.js',
+            'sprite-frames-db.js'].forEach(function (f) {
             document.write('<script src="' + DATA_BASE + f + '"><\/script>');
         });
     </script>
@@ -4688,7 +5589,12 @@
         // Character sheet interactive state; persisted per-Pokémon in localStorage,
         // or (in trainer mode) inside the trainer's working-set entry
         let sheetState = {
-            hp: pokemonData.pokemon.BaseHP,
+            /* Base HP is where every Pokémon starts, but the egg's is 1 of a
+               pool of 2 and a fresh egg is not meant to open damaged, so it
+               starts on its full pool instead. */
+            hp: pokemonData.pokemon._id === 'egg'
+                ? pokemonData.pokemon.BaseHP + pokemonData.pokemon.Vitality
+                : pokemonData.pokemon.BaseHP,
             will: 5,
             hpMaxBonus: 0,
             /* Manual resize of the HP pool, stored as an offset from
@@ -4724,7 +5630,12 @@
                on reopen and reused for this Pokémon's team slot on the license */
             spriteScales: {},
             /* Per-sprite-type zoom, keyed by sprite tab (e.g. {Box: 1.4}); a
-               missing key means the default 1x. Mirrored on the team preview. */
+               missing key means the default 1x. Card-only: the trainer sheet's team
+               slot frames its sprite with its own preview.scale/offsetX/offsetY and
+               never reads these. */
+            spriteOffsets: {},
+            /* Per-sprite-type nudge in px, keyed the same way (e.g.
+               {Box: {x: -4, y: 8}}); a missing key means dead centre. */
             customImageFile: '',
             imageId: '',
             /* Full-res copy lives in Custom Images/Pokemons/<imageId>.<ext> in the
@@ -4778,6 +5689,9 @@
                before this flag existed get their social totals migrated */
             themeType: '',
             /* Dual-type Pokémon: which of the two types drives the theme */
+            pageTheme: '',
+            /* A named theme from CUSTOM_THEMES, or '' when the typing above
+               drives the page. The two are mutually exclusive. */
             abilityInUse: '',
             customAbility: '',
             /* An ability picked from the full list, for Pokémon running an
@@ -5418,10 +6332,77 @@
 
         function toggleSkillsPanel() {
             skillsCollapsed = !skillsCollapsed;
-            document.getElementById('skills-body').style.display = skillsCollapsed ? 'none' : 'flex';
             const btn = document.getElementById('skills-collapse-btn');
             btn.title = skillsCollapsed ? 'Expand section' : 'Collapse section';
             btn.querySelector('i').className = 'fa-solid ' + (skillsCollapsed ? 'fa-chevron-down' : 'fa-chevron-up');
+            applySkillsCollapse();
+        }
+
+        /* Collapsed, the panel keeps only what has points on it: the skill rows
+           with a dot filled, the specialties with a value, and the category
+           heading above whichever of those survive — a heading pulled out from
+           over its own rows would leave them unlabelled. Everything sitting at
+           zero goes, along with the add-a-specialty field; a sheet with nothing
+           assigned collapses to the title bar by itself.
+
+           Read off the filled dots rather than sheetState so it can never
+           disagree with what is on screen, and called from every skills
+           renderer as well as the chevron: the dots stay clickable while
+           collapsed, so taking the last point off a row has to drop the row. */
+        function applySkillsCollapse() {
+            const body = document.getElementById('skills-body');
+            const show = (el, on) => { if (el) el.style.display = on ? '' : 'none'; };
+            const rows = '#skills-body .skills-category, #skills-body .skill-row,'
+                + ' #skills-body .category-title, #skills-body .specialties-section,'
+                + ' #skills-body .specialty-input-group, #skills-body .custom-specialty-row';
+            if (!skillsCollapsed) {
+                body.style.display = 'flex';
+                document.querySelectorAll(rows).forEach(el => { el.style.display = ''; });
+                return;
+            }
+            const hasPoints = el => !!el && !!el.querySelector('.skill-dot.filled');
+            let anythingLeft = false;
+            document.querySelectorAll('#skills-body .skills-category').forEach(cat => {
+                const title = cat.querySelector('.category-title');
+                let kept = hasPoints(title) ? 1 : 0;
+                cat.querySelectorAll('.skill-row').forEach(row => {
+                    const on = hasPoints(row);
+                    show(row, on);
+                    if (on) kept++;
+                });
+                show(title, kept > 0);
+                show(cat, kept > 0);
+                if (kept > 0) anythingLeft = true;
+            });
+            const spec = document.querySelector('#skills-body .specialties-section');
+            if (spec) {
+                let kept = 0;
+                spec.querySelectorAll('.custom-specialty-row').forEach(row => {
+                    const on = hasPoints(row);
+                    show(row, on);
+                    if (on) kept++;
+                });
+                show(spec.querySelector('.specialty-input-group'), false);
+                show(spec, kept > 0);
+                if (kept > 0) anythingLeft = true;
+            }
+            /* Nothing left to show: drop the body outright, or the panel's own
+               16px gap would sit under the title as a strip of empty box */
+            body.style.display = anythingLeft ? 'flex' : 'none';
+        }
+
+        /* The notes take one grid row by default, level with the condition box.
+           Expanded they take a second, which reaches the bottom of Base Stats &
+           Social and drops the abilities a row - see .notes-tall. In memory
+           only, like the skills collapse: it is a view, not sheet data. */
+        let notesTall = false;
+
+        function toggleNotesHeight() {
+            notesTall = !notesTall;
+            document.getElementById('pokerole-card').classList.toggle('notes-tall', notesTall);
+            const btn = document.getElementById('notes-expand-btn');
+            btn.title = notesTall ? 'Back to the normal size' : 'Make the notes taller';
+            btn.querySelector('i').className = 'fa-solid ' + (notesTall ? 'fa-angles-up' : 'fa-angles-down');
         }
 
         // Purely visual toggle between combat stats and social attributes
@@ -5551,6 +6532,7 @@
                     container.appendChild(dot);
                 }
             });
+            applySkillsCollapse();
         }
 
         // Category ratings: clicking the category icon toggles 5 empty dots
@@ -5584,6 +6566,7 @@
                     container.appendChild(dot);
                 }
             });
+            applySkillsCollapse();
         }
 
         // Specialties management (interactive skill row structure)
@@ -5593,6 +6576,7 @@
 
             if (sheetState.specialties.length === 0) {
                 container.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-muted); font-style: italic; margin-bottom: 5px;">No specialties added yet.</span>';
+                applySkillsCollapse();
                 return;
             }
 
@@ -5633,6 +6617,7 @@
                 row.appendChild(controls);
                 container.appendChild(row);
             });
+            applySkillsCollapse();
         }
 
         function addSpecialty() {
@@ -5710,7 +6695,7 @@
             Normal: 'fa-circle', Fire: 'fa-fire', Water: 'fa-droplet', Electric: 'fa-bolt',
             Grass: 'fa-leaf', Ice: 'fa-snowflake', Fighting: 'fa-hand-fist', Poison: 'fa-skull-crossbones',
             Ground: 'fa-mountain', Flying: 'fa-dove', Psychic: 'fa-eye', Bug: 'fa-bug',
-            Rock: 'fa-hill-rockslide', Ghost: 'fa-ghost', Dragon: 'fa-dragon', Dark: 'fa-moon',
+            Rock: 'fa-gem', Ghost: 'fa-ghost', Dragon: 'fa-dragon', Dark: 'fa-circle-half-stroke',
             Steel: 'fa-shield-halved', Fairy: 'fa-wand-magic-sparkles'
         };
 
@@ -5776,67 +6761,244 @@
             return { primary, secondary: types.find(t => t !== primary) || null };
         }
 
-        /* Recolor the whole page from the loaded Pokémon's typing: the
-           primary type drives the palette, the other type the accent
-           (single-type Pokémon get a lighter primary tint as accent) */
+        /* Named themes that do not come from the Pokémon's typing. Both mirror
+           the trainer sheet's License themes — crimson-red bars, warm charcoal
+           panels on the dark one, near-white on the light one — so a card open
+           beside a license matches it. `light` flips the .light-theme root
+           class; `vars` overrides the CSS palette directly.
+
+           Mutually exclusive with the type palette: sheetState.pageTheme holds
+           the key while one of these is on, and is '' when the typing drives
+           the page. Picking a type in the header or the picker clears it. */
+        const CUSTOM_THEMES = {
+            License: {
+                label: 'Dark License',
+                icon: 'fa-moon',
+                swatch: '#c8383b',
+                vars: {
+                    '--ghost-color': '#c8383b',
+                    '--ghost-color-glow': '#c8383b59',
+                    '--border-color': '#c8383b3a',
+                    '--border-glow': '#c8383b1e',
+                    '--primary-soft': '#c8383b33',
+                    '--primary-faint': '#c8383b10',
+                    '--accent': '#e0645c',
+                    '--accent-glow': '#e0645c4c',
+                    '--accent-faint': '#e0645c26',
+                    '--accent-soft': '#e0645c14',
+                    '--accent-border': '#e0645c40',
+                    '--trained-color': '#e0645c',
+                    '--trained-glow': '#e0645c4c',
+                    '--text-primary': '#f4efef',
+                    '--text-secondary': '#c8b4b4',
+                    '--text-muted': '#8a7c7c',
+                    '--bg-color': '#161514',
+                    '--bg-top': '#231d1e',
+                    '--card-bg': '#2b2928b0',
+                    '--panel-strong': '#302e2df7',
+                    '--panel-medium': '#302e2dec',
+                    '--panel-soft': '#302e2dd9',
+                    '--panel-solid': '#302e2d'
+                }
+            },
+            LicenseLight: {
+                label: 'Light License',
+                icon: 'fa-sun',
+                swatch: '#c0272b',
+                light: true,
+                vars: {
+                    '--ghost-color': '#c0272b',
+                    '--ghost-color-glow': '#c0272b4a',
+                    '--border-color': '#c0272b42',
+                    '--border-glow': '#c0272b1a',
+                    '--primary-soft': '#c0272b30',
+                    '--primary-faint': '#c0272b14',
+                    '--accent': '#cf3b39',
+                    '--accent-glow': '#cf3b3944',
+                    '--accent-faint': '#cf3b3926',
+                    '--accent-soft': '#cf3b3914',
+                    '--accent-border': '#cf3b3940',
+                    '--trained-color': '#cf3b39',
+                    '--trained-glow': '#cf3b3944',
+                    '--text-primary': '#2a2020',
+                    '--text-secondary': '#785454',
+                    '--text-muted': '#9a8585',
+                    '--bg-color': '#ddd2ca',
+                    '--bg-top': '#ebe0d9',
+                    '--card-bg': '#fdfbf9f7',
+                    '--panel-strong': '#fdfbf9fa',
+                    '--panel-medium': '#fdfbf9f2',
+                    '--panel-soft': '#fdfbf9ec',
+                    '--panel-solid': '#fdfbf9'
+                }
+            }
+        };
+
+        /* The named theme in force, or null when the page is themed from the
+           Pokémon's own typing */
+        function themeConfig() {
+            return CUSTOM_THEMES[sheetState.pageTheme] || null;
+        }
+
+        function isLightTheme() {
+            const custom = themeConfig();
+            return !!(custom && custom.light);
+        }
+
+        /* typeColors is tuned for a dark page. Painted straight onto a light
+           panel the pale entries all but vanish — Steel and Normal land around
+           2:1, Flying / Fairy / Ice / Electric nearer 1.5:1 — so any border or
+           glyph drawn in the raw type color disappears. On the light theme,
+           ink them halfway to black instead. `onDark` is what the color should
+           stay while the page is dark. */
+        function typeInk(c, onDark) {
+            return isLightTheme() ? mixHex(c, '#000000', 0.5) : (onDark || c);
+        }
+
+        /* The ailment and weather band labels sit on a wash of the tile's own
+           color: lightened to read on a dark tile, darkened on a light one. */
+        function ailInk(c) {
+            return isLightTheme() ? mixHex(c, '#000000', 0.35) : mixHex(c, '#ffffff', 0.44);
+        }
+
+        /* Recolor the whole page: a named theme paints its own palette, and
+           otherwise the loaded Pokémon's typing drives it — the primary type
+           the palette, the other type the accent (single-type Pokémon get a
+           lighter primary tint as accent) */
         /* Types whose hue-shifted trained color clashes: their trained
            circles use the accent (the willpower bar color) instead */
         const ACCENT_TRAINED_TYPES = ['Electric', 'Fire', 'Flying', 'Ground', 'Water'];
 
         function applyTheme() {
-            const { primary, secondary } = currentThemeTypes();
-            const c1 = typeColors[primary] || '#a855f7';
-            const c2 = secondary ? (typeColors[secondary] || c1) : mixHex(c1, '#ffffff', 0.4);
-            const trained = (secondary || ACCENT_TRAINED_TYPES.includes(primary))
-                ? c2 : distinctVariant(c1);
-            const panel = mixHex(c1, '#000000', 0.87);
-            const vars = {
-                '--ghost-color': c1,
-                '--ghost-color-glow': c1 + '66',
-                '--border-color': c1 + '40',
-                '--border-glow': c1 + '26',
-                '--primary-soft': c1 + '33',
-                '--primary-faint': c1 + '0d',
-                '--accent': c2,
-                '--accent-glow': c2 + '4c',
-                '--accent-faint': c2 + '26',
-                '--accent-soft': c2 + '14',
-                '--accent-border': c2 + '40',
-                '--trained-color': trained,
-                '--trained-glow': trained + '4c',
-                '--text-primary': mixHex(c1, '#ffffff', 0.88),
-                '--text-secondary': mixHex(c1, '#ffffff', 0.5),
-                '--text-muted': mixHex(c1, '#000000', 0.3),
-                '--bg-color': mixHex(c1, '#000000', 0.93),
-                '--bg-top': mixHex(c2, '#000000', 0.82),
-                '--card-bg': panel + 'b2',
-                '--panel-strong': panel + 'f2',
-                '--panel-medium': panel + 'e6',
-                '--panel-soft': panel + 'cc',
-                '--panel-solid': panel
-            };
+            const custom = themeConfig();
+            let vars;
+            if (custom) {
+                vars = custom.vars;
+            } else {
+                const { primary, secondary } = currentThemeTypes();
+                const c1 = typeColors[primary] || '#a855f7';
+                const c2 = secondary ? (typeColors[secondary] || c1) : mixHex(c1, '#ffffff', 0.4);
+                const trained = (secondary || ACCENT_TRAINED_TYPES.includes(primary))
+                    ? c2 : distinctVariant(c1);
+                const panel = mixHex(c1, '#000000', 0.87);
+                vars = {
+                    '--ghost-color': c1,
+                    '--ghost-color-glow': c1 + '66',
+                    '--border-color': c1 + '40',
+                    '--border-glow': c1 + '26',
+                    '--primary-soft': c1 + '33',
+                    '--primary-faint': c1 + '0d',
+                    '--accent': c2,
+                    '--accent-glow': c2 + '4c',
+                    '--accent-faint': c2 + '26',
+                    '--accent-soft': c2 + '14',
+                    '--accent-border': c2 + '40',
+                    '--trained-color': trained,
+                    '--trained-glow': trained + '4c',
+                    '--text-primary': mixHex(c1, '#ffffff', 0.88),
+                    '--text-secondary': mixHex(c1, '#ffffff', 0.5),
+                    '--text-muted': mixHex(c1, '#000000', 0.3),
+                    '--bg-color': mixHex(c1, '#000000', 0.93),
+                    '--bg-top': mixHex(c2, '#000000', 0.82),
+                    '--card-bg': panel + 'b2',
+                    '--panel-strong': panel + 'f2',
+                    '--panel-medium': panel + 'e6',
+                    '--panel-soft': panel + 'cc',
+                    '--panel-solid': panel
+                };
+            }
             const root = document.documentElement.style;
             Object.entries(vars).forEach(([k, v]) => root.setProperty(k, v));
+            /* Light themes flip a root class so the white-alpha hairlines and
+               the near-black wells switch to their light-appropriate values */
+            document.documentElement.classList.toggle('light-theme', !!(custom && custom.light));
         }
 
         function typeBadgeHtml(type) {
             const c = typeColors[type] || '#e5e7eb';
             const icon = TYPE_ICONS[type] || 'fa-circle-question';
             const dual = !!pokemonData.pokemon.Type2;
-            const active = currentThemeTypes().primary === type;
-            const classes = 'type-badge' + (dual ? ' type-switch' : '') + (active ? ' theme-active' : '');
-            const click = dual ? ` onclick="setThemeType('${type}')" title="Use ${type} as the page theme"` : '';
-            return `<span class="${classes}"${click} style="background: ${c}33; border: 1px solid ${c};
-                        color: ${mixHex(c, '#ffffff', 0.55)}; box-shadow: 0 0 10px ${c}26;">
+            /* No badge is the active one while a License theme is on: the page
+               is not being themed from the typing at all. */
+            const active = !sheetState.pageTheme && currentThemeTypes().primary === type;
+            /* A License theme makes even a single-type badge a switch — it is
+               the click that hands the page back to the typing. */
+            const switchable = dual || !!sheetState.pageTheme;
+            const classes = 'type-badge' + (switchable ? ' type-switch' : '') + (active ? ' theme-active' : '');
+            const click = switchable
+                ? ` onclick="setThemeType('${type}')" title="Use ${type} as the page theme"` : '';
+            const glow = isLightTheme() ? 'none' : `0 0 10px ${c}26`;
+            return `<span class="${classes}"${click} style="background: ${c}33;
+                        border: 1px solid ${typeInk(c)};
+                        color: ${typeInk(c, mixHex(c, '#ffffff', 0.55))}; box-shadow: ${glow};">
                         <i class="fa-solid ${icon}"></i> ${type}
                     </span>`;
         }
 
-        function setThemeType(type) {
-            sheetState.themeType = type;
-            saveState();
+        /* Everything painted in a raw type color is set inline, out of reach of
+           CSS, and typeInk() answers differently on a light page — so the two
+           lists that carry one have to be redrawn whenever the theme flips. */
+        function repaintTheme() {
             applyTheme();
             renderStaticInfo();
+            renderMoves();
+        }
+
+        function setThemeType(type) {
+            sheetState.themeType = type;
+            /* Type and named themes are mutually exclusive: picking a type is
+               also how you leave a License theme */
+            sheetState.pageTheme = '';
+            saveState();
+            repaintTheme();
+        }
+
+        function setPageTheme(key) {
+            sheetState.pageTheme = key;
+            saveState();
+            repaintTheme();
+            closeThemePicker();
+        }
+
+        /* One chip in the theme picker. `active` dims every other one, the same
+           way the header's type badges mark which type is driving the page. */
+        function themeChip(swatch, icon, label, active, onclick) {
+            const chip = document.createElement('span');
+            chip.className = 'type-badge theme-chip' + (active ? ' theme-active' : '');
+            const glow = isLightTheme() ? 'none' : `0 0 10px ${swatch}26`;
+            chip.style.cssText = `background: ${swatch}33;
+                border: 1px solid ${typeInk(swatch)};
+                color: ${typeInk(swatch, mixHex(swatch, '#ffffff', 0.55))};
+                box-shadow: ${glow};`;
+            chip.innerHTML = `<i class="fa-solid ${icon}"></i> ${label}`;
+            chip.title = label;
+            chip.onclick = onclick;
+            return chip;
+        }
+
+        function openThemePicker() {
+            const named = document.getElementById('theme-named-grid');
+            const typeGrid = document.getElementById('theme-type-grid');
+            named.innerHTML = '';
+            typeGrid.innerHTML = '';
+            Object.entries(CUSTOM_THEMES).forEach(([key, theme]) => {
+                named.appendChild(themeChip(theme.swatch, theme.icon, theme.label,
+                    sheetState.pageTheme === key, () => setPageTheme(key)));
+            });
+            /* Only this Pokémon's own type(s) — the card has never themed
+               itself from a type it does not have */
+            const p = pokemonData.pokemon;
+            const primary = sheetState.pageTheme ? null : currentThemeTypes().primary;
+            [p.Type1, p.Type2].filter(Boolean).forEach(type => {
+                typeGrid.appendChild(themeChip(typeColors[type] || '#e5e7eb',
+                    TYPE_ICONS[type] || 'fa-circle-question', type,
+                    primary === type, () => { setThemeType(type); closeThemePicker(); }));
+            });
+            document.getElementById('theme-picker-modal').style.display = 'flex';
+        }
+
+        function closeThemePicker() {
+            document.getElementById('theme-picker-modal').style.display = 'none';
         }
 
         /* Gender-locked evolutions the dex leaves untagged — the restriction
@@ -5879,6 +7041,13 @@
             if (evo.Region) bits.push(evo.Region);
             if (evo.Game) bits.push(evo.Game);
             return bits.join(', ') || evo.Kind || '?';
+        }
+
+        /* The dataset's #0000 placeholder entry, used for an un-hatched egg. It
+           has no dex category and no real art, so parts of the card special-case
+           it. Mirrors SPRITE_SET_BLOCKED, which keys off the same species. */
+        function isEgg() {
+            return pokemonData.pokemon._id === 'egg';
         }
 
         /* Mega forms carry an Evolutions entry naming their stone; the header
@@ -5954,9 +7123,15 @@
             el.style.fontSize = '';                     // back to the 2.5rem default
             const rowStyle = getComputedStyle(row);
             const gap = parseFloat(rowStyle.columnGap || rowStyle.gap || '0') || 0;
-            let siblings = 0;
-            Array.from(row.children).forEach(c => { if (c !== el) siblings += c.offsetWidth; });
-            const avail = row.clientWidth - siblings - gap * Math.max(0, row.children.length - 1);
+            /* Hidden siblings (the Egg-only dex number, on every other species)
+               take neither width nor a gap, so they must not be counted */
+            let siblings = 0, shown = 0;
+            Array.from(row.children).forEach(c => {
+                if (c !== el && !c.offsetWidth) return;
+                shown++;
+                if (c !== el) siblings += c.offsetWidth;
+            });
+            const avail = row.clientWidth - siblings - gap * Math.max(0, shown - 1);
             if (avail <= 0) return;
             let size = 2.5;
             while (el.scrollWidth > avail && size > 1.1) {
@@ -5979,14 +7154,6 @@
             const displayName = (!WILD_MODE && sheetState.nickname) ? sheetState.nickname : shownName;
             document.title = 'Pokerole Card - ' + displayName;
 
-            /* Leading space, not trailing: the icon used to sit between the name
-               and the #number, which has moved to the subline. The mirror copy
-               goes on the left so the name stays on the header's centre axis. */
-            const stoneHtml = stone ? ' ' + stoneIconHtml(stone) : '';
-            const stoneMirrorHtml = stone
-                ? stoneIconHtml(stone).replace('class="mega-stone-icon"',
-                    'class="mega-stone-icon mirror" aria-hidden="true"') + ' '
-                : '';
             const nameHtml = WILD_MODE
                 ? `<span class="pokemon-name-text">${escapeName(shownName)}</span>`
                 : `<span class="pokemon-name-text editable" id="pokemon-name-text" contenteditable="true"
@@ -5994,12 +7161,22 @@
                      onblur="commitNameEdit(this)"
                      onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}"
                      >${escapeName(displayName)}</span>`;
-            document.getElementById('pokemon-name').innerHTML = `${stoneMirrorHtml}${nameHtml}${stoneHtml}`;
-            fitPokemonName();
+            document.getElementById('pokemon-name').innerHTML = nameHtml;
+            /* The stone shows in the sprite box, beside the gender toggle. In the
+               title it pushed the name off the header's centre axis. */
+            document.getElementById('mega-stone-slot').innerHTML = stone ? stoneIconHtml(stone) : '';
             document.getElementById('pokemon-category').textContent = p.DexCategory || '';
             const dexNo = '#' + (p.DexID || p.Number);
             document.getElementById('pokedex-number').textContent = dexNo;
             document.getElementById('pokedex-number-mirror').textContent = dexNo;   // keeps the category centred
+            /* The Egg is the one species with no dex category, so its subline is
+               an empty centre cell with the number hanging off it. Move the
+               number up beside the title and drop the empty line. */
+            const titleNum = document.getElementById('pokedex-number-title');
+            titleNum.textContent = dexNo;
+            titleNum.style.display = isEgg() ? '' : 'none';
+            document.querySelector('.pokemon-subline').style.display = isEgg() ? 'none' : '';
+            fitPokemonName();   // after the number, whose width the fit has to allow for
             renderGender();
             document.getElementById('type-badges').innerHTML =
                 [p.Type1, p.Type2].filter(Boolean).map(typeBadgeHtml).join('');
@@ -6456,13 +7633,46 @@
 
         function startMegaEvolve() {
             const list = megaEvolutions();
-            if (list.length === 1) transformInto(list[0].id, { mega: true });
+            if (list.length === 1) requestMega(list[0].id, true);
             else if (list.length > 1) openEvolveChooser(list, true, 'Mega Evolve into…');
         }
 
         function revertMega() {
             const id = megaRevertTargetId();
-            if (id) transformInto(id, { mega: false });
+            if (id) requestMega(id, false);
+        }
+
+        /* Both directions ask first. One step, not the evolve warning's two: Mega
+           is reversible, so this is a "did you mean to?" rather than a warning. */
+        let pendingMega = null;
+
+        function requestMega(targetId, into) {
+            pendingMega = { id: targetId, into: into };
+            const target = ALL_POKEMON.find(p => p._id === targetId);
+            const tname = target ? target.Name.replace(/\s*\(Mega[^)]*\)/, '') : 'its base form';
+            const stone = target && into ? megaStoneOf(target) : null;
+            document.getElementById('mega-confirm-title').textContent =
+                into ? 'Mega Evolve?' : 'Revert Mega Evolution?';
+            document.getElementById('mega-confirm-text').innerHTML = into
+                ? 'Mega Evolve <strong>' + escapeName(tname) + '</strong>'
+                  + (stone ? ' with its <strong>' + escapeName(stone) + '</strong>' : '') + '. '
+                  + 'Base stats, caps and ability change to the Mega form; everything you have filled in '
+                  + 'on the sheet carries over. This is <strong>temporary</strong> — you can revert it at any time.'
+                : 'Return to <strong>' + escapeName(tname) + '</strong>, the form it Mega Evolved from. '
+                  + 'Everything on the sheet carries over.';
+            document.getElementById('mega-confirm-btn').textContent = into ? 'Mega Evolve' : 'Revert';
+            document.getElementById('mega-confirm-modal').style.display = 'flex';
+        }
+
+        function confirmMega() {
+            const p = pendingMega;
+            closeMegaConfirm();
+            if (p) transformInto(p.id, { mega: p.into });
+        }
+
+        function closeMegaConfirm() {
+            pendingMega = null;
+            document.getElementById('mega-confirm-modal').style.display = 'none';
         }
 
         function openEvolveChooser(list, isMega, title) {
@@ -6484,8 +7694,8 @@
 
         function chooseEvolve(id, isMega) {
             closeEvolveModal();
-            /* Mega is reversible → go straight in; regular evolution warns twice */
-            if (isMega) transformInto(id, { mega: true });
+            /* Mega is reversible, so one confirm; regular evolution warns twice */
+            if (isMega) requestMega(id, true);
             else requestEvolve(id);
         }
 
@@ -6605,10 +7815,12 @@
                         const chip = document.createElement('span');
                         chip.className = 'type-eff-chip';
                         const color = typeColors[type] || '#e5e7eb';
-                        chip.style.color = color;
-                        chip.style.borderColor = color + '66';
+                        chip.style.color = typeInk(color);
+                        chip.style.borderColor = typeInk(color) + '66';
                         chip.style.background = color + '1f';
-                        chip.textContent = type;
+                        const icon = TYPE_ICONS[type] || 'fa-circle-question';
+                        chip.innerHTML = '<i class="fa-solid ' + icon + '"></i>';
+                        chip.title = type;   // the name, now that the chip is icon-only
                         chips.appendChild(chip);
                     });
                 }
@@ -6750,7 +7962,7 @@
                     : '';
                 return `
                     <div class="ail-tile" style="--ail: ${a.color};
-                        --ail-ink: ${mixHex(a.color, '#ffffff', 0.44)};
+                        --ail-ink: ${ailInk(a.color)};
                         --ail-wash: ${mixHex(a.color, '#ffffff', 0.1)}5c;">
                         <div class="ail-tile-head" style="background: ${a.color}; color: ${ink};
                             border-bottom: 1px solid ${ink}1f;">
@@ -6775,40 +7987,415 @@
             document.getElementById('ailments-modal').style.display = 'none';
         }
 
-        /* Weather conditions, drawn with the same tiles as the ailments window.
-           Each entry brings its own bands as { label, html } pairs rather than
-           the fixed Effect / Treatment / Duration triple, so writing the rules
-           in later is only a matter of filling this array. */
+        /* Weather and environments, drawn with the same tiles as the ailments
+           window because they are the same kind of reference card. Three tabs
+           rather than one 23-tile scroll: the five ordinary weathers, the three
+           extreme ones - which override one another and cannot stack with the
+           rest - and the optional environmental challenges.
+
+           The strings are transcribed from the book as printed, typos and all
+           ("ther", "Firer-type", "frigtening", "Semantary", "Disorted",
+           "overriden"): it is rules text, not prose to tidy up. */
         const WEATHER_CONDITIONS = [
-            // { key: 'sunny', name: 'Harsh Sunlight', color: '#f59e0b', icon: 'fa-sun',
-            //   modifier: '', bands: [{ label: 'Effect', html: '…' }] }
+            {
+                key: 'sunny', name: 'Sunny Weather', color: '#8d7210', icon: 'fa-sun',
+                sub: `A bright sunlight shines through the area. It's hot, you feel thirsty
+                    and tired.`,
+                where: `This weather can naturally be found in plains, tropical areas and
+                    semi-desertic Regions. Wild Pok&eacute;mon will look for shade or a source
+                    of water to cool themselves.`,
+                effects: [
+                    `All Fire-type moves add <strong>1 Extra Dice</strong> to their Damage Pools.`,
+                    `All Water-type moves get ther total damage reduced by <strong>1</strong>.`,
+                    `Cannot be active at night or in places where sunlight doesn't reach.`,
+                    `No one can be affected by the <strong>Frozen Solid</strong> Status Condition.
+                        Unless it was inflicted before Sunny Weather started.`,
+                    `Certain Moves &amp; Abilities interact with this type of weather.
+                        (ie. Solar Beam, Morning Sun, Chlorophyll, Solar Power etc.)`
+                ]
+            },
+            ,
+            {
+                key: 'rain', name: 'Rain Weather', color: '#4a5aa8', icon: 'fa-cloud-showers-heavy',
+                sub: `A heavy downpour. You are soaking wet. There's deep puddles and it is
+                    difficult to travel though.`,
+                where: `This weather is common in rainforests, lakesides and marshes. Some wild
+                    Pok&eacute;mon will look for shelter while others enjoy rain in the open.`,
+                effects: [
+                    `All Water-type moves have <strong>1 Extra Dice</strong> to their Damage Pools.`,
+                    `All Firer-type moves get ther total damage reduced by <strong>1</strong>.`,
+                    `Cannot be active indoors, or in places where the rain cannot reach.`,
+                    `No one can be affected by <strong>2nd</strong> or <strong>3rd Burn</strong>
+                        Status Condition. Unless it was inflicted before Rain Weather started.`,
+                    `Certain Moves &amp; Abilities interact with this type of weather.
+                        (ie. Thunder, Hurricane, Swift Swim)`
+                ]
+            },
+            ,
+            {
+                key: 'snowy', name: 'Snowy Weather', color: '#17578f', icon: 'fa-snowman',
+                sub: `Everything is covered in a thick layer of ice and snow with snowflakes
+                    falling all around you. It'd be beautiful if it wasn't so cold.`,
+                where: `This weather is common in tall mountains artic Regions and during most of
+                    winter. Wild Ice-type Pok&eacute;mon thrive in this weather but most
+                    Pok&eacute;mon will seek warmth.`,
+                effects: [
+                    `All Ice-type moves have <strong>1 Extra Dice</strong> to their Damage Pools.`,
+                    `Increase <strong>1 Point</strong> to the Defense of all Ice-type
+                        Pok&eacute;mon in the field.`,
+                    `Add <strong>1 Chance Die</strong> to all chance rolls to inflict
+                        <strong>Frozen Solid</strong> Status Condition.`,
+                    `Increase the HP and Defense of the ice block created by Frozen Solid to
+                        <strong>7HP</strong> and <strong>3 points of Def</strong>.`,
+                    `Certain Moves &amp; Abilities interact with this type of weather.`
+                ]
+            },
+            ,
+            {
+                key: 'sandstorm', name: 'Sandstorm Weather', color: '#827450', icon: 'fa-wind',
+                sub: `A dense brown cloud covers the area, it's made of sand and tiny rocks,
+                    visibility is poor and the sharp shards hurt your eyes and skin.`,
+                where: `This weather is commonly seen in deserts and dunes. Rock, Ground and Steel
+                    Types barely pay any mind to it, but the rest of the Pok&eacute;mon will run
+                    towards their shelter.`,
+                effects: [
+                    `All non Rock, Ground or Steel Type Pok&eacute;mon in the battlefield take
+                        <strong>1 typeless Damage</strong> at the end of the Round.`,
+                    `Full body cover prevents Sandstorm Damage.`,
+                    `Increase <strong>1 Point</strong> to the Special Defense of all Rock-type
+                        Pok&eacute;mon in the field.`,
+                    `Cannot be active indoors, or in places where the Sand cannot reach.`,
+                    `Certain Moves &amp; Abilities interact with this type of weather.`
+                ]
+            },
+            ,
+            {
+                key: 'hail', name: 'Hail Weather', color: '#147e9f', icon: 'fa-snowflake',
+                sub: `Rain and sharp and heavy ice balls are falling with enough force to dent a
+                    ceiling or crash a window, take refuge!`,
+                where: `This weather can be found in plains, and at high altitudes during certain
+                    parts of the year. Almost every Pok&eacute;mon dislikes this weather as only
+                    Ice-types can resist it.`,
+                effects: [
+                    `All non Ice-type Pok&eacute;mon in the battlefield take
+                        <strong>1 typeless Damage</strong> at the end of the Round.`,
+                    `Full body cover prevents Hail Damage.`,
+                    `Add <strong>1 Chance Die</strong> to all chance rolls to inflict
+                        <strong>Frozen Solid</strong> Status Condition.`,
+                    `Cannot be active indoors, or in places where the Hail cannot reach.`,
+                    `Certain Moves &amp; Abilities interact with this type of weather.`
+                ]
+            },
+            ,
+            {
+                key: 'desolate', name: 'Desolate Weather', color: '#ba5b0c', icon: 'fa-sun-plant-wilt',
+                extreme: true,
+                sub: `Extreme heat all around and even lava. some objects just burst into flames.
+                    You will need special equipment to handle this weather.`,
+                where: `This weather can only be found in completely arid deserts and volcanic
+                    areas. Only the most resilient wild Pok&eacute;mon can be found living in this
+                    very extreme weather.`,
+                effects: [
+                    `All Fire-type moves add <strong>2 Extra Dice</strong> to their Damage Pools.`,
+                    `All Water-type Moves fail to be executed.`,
+                    `No other weather can be activated during Desolate Weather. Only Typhoon or
+                        Strong Winds weather may override it.`,
+                    `No one can be affected by the <strong>Frozen Solid</strong> Status Condition.`,
+                    `At the beginning of the Round, except for Fire-type Pok&eacute;mon, all with a
+                        Vitality Score of <strong>4</strong> or lower must make a Vitality check
+                        requiring <strong>2 successes</strong>. Taking
+                        <strong>2 Fire-type Damage</strong> upon failure.`
+                ]
+            },
+            ,
+            {
+                key: 'typhoon', name: 'Typhoon Weather', color: '#1c4e9e', icon: 'fa-cloud-bolt',
+                extreme: true,
+                sub: `A great torrent quckly leaves everything underwater and you struggle to stay
+                    afloat trough the crashing waves around.`,
+                where: `This weather can rarely be found in-land as it is more often seen closer to
+                    the sea. Only water-type Pok&eacute;mon are able to endure it, the rest are at
+                    risk of being washed off by the ocean.`,
+                effects: [
+                    `All Water-type moves add <strong>2 Extra Dice</strong> to their Damage Pools.`,
+                    `All Fire-type Moves fail to be executed.`,
+                    `No other weather can be activated during Typhoon Weather. Only Desolate or
+                        Strong Winds weather may override it.`,
+                    `No one can be affected by <strong>Burn</strong> Status Condition at any degree.`,
+                    `At the beginning of the Round, except for Water-type Pok&eacute;mon, all with a
+                        Vitality Score of <strong>4</strong> or lower must make a Vitality check
+                        requiring <strong>2 successes</strong>. Taking
+                        <strong>2 Water-type Damage</strong> upon failure.`
+                ]
+            },
+            ,
+            {
+                key: 'strongWinds', name: 'Strong Winds Weather', color: '#14313a', icon: 'fa-wind',
+                extreme: true,
+                sub: `Strong wind currents lift and swirl everything in the air. You are either
+                    being swept around or falling straight to the floor at great speed.`,
+                where: `This weather can only be found at heights above 30,000 feet in the sky.
+                    Flying and floating Pok&eacute;mon can stay active in the air, but others may
+                    fall or bump into things.`,
+                effects: [
+                    `All Flying-type Moves add <strong>2 Extra Dice</strong> to their Damage Pools.`,
+                    `Flying types do not receive Extra Damage from a Super-Effective Move.`,
+                    `No other weather can be activated during Strong Winds Weather. Once active, it
+                        cannot be overriden.`,
+                    `At the beginning of the Round, except for Flying-type Pok&eacute;mon and
+                        Pok&eacute;mon with the Levitate Ability, all with a Dexterity Score of
+                        <strong>4</strong> or lower must make a Dexterity check requiring
+                        <strong>2 successes</strong>. Taking <strong>2 Typeless Damage</strong>
+                        upon failure.`
+                ]
+            }
         ];
 
-        function openWeather() {
+        /* The optional challenges. They have no "where it's found" - the tile
+           simply skips that band. `mods` carries the book's icon badges, and
+           only where they say something the paragraph does not: everywhere else
+           the badges just restate the text, and a band repeating it is noise. */
+        const ENVIRONMENTS = [
+            {
+                key: 'underwater', name: 'Underwater', sub: 'Race Against Time',
+                color: '#2269a3', icon: 'fa-water',
+                effects: [`At the end of the Round, Non Water-type Pok&eacute;mon &amp; Trainers
+                    roll <strong>Vitality</strong> to hold their breath, difficulty increases by
+                    <strong>2</strong> each Round. Those affected faint upon failure.`]
+            },
+            {
+                key: 'fog', name: 'Fog/Darkness', sub: 'Reduced Visibility',
+                color: '#6b6b6b', icon: 'fa-smog',
+                effects: [`All Pok&eacute;mon in get extra <strong>Low Accuracy 1</strong> on all
+                    their Moves targeting Foes.`]
+            },
+            {
+                key: 'onFire', name: 'On Fire!', sub: 'Dangerous Hazards',
+                color: '#d1421f', icon: 'fa-fire',
+                effects: [`At the end of each Round, Roll <strong>3 Chance Dice</strong> to inflict
+                    <strong>2nd Degree Burn</strong> to everyone in the field.`]
+            },
+            {
+                key: 'muddy', name: 'Muddy', sub: 'Difficult Terrain',
+                color: '#8f4a49', icon: 'fa-shoe-prints',
+                effects: [
+                    `All Pok&eacute;mon on the ground have their Dexterity reduced by
+                        <strong>1</strong>.`,
+                    `Pok&eacute;mon on the ground are <strong>Blocked</strong>.`
+                ]
+            },
+            {
+                key: 'electricPoles', name: 'Electric Poles', sub: 'Type-Boosting Elements',
+                color: '#8a7500', icon: 'fa-bolt',
+                effects: [`All Pok&eacute;mon will add <strong>1 Extra Die</strong> to the damage
+                    pool of Electric Type moves.`]
+            },
+            {
+                key: 'flowers', name: 'Lovely Flowers', sub: 'Relaxing Effects',
+                color: '#a8567f', icon: 'fa-spa',
+                effects: [`The battlefield is a flower field that gives out a delicious aroma but
+                    also preventing evasion but also reducing aggression.`],
+                mods: ['Damage -1', 'Damage -2', 'No Evasion']
+            },
+            {
+                key: 'cemetery', name: 'Pkmn Semantary', sub: 'Frightening Environment',
+                color: '#4a5aa8', icon: 'fa-ghost',
+                effects: [`The battlefield is a frigtening place. Add <strong>2 Extra dice</strong>
+                    to all rolls involving the Intimidate Skill. Non Ghost-Type Pok&eacute;mon get
+                    the ability &ldquo;Run Away&rdquo;.`]
+            },
+            {
+                key: 'sewer', name: 'Sewer/Dumpster', sub: 'Unsanitary Conditions',
+                color: '#7b4f9d', icon: 'fa-dumpster',
+                effects: [`The battlefield is knee-deep in filth. At the end of each Round roll
+                    <strong>3 dice</strong> to inflict <strong>Poison</strong> to everyone in the
+                    field.`]
+            },
+            {
+                key: 'minefield', name: 'Minefield', sub: 'Hidden traps',
+                color: '#8a5a2b', icon: 'fa-bomb',
+                effects: [`Watch your step. All Pok&eacute;mon entering the field take
+                    <strong>1 typeless damage</strong>.`]
+            },
+            {
+                key: 'jungle', name: 'Deep in the Jungle', sub: 'Added Camouflage',
+                color: '#3a8444', icon: 'fa-tree',
+                effects: [`A lush foliage covers the battlefield. Add <strong>2 Extra dice</strong>
+                    to all rolls involving the Stealth and Nature Skills.`]
+            },
+            {
+                key: 'healingPits', name: 'Healing Pits', sub: 'HP Restoring Sources',
+                color: '#dc2a70', icon: 'fa-heart-circle-plus',
+                effects: [`There are areas in the field that restore HP to those who spend their
+                    action to touch them. The area is depleted afterwards.`],
+                mods: ['Heal 1']
+            },
+            {
+                key: 'highPoles', name: 'High Poles', sub: 'Risk of Falling',
+                color: '#4d7590', icon: 'fa-tower-observation',
+                effects: [`At the end of the Round, Non Flying-Type Pok&eacute;mon roll
+                    <strong>Dexterity + Athletic</strong> to keep their balance. Taking
+                    <strong>2 damage</strong> on a fail.`]
+            },
+            {
+                key: 'tornWorld', name: 'Torn World', sub: 'Disorted Space',
+                color: '#4a4a5c', icon: 'fa-shuffle',
+                effects: [`The laws of physics have abandoned the battlefield. All Moves get their
+                    Target changed at random.`]
+            },
+            {
+                key: 'sprinklers', name: 'Sprinklers', sub: 'Type-Changing Effects',
+                color: '#0f7f86', icon: 'fa-shower',
+                effects: [`Everyone on the battlefield gets soaking wet by active sprinklers. Their
+                    Type is changed to Water. Whole Scene Duration.`]
+            },
+            {
+                key: 'finalDestination', name: 'Final Destination', sub: 'Power Test',
+                color: '#b3419c', icon: 'fa-star',
+                effects: [`No items. No Evasion. No Clash. Raw power only.`]
+            }
+        ];
+
+        const WEATHER_TABS = [
+            { key: 'weather', label: 'Weather' },
+            { key: 'extreme', label: 'Extreme Weather' },
+            { key: 'env', label: 'Environments' }
+        ];
+
+        const ENV_INTRO = `You can add an extra layer of challenge into your battles if you take the
+            environment into account. You don't have to use them all the time, but Official League
+            Tournaments usually give each match one or two added Challenges.`;
+
+        /* Which tab the window is on. A module variable and not sheetState:
+           that gets written into the trainer's .json, and where someone left a
+           reference window is not something to carry around in a shared file. */
+        let weatherTab = 'weather';
+
+        /* One tile shape for both families - the banner carries the name over a
+           second line, the weather's flavor text or the environment's subtitle. */
+        function weatherTile(entry) {
+            /* One ink for every banner, unlike the ailment tiles next door,
+               which let inkOn() pick per color. Those run to #eedc00 and have
+               to; these are a palette of our own, so every one of them is dark
+               enough to carry white - which is what this dark-only sheet wants,
+               and what keeps the tiles reading as one set. Check any new color
+               against white at 4.5:1 before adding it. */
+            const ink = '#ffffff';
+            const bands = [];
+            if (entry.where) bands.push({ label: `Where It's Found`, html: entry.where });
+            const mods = (entry.mods || []).length
+                ? `<p class="wx-mods">${entry.mods.map(m => `<strong>${m}</strong>`).join(' &middot; ')}</p>`
+                : '';
+            bands.push({
+                label: entry.effects.length > 1 ? 'Effects' : 'Effect',
+                html: (entry.effects.length > 1
+                    ? `<ul class="wx-list">${entry.effects.map(e => `<li>${e}</li>`).join('')}</ul>`
+                    : entry.effects[0]) + mods
+            });
+            return `
+                <div class="ail-tile" style="--ail: ${entry.color};
+                    --ail-ink: ${ailInk(entry.color)};
+                    --ail-wash: ${mixHex(entry.color, '#ffffff', 0.1)}5c;">
+                    <div class="ail-tile-head" style="background: ${entry.color}; color: ${ink};
+                        border-bottom: 1px solid ${ink}1f;">
+                        <span class="ail-tile-icons"><i class="fa-solid ${entry.icon}"></i></span>
+                        <span class="wx-head-text">
+                            <span class="ail-tile-name">${entry.name}</span>
+                            <span class="wx-sub">${entry.sub}</span>
+                        </span>
+                        ${entry.extreme
+                    ? `<span class="ail-tile-mod" style="background: ${ink}1f;">Extreme</span>`
+                    : ''}
+                    </div>
+                    ${bands.map(b => `
+                        <div class="ail-band">${b.label}</div>
+                        <div class="ail-text">${b.html}</div>`).join('')}
+                </div>`;
+        }
+
+        function renderWeather() {
+            document.getElementById('weather-tabs').innerHTML = WEATHER_TABS.map(t => `
+                <button class="wx-tab${t.key === weatherTab ? ' active' : ''}"
+                    onclick="selectWeatherTab('${t.key}')">${t.label}</button>`).join('');
+
+            const isEnv = weatherTab === 'env';
+            const entries = isEnv
+                ? ENVIRONMENTS
+                : WEATHER_CONDITIONS.filter(w => !!w.extreme === (weatherTab === 'extreme'));
+
+            const note = document.getElementById('weather-note');
+            note.innerHTML = isEnv ? ENV_INTRO : '';
+            note.style.display = isEnv ? 'block' : 'none';
+
+            // An environment tile has one band, a weather two - head included,
+            // three subgrid rows against five. See #weather-content.wx-rows-*.
             const grid = document.getElementById('weather-content');
-            grid.innerHTML = WEATHER_CONDITIONS.length
-                ? WEATHER_CONDITIONS.map(w => {
-                    const ink = inkOn(w.color);
-                    return `
-                    <div class="ail-tile" style="--ail: ${w.color};
-                        --ail-ink: ${mixHex(w.color, '#ffffff', 0.44)};
-                        --ail-wash: ${mixHex(w.color, '#ffffff', 0.1)}5c;">
-                        <div class="ail-tile-head" style="background: ${w.color}; color: ${ink};
-                            border-bottom: 1px solid ${ink}1f;">
-                            <span class="ail-tile-icons"><i class="fa-solid ${w.icon}"></i></span>
-                            <span class="ail-tile-name">${w.name}</span>
-                            ${w.modifier
-                            ? `<span class="ail-tile-mod" style="background: ${ink}1f;">${w.modifier}</span>`
-                            : ''}
-                        </div>
-                        ${(w.bands || []).map(b => `
-                            <div class="ail-band">${b.label}</div>
-                            <div class="ail-text">${b.html}</div>`).join('')}
-                    </div>`;
-                }).join('')
-                : `<p class="modal-text" style="grid-column: 1 / -1; margin: 0;">
-                       The weather rules haven't been filled in yet.</p>`;
+            grid.className = `ailments-content ${isEnv ? 'wx-rows-3' : 'wx-rows-5'}`;
+            grid.innerHTML = entries.map(weatherTile).join('');
+            equalizeWeatherTiles();
+        }
+
+        /* Subgrid already levels the bands of the tiles sitting on one row.
+           This levels one row against the next, so every tile in the window is
+           the height of the tallest and an "Effects" bar lands at the same
+           place wherever you look.
+
+           Every tile spans the same number of rows, so take the tallest head,
+           the tallest band label and so on across the whole window, then hand
+           that group back as grid-auto-rows - whose track list cycles over the
+           implicit rows, which here is all of them.
+
+           The heights come off the tiles' own children rather than the grid's
+           computed grid-template-rows: with subgrid a child is exactly as tall
+           as its track, and browsers disagree on whether implicit tracks show
+           up in that property at all. It is a layout read either way, so this
+           must run with the window on screen - openWeather() shows it first. */
+        function equalizeWeatherTiles() {
+            const grid = document.getElementById('weather-content');
+            const per = grid.classList.contains('wx-rows-3') ? 3 : 5;
+            const tiles = Array.from(grid.querySelectorAll('.ail-tile'));
+
+            // Back to content sizing, or the children measure as the last pass sized them
+            grid.style.gridAutoRows = '';
+            if (!tiles.length) return;
+
+            const tallest = new Array(per).fill(0);
+            for (const tile of tiles) {
+                // A tile that is not laid out, or does not carry the bands this
+                // tab says it does: leave the row-by-row look rather than force
+                // wrong heights onto every tile in the window.
+                if (tile.children.length !== per) return;
+                Array.from(tile.children).forEach((row, i) => {
+                    const h = row.getBoundingClientRect().height;
+                    if (h > tallest[i]) tallest[i] = h;
+                });
+            }
+            if (tallest.some(h => !h)) return;
+            grid.style.gridAutoRows = tallest.map(h => `${h}px`).join(' ');
+        }
+
+        /* Track heights are measured, so a resize invalidates them - and the
+           grid drops a column on the way, which changes what the tallest tile
+           in a group is. */
+        window.addEventListener('resize', () => {
+            if (document.getElementById('weather-modal').style.display === 'flex') {
+                equalizeWeatherTiles();
+            }
+        });
+
+        function selectWeatherTab(key) {
+            weatherTab = key;
+            renderWeather();
+            // A short tab opened at the scroll position of a long one looks empty
+            document.getElementById('weather-content').scrollTop = 0;
+        }
+
+        // The tab is not reset, so reopening the window lands where it was left.
+        // Shown before it is filled: equalizeWeatherTiles() measures used track
+        // heights, and a display: none grid has none to measure.
+        function openWeather() {
             document.getElementById('weather-modal').style.display = 'flex';
+            renderWeather();
         }
 
         function closeWeather() {
@@ -6842,7 +8429,7 @@
                 return `<div class="move-suggestion" onclick="pickMoveSuggestion(this.dataset.name)"
                             data-name="${m.Name}">
                             <span>${m.Name}</span>
-                            <span class="move-suggestion-type" style="color: ${tc}">${m.Type}</span>
+                            <span class="move-suggestion-type" style="color: ${typeInk(tc)}">${m.Type}</span>
                         </div>`;
             }).join('')
                 + (matches.length > shown.length
@@ -7014,6 +8601,7 @@
                 closeAbilityPicker();
                 closeEvolveModal();
                 closeEvolveWarn();
+                closeMegaConfirm();
                 closeMoveSuggestions();
                 closeItemSuggestions();
                 closeScaleEditor();
@@ -7498,7 +9086,7 @@
                 card.className = `move-card ${move.Category}${isPinned ? ' pinned' : ''}`
                     + (isDisabled ? ' disabled' : '');
                 card.dataset.moveName = move.Name;
-                card.style.setProperty('--type-color', typeColors[move.Type] || '#e5e7eb');
+                card.style.setProperty('--type-color', typeInk(typeColors[move.Type] || '#e5e7eb'));
                 card.onclick = function () { toggleMove(this); };
 
                 if (expandedNames.has(move.Name)) card.classList.add('expanded');
@@ -7526,7 +9114,8 @@
                 // Type badge, tinted from the move's own type
                 const tc = typeColors[move.Type] || '#e5e7eb';
                 const typeBadge = `<span class="badge type" style="background: ${tc}26;
-                    border-color: ${tc}4c; color: ${mixHex(tc, '#ffffff', 0.6)}">${move.Type}</span>`;
+                    border-color: ${typeInk(tc)}4c;
+                    color: ${typeInk(tc, mixHex(tc, '#ffffff', 0.6))}">${move.Type}</span>`;
 
                 // Accuracy pool
                 const accNames = [move.Accuracy1, move.Accuracy2, move.Accuracy3].filter(Boolean);
@@ -8069,19 +9658,61 @@
             }
         }
 
-        /* Per-sprite zoom: each sprite type (Home/Book/Box/Token/Custom) keeps
-           its own scale, applied to the main sprite and mirrored on the team
-           preview. currentSpriteType tracks whichever sprite is on screen. */
+        /* Per-sprite framing: each sprite type (Home/Book/Box/Token/Custom) keeps
+           its own zoom and nudge. All three are a transform, so the box never
+           resizes with them. currentSpriteType tracks whichever sprite is on
+           screen. */
         let currentSpriteType = 'Home';
+
+        function spriteOffsetOf(type) {
+            const o = sheetState.spriteOffsets && sheetState.spriteOffsets[type];
+            return { x: (o && o.x) || 0, y: (o && o.y) || 0 };
+        }
+
+        /* .sprite-stage is a square, and the image is object-fit: contain into it,
+           so the sprite's longest side measures exactly this before any transform
+           — which is the unit SPRITE_FRAMES stores its fractions in. Must match
+           the CSS. */
+        const SPRITE_STAGE = 180;
+
+        /* Where the art sits inside its own canvas, from sprite-frames-db.js:
+           [cx, cy, rr] in thousandths of the stage, cx/cy being the silhouette's
+           centre measured from the middle. Negating them centres the Pokémon
+           rather than the file it is stored in.
+
+           Only Home, Book and Box are measured. Tokens are round and centred by
+           construction, and a custom upload is the user's own framing, so both
+           fall through to no correction. The whole thing is optional: an
+           app-data folder predating the file just leaves sprites where they
+           were. */
+        function spriteFrameOffset(type) {
+            const table = (typeof SPRITE_FRAMES !== 'undefined' && SPRITE_FRAMES[type]) || null;
+            const f = table && table[pokemonData.pokemon.Image];
+            if (!f) return { x: 0, y: 0 };
+            return { x: -f[0] / 1000 * SPRITE_STAGE, y: -f[1] / 1000 * SPRITE_STAGE };
+        }
 
         function applySpriteScale(type) {
             currentSpriteType = type;
             const scale = (sheetState.spriteScales && sheetState.spriteScales[type]) || 1;
-            document.getElementById('poke-sprite').style.setProperty('--sprite-scale', scale);
-            const range = document.getElementById('sprite-scale-range');
-            const val = document.getElementById('sprite-scale-val');
-            if (range) range.value = scale;
-            if (val) val.textContent = Number(scale).toFixed(2) + '×';
+            const off = spriteOffsetOf(type);
+            const frame = spriteFrameOffset(type);
+            const img = document.getElementById('poke-sprite');
+            img.style.setProperty('--sprite-frame-x', frame.x.toFixed(2) + 'px');
+            img.style.setProperty('--sprite-frame-y', frame.y.toFixed(2) + 'px');
+            img.style.setProperty('--sprite-scale', scale);
+            img.style.setProperty('--sprite-x', off.x + 'px');
+            img.style.setProperty('--sprite-y', off.y + 'px');
+            setSliderPair('sprite-scale-range', 'sprite-scale-val', scale, Number(scale).toFixed(2) + '×');
+            setSliderPair('sprite-x-range', 'sprite-x-val', off.x, off.x);
+            setSliderPair('sprite-y-range', 'sprite-y-val', off.y, off.y);
+        }
+
+        function setSliderPair(rangeId, valId, value, label) {
+            const range = document.getElementById(rangeId);
+            const val = document.getElementById(valId);
+            if (range) range.value = value;
+            if (val) val.textContent = label;
         }
 
         function toggleScaleEditor(event) {
@@ -8096,18 +9727,33 @@
             document.getElementById('sprite-scale-editor').classList.remove('open');
         }
 
-        function onSpriteScaleInput(value) {
-            const scale = parseFloat(value);
-            if (!sheetState.spriteScales) sheetState.spriteScales = {};
-            if (scale === 1) delete sheetState.spriteScales[currentSpriteType];
-            else sheetState.spriteScales[currentSpriteType] = scale;
-            document.getElementById('poke-sprite').style.setProperty('--sprite-scale', scale);
-            document.getElementById('sprite-scale-val').textContent = scale.toFixed(2) + '×';
+        /* One handler for all three sliders. A value back at its default drops the
+           key rather than storing it, so an untouched sprite adds nothing to the
+           saved sheet and keeps following any later change to the defaults. */
+        function onSpriteAdjust(what, value) {
+            const img = document.getElementById('poke-sprite');
+            if (what === 'scale') {
+                const scale = parseFloat(value);
+                if (!sheetState.spriteScales) sheetState.spriteScales = {};
+                if (scale === 1) delete sheetState.spriteScales[currentSpriteType];
+                else sheetState.spriteScales[currentSpriteType] = scale;
+                img.style.setProperty('--sprite-scale', scale);
+                document.getElementById('sprite-scale-val').textContent = scale.toFixed(2) + '×';
+            } else {
+                const n = Math.round(parseFloat(value));
+                if (!sheetState.spriteOffsets) sheetState.spriteOffsets = {};
+                const off = Object.assign(spriteOffsetOf(currentSpriteType), { [what]: n });
+                if (!off.x && !off.y) delete sheetState.spriteOffsets[currentSpriteType];
+                else sheetState.spriteOffsets[currentSpriteType] = off;
+                img.style.setProperty('--sprite-' + what, n + 'px');
+                document.getElementById('sprite-' + what + '-val').textContent = n;
+            }
             saveState();
         }
 
         function resetSpriteScale() {
             if (sheetState.spriteScales) delete sheetState.spriteScales[currentSpriteType];
+            if (sheetState.spriteOffsets) delete sheetState.spriteOffsets[currentSpriteType];
             applySpriteScale(currentSpriteType);
             saveState();
         }
