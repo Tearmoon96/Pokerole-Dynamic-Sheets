@@ -2677,8 +2677,8 @@
             color: var(--text-muted);
         }
 
-        /* Held item search: same themed dropdown, anchored to the input's
-           right edge so the wider panel stays inside the column */
+        /* Held item and nature searches: same themed dropdown, anchored to the
+           input's right edge so the wider panel stays inside the column */
         .item-search-wrap {
             position: relative;
             flex: 1;
@@ -2708,6 +2708,14 @@
         .move-suggestion .item-suggestion-name {
             flex: 1;
             text-align: left;
+        }
+
+        /* Nature list: one short name per row, so it needs nowhere near the
+           width the item list takes */
+        .nature-suggestions {
+            left: auto;
+            right: 0;
+            width: 150px;
         }
 
         .custom-move-status {
@@ -4837,8 +4845,13 @@
                 <div class="tracker-row">
                     <span class="tracker-label"><i class="fa-solid fa-leaf" style="color: #22c55e;"></i>
                         Nature</span>
-                    <input type="text" id="nature-input" class="pool-text-input"
-                        onchange="setSheetField('nature', this.value)">
+                    <div class="item-search-wrap">
+                        <input type="text" id="nature-input" class="pool-text-input" autocomplete="off"
+                            onchange="setSheetField('nature', this.value)" oninput="renderNatureSuggestions()"
+                            onfocus="renderNatureSuggestions()" onclick="renderNatureSuggestions()">
+                        <div class="move-suggestions nature-suggestions" id="nature-suggestions"
+                            style="display: none;"></div>
+                    </div>
                 </div>
             </div>
 
@@ -5641,7 +5654,7 @@
     <script>
         window.DATA_BASE = 'app-data/';
         ['moves-db.js', 'pokedex-db.js', 'abilities-db.js', 'items-db.js',
-            'sprite-frames-db.js'].forEach(function (f) {
+            'natures-db.js', 'sprite-frames-db.js'].forEach(function (f) {
             document.write('<script src="' + DATA_BASE + f + '"><\/script>');
         });
     </script>
@@ -8659,6 +8672,7 @@
         function renderItemSuggestions() {
             const panel = document.getElementById('item-suggestions');
             if (typeof ALL_ITEMS === 'undefined') return;
+            closeNatureSuggestions();
             const q = document.getElementById('held-item-input').value.trim().toLowerCase();
             const matches = ALL_ITEMS.filter(it => it.Name.toLowerCase().includes(q));
             if (matches.length === 0) {
@@ -8695,12 +8709,52 @@
             document.getElementById('item-suggestions').style.display = 'none';
         }
 
+        /* Nature search: the same dropdown over the 25 book natures. The input
+           stays a plain text field, so a homebrew nature can just be typed in
+           and saved on blur — the list is a shortcut, not a constraint. */
+        function renderNatureSuggestions() {
+            const panel = document.getElementById('nature-suggestions');
+            if (typeof ALL_NATURES === 'undefined') return;
+            closeItemSuggestions();
+            const q = document.getElementById('nature-input').value.trim().toLowerCase();
+            const matches = ALL_NATURES.filter(n => n.Name.toLowerCase().includes(q)
+                || (n.Keywords || '').toLowerCase().includes(q));
+            if (matches.length === 0) {
+                panel.style.display = 'none';
+                return;
+            }
+            panel.innerHTML = matches.map(n => {
+                /* &#10; is the newline the tooltip splits on: keywords first,
+                   then the book's description of the nature */
+                const tip = [n.Keywords, n.Description].filter(Boolean).join('&#10;&#10;')
+                    .replace(/"/g, '&quot;');
+                return `<div class="move-suggestion" onclick="pickNatureSuggestion(this.dataset.name)"
+                            data-name="${n.Name}" title="${n.Name}&#10;${tip}">
+                            <span class="item-suggestion-name">${n.Name}</span>
+                        </div>`;
+            }).join('');
+            panel.style.display = 'flex';
+        }
+
+        function pickNatureSuggestion(name) {
+            document.getElementById('nature-input').value = name;
+            setSheetField('nature', name);
+            closeNatureSuggestions();
+        }
+
+        function closeNatureSuggestions() {
+            document.getElementById('nature-suggestions').style.display = 'none';
+        }
+
         /* Any click outside a search closes its suggestion list. The +
            button is excluded: its click focuses the move input (opening
            the list), and would otherwise bubble here and close it again */
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.move-search-wrap, #custom-adder-btn')) closeMoveSuggestions();
-            if (!e.target.closest('.item-search-wrap')) closeItemSuggestions();
+            if (!e.target.closest('.item-search-wrap')) {
+                closeItemSuggestions();
+                closeNatureSuggestions();
+            }
         });
 
         function setCustomMoveStatus(msg) {

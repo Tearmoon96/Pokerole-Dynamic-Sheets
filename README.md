@@ -76,7 +76,7 @@ The Core Books version 1.25 and 3.0 already have pre-set bookmarks toward the mo
 
 ## Under the hood
 
-Plain HTML, CSS, and JavaScript — no framework, no build step, nothing to install. The game data lives in `app-data/` as pre-built JS bundles (`pokedex-db.js`, `moves-db.js`, `abilities-db.js`, `items-db.js`, `equip-icons-db.js`, `equip-icons-mono-db.js`, `sprite-frames-db.js`). Fonts are Outfit and Fira Code from Google Fonts; icons are FontAwesome 6.4.
+Plain HTML, CSS, and JavaScript — no framework, no build step, nothing to install. The game data lives in `app-data/` as pre-built JS bundles (`pokedex-db.js`, `moves-db.js`, `abilities-db.js`, `items-db.js`, `natures-db.js`, `equip-icons-db.js`, `equip-icons-mono-db.js`, `sprite-frames-db.js`). Fonts are Outfit and Fira Code from Google Fonts; icons are FontAwesome 6.4.
 
 This branch carries the app and nothing else, so a download stays as small as it can while still working offline. The raw Pokerole dataset those bundles are compiled from, the Python scripts that compile it, and the two icon packs in full live on the **[`dev-data`](../../tree/dev-data)** branch — or in the developer zip attached to any release. None of it is needed to run the app.
 

@@ -2271,6 +2271,22 @@
             text-align: left;
         }
 
+        /* Nature search. The list opens upward: this pill is the last thing in
+           its panel and .panel clips its overflow, so one hanging down would be
+           sliced off just under the Rank pill. */
+        .nature-field {
+            position: relative;
+            z-index: 5;
+        }
+
+        /* One short name per row, so it does not take the pill's full width */
+        .nature-suggestions {
+            top: auto;
+            bottom: calc(100% + 6px);
+            width: 150px;
+            max-height: 220px;
+        }
+
         .custom-move-status {
             font-size: 0.75rem;
             font-style: italic;
@@ -6045,9 +6061,13 @@
                 </div>
 
                 <div class="nature-rank">
-                    <div class="pill-field">
+                    <div class="pill-field nature-field">
                         <label for="nature-input">Nature:</label>
-                        <input type="text" id="nature-input" onchange="setSheetField('nature', this.value)">
+                        <input type="text" id="nature-input" autocomplete="off"
+                            onchange="setSheetField('nature', this.value)" oninput="renderNatureSuggestions()"
+                            onfocus="renderNatureSuggestions()" onclick="renderNatureSuggestions()">
+                        <div class="move-suggestions nature-suggestions" id="nature-suggestions"
+                            style="display: none;"></div>
                     </div>
                     <div class="pill-field">
                         <label for="rank-input">Rank:</label>
@@ -6861,7 +6881,7 @@
          bundles synchronously, in order, before the main script runs. -->
     <script>
         window.DATA_BASE = 'app-data/';
-        ['pokedex-db.js', 'items-db.js', 'equip-icons-db.js',
+        ['pokedex-db.js', 'items-db.js', 'natures-db.js', 'equip-icons-db.js',
             'equip-icons-mono-db.js', 'sprite-frames-db.js', 'version.js'].forEach(function (f) {
             document.write('<script src="' + DATA_BASE + f + '"><\/script>');
         });
@@ -10421,11 +10441,54 @@
             });
         }
 
+        /* Nature search: the same dropdown over the 25 book natures. The input
+           stays a plain text field, so a homebrew nature can just be typed in
+           and saved on blur — the list is a shortcut, not a constraint. */
+        function renderNatureSuggestions() {
+            const panel = document.getElementById('nature-suggestions');
+            if (typeof ALL_NATURES === 'undefined') return;
+            const q = document.getElementById('nature-input').value.trim().toLowerCase();
+            const matches = ALL_NATURES.filter(n => n.Name.toLowerCase().includes(q)
+                || (n.Keywords || '').toLowerCase().includes(q));
+            if (!matches.length) {
+                panel.style.display = 'none';
+                return;
+            }
+
+            panel.innerHTML = '';
+            matches.forEach(n => {
+                const row = document.createElement('div');
+                row.className = 'move-suggestion';
+                row.title = [n.Name, n.Keywords, n.Description].filter(Boolean).join('\n\n');
+                row.onclick = () => pickNatureSuggestion(n.Name);
+
+                const name = document.createElement('span');
+                name.className = 'item-suggestion-name';
+                name.textContent = n.Name;
+
+                row.appendChild(name);
+                panel.appendChild(row);
+            });
+            panel.style.display = 'flex';
+        }
+
+        function pickNatureSuggestion(name) {
+            document.getElementById('nature-input').value = name;
+            setSheetField('nature', name);
+            closeNatureSuggestions();
+        }
+
+        function closeNatureSuggestions() {
+            const panel = document.getElementById('nature-suggestions');
+            if (panel) panel.style.display = 'none';
+        }
+
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.bag-add-wrap')) {
                 closeBagSuggestions();
                 closeEquipBagSuggestions();
             }
+            if (!e.target.closest('.nature-field')) closeNatureSuggestions();
         });
 
         // ------------------------------------------------------------------
