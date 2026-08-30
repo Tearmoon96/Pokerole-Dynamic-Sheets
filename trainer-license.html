@@ -50,6 +50,14 @@
             --phys-color: #f97316;
             --spec-color: #3b82f6;
             --supp-color: #10b981;
+
+            /* One colour per pool, same as pokemon-card.html: elemental themes
+               keep the heart's rose and the star's --accent, the two License
+               themes name their own pair below. */
+            --hp-color: #f43f5e;
+            --hp-glow: #f43f5e66;
+            --will-color: var(--accent);
+            --will-glow: var(--accent-glow);
         }
 
         * {
@@ -1264,14 +1272,17 @@
             outline: none;
         }
 
+        /* Both fills match pokemon-card.html: HP on --ghost-color, the crimson
+           the section bars are painted with, and Will on the SPECIAL move
+           badge's blue rather than on whatever the theme accent happens to be. */
         .pool-bar-fill.health {
-            background: #f43f5e;
-            box-shadow: 0 0 8px #f43f5e66;
+            background: var(--hp-color);
+            box-shadow: 0 0 8px var(--hp-glow);
         }
 
         .pool-bar-fill.willpower {
-            background: var(--accent);
-            box-shadow: 0 0 8px var(--accent-glow);
+            background: var(--will-color);
+            box-shadow: 0 0 8px var(--will-glow);
         }
 
         .exp-input {
@@ -3963,11 +3974,16 @@
             color: var(--text-primary);
         }
 
-        .tower-skill .skill-dots {
+        /* The Extra rows share these: an added specialty has to read as one of
+           the sheet's own, so the two sets of circles cannot be allowed to
+           drift apart in size or spacing. */
+        .tower-skill .skill-dots,
+        .extra-row .skill-dots {
             gap: 3px;
         }
 
-        .tower-skill .skill-dot {
+        .tower-skill .skill-dot,
+        .extra-panel .skill-dot {
             width: 10px;
             height: 10px;
             border-width: 2.5px;
@@ -4052,6 +4068,22 @@
             box-shadow: 0 0 8px var(--accent-glow);
         }
 
+        /* The bottom row of this quadrant has to sit level with the CHARACTER
+           row of the licence plate opposite it. How far apart the two land is
+           the attribute pills plus the achievements box measured against the
+           photo arch — font metrics included, so it comes out differently in
+           different browsers and a constant here could only ever be right in
+           one of them. alignNatureRow() measures it and sets the variable.
+
+           Both items take the same offset: they share the grid row, so moving
+           them together keeps the Extra box level with Nature — and keeps it
+           exactly as tall as the four tower boxes, which growing those boxes to
+           push this row down would not. */
+        .nature-rank,
+        .extra-panel {
+            margin-top: var(--natrank-lift, 0px);
+        }
+
         /* Nature / Rank pill inputs */
         .nature-rank {
             grid-area: natrank;
@@ -4115,17 +4147,15 @@
             gap: 4px;
         }
 
-        /* Slightly thicker dot outline inside the specialties (Extra) box */
-        .extra-panel .skill-dot {
-            border-width: 2.5px;
-        }
-
+        /* Spacing copied from .skill-group-rows, and the row chrome below is
+           kept out of the flow, so four Extra rows come out exactly as tall as
+           the four rows of a tower group — the two boxes have to match. */
         .extra-rows {
             flex: 1;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            gap: 7px;
+            justify-content: space-around;
+            gap: 5px;
             min-width: 0;
         }
 
@@ -4133,33 +4163,50 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 2px;
+            gap: 3px;
             position: relative;
         }
 
+        /* Typed like .tower-skill-name, so an Extra reads as one of the sheet's
+           own specialties rather than as a filled-in field. It stays an input,
+           so the dashed rule and the placeholder stay with it. */
         .extra-name-input {
             width: 100%;
-            background: none;
             border: none;
-            border-bottom: 1px dashed var(--border-color);
             text-align: center;
-            font-size: 0.6rem;
+            font-size: 0.58rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.2px;
             color: var(--text-primary);
             outline: none;
-            padding: 1px;
+            padding: 0 1px;
             font-family: inherit;
+            /* Painted, not bordered: a real border-bottom plus the padding it
+               needs would make every Extra row 3px taller than a tower row. */
+            background: repeating-linear-gradient(to right,
+                    var(--border-color) 0 3px, #00000000 3px 6px) no-repeat 0 100% / 100% 1px;
         }
 
+        /* The hint is not a specialty name: left at normal weight so an empty
+           row is still legible as empty */
         .extra-name-input::placeholder {
             color: var(--text-muted);
+            font-weight: 400;
             letter-spacing: 0;
             text-transform: none;
         }
 
+        /* Named, it is a specialty and looks like one — the dashed rule was the
+           last thing marking it out as a field. Empty or being edited, the cue
+           comes back. :placeholder-shown is what tells the two apart. */
+        .extra-name-input:not(:placeholder-shown) {
+            background-image: none;
+        }
+
         .extra-name-input:focus {
-            border-bottom-color: var(--accent);
+            background-image: repeating-linear-gradient(to right,
+                    var(--accent) 0 3px, #00000000 3px 6px);
         }
 
         .extra-add-btn {
@@ -5247,7 +5294,6 @@
         :root.light-theme .pool-text-input,
         :root.light-theme .specialty-input,
         :root.light-theme .tally-qty-input,
-        :root.light-theme .hwe-exp-input,
         :root.light-theme .pill-field,
         :root.light-theme .move-suggestions {
             border-color: #00000024;
@@ -5292,6 +5338,28 @@
             background: #00000012;
         }
 
+        /* The red banner is a child of these boxes and overflow: hidden clips it
+           to the padding box, so with a border on the box it stopped 1px short of
+           the card's edge. That 1px of box fill under a #00000024 border is all
+           but invisible against the light body, but obvious against the red — so
+           the banner read as inset and left a step where the two meet.
+
+           Moving the hairline to an inset shadow fixes it without moving
+           anything: paint order is background, then inset shadow, then children.
+           So the banner — the only child here with a background of its own —
+           covers the ring and runs edge to edge, while the bodies below it
+           (.hwe-body, #achievements-list, .other-textarea are all transparent)
+           let it through. Border round the light part, none round the red.
+
+           The alpha is unchanged because the stack is: the ring still sits on
+           the box's own #00000012 fill, exactly as the border did. */
+        :root.light-license .hwe-box,
+        :root.light-license .other-box,
+        :root.light-license .achievements-box {
+            border: none;
+            box-shadow: inset 0 0 0 1px #00000024;
+        }
+
         /* The Healing Item chip sits on an already-tinted box, so it needs a
            lighter fill of its own to stay legible; the green kit icon is a
            dark-page color and gets the same halfway-to-black ink as typeInk. */
@@ -5328,7 +5396,6 @@
         :root.light-theme .pool-text-input,
         :root.light-theme .pill-field,
         :root.light-theme .specialty-input,
-        :root.light-theme .hwe-exp-input,
         :root.light-theme .tally-qty-input,
         :root.light-theme .team-sprite-circle,
         :root.light-theme .equip-notes,
@@ -5368,29 +5435,67 @@
 
         /* HP / Will bars are too vivid on the light theme: mute the fills
            and drop the saturated glow */
+        /* Darker than the other light-theme wells, and it has to be: the value
+           is centred, so on a low pool the white digits sit on this track and
+           not on the fill. #69 is the lightest alpha that still clears 3:1 for
+           them (the empty track lands on ~#959595). Same as the card. */
         :root.light-theme .pool-bar {
-            background: #0000001f;
+            background: #00000069;
         }
 
-        :root.light-theme .pool-bar-fill.health {
-            background: #e07a84;
-            box-shadow: none;
-        }
-
+        /* Both fills are themed on their base rules; the light page only drops
+           the glow, which smears on a pale panel instead of reading as a halo */
+        :root.light-theme .pool-bar-fill.health,
         :root.light-theme .pool-bar-fill.willpower {
-            background: #e0968f;
             box-shadow: none;
+        }
+
+        /* Light License: HP on the crimson of the section bars, Will on the
+           SPECIAL badge's blue. Plain :root.light-theme, not :where(): a
+           zero-specificity selector would lose the variables back to :root.
+
+           The crimson is opaque here, not the banners' #c0272be6: the bars sit
+           on a dark track, so the same translucent fill composited a shade
+           darker than the banners it was meant to match. #c54042 is what that
+           90% crimson resolves to over a pale panel. */
+        :root.light-theme {
+            --hp-color: #c54042;
+            --hp-glow: var(--ghost-color-glow);
+            --will-color: #3e6cf8;
+            --will-glow: #3e6cf866;
+        }
+
+        /* Hand-picked pair for the Dark License, whose own crimson sits too dark
+           behind a pool bar */
+        :root.dark-license {
+            --hp-color: #ff4a4e;
+            --hp-glow: #ff4a4e66;
+            --will-color: #3c6cf8;
+            --will-glow: #3c6cf866;
+        }
+
+        /* License themes only: no edge at all on the two pool bars, so each
+           reads as one clean band of colour. The elemental themes keep the
+           neutral white-alpha hairline.
+
+           Specificity, not order, is what carries this: (0,3,0) against the
+           (0,1,0) edge on .pool-bar and the light page's own :where()-flattened
+           hairline rule. Everything is border-box, so dropping the 1px leaves
+           the bar the same size on the outside and hands the room to the fill. */
+        :root.light-license .pool-bar,
+        :root.dark-license .pool-bar {
+            border: none;
         }
 
         :root.light-theme .move-suggestion:hover {
             background: var(--primary-soft);
         }
 
-        /* Filled HP/Will numbers sit on colored fill; keep them readable
-           where the bar is empty (light grey) by darkening the text */
+        /* Same near-white as the text on the section bars, carried over the
+           empty track by the shadow — see the .pool-bar note above */
         :root.light-theme .pool-bar-value {
-            color: #2a2020;
-            text-shadow: 0 1px 1px #ffffffcc;
+            color: #fff5f5;
+            text-shadow: 0 1px 2px #000000b3, 0 0 3px #00000080;
         }
 
         /* ---- Buttons that were drawn for a dark page ----
@@ -5975,7 +6080,9 @@
                                 <div class="skill-dots" data-skill="brawl"></div>
                             </div>
                             <div class="tower-skill">
-                                <span class="tower-skill-name">Channel</span>
+                                <!-- Label only, as with Etiquette below. The key stays
+                                     "channel" so existing trainer .json files still load. -->
+                                <span class="tower-skill-name">Throw</span>
                                 <div class="skill-dots" data-skill="channel"></div>
                             </div>
                             <div class="tower-skill">
@@ -6234,12 +6341,12 @@
             <button class="modal-close-btn" onclick="closeBadgePicker()" title="Close">
                 <i class="fa-solid fa-xmark"></i>
             </button>
-            <div class="modal-title" style="color: var(--text-primary);">
-                <i class="fa-solid fa-medal" style="color: var(--ghost-color);"></i> Badge Type
+            <!-- Centred, because the type chips below are a centred wrapping
+                 row: left-aligned the heading sat off to one side of them. -->
+            <div class="modal-title" style="justify-content: center; color: var(--text-primary);">
+                <i class="fa-solid fa-medal" style="color: var(--ghost-color);"></i> Gym Badge Picker
             </div>
-            <p class="modal-text">Pick the type for this gym badge.</p>
-            <div class="theme-grid" id="badge-type-grid"
-                style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;"></div>
+            <div class="theme-grid theme-type-row" id="badge-type-grid"></div>
             <div class="modal-actions">
                 <button class="form-btn danger" id="badge-remove-btn" onclick="removeBadge()"
                     style="display: none;">Remove badge</button>
@@ -6527,10 +6634,10 @@
             <button class="modal-close-btn" onclick="closeThemePicker()" title="Close">
                 <i class="fa-solid fa-xmark"></i>
             </button>
-            <div class="modal-title" style="color: var(--text-primary);">
-                <i class="fa-solid fa-palette" style="color: var(--ghost-color);"></i> Page Theme
+            <!-- Centred, to sit over the centred chip rows below it -->
+            <div class="modal-title" style="justify-content: center; color: var(--text-primary);">
+                <i class="fa-solid fa-palette" style="color: var(--ghost-color);"></i> Page Theme Picker
             </div>
-            <p class="modal-text">Pick the color the whole sheet is themed with.</p>
             <!-- The named License themes keep their labels and stack at equal
                  width; the 18 types below are icon-only so they fit on a
                  couple of rows -->
@@ -7932,6 +8039,13 @@
             /* Light themes flip a root class so the dark-assuming hairline
                borders (and pill rendering) switch to light-appropriate values */
             document.documentElement.classList.toggle('light-theme', !!(custom && custom.light));
+            /* Named, not derived from "custom and not light": Steel and Dark are
+               dark themes too, and they keep the themed pool fills. Its light
+               counterpart has to be named for the mirror-image reason — Normal
+               is a light theme as well, so .light-theme is not the Light
+               License on its own. */
+            document.documentElement.classList.toggle('dark-license', type === 'License');
+            document.documentElement.classList.toggle('light-license', type === 'LicenseLight');
         }
 
         function isLightTheme() {
@@ -10600,28 +10714,23 @@
             const badge = sheetState.badges[i];
             const grid = document.getElementById('badge-type-grid');
             grid.innerHTML = '';
+            /* Built by themeChip, the same call the theme picker's type row
+               makes, so the two grids cannot drift apart: icon-only circles,
+               one per type, no labels. */
             Object.keys(typeColors).forEach(type => {
-                const c = typeColors[type];
-                const chip = document.createElement('span');
-                chip.className = 'type-badge theme-chip';
-                const active = badge.earned && badge.type === type;
-                const light = isLightTheme();
-                /* The white "this is the current one" outline needs to invert
-                   too, or the selected chip loses its marker on a light modal */
-                const marker = light ? '#2a2020' : '#fff';
-                chip.style.cssText = 'background: ' + c + '33;'
-                    + ' border: 1px solid ' + typeInk(c) + ';'
-                    + ' color: ' + typeInk(c, mixHex(c, '#ffffff', 0.55)) + ';'
-                    + ' box-shadow: ' + (light ? 'none' : '0 0 10px ' + c + '26') + ';'
-                    + ' cursor: pointer;'
-                    + (active ? ' outline: 2px solid ' + marker + '; outline-offset: 1px;' : '');
-                chip.innerHTML = '<i class="fa-solid ' + TYPE_ICONS[type] + '"></i> ' + type;
+                const chip = themeChip(typeColors[type], TYPE_ICONS[type], type, type, true);
                 chip.onclick = () => {
                     sheetState.badges[activeBadge] = { earned: true, type };
                     saveState();
                     renderBadges();
                     closeBadgePicker();
                 };
+                /* Which type this badge already is. The white marker inverts on
+                   a light modal, or the chosen chip loses it against the page. */
+                if (badge.earned && badge.type === type) {
+                    chip.style.outline = '2px solid ' + (isLightTheme() ? '#2a2020' : '#fff');
+                    chip.style.outlineOffset = '1px';
+                }
                 grid.appendChild(chip);
             });
             document.getElementById('badge-remove-btn').style.display = badge.earned ? 'inline-block' : 'none';
@@ -11718,6 +11827,36 @@
             return '';
         }
 
+        /* Puts the Nature / Extra row level with the CHARACTER row of the licence
+           plate beside it. The two live in different panels, so no stylesheet
+           rule can tie them together — and the distance depends on font metrics,
+           which differ between browsers and are not even settled until the
+           webfont has loaded. So: measure from zero, then hand CSS the offset.
+
+           Only while the two are actually side by side. Under the stacked
+           layout the plate is above the quadrant, not opposite it, and there is
+           nothing to line up with. */
+        function alignNatureRow() {
+            /* .license-plate, not its first .plate-row: what has to meet the
+               Nature pill's edge is the plate's painted border, and the row
+               inside it starts a border-width lower. Rounded, because the two
+               rects can land on fractions the browser then paints to different
+               whole pixels. */
+            const plate = document.querySelector('.license-plate');
+            const nat = document.querySelector('.nature-rank');
+            if (!plate || !nat) return;
+            const root = document.documentElement;
+            root.style.setProperty('--natrank-lift', '0px');
+            const p = plate.getBoundingClientRect();
+            const n = nat.getBoundingClientRect();
+            if (n.left < p.right) return;          // stacked: leave it alone
+            root.style.setProperty('--natrank-lift', Math.round(p.top - n.top) + 'px');
+        }
+
+        window.addEventListener('resize', alignNatureRow);
+        /* Metrics move when the webfont swaps in, so measure again once it has */
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(alignNatureRow);
+
         function renderAll() {
             applyTheme();
             syncFields();
@@ -11736,6 +11875,7 @@
             renderBadges();
             renderTrainerNav();
             updateSaveIndicator();
+            alignNatureRow();   // last: it measures what everything above laid out
         }
 
         // ------------------------------------------------------------------
