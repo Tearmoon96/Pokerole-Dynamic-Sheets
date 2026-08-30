@@ -9,6 +9,8 @@ Two HTML files, each a standalone app:
 - **`trainer-license.html`** — a trainer's sheet: attributes, skills, the six-Pokémon team, PC storage for the ones not being carried, bag and money, potions, badges, and achievements. A GM can point it at a folder full of players' sheets and flip between them during a session.
 - **`pokemon-card.html`** — a single Pokémon's sheet: stats, moves and their effects, ability, HP and Will tracking, status conditions, and evolutions. The page recolors itself to match the Pokémon's type; on a dual-type Pokémon you click the type badge to switch which one drives the palette. It's also where you build wild Pokémon.
 
+![A Pokémon's card: stats and pools down the left, moves with their full effects on the right](https://raw.githubusercontent.com/Tearmoon96/Pokerole-Dynamic-Sheets/media/pokemon-card.gif)
+
 The two are linked. Click a team slot on a trainer's license and it opens that Pokémon's card; whatever you change there syncs back into the trainer's file. Stored Pokémon work the same way — being in the PC doesn't make one read-only.
 
 ## What it does
@@ -18,6 +20,12 @@ The two are linked. Click a team slot on a trainer's license and it opens that P
 - Lets a GM build wild Pokémon, export them, and lets a player "capture" one straight into an open team slot — or into PC storage when the team is full.
 - Stores full-resolution portraits on disk while embedding a small thumbnail inside the `.json`, so a file still shows its art when you hand it to someone else.
 - Autofills Pokédex, move, ability, and item data from a bundled database, so you pick from real Pokerole values instead of typing them by hand.
+
+![PC storage on a trainer's license: six renameable boxes, with Pokémon dragged between them and the team strip](https://raw.githubusercontent.com/Tearmoon96/Pokerole-Dynamic-Sheets/media/pc-storage.gif)
+
+Both sheets recolor, too: one theme per elemental type, plus a dark and a light take on the printed license.
+
+![Picking a page theme on a trainer's license](https://raw.githubusercontent.com/Tearmoon96/Pokerole-Dynamic-Sheets/media/themes.gif)
 
 ## What you need
 
@@ -78,7 +86,7 @@ The Core Books version 1.25 and 3.0 already have pre-set bookmarks toward the mo
 
 Plain HTML, CSS, and JavaScript — no framework, no build step, nothing to install. The game data lives in `app-data/` as pre-built JS bundles (`pokedex-db.js`, `moves-db.js`, `abilities-db.js`, `items-db.js`, `natures-db.js`, `equip-icons-db.js`, `equip-icons-mono-db.js`, `sprite-frames-db.js`). Fonts are Outfit and Fira Code from Google Fonts; icons are FontAwesome 6.4.
 
-This branch carries the app and nothing else, so a download stays as small as it can while still working offline. The raw Pokerole dataset those bundles are compiled from, the Python scripts that compile it, and the two icon packs in full live on the **[`dev-data`](../../tree/dev-data)** branch — or in the developer zip attached to any release. None of it is needed to run the app.
+This branch carries the app and nothing else, so a download stays as small as it can while still working offline. The raw Pokerole dataset those bundles are compiled from, the Python scripts that compile it, and the two icon packs in full live on the **[`dev-data`](../../tree/dev-data)** branch — or in the developer zip attached to any release. None of it is needed to run the app. The clips above sit on **[`media`](../../tree/media)**, kept off this branch for the same reason.
 
 ## Contact
 
