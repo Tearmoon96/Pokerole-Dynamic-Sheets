@@ -5504,9 +5504,8 @@
            a mid-tone fill. Each hover state is restated because these
            selectors outrank the plain `.class:hover` rules they override. */
 
-        /* Done / Save: `color: #0b0713` on --accent is black-on-crimson here
-           (and black-on-slate on the Normal theme). Solid themed body with
-           white text, matching the Add buttons above. */
+        /* Done / Save: `color: #0b0713` on --accent is black-on-crimson here.
+           Solid themed body with white text, matching the Add buttons above. */
         :root.light-theme .form-btn.save {
             background: var(--ghost-color);
             color: #fff;
@@ -7862,36 +7861,43 @@
         /* A few Pokémon-type themes share such similar gray type colors that the
            plain c1-derivation makes them near-identical. These give the three
            grays their own character while still living in the type picker:
-           Normal reads near-white (a light theme), Steel a luminous cool slate,
-           Dark a deep neutral charcoal. Same var/alpha shape as CUSTOM_THEMES. */
+           Normal a mid graphite, Steel a luminous cool slate, Dark a deep
+           near-black. All three are dark pages that follow the same convention
+           as the other fifteen types — one dominant shade through the borders,
+           bars and headings, the rose heart and the accent star on the pools —
+           and use the alphas applyTheme() derives with. Only the base colors
+           are hand-picked, to pull the three apart. */
         const TYPE_THEME_OVERRIDES = {
+            /* Graphite: the palest of the three grays in its chrome, on the
+               mid-tone page that keeps it clear of Dark's near-black below and
+               Steel's blue slate above. Neutral on purpose — those two hold the
+               blue end, and plain is the type. No `combat`, so the attribute
+               pills take typeColors.Normal exactly as a derived theme does. */
             Normal: {
-                light: true,
-                combat: '#6b7280',
                 vars: {
-                    '--ghost-color': '#6b7280',
-                    '--ghost-color-glow': '#6b72804a',
-                    '--border-color': '#6b728042',
-                    '--border-glow': '#6b72801a',
-                    '--primary-soft': '#6b728030',
-                    '--primary-faint': '#6b728014',
-                    '--accent': '#565d68',
-                    '--accent-glow': '#565d6844',
-                    '--accent-faint': '#565d6826',
-                    '--accent-soft': '#565d6814',
-                    '--accent-border': '#565d6840',
-                    '--trained-color': '#565d68',
-                    '--trained-glow': '#565d6844',
-                    '--text-primary': '#232529',
-                    '--text-secondary': '#5a616c',
-                    '--text-muted': '#8b9099',
-                    '--bg-color': '#e2e5e9',
-                    '--bg-top': '#eef0f2',
-                    '--card-bg': '#fbfcfdf7',
-                    '--panel-strong': '#fbfcfdfa',
-                    '--panel-medium': '#fbfcfdf2',
-                    '--panel-soft': '#fbfcfdec',
-                    '--panel-solid': '#fbfcfd'
+                    '--ghost-color': '#b3b8bd',
+                    '--ghost-color-glow': '#b3b8bd66',
+                    '--border-color': '#b3b8bd40',
+                    '--border-glow': '#b3b8bd26',
+                    '--primary-soft': '#b3b8bd33',
+                    '--primary-faint': '#b3b8bd0d',
+                    '--accent': '#d2d6da',
+                    '--accent-glow': '#d2d6da4c',
+                    '--accent-faint': '#d2d6da26',
+                    '--accent-soft': '#d2d6da14',
+                    '--accent-border': '#d2d6da40',
+                    '--trained-color': '#e3e6e8',
+                    '--trained-glow': '#e3e6e84c',
+                    '--text-primary': '#f5f6f7',
+                    '--text-secondary': '#c6cacd',
+                    '--text-muted': '#868b8f',
+                    '--bg-color': '#141618',
+                    '--bg-top': '#212427',
+                    '--card-bg': '#2a2e31b2',
+                    '--panel-strong': '#2a2e31f2',
+                    '--panel-medium': '#2a2e31e6',
+                    '--panel-soft': '#2a2e31cc',
+                    '--panel-solid': '#2a2e31'
                 }
             },
             Steel: {
@@ -8039,11 +8045,11 @@
             /* Light themes flip a root class so the dark-assuming hairline
                borders (and pill rendering) switch to light-appropriate values */
             document.documentElement.classList.toggle('light-theme', !!(custom && custom.light));
-            /* Named, not derived from "custom and not light": Steel and Dark are
-               dark themes too, and they keep the themed pool fills. Its light
-               counterpart has to be named for the mirror-image reason — Normal
-               is a light theme as well, so .light-theme is not the Light
-               License on its own. */
+            /* Named, not derived from "custom and not light": Steel, Dark and
+               Normal are dark themes too, and they keep the themed pool fills.
+               The light one is named to match rather than reusing .light-theme,
+               so the crimson bars and the License pool pair stay tied to the
+               License itself and cannot leak into a light elemental theme. */
             document.documentElement.classList.toggle('dark-license', type === 'License');
             document.documentElement.classList.toggle('light-license', type === 'LicenseLight');
         }

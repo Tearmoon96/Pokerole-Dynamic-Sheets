@@ -31,3 +31,8 @@ CLAUDE.md
 
 # Working notes on the equipment icon picks — kept locally, not shipped
 EQUIPMENT-ICONS.md
+
+# Demo recordings for the README, and the GIFs built from them. Hosted outside
+# the app download: both release zips are built from git refs, so anything
+# committed here would land in every download of the app.
+gifs/
