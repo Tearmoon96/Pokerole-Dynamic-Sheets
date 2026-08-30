@@ -153,7 +153,10 @@
         .pokemon-header { grid-row: 1; }
         .sprite-panel { grid-row: 2; }
         .tracker-panel.pools { grid-row: 3; }
-        .tracker-panel.condition { grid-row: 4; }
+        /* Over .stats-panel: every panel here is a z-index: 1 grid item, so an
+           autocomplete list inside this one is trapped in its stacking context
+           and the later sibling painted straight over it. */
+        .tracker-panel.condition { grid-row: 4; z-index: 2; }
         .stats-panel { grid-row: 5; }
         .skills-panel { grid-row: 6; }
 
