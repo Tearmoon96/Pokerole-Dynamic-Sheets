@@ -50,6 +50,17 @@
             --phys-color: #f97316;
             --spec-color: #3b82f6;
             --supp-color: #10b981;
+
+            /* Health and Willpower are one colour each, worn by the pool bar and
+               by the icon beside it — they must never disagree. The elemental
+               themes keep what they always had: the heart's own rose, and the
+               star on --accent, which is the secondary type (or the lighter
+               tint of the only type on a single-type Pokémon). The two License
+               themes name their own pair further down. */
+            --hp-color: #f43f5e;
+            --hp-glow: #f43f5e66;
+            --will-color: var(--accent);
+            --will-glow: var(--accent-glow);
         }
 
         * {
@@ -109,7 +120,12 @@
             padding: 40px;
             display: grid;
             grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
-            grid-template-rows: repeat(6, auto);
+            /* Row 6 is the flexible one on purpose. .side-details spans rows 5
+               and 6, and an all-auto map splits its extra height between them —
+               which strands half the slack above Skills as a gap under Base
+               Stats. A flexible last row takes all of it, so the two left-hand
+               panels stay stacked and the leftover falls below them. */
+            grid-template-rows: repeat(5, auto) 1fr;
             column-gap: 40px;
             row-gap: 24px;
             position: relative;
@@ -166,7 +182,10 @@
            that slack as blank space inside itself. Collapsing Skills is what
            made it obvious: the row shrank, side-details became the taller
            column, and both Base Stats and the collapsed Skills box grew empty
-           padding. Only in the two-column layout: below the breakpoint the
+           padding. This keeps them from stretching; the 1fr row above is what
+           keeps the slack they no longer absorb from landing between them
+           instead of under them. Only in the two-column layout: below the
+           breakpoint the
            columns are flex again, where align-self would size them by content
            width instead. */
         @media (min-width: 901px) {
@@ -727,37 +746,45 @@
             opacity: 0.8;
         }
 
-        /* Two equal halves with the 10px gap dead centre, so on a dual-type
-           Pokémon the space *between* the badges sits on the same vertical
-           line as the name, the category, the middle tool button and Evolve.
-           Centring the pair as one group (justify-content: center) does not:
-           the badges are different widths, so the gap drifts off-axis by half
-           that difference — 3.7px on Grass/Poison.
+        /* Page-theme switches on the left, typing on the right, and the rule
+           between them dead centre — on the same vertical line as the name,
+           the category, the middle tool button and Evolve.
 
-           The badges are grid items rather than children of #type-badges
-           because that span is display: contents; selectors still follow the
-           DOM, hence the descendant combinators below. */
+           1fr auto 1fr is what puts it there. Centring the whole row as one
+           group (justify-content: center) would not: the two sides are
+           different widths, so the divider would drift off-axis by half that
+           difference. Each 1fr is free to be wider than its content, which is
+           exactly what keeps the middle column pinned to the centre. */
         .types-row {
             display: grid;
-            grid-auto-flow: column;
-            grid-auto-columns: 1fr;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
             gap: 10px;
             margin-top: 10px;
         }
 
-        /* First badge ends at the gap, second starts after it */
-        .types-row .type-badge {
+        /* The two halves close in on the divider from either side */
+        .theme-switch-group {
             justify-self: end;
         }
 
-        .types-row .type-badge:last-child {
+        .type-badge-group {
             justify-self: start;
         }
 
-        /* A single type has no gap to centre, so centre the badge itself.
-           Must follow :last-child, which a lone badge also matches. */
-        .types-row .type-badge:only-child {
-            justify-self: center;
+        .theme-switch-group,
+        .type-badge-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Sized off the badges beside it rather than the full row height, so it
+           reads as a separator and not as a third column of content. */
+        .types-divider {
+            width: 1px;
+            height: 24px;
+            background: var(--border-color);
         }
 
         /* The row of round tool buttons under the types: type chart, ailments,
@@ -1093,16 +1120,28 @@
             align-items: center;
         }
 
+        /* Icon-only, the same round chip the theme and badge pickers use. The
+           type name moved to the title attribute — the icons are the pickers'
+           own, so the two read as one vocabulary. */
         .type-badge {
-            padding: 6px 16px;
-            border-radius: 30px;
-            font-size: 0.85rem;
+            width: 34px;
+            height: 34px;
+            padding: 0;
+            border-radius: 50%;
+            font-size: 0.95rem;
             font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
             display: flex;
             align-items: center;
-            gap: 6px;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        /* Inline glyphs are centred by their line box — built from the font's
+           ascent/descent — not by the icon itself, which leaves some sitting
+           visibly high. As a block with line-height 1 the box is the glyph. */
+        .type-badge i {
+            display: block;
+            line-height: 1;
         }
 
         .type-badge.ghost {
@@ -1140,17 +1179,14 @@
             box-shadow: 0 0 10px var(--ghost-color-glow);
         }
 
-        /* Page theme, in the card's top-left padding. Same body and hover as the
-           header tool buttons, at the smaller size the corner wants. */
-        .theme-corner-btn {
-            position: absolute;
-            top: 16px;
-            left: 16px;
-            /* Over .card-container::before, the corner glow it sits in */
-            z-index: 2;
-            width: 30px;
-            height: 30px;
+        /* Page theme, on the left of the types row. Same body and hover as the
+           header tool buttons, at the round size that matches the type chips
+           across the divider from it. */
+        .theme-switch-btn {
+            width: 34px;
+            height: 34px;
             padding: 0;
+            flex-shrink: 0;
             border-radius: 50%;
             background: #ffffff08;
             border: 1px solid #ffffff14;
@@ -1163,7 +1199,33 @@
             transition: all 0.3s ease;
         }
 
-        .theme-corner-btn:hover {
+        .theme-switch-btn:hover {
+            background: var(--ghost-color);
+            border-color: var(--ghost-color);
+            color: #fff;
+            box-shadow: 0 0 10px var(--ghost-color-glow);
+        }
+
+        /* Dual-type pages split the toggle into an explicit pair, which then
+           joins the type chips as one radio set: whichever of the four is
+           driving the page is the lit one. Dimmed exactly like .type-switch. */
+        .theme-switch-btn.pick:not(.theme-active) {
+            opacity: 0.55;
+            box-shadow: none;
+        }
+
+        .theme-switch-btn.pick:hover {
+            opacity: 1;
+        }
+
+        /* Dimming the others was not enough to say which theme is on. The
+           button's own body is #ffffff08 over a dark panel, so on the Dark
+           License 55% of it and 100% of it are the same grey — there was
+           nothing to compare. The lit one takes the filled body it already
+           shows on hover, which reads at a glance on both License pages and
+           gives the row exactly one member switched on, the way the type
+           chips do with their own colour. */
+        .theme-switch-btn.theme-active {
             background: var(--ghost-color);
             border-color: var(--ghost-color);
             color: #fff;
@@ -1325,11 +1387,18 @@
         .pool-bar {
             flex: 1;
             max-width: 110px;
-            /* Slightly shorter than the full track width */
-            height: 18px;
-            border-radius: 9px;
+            /* Slightly shorter than the full track width.
+
+               16px and no edge. It was 18px with a 1px border, which drew the
+               band of colour at 16px on the type themes and at 18 on the two
+               License ones, where the border is dropped — the same bar in two
+               heights depending on the theme. The border goes for good and the
+               height comes down to the band the type themes always showed, so
+               every theme draws the identical bar. Radius is half of it, so
+               the ends stay round. */
+            height: 16px;
+            border-radius: 8px;
             background: #00000066;
-            border: 1px solid #ffffff14;
             overflow: hidden;
             position: relative;
             display: flex;
@@ -1360,18 +1429,19 @@
             color: #fff;
             text-shadow: 0 1px 2px #000000cc;
             cursor: pointer;
-            /* Digits sat a pixel high in the bar. Two things stack up: their
-               ink is 0.17px above the line box's middle, because digits have
-               no descender while the box still reserves room for one, and the
-               baseline then lands at 11.75px — a fraction the browser rounds
-               down, worth another 0.75px. Together that is the pixel you can
-               see on a 1 or a 5, which have long flat tops to read it off.
+            /* No nudge, and trainer-license.html has none either — which is
+               what settled it: the digits read as centred there and low here.
+               There used to be a top: 1px, on the reading that the baseline
+               lands at 11.75px and the renderer rounds that down to 11. It
+               does not — it rounds to the nearest whole pixel, so 11.75 goes
+               to 12 and the digits were already where they belong. The extra
+               pixel pushed them past it.
 
-               Unlike the half-pixel the +/- glyphs were once "corrected" with
-               (see the note by .pool-btn, where the metrics said zero), this
-               one is a whole pixel and stays crisp — no transform, no
-               resampling of 11px text. */
-            top: 1px;
+               What is left is the 0.17px their ink sits above the middle of
+               the line box, digits having no descender while the box still
+               reserves room for one. A sixth of a pixel, and not correctable
+               in whole ones — see .quick-move-val, where the padding is split
+               to take out the same error. */
         }
 
         .pool-max-input {
@@ -1388,13 +1458,22 @@
         }
 
         .pool-bar-fill.health {
-            background: #f43f5e;
-            box-shadow: 0 0 8px #f43f5e66;
+            background: var(--hp-color);
+            box-shadow: 0 0 8px var(--hp-glow);
         }
 
         .pool-bar-fill.willpower {
-            background: var(--accent);
-            box-shadow: 0 0 8px var(--accent-glow);
+            background: var(--will-color);
+            box-shadow: 0 0 8px var(--will-glow);
+        }
+
+        /* Same two variables the bars use: the icon and its bar are one colour */
+        .pool-ink-hp {
+            color: var(--hp-color);
+        }
+
+        .pool-ink-will {
+            color: var(--will-color);
         }
 
         .exp-input {
@@ -1407,6 +1486,9 @@
             text-align: center;
             font-family: 'Fira Code', monospace;
             font-size: 0.9rem;
+            /* Same weight as .pool-static-val: the Def / Sp.Def numbers right
+               above it, so the column of values reads as one. */
+            font-weight: 600;
             outline: none;
             transition: border-color 0.2s;
         }
@@ -1431,6 +1513,13 @@
 
         .pool-text-input:focus {
             border-color: var(--accent);
+        }
+
+        /* Rank alone is bold, at the weight .pool-static-val gives Def / Sp.Def
+           and .exp-input gives EXP - it is a stat in that column, where Held
+           Item and Nature below it are plain fields. */
+        #rank-input {
+            font-weight: 600;
         }
 
         .pool-static-val {
@@ -1968,6 +2057,7 @@
 
         .skill-label {
             font-size: 0.9rem;
+            font-weight: 700;
             color: var(--text-primary);
         }
 
@@ -2691,6 +2781,13 @@
             max-width: none;
         }
 
+        /* Both are names of a thing, so they carry the same weight the skill
+           and specialty names do */
+        #held-item-input,
+        #nature-input {
+            font-weight: 700;
+        }
+
         .item-suggestions {
             left: auto;
             right: 0;
@@ -3381,16 +3478,30 @@
         .quick-move-val {
             font-family: 'Fira Code', monospace;
             font-size: 0.78rem;
+            font-weight: 700;
             color: var(--text-secondary);
             background: #00000033;
-            padding: 3px 10px;
+            /* 3.22 / 2.78, not 3 / 3, and the pair still sums to 6 so the pill
+               keeps its height. Symmetric padding centres the LINE BOX, not
+               the digits: Fira Code reserves 0.265em under the baseline for
+               descenders that figures do not have, while only 0.235em of its
+               0.935em ascent clears their flat tops. The ink therefore sits
+               half that difference above the middle — 0.015em, 0.216px at the
+               0.9rem the number is set in. Splitting the padding by exactly
+               that puts it back. Same metrics as the note on .pool-bar-value,
+               which is where they were measured. */
+            padding: 3.22px 10px 2.78px;
             border-radius: 8px;
             border: 1px solid #ffffff0d;
             white-space: nowrap;
         }
 
+        /* Body text, like the move names beside them. --accent is the theme
+           hue, and a pool total painted in it read as if the number meant
+           something; Pain is the one that does, and it says so from its own
+           rules below, which are more specific and later than this. */
         .quick-move-val strong {
-            color: var(--accent);
+            color: var(--text-primary);
             font-size: 0.9rem;
         }
 
@@ -4121,6 +4232,49 @@
             --phys-color: #b45309;
             --spec-color: #1d4ed8;
             --supp-color: #047857;
+
+            /* HP on the very crimson the trainer sheet's HP / WILL / EXP banners
+               carry, Will on its own blue. Plain :root.light-theme, not
+               :where(): a zero-specificity selector would lose the variables
+               back to :root.
+
+               Opaque, not the banners' #c0272be6: the bar sits on a dark track,
+               so that translucent fill composited a shade darker than the
+               banners. This is roughly where the 90% crimson resolves over a
+               pale panel, and being opaque it holds wherever it lands — bar,
+               icon, or a filled stat circle. */
+            --hp-color: #c33e41;
+            --hp-glow: var(--ghost-color-glow);
+            --will-color: #3e6cf8;
+            --will-glow: #3e6cf866;
+        }
+
+        /* Every filled circle — base stats, socials, the loyalty/happiness
+           trackers, skills and specialties — takes the same crimson as the HP
+           bar. The theme's own --ghost-color and --trained-color sit a shade
+           apart, which on a pale panel reads as two arbitrary reds rather than
+           as base-vs-trained, so the light page collapses them to one. */
+        :where(:root.light-theme) .dot.filled,
+        :where(:root.light-theme) .dot.trained {
+            background-color: #c33e41;
+            border-color: #c33e41;
+            box-shadow: 0 0 8px #c33e414a;
+        }
+
+        /* Split off only to keep the skill circles' tighter 6px halo */
+        :where(:root.light-theme) .skill-dot.filled {
+            background-color: #c33e41;
+            border-color: #c33e41;
+            box-shadow: 0 0 6px #c33e414a;
+        }
+
+        /* Hand-picked pair for the Dark License, whose own crimson sits too dark
+           behind a pool bar */
+        :root.dark-license {
+            --hp-color: #ff4a4e;
+            --hp-glow: #ff4a4e66;
+            --will-color: #3c6cf8;
+            --will-glow: #3c6cf866;
         }
 
         :where(:root.light-theme) ::-webkit-scrollbar-track,
@@ -4138,7 +4292,6 @@
         :where(:root.light-theme) .type-eff-btn,
         :where(:root.light-theme) .type-eff-row + .type-eff-row,
         :where(:root.light-theme) .pool-btn,
-        :where(:root.light-theme) .pool-bar,
         :where(:root.light-theme) .pool-static-val,
         :where(:root.light-theme) .exp-input,
         :where(:root.light-theme) .pool-text-input,
@@ -4258,8 +4411,12 @@
             background: #00000012;
         }
 
+        /* Darker than the other light-theme wells, and it has to be: the value
+           is centred, so on a low pool the white digits sit on this track and
+           not on the fill. #69 is the lightest alpha that still clears 3:1 for
+           them (the empty track lands on ~#959595). */
         :where(:root.light-theme) .pool-bar {
-            background: #0000001f;
+            background: #00000069;
         }
 
         /* Sits over the bar it replaces, so it needs a solid light body */
@@ -4354,24 +4511,21 @@
             color: #db2777;
         }
 
-        /* HP / Will bars are too vivid on a pale page: mute the fills, drop the
-           saturated glow, and darken the number so it holds over the empty part */
-        :where(:root.light-theme) .pool-bar-fill.health {
-            background: #e07a84;
-            box-shadow: none;
-        }
-
+        /* The fills are themed by --hp-color / --will-color; all the light page
+           changes is the glow, which smears on a pale panel instead of reading
+           as a halo. */
+        :where(:root.light-theme) .pool-bar-fill.health,
         :where(:root.light-theme) .pool-bar-fill.willpower {
-            background: #e0968f;
             box-shadow: none;
         }
 
-        /* No halo: the muted fills below are pale enough for the dark ink to
-           carry on its own (5.5:1 on the health bar), and a white shadow under
-           it only softened the digits. */
+        /* Same near-white as the text on those section bars. It has to survive
+           both grounds: the digits are centred, so on a low pool they sit on
+           the bar's own pale empty track, not on the fill — hence the shadow,
+           which is what carries them there. */
         :where(:root.light-theme) .pool-bar-value {
-            color: #2a2020;
-            text-shadow: none;
+            color: #fff5f5;
+            text-shadow: 0 1px 2px #000000b3, 0 0 3px #00000080;
         }
 
         /* ---- Buttons drawn for a dark page ----
@@ -4480,10 +4634,12 @@
            form prints its HP / WILL headers. Dark-page equivalents already
            carry the theme in their glows, so all of this is light-only. */
 
-        /* Section headings become solid bars. --ghost-color rather than a
-           literal so the bar tracks the theme if the crimson is ever retuned. */
+        /* Section headings become solid bars, in the crimson the trainer sheet
+           paints its own banners with (.section-bar, .hwe-label) — the same hue
+           at 90%, which reads a touch softer than the flat --ghost-color this
+           used to carry. Kept as a literal so the two sheets stay in step. */
         :where(:root.light-theme) .stats-title {
-            background: var(--ghost-color);
+            background: #c0272be6;
             color: #fff5f5;
             border-bottom-color: transparent;
             border-radius: 10px;
@@ -4525,6 +4681,18 @@
             border-bottom-color: var(--accent-border);
         }
 
+        /* On the dark page .cat-icon.active goes to --text-primary, which is
+           a brightening: grey glyph to white, plus the glow. Here the row is
+           already printed in the theme red and --text-primary is near-black,
+           so switching a category on drained the colour out of its icon and
+           the glow was left ringing a black glyph. The glow alone says it is
+           on; the icon keeps the colour it inherits from the row. Hover too,
+           or hovering an active one turned it black again. */
+        :where(:root.light-theme) .cat-icon:hover,
+        :where(:root.light-theme) .cat-icon.active {
+            color: inherit;
+        }
+
         /* Red rules where the panels divide themselves */
         :where(:root.light-theme) .specialties-section,
         :where(:root.light-theme) .evolution-panel {
@@ -4551,13 +4719,17 @@
 
         /* Tracker row icons are inline pastels picked for a dark page — Def and
            Sp.Def land under 2:1 on a pale row. Darkened through a filter, which
-           is not set inline, so it reaches them without !important. */
-        :where(:root.light-theme) .tracker-label i {
+           is not set inline, so it reaches them without !important.
+
+           The HP and Will icons are exempt: they already carry --hp-color /
+           --will-color, which are picked for this page, and the filter was
+           pulling each one off the bar it is supposed to match. */
+        :where(:root.light-theme) .tracker-label i:not(.pool-ink-hp):not(.pool-ink-will) {
             filter: brightness(0.62) saturate(1.3);
         }
 
-        /* The corner sun keeps the same body as the tool buttons below it */
-        :where(:root.light-theme) .theme-corner-btn {
+        /* The light/dark switch keeps the same body as the tool buttons below it */
+        :where(:root.light-theme) .theme-switch-btn {
             background: #0000000d;
             border-color: #00000024;
         }
@@ -4608,15 +4780,6 @@
 
     <main class="card-container" id="pokerole-card">
 
-        <!-- Light / dark switch, in the card's own top-left padding rather than
-             the header tool row below, which was already five buttons wide.
-             The glyph says which page you are on: a sun under the Light
-             License, a moon under the dark one and under every type theme. -->
-        <button class="theme-corner-btn" id="theme-corner-btn" onclick="toggleLightDark()"
-            title="Switch to the light theme">
-            <i class="fa-solid fa-moon"></i>
-        </button>
-
         <!-- LEFT COLUMN: core info, sprite, pools, stats, skills -->
         <section class="left-column">
 
@@ -4639,10 +4802,14 @@
                     <span class="pokemon-category" id="pokemon-category"></span>
                     <span class="pokemon-number" id="pokedex-number"></span>
                 </div>
-                <!-- Types only. The tool buttons used to share this row; they have
-                     their own below so the typing reads as one line by itself. -->
+                <!-- The page-theme controls and the typing, split by a rule on the
+                     card's centre line. Both halves are filled by
+                     renderStaticInfo(), which knows whether this is a single- or
+                     dual-type Pokémon; see themeSwitchHtml(). -->
                 <div class="types-row">
-                    <span id="type-badges" style="display: contents;"></span>
+                    <span class="theme-switch-group" id="theme-switches"></span>
+                    <span class="types-divider" aria-hidden="true"></span>
+                    <span class="type-badge-group" id="type-badges"></span>
                 </div>
                 <!-- Header tools, all the same pill. "Load another Pokémon" keeps
                      id="load-picker" because trainer mode hides it by that id. -->
@@ -4751,12 +4918,12 @@
             <!-- Pools: Health, Willpower, Def, Sp.Def, EXP, Status -->
             <div class="tracker-panel pools">
                 <div class="tracker-row">
-                    <span class="tracker-label"><i class="fa-solid fa-heart-pulse" style="color: #f43f5e;"></i>
+                    <span class="tracker-label"><i class="fa-solid fa-heart-pulse pool-ink-hp"></i>
                         Health</span>
                     <div class="pool-track" id="hp-tracker"></div>
                 </div>
                 <div class="tracker-row">
-                    <span class="tracker-label"><i class="fa-solid fa-star" style="color: var(--accent);"></i>
+                    <span class="tracker-label"><i class="fa-solid fa-star pool-ink-will"></i>
                         Willpower</span>
                     <div class="pool-track" id="will-tracker"></div>
                 </div>
@@ -7161,11 +7328,8 @@
                that the quick-move boxes' #ffffff0a hairline disappears; the
                Pain box's edge is drawn differently there. See .pain-quick.on */
             document.documentElement.classList.toggle('dark-license', !!custom && !light);
-            const corner = document.getElementById('theme-corner-btn');
-            if (corner) {
-                corner.querySelector('i').className = 'fa-solid ' + (light ? 'fa-sun' : 'fa-moon');
-                corner.title = light ? 'Switch to the dark theme' : 'Switch to the light theme';
-            }
+            /* The switch itself is rebuilt by renderStaticInfo(), which always
+               runs after this — at load and in repaintTheme() alike. */
         }
 
         function typeBadgeHtml(type) {
@@ -7182,11 +7346,42 @@
             const click = switchable
                 ? ` onclick="setThemeType('${type}')" title="Use ${type} as the page theme"` : '';
             const glow = isLightTheme() ? 'none' : `0 0 10px ${c}26`;
-            return `<span class="${classes}"${click} style="background: ${c}33;
+            /* The chip is icon-only now, so the name has to be in the tooltip:
+               a switchable one already says it, a fixed one gets it alone. */
+            const title = switchable ? '' : ` title="${type}"`;
+            return `<span class="${classes}"${click}${title} style="background: ${c}33;
                         border: 1px solid ${typeInk(c)};
                         color: ${typeInk(c, mixHex(c, '#ffffff', 0.55))}; box-shadow: ${glow};">
-                        <i class="fa-solid ${icon}"></i> ${type}
+                        <i class="fa-solid ${icon}"></i>
                     </span>`;
+        }
+
+        /* The light/dark controls that sit across the divider from the typing.
+           A single-type Pokémon gets one toggle — the glyph says which page you
+           are on, a sun under the Light License and a moon everywhere else. A
+           dual-type one gets the two as separate buttons, so that they and its
+           two type chips form one set with exactly one member lit: whichever
+           theme is actually driving the page. On a type theme that is a chip,
+           and neither of these. */
+        function themeSwitchHtml() {
+            const btn = (theme, icon, label, extra) =>
+                `<button class="theme-switch-btn${extra}" onclick="setPageTheme('${theme}')"
+                     title="${label}"><i class="fa-solid ${icon}"></i></button>`;
+
+            if (!pokemonData.pokemon.Type2) {
+                const light = isLightTheme();
+                /* Lit only while a License theme is the one driving the page.
+                   On the type theme the glyph still says which page you are
+                   looking at, but the chip across the divider is what is on,
+                   so this dims with the rest of the set. */
+                const extra = sheetState.pageTheme ? ' pick theme-active' : ' pick';
+                return btn(light ? 'License' : 'LicenseLight',
+                    light ? 'fa-sun' : 'fa-moon',
+                    light ? 'Switch to the dark theme' : 'Switch to the light theme', extra);
+            }
+            const on = t => sheetState.pageTheme === t ? ' pick theme-active' : ' pick';
+            return btn('LicenseLight', 'fa-sun', 'Light theme', on('LicenseLight'))
+                 + btn('License', 'fa-moon', 'Dark theme', on('License'));
         }
 
         /* Everything painted in a raw type color is set inline, out of reach of
@@ -7207,13 +7402,11 @@
             repaintTheme();
         }
 
-        /* The corner button is a plain light/dark switch between the two
-           License themes — dark on the first press from a type theme, since
-           that is the page you are already on. Nothing here reaches the type
-           palette: a type badge in the header does that, and it stays
+        /* Picks one of the two License themes. Nothing here reaches the type
+           palette: a type chip across the divider does that, and it stays
            clickable while a License theme is up precisely so it can. */
-        function toggleLightDark() {
-            sheetState.pageTheme = isLightTheme() ? 'License' : 'LicenseLight';
+        function setPageTheme(theme) {
+            sheetState.pageTheme = theme;
             saveState();
             repaintTheme();
         }
@@ -7395,6 +7588,7 @@
             document.querySelector('.pokemon-subline').style.display = isEgg() ? 'none' : '';
             fitPokemonName();   // after the number, whose width the fit has to allow for
             renderGender();
+            document.getElementById('theme-switches').innerHTML = themeSwitchHtml();
             document.getElementById('type-badges').innerHTML =
                 [p.Type1, p.Type2].filter(Boolean).map(typeBadgeHtml).join('');
 
