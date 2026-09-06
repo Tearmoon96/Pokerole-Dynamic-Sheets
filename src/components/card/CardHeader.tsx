@@ -87,10 +87,9 @@ export function CardHeader({ wildMode, tools, evolveControls, wildActions }: {
                     className="nickname-input"
                     maxLength={20}
                     placeholder="Give it a nickname…"
-                    defaultValue={sheet.nickname}
-                    key={'nick-' + sheet.nickname}
+                    value={sheet.nickname || ''}
                     onChange={(e) => {
-                        const nickname = e.currentTarget.value.trim();
+                        const nickname = e.currentTarget.value;
                         store.update((s) => { s.nickname = nickname; });
                     }}
                 />

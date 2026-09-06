@@ -22,12 +22,10 @@ export function PoolsRow() {
                         inputMode="numeric"
                         id="exp-input"
                         className="hwe-exp-input"
-                        defaultValue={sheet.exp}
-                        key={'exp-' + sheet.id + '-' + sheet.exp}
+                        value={sheet.exp}
                         onChange={(e) => {
                             const parsed = parseInt(e.currentTarget.value, 10);
                             const exp = (isNaN(parsed) || parsed < 0) ? 0 : parsed;
-                            e.currentTarget.value = String(exp);
                             store.update((s) => { s.exp = exp; });
                         }}
                     />
@@ -46,8 +44,7 @@ export function AgeMoneyRow() {
                 <input
                     type="text"
                     id="age-input"
-                    defaultValue={sheet.age}
-                    key={'age-' + sheet.id + '-' + sheet.age}
+                    value={sheet.age}
                     onChange={(e) => {
                         const age = e.currentTarget.value;
                         store.update((s) => { s.age = age; });
@@ -60,12 +57,10 @@ export function AgeMoneyRow() {
                     type="text"
                     inputMode="numeric"
                     id="money-input"
-                    defaultValue={sheet.money}
-                    key={'money-' + sheet.id + '-' + sheet.money}
+                    value={sheet.money}
                     onChange={(e) => {
                         const parsed = parseInt(String(e.currentTarget.value).replace(/[^0-9-]/g, ''), 10);
                         const money = (isNaN(parsed) || parsed < 0) ? 0 : parsed;
-                        e.currentTarget.value = String(money);
                         store.update((s) => { s.money = money; });
                     }}
                 />

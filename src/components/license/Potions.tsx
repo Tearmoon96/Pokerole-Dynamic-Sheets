@@ -28,12 +28,10 @@ export function PotionTallies() {
                             inputMode="numeric"
                             className="tally-qty-input"
                             title={'How many ' + pt.label + ' are in the bag'}
-                            defaultValue={sheet.potionQty[pt.key] || 0}
-                            key={'qty-' + pt.key + '-' + (sheet.potionQty[pt.key] || 0)}
+                            value={sheet.potionQty[pt.key] || 0}
                             onChange={(e) => {
                                 const n = parseInt(e.currentTarget.value, 10);
                                 const clean = (isNaN(n) || n < 0) ? 0 : n;
-                                e.currentTarget.value = String(clean);
                                 store.update((s) => {
                                     s.potionQty = { ...s.potionQty, [pt.key]: clean };
                                 });

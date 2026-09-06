@@ -117,8 +117,7 @@ export function PoolsPanel() {
                     type="text"
                     id="rank-input"
                     className="pool-text-input"
-                    defaultValue={sheet.rank}
-                    key={'rank-' + sheet.rank}
+                    value={sheet.rank}
                     onChange={(e) => {
                         const rank = e.currentTarget.value;
                         store.update((s) => { s.rank = rank; });
@@ -135,12 +134,10 @@ export function PoolsPanel() {
                     inputMode="numeric"
                     id="exp-input"
                     className="exp-input"
-                    defaultValue={sheet.exp}
-                    key={'exp-' + sheet.exp}
+                    value={sheet.exp}
                     onChange={(e) => {
                         const parsed = parseInt(e.currentTarget.value, 10);
                         const exp = (isNaN(parsed) || parsed < 0) ? 0 : parsed;
-                        e.currentTarget.value = String(exp);
                         store.update((s) => { s.exp = exp; });
                     }}
                 />

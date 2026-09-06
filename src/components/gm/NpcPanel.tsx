@@ -234,9 +234,8 @@ function NpcRow({ npc, natures, nature, onNote, onNature, onRoll, onRemove }: {
                 {region && <span className="npc-region">{region}</span>}
                 <input
                     type="text"
-                    defaultValue={npc.note}
+                    value={npc.note}
                     placeholder="role, town, voice…"
-                    key={'note-' + npc.gid + '-' + npc.note}
                     onChange={(e) => onNote(e.currentTarget.value)}
                 />
                 <button className="icon-btn danger" title="Forget" onClick={onRemove}>

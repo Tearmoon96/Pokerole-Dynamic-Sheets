@@ -56,8 +56,7 @@ export function NatureRank() {
                 <input
                     type="text"
                     id="rank-input"
-                    defaultValue={sheet.rank}
-                    key={'rank-' + sheet.id + '-' + sheet.rank}
+                    value={sheet.rank}
                     onChange={(e) => {
                         const rank = e.currentTarget.value;
                         store.update((s) => { s.rank = rank; });

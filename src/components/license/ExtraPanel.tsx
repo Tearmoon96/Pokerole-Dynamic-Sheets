@@ -17,10 +17,21 @@ export function ExtraPanel() {
                             type="text"
                             className="extra-name-input"
                             placeholder="name..."
-                            defaultValue={extra.name}
-                            key={'name-' + idx + '-' + extra.name}
+                            value={extra.name}
                             onChange={(e) => {
+                                const name = e.currentTarget.value;
+                                store.update((s) => {
+                                    s.extras = s.extras.map((x, j) => j === idx ? { ...x, name } : x);
+                                });
+                            }}
+                            /* Trimmed when you leave the field, not as you type:
+                               the GM screen matches these names, so trailing
+                               space matters — but stripping it on every
+                               keystroke would eat the space in "Fire Blast"
+                               before the second word could be started. */
+                            onBlur={(e) => {
                                 const name = e.currentTarget.value.trim();
+                                if (name === extra.name) return;
                                 store.update((s) => {
                                     s.extras = s.extras.map((x, j) => j === idx ? { ...x, name } : x);
                                 });

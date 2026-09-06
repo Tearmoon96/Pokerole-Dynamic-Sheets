@@ -13,7 +13,6 @@ import type { WorkingTrainer } from '../../state/workingSet';
 export function SessionDialogs() {
     const s = useSession();
     const store = useStore();
-    const toast = useToast();
 
     return (
         <>
@@ -181,104 +180,6 @@ export function SessionDialogs() {
         </>
     );
 
-    function NewTrainerModal() {
-        const [name, setName] = useState('trainer-new.json');
-        const ref = useRef<HTMLInputElement>(null);
-        const open = s.dialogs.newTrainerName != null;
-
-        useEffect(() => {
-            if (!open) return;
-            setName(s.dialogs.newTrainerName || 'trainer-new.json');
-            const id = window.setTimeout(() => { ref.current?.focus(); ref.current?.select(); }, 0);
-            return () => clearTimeout(id);
-            // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, [open]);
-
-        return (
-            <Modal
-                open={open}
-                onClose={() => s.setDialogs({ ...s.dialogs, newTrainerName: null })}
-                id="new-trainer-save-modal"
-            >
-                <ModalTitle icon="fa-file-circle-plus" centered={false}>Save new trainer</ModalTitle>
-                <p className="modal-text">
-                    A new trainer needs its own <strong>.json</strong> file before it can auto-save.
-                    Name the file, then it's saved into your working folder:
-                </p>
-                <input
-                    ref={ref}
-                    type="text"
-                    id="new-trainer-filename"
-                    className="specialty-input"
-                    style={{ width: '100%' }}
-                    placeholder="trainer-name.json"
-                    value={name}
-                    onChange={(e) => setName(e.currentTarget.value)}
-                />
-                <div className="modal-actions">
-                    <button className="form-btn cancel" onClick={() => s.setDialogs({ ...s.dialogs, newTrainerName: null })}>
-                        Cancel
-                    </button>
-                    <button
-                        className="form-btn save"
-                        onClick={async () => {
-                            const entry = await createTrainerFile(name, toast);
-                            if (!entry) return;
-                            store.addTrainer(entry);
-                            s.setDialogs({ ...s.dialogs, newTrainerName: null });
-                        }}
-                    >
-                        Create file
-                    </button>
-                </div>
-            </Modal>
-        );
-    }
-
-    function LandingModal() {
-        const n = s.pendingRestore?.trainers.length || 0;
-        return (
-            <Modal open={s.landingOpen} onClose={s.closeLanding} id="license-landing-modal">
-                <ModalClose onClick={s.closeLanding} />
-                <ModalTitle icon="fa-id-card" centered={false}>Trainer's License</ModalTitle>
-                <p className="modal-text">
-                    Your trainers live in a working folder of <strong>.json</strong> files
-                    called <strong>Trainers</strong>. Open that folder to load them — your edits are kept
-                    there whenever you <strong>Save All</strong>.
-                </p>
-                <div className="modal-actions" style={{ flexDirection: 'column', gap: '10px' }}>
-                    <button
-                        className="form-btn save"
-                        style={{ width: '100%' }}
-                        onClick={() => { s.closeLanding(); s.openWorkingFolder(); }}
-                    >
-                        <i className="fa-solid fa-folder-open"></i> Open working folder
-                    </button>
-                    {n > 0 && (
-                        <button
-                            className="form-btn cancel"
-                            id="landing-restore-btn"
-                            style={{ width: '100%', flexDirection: 'column', gap: '2px' }}
-                            onClick={() => s.restoreLastSession()}
-                        >
-                            <span><i className="fa-solid fa-clock-rotate-left"></i> Restore last session</span>
-                            {' '}
-                            <span id="landing-restore-sub" style={{ fontSize: '0.7rem', opacity: 0.7 }}>
-                                {n} trainer{n === 1 ? '' : 's'} from your last session
-                            </span>
-                        </button>
-                    )}
-                    <button
-                        className="form-btn cancel"
-                        style={{ width: '100%' }}
-                        onClick={() => { s.closeLanding(); s.newTrainer(); }}
-                    >
-                        <i className="fa-solid fa-file-circle-plus"></i> Start a new trainer
-                    </button>
-                </div>
-            </Modal>
-        );
-    }
 }
 
 function noTrainersDetail(diag: { json: number; marked: number; skipped: string[] } | null): string {
@@ -288,4 +189,117 @@ function noTrainersDetail(diag: { json: number; marked: number; skipped: string[
         + (diag.json && !diag.marked ? ', but none were trainer files' : '')
         + (diag.skipped && diag.skipped.length
             ? ' (couldn\u2019t read: ' + diag.skipped.join('; ') + ')' : '') + '.';
+}
+
+/* These two live at module scope, not inside SessionDialogs, and that is
+   load-bearing rather than stylistic.
+
+   A component declared inside another is a NEW function identity on every
+   render of the parent, so React treats it as a different component type,
+   unmounts the old tree and mounts a fresh one. For NewTrainerModal that meant
+   the filename box lost focus — and its useState went back to
+   "trainer-new.json" — any time anything else on the sheet caused a re-render
+   while someone was still typing the name. */
+
+function NewTrainerModal() {
+    const s = useSession();
+    const store = useStore();
+    const toast = useToast();
+    const [name, setName] = useState('trainer-new.json');
+    const ref = useRef<HTMLInputElement>(null);
+    const open = s.dialogs.newTrainerName != null;
+
+    useEffect(() => {
+        if (!open) return;
+        setName(s.dialogs.newTrainerName || 'trainer-new.json');
+        const id = window.setTimeout(() => { ref.current?.focus(); ref.current?.select(); }, 0);
+        return () => clearTimeout(id);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
+
+    return (
+        <Modal
+            open={open}
+            onClose={() => s.setDialogs({ ...s.dialogs, newTrainerName: null })}
+            id="new-trainer-save-modal"
+        >
+            <ModalTitle icon="fa-file-circle-plus" centered={false}>Save new trainer</ModalTitle>
+            <p className="modal-text">
+                A new trainer needs its own <strong>.json</strong> file before it can auto-save.
+                Name the file, then it's saved into your working folder:
+            </p>
+            <input
+                ref={ref}
+                type="text"
+                id="new-trainer-filename"
+                className="specialty-input"
+                style={{ width: '100%' }}
+                placeholder="trainer-name.json"
+                value={name}
+                onChange={(e) => setName(e.currentTarget.value)}
+            />
+            <div className="modal-actions">
+                <button className="form-btn cancel" onClick={() => s.setDialogs({ ...s.dialogs, newTrainerName: null })}>
+                    Cancel
+                </button>
+                <button
+                    className="form-btn save"
+                    onClick={async () => {
+                        const entry = await createTrainerFile(name, toast);
+                        if (!entry) return;
+                        store.addTrainer(entry);
+                        s.setDialogs({ ...s.dialogs, newTrainerName: null });
+                    }}
+                >
+                    Create file
+                </button>
+            </div>
+        </Modal>
+    );
+}
+
+function LandingModal() {
+    const s = useSession();
+    const n = s.pendingRestore?.trainers.length || 0;
+    return (
+        <Modal open={s.landingOpen} onClose={s.closeLanding} id="license-landing-modal">
+            <ModalClose onClick={s.closeLanding} />
+            <ModalTitle icon="fa-id-card" centered={false}>Trainer's License</ModalTitle>
+            <p className="modal-text">
+                Your trainers live in a working folder of <strong>.json</strong> files
+                called <strong>Trainers</strong>. Open that folder to load them — your edits are kept
+                there whenever you <strong>Save All</strong>.
+            </p>
+            <div className="modal-actions" style={{ flexDirection: 'column', gap: '10px' }}>
+                <button
+                    className="form-btn save"
+                    style={{ width: '100%' }}
+                    onClick={() => { s.closeLanding(); s.openWorkingFolder(); }}
+                >
+                    <i className="fa-solid fa-folder-open"></i> Open working folder
+                </button>
+                {n > 0 && (
+                    <button
+                        className="form-btn cancel"
+                        id="landing-restore-btn"
+                        style={{ width: '100%', flexDirection: 'column', gap: '2px' }}
+                        onClick={() => s.restoreLastSession()}
+                    >
+                        <span><i className="fa-solid fa-clock-rotate-left"></i> Restore last session</span>
+                        {' '}
+                        <span id="landing-restore-sub" style={{ fontSize: '0.7rem', opacity: 0.7 }}>
+                            {n} trainer{n === 1 ? '' : 's'} from your last session
+                        </span>
+                    </button>
+                )}
+                <button
+                    className="form-btn cancel"
+                    style={{ width: '100%' }}
+                    onClick={() => { s.closeLanding(); s.newTrainer(); }}
+                >
+                    <i className="fa-solid fa-file-circle-plus"></i> Start a new trainer
+                </button>
+            </div>
+        </Modal>
+    );
 }

@@ -12,8 +12,7 @@ export function Achievements() {
                         <input
                             type="text"
                             className={'achievement-input' + (ach.done ? ' done' : '')}
-                            defaultValue={ach.text}
-                            key={'input-' + i + '-' + ach.text}
+                            value={ach.text}
                             onChange={(e) => {
                                 const text = e.currentTarget.value;
                                 store.update((s) => {
