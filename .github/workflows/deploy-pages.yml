@@ -1,0 +1,49 @@
+# Publishes "PDS React Deploy/" to GitHub Pages.
+#
+# This branch carries only the finished site — no sources, no toolchain — so
+# there is nothing to build here. The folder is produced locally by
+# `npm run deploy`, which assembles it from an allowlist and refuses to write one
+# containing rulebook PDFs, trainer sheets or personal images. Commit the folder,
+# push, and this uploads it verbatim.
+#
+# `main` is the offline tool and is never deployed.
+#
+# The folder's CONTENTS become the site root, so pages land at
+# /Pokerole-Dynamic-Sheets/trainer-license.html rather than under the folder name.
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [gh-pages]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time. `cancel-in-progress: false` because a half-finished
+# upload of a 250 MB artifact is worse than waiting for the one in flight.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          # Quoted: the path contains spaces.
+          path: "PDS React Deploy"
+
+      - id: deployment
+        uses: actions/deploy-pages@v5

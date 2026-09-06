@@ -1,0 +1,21 @@
+Pokerole Core Book — adding the rulebook PDFs
+
+The rulebook PDFs are NOT included in this repository. To use the in-app
+bookmark buttons, download the official Pokerole core book(s) and drop the PDF(s) into THIS folder.
+
+Naming scheme (must match exactly):
+
+    Pokerole Core Book <version>.pdf
+
+The app ships with ready-made bookmarks for two editions, so use these exact
+names to get them:
+
+    Pokerole Core Book 1.25.pdf
+    Pokerole Core Book 3.0.pdf
+
+Any other edition works too — name it "Pokerole Core Book <version>.pdf"
+(for example "Pokerole Core Book 2.0.pdf") and add it from the app's Core Book
+menu. The app then saves that edition's bookmarks beside the PDF as
+"Pokerole Core Book <version>.json".
+
+Custom bookmars are always saved into the trainer's .json file.
