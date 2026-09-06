@@ -1,0 +1,72 @@
+/* ---------------- Confirm dialog ----------------
+   Replaces window.confirm, which draws the browser's own chrome in the
+   middle of a themed page. Same materials as the move tooltip: strong
+   panel, one crimson hairline, a deep drop shadow. */
+.gm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: #000000a6;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+
+.gm-overlay.open { display: flex; }
+
+.gm-dialog {
+    width: min(26rem, 90vw);
+    background: var(--panel-strong);
+    border: 1px solid var(--ghost-color);
+    border-radius: 12px;
+    box-shadow: 0 8px 28px #000c;
+    padding: 0.9rem 1rem;
+}
+
+.gm-dialog-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 800;
+    font-size: 0.95rem;
+    margin-bottom: 0.4rem;
+}
+
+.gm-dialog-title i { color: var(--ghost-color); }
+.gm-dialog.danger { border-color: var(--danger); }
+.gm-dialog.danger .gm-dialog-title i { color: var(--danger); }
+
+.gm-dialog-text {
+    font-size: 0.83rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    white-space: pre-line;
+}
+
+.gm-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    margin-top: 0.9rem;
+}
+
+.gm-dialog-actions button { padding: 0.35rem 0.9rem; font-size: 0.82rem; }
+
+.gm-dialog-actions .go {
+    border-color: var(--ghost-color);
+    background: var(--primary-soft);
+    font-weight: 600;
+}
+
+.gm-dialog-actions .go:hover { box-shadow: 0 0 10px var(--ghost-color-glow); }
+
+.gm-dialog.danger .gm-dialog-actions .go {
+    border-color: var(--danger);
+    background: #ef444426;
+    color: #fecaca;
+}
+
+.gm-dialog.danger .gm-dialog-actions .go:hover { box-shadow: 0 0 10px #ef444466; }
+

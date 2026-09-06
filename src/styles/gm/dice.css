@@ -1,0 +1,175 @@
+/* ---------------- Dice roller ---------------- */
+.dice-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+
+.dice-chip {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.75rem;
+}
+
+.dice-chip.selected {
+    background: var(--primary-soft);
+    border-color: var(--ghost-color);
+    color: var(--text-primary);
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+.dice-config {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dice-config label {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+}
+
+.stepper { display: flex; align-items: center; gap: 0.25rem; }
+
+.stepper input { width: 3.2rem; text-align: center; }
+
+#roll-btn {
+    font-size: 0.95rem;
+    font-weight: 800;
+    padding: 0.55rem;
+    border-color: var(--accent-border);
+    background: var(--accent-faint);
+    color: var(--accent);
+    font-family: 'Fira Code', monospace;
+}
+
+#roll-btn:hover { border-color: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
+
+.roll-result {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--primary-faint);
+    padding: 0.5rem 0.6rem;
+}
+
+.roll-result .roll-label {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    display: flex;
+    justify-content: space-between;
+}
+
+.die-faces { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.35rem 0; }
+
+.die-face {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+    min-width: 1.8rem;
+    text-align: center;
+    padding: 0.2rem 0.25rem;
+    border-radius: 7px;
+    border: 1px solid var(--border-color);
+    background: var(--panel-solid);
+}
+
+.die-face.success { border-color: var(--ok); color: var(--ok); }
+/* Gold, not the theme's accent: on this palette the accent is a salmon
+   red and a top face would read the same as a rolled 1 */
+.die-face.max { border-color: var(--crit); color: var(--crit); box-shadow: 0 0 6px var(--crit-glow); }
+.die-face.one { border-color: var(--danger); color: #fca5a5; }
+
+/* A success cancelled by the pain penalty: still shown, because the
+   roll happened, but struck through and dimmed so the arithmetic on
+   the successes line can be followed die by die. */
+.die-face.struck {
+    text-decoration: line-through;
+    text-decoration-thickness: 2px;
+    text-decoration-color: var(--danger);
+    opacity: 0.45;
+    border-style: dashed;
+}
+
+.roll-totals {
+    display: flex;
+    gap: 0.8rem;
+    font-size: 0.8rem;
+}
+
+.roll-totals strong { font-family: 'Fira Code', monospace; }
+
+.roll-totals .succ { color: var(--ok); }
+.roll-totals .need { color: var(--crit); }
+
+.roll-totals .pain-sub {
+    color: #fca5a5;
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+/* Who rolled what, under the pool size */
+.roll-ctx {
+    font-size: 0.7rem;
+    color: var(--text-primary);
+    font-weight: 600;
+    margin-top: 0.1rem;
+}
+
+.roll-verdict {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    margin-top: 0.4rem;
+    padding: 0.25rem 0.45rem;
+    border-radius: 7px;
+    border: 1px solid;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.roll-verdict .sub {
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.68rem;
+    opacity: 0.85;
+}
+
+.roll-verdict.win    { border-color: var(--ok);     color: var(--ok);     background: #3aa5931a; }
+.roll-verdict.lose   { border-color: var(--border-color); color: var(--text-secondary); }
+.roll-verdict.crit   { border-color: var(--crit);   color: var(--crit);   background: #f0b4291a;
+                       box-shadow: 0 0 9px var(--crit-glow); }
+.roll-verdict.fumble { border-color: var(--danger); color: #fca5a5;       background: #ef44441a; }
+
+.roll-followup {
+    margin-top: 0.4rem;
+    width: 100%;
+    justify-content: center;
+}
+
+.h-verdict {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.h-verdict.win { color: var(--ok); }
+.h-verdict.lose { color: var(--text-secondary); }
+.h-verdict.crit { color: var(--crit); }
+.h-verdict.fumble { color: #fca5a5; }
+
+.roll-history-entry {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    padding: 0.2rem 0.1rem;
+    border-bottom: 1px solid var(--border-glow);
+    display: flex;
+    gap: 0.5rem;
+}
+
+.roll-history-entry .h-label { color: var(--text-primary); flex: 0 0 3.5rem; }
+.roll-history-entry .h-vals { flex: 1; word-break: break-all; }
+.roll-history-entry .h-total { flex: 0 0 auto; }
+

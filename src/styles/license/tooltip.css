@@ -1,0 +1,95 @@
+/* ---------------- Themed tooltip ----------------
+   Replaces the browser's native grey `title` square everywhere on the
+   page. The engine at the bottom of the script moves the text out of
+   the title attribute at hover time and renders it here, so the bubble
+   follows the palette like every other panel. Sits above the modals
+   (z 300) but under the missing-data warning bar (z 100000). */
+#app-tooltip {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 99999;
+    width: max-content;
+    max-width: 280px;
+    padding: 8px 12px;
+    background: var(--panel-strong);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px #00000099, 0 0 18px 1px var(--border-glow);
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    text-align: left;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+#app-tooltip.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Heading line of a two-part tooltip (everything before the first
+   newline); plain single-line tooltips never render one */
+#app-tooltip .tt-head {
+    display: block;
+    color: var(--accent);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin-bottom: 3px;
+}
+
+#app-tooltip .tt-body {
+    display: block;
+    color: var(--text-secondary);
+}
+
+/* Single-line tooltips have no heading, so the body is the main text */
+#app-tooltip .tt-body:only-child {
+    color: var(--text-primary);
+}
+
+/* Rotated square sharing the panel's fill and hairline, with only the
+   two outward edges kept. --tt-arrow-x is set from JS so it keeps
+   pointing at the target's centre even after the bubble has been
+   clamped against a viewport edge. Default position is below the
+   bubble, i.e. the tooltip sits above its target. */
+#app-tooltip::after {
+    content: '';
+    position: absolute;
+    left: var(--tt-arrow-x, 50%);
+    margin-left: -5px;
+    bottom: -5px;
+    width: 9px;
+    height: 9px;
+    background: var(--panel-strong);
+    border: 1px solid var(--border-color);
+    border-top: none;
+    border-left: none;
+    transform: rotate(45deg);
+}
+
+/* Flipped below the target (no room above) — arrow moves to the top */
+#app-tooltip.below::after {
+    bottom: auto;
+    top: -5px;
+    border: 1px solid var(--border-color);
+    border-bottom: none;
+    border-right: none;
+}
+
+/* Tooltips are dark-assuming like the rest of the sheet; on the Light
+   License themes the shadow and hairline need the light treatment */
+:root.light-theme #app-tooltip {
+    border-color: #00000024;
+    box-shadow: 0 8px 24px #0000002e, 0 0 14px 1px var(--border-glow);
+}
+
+:root.light-theme #app-tooltip::after {
+    border-color: #00000024;
+}

@@ -1,0 +1,186 @@
+/* ---------------- Trainer equipment window ---------------- */
+/* Compound selector so it beats the base `.modal-box { max-width: 360px }` */
+.modal-box.equipment-box {
+    /* Five grid columns and the bag beside them, editor underneath.
+       Roomy on purpose: at the old 470px the wells were shoulder to
+       shoulder and the artwork inside them had nowhere to breathe. */
+    max-width: 940px;
+    max-height: 92vh;
+    overflow-y: auto;
+}
+
+/* Worn on the left, carried on the right */
+.equip-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+}
+
+.equip-bag {
+    display: flex;
+    flex-direction: column;
+    /* The doll's own top margin, so the two columns start level */
+    margin-top: 10px;
+    padding: 10px 12px 12px;
+    border-radius: 10px;
+    background: #00000038;
+    border: 1px solid var(--border-color);
+}
+
+.equip-bag-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding-bottom: 7px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.equip-bag .bag-list {
+    /* Tall enough to look like a bag when empty, capped so a hoarder's
+       list scrolls instead of stretching the modal */
+    min-height: 150px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+/* The gear icons are line art on a dark well, not sprites */
+.equip-bag .line-item img {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+/* Below this the two columns stop fitting side by side */
+@media (max-width: 760px) {
+    .equip-layout {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .equip-bag {
+        margin-top: 0;
+    }
+}
+
+/* Gear grid, arranged like Path of Exile 2's equipment panel minus the
+   belt: a weapon down each edge, helmet and amulet across the top, body
+   armour tall in the middle with a ring either side, gloves and boots
+   along the bottom. `grid-area` for each slot comes from EQUIP_SLOTS. */
+#equip-slots {
+    display: grid;
+    grid-template-columns: 1fr 0.85fr 1.15fr 0.85fr 1fr;
+    gap: 12px;
+    margin: 10px 0 4px;
+    grid-template-areas:
+        "weapon quick  helmet necklace offhand"
+        "weapon ring1  armor  ring2    offhand"
+        "weapon gloves armor  boots    offhand";
+}
+
+/* Recessed well, same treatment as the team sprite circles */
+.equip-slot {
+    position: relative;
+    min-height: 84px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    font-size: 1.15rem;
+    background: #00000059;
+    border: 1px dashed var(--border-color);
+    box-shadow: inset 0 0 10px #00000080;
+    color: var(--text-muted);
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.equip-slot:hover {
+    border-color: var(--ghost-color);
+    color: var(--text-primary);
+    box-shadow: inset 0 0 10px #00000080, 0 0 12px var(--ghost-color-glow);
+}
+
+.equip-slot.filled {
+    border-style: solid;
+    border-color: var(--ghost-color);
+    background: var(--primary-soft);
+    color: var(--ghost-color);
+}
+
+.equip-slot.selected {
+    border-style: solid;
+    border-color: var(--accent);
+    box-shadow: inset 0 0 10px #00000080, 0 0 0 1px var(--accent), 0 0 14px var(--border-glow);
+}
+
+/* The wells differ in size, so the art scales to whichever it sits in
+   rather than being pinned to one pixel size */
+.equip-slot .equip-art {
+    max-width: 100%;
+    max-height: 100px;
+    object-fit: contain;
+}
+
+/* Flips the armour cell between armour and clothing */
+.equip-face-toggle {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 21px;
+    height: 21px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.58rem;
+    background: #0000008c;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    z-index: 1;
+}
+
+.equip-face-toggle:hover,
+.equip-face-toggle:focus-visible {
+    color: var(--text-primary);
+    border-color: var(--ghost-color);
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+    outline: none;
+}
+
+/* A dot when the face you can't see is carrying something, so a filled
+   slot never hides without a trace */
+.equip-face-toggle.has-other::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ghost-color);
+    border: 1.5px solid var(--panel-strong);
+}
+
+/* Already worn on the other half of the armour cell */
+.gear-choice.taken {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.gear-choice.taken:hover {
+    border-color: var(--border-color);
+    box-shadow: none;
+}
+

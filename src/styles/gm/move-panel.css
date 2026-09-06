@@ -1,0 +1,240 @@
+/* ---------------- Pokémon move panel ----------------
+   Pinned moves with their accuracy and damage pools, computed the same
+   way the Pokémon card computes them. Opened by a row's own button and
+   held open until it is closed. Fixed-position so it escapes the panels'
+   own scroll containers. */
+.mon-tooltip {
+    position: fixed;
+    z-index: 60;
+    width: 330px;
+    max-height: 80vh;
+    overflow-y: auto;
+    background: var(--panel-strong);
+    border: 1px solid var(--ghost-color);
+    border-radius: 12px;
+    box-shadow: 0 8px 28px #000c;
+    padding: 0.6rem 0.7rem;
+    font-size: 0.8rem;
+    display: none;
+}
+
+.tip-close {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.4rem;
+    width: 1.3rem;
+    height: 1.3rem;
+    padding: 0;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    cursor: pointer;
+}
+
+.tip-close:hover { border-color: var(--danger); color: #fca5a5; background: #ef444422; }
+
+/* The button that opens the move panel, held down while its own panel
+   is the one on screen */
+.tip-btn.on {
+    border-color: var(--ghost-color);
+    color: var(--text-primary);
+    background: var(--ghost-color);
+    box-shadow: 0 0 5px var(--ghost-color-glow);
+}
+
+.tip-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    /* clears the close button in the corner */
+    padding-right: 1.5rem;
+    font-weight: 800;
+    font-size: 0.9rem;
+    margin-bottom: 0.1rem;
+}
+
+.tip-sub {
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.45rem;
+}
+
+.tip-quick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Every chip in this row looks the same whether or not it rolls; the
+   ones that do are buttons, so they also take a hover and a cursor. */
+.tip-quick > * {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.66rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.1rem 0.35rem;
+    color: var(--text-secondary);
+    background: transparent;
+}
+
+.tip-quick > * strong { color: var(--text-primary); }
+
+.tip-roll { cursor: pointer; }
+
+.tip-roll:hover {
+    border-color: var(--ghost-color);
+    background: var(--primary-soft);
+    color: var(--text-primary);
+}
+
+.tip-roll:active { transform: translateY(1px); }
+
+.tip-pain {
+    border-color: var(--danger) !important;
+    color: #fca5a5 !important;
+}
+
+.tip-move {
+    border-top: 1px solid var(--border-glow);
+    padding: 0.35rem 0 0.3rem;
+}
+
+.tip-move-head {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.2rem;
+}
+
+.tip-move-name { font-weight: 600; flex: 1; }
+
+.tip-badge {
+    font-size: 0.58rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: 5px;
+    padding: 0.05rem 0.3rem;
+    border: 1px solid;
+}
+
+.tip-pools {
+    display: flex;
+    gap: 0.4rem;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.68rem;
+}
+
+.tip-pool {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.05rem 0.35rem;
+    color: var(--text-secondary);
+}
+
+.tip-pool strong { color: var(--text-primary); font-size: 0.78rem; }
+.tip-pool.acc { border-color: var(--accent-border); }
+.tip-pool.dmg { border-color: #ff4a4e55; }
+
+/* A pool with dice behind it is a button; an empty one stays flat text
+   so there is nothing to press that would roll nothing. */
+button.tip-pool {
+    font-family: inherit;
+    font-size: inherit;
+    background: transparent;
+    cursor: pointer;
+}
+
+button.tip-pool:hover { background: var(--primary-soft); }
+button.tip-pool.acc:hover { border-color: var(--ghost-color); }
+button.tip-pool.dmg:hover { border-color: var(--hp-color); }
+button.tip-pool:active { transform: translateY(1px); }
+
+/* What STAB or a held item is adding to the damage beside it */
+.tip-bonus {
+    font-size: 0.6rem;
+    font-weight: 700;
+    align-self: center;
+    border-radius: 5px;
+    padding: 0.05rem 0.3rem;
+    border: 1px solid var(--ok);
+    color: var(--ok);
+    background: #3aa5931a;
+}
+
+/* The subject's place in the round, above its moves */
+.tip-action {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.64rem;
+    color: var(--crit);
+    border: 1px solid var(--crit);
+    background: #f0b4291a;
+    border-radius: 6px;
+    padding: 0.15rem 0.4rem;
+    margin-bottom: 0.4rem;
+}
+
+.tip-effect {
+    font-size: 0.66rem;
+    color: var(--text-secondary);
+    opacity: 0.85;
+    margin-top: 0.15rem;
+}
+
+.tip-empty {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    padding: 0.3rem 0;
+}
+
+.trainer-actions {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.45rem;
+    display: flex;
+    gap: 0.3rem;
+}
+
+/* The chevron is the row's own affordance, so it stays OUTSIDE the
+   action buttons' stopPropagation wrapper — inside it, the one thing
+   that looks like the expander would be the one thing that doesn't
+   expand. Padded to a real click target. */
+.trainer-toggle {
+    position: absolute;
+    bottom: 0.3rem;
+    right: 0.8rem;
+    width: 1.5rem;
+    text-align: center;
+    padding: 0.2rem 0;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    font-size: 0.8rem;
+    transition: opacity 0.15s, color 0.15s;
+}
+
+.trainer-head:hover .trainer-toggle { opacity: 1; color: var(--ghost-color); }
+
+.team-strip {
+    display: flex;
+    gap: 2px;
+    padding: 0 0.6rem 0.45rem;
+}
+
+/* Interpolated, not pixelated, and for the reason the trainer sheet
+   gives on its own tiles: these are Home sprites, 512px renders drawn
+   here at 30-40px. Nearest-neighbour at 0.06x samples one pixel in
+   sixteen and turns a smooth render into gravel. Only the small Box
+   and Shuffle sprites — actual pixel art, drawn near their own size —
+   want pixelated, and applySpeciesSprite tags those. */
+.team-strip img {
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+    image-rendering: auto;
+    filter: drop-shadow(0 1px 2px #0008);
+}
+

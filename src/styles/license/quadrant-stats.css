@@ -1,0 +1,390 @@
+/* ---------------- Stats quadrant ---------------- */
+.q2-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 158px;
+    grid-template-areas:
+        "combat social skills"
+        "ach    ach    skills"
+        "natrank natrank extra";
+    gap: 12px;
+}
+
+@media (max-width: 480px) {
+    .q2-grid {
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+            "combat social"
+            "skills skills"
+            "ach    ach"
+            "natrank extra";
+    }
+}
+
+.pill-col {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pill-col.combat {
+    grid-area: combat;
+}
+
+.pill-col.social {
+    grid-area: social;
+}
+
+/* One colored attribute pill: label on top, five dots under it */
+.stat-pill {
+    border-radius: 14px;
+    padding: 8px 10px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid;
+    flex: 1;
+}
+
+.stat-pill-label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+}
+
+.stat-pill .stat-dots {
+    gap: 5px;
+}
+
+.stat-pill .dot {
+    width: 13px;
+    height: 13px;
+}
+
+/* Skills tower: four vertical-labeled groups down the right edge */
+.skills-tower {
+    grid-area: skills;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.skill-group {
+    background: linear-gradient(160deg, var(--primary-soft) 0%, var(--primary-faint) 100%);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    padding: 8px 8px 8px 4px;
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    flex: 1;
+}
+
+.skill-group-label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    text-align: center;
+    font-size: 0.6rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.skill-group-rows {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: 5px;
+    min-width: 0;
+}
+
+.tower-skill {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+}
+
+.tower-skill-name {
+    font-size: 0.58rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-primary);
+}
+
+/* The Extra rows share these: an added specialty has to read as one of
+   the sheet's own, so the two sets of circles cannot be allowed to
+   drift apart in size or spacing. */
+.tower-skill .skill-dots,
+.extra-row .skill-dots {
+    gap: 3px;
+}
+
+.tower-skill .skill-dot,
+.extra-panel .skill-dot {
+    width: 10px;
+    height: 10px;
+    border-width: 2.5px;
+}
+
+/* Achievements box */
+.achievements-box {
+    grid-area: ach;
+    background: #0d09144c;
+    border: 1px solid #ffffff0d;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.achievements-title {
+    background: #00000066;
+    border-bottom: 1px solid #ffffff14;
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-secondary);
+    padding: 6px;
+}
+
+.achievement-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 12px;
+}
+
+.achievement-input {
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: none;
+    border-bottom: 1px dashed #ffffff1a;
+    padding: 3px 2px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.8rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.achievement-input:focus {
+    border-bottom-color: var(--accent);
+}
+
+.achievement-input.done {
+    text-decoration: line-through;
+    color: var(--text-secondary);
+}
+
+.ach-check {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    border-radius: 5px;
+    border: 1px solid #ffffff26;
+    background: #00000066;
+    color: #00000000;
+    font-size: 0.65rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    padding: 0;
+}
+
+.ach-check:hover {
+    border-color: var(--accent);
+}
+
+.ach-check.done {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg-color);
+    box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* The bottom row of this quadrant has to sit level with the CHARACTER
+   row of the licence plate opposite it. How far apart the two land is
+   the attribute pills plus the achievements box measured against the
+   photo arch — font metrics included, so it comes out differently in
+   different browsers and a constant here could only ever be right in
+   one of them. alignNatureRow() measures it and sets the variable.
+
+   Both items take the same offset: they share the grid row, so moving
+   them together keeps the Extra box level with Nature — and keeps it
+   exactly as tall as the four tower boxes, which growing those boxes to
+   push this row down would not. */
+.nature-rank,
+.extra-panel {
+    margin-top: var(--natrank-lift, 0px);
+}
+
+/* Nature / Rank pill inputs */
+.nature-rank {
+    grid-area: natrank;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pill-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #00000066;
+    border: 1px solid #ffffff26;
+    border-radius: 20px;
+    padding: 7px 16px;
+    transition: border-color 0.2s;
+}
+
+.pill-field:focus-within {
+    border-color: var(--accent);
+}
+
+.pill-field label {
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.pill-field input {
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.88rem;
+}
+
+.pill-field .money-suffix {
+    font-family: 'Fira Code', monospace;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+/* Extra panel: custom dot tracks */
+.extra-panel {
+    grid-area: extra;
+    /* Same themed treatment as the skill-group tiles it sits under,
+       so it stays legible across every color palette */
+    background: linear-gradient(160deg, var(--primary-soft) 0%, var(--primary-faint) 100%);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    padding: 8px 8px 8px 4px;
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+}
+
+/* Spacing copied from .skill-group-rows, and the row chrome below is
+   kept out of the flow, so four Extra rows come out exactly as tall as
+   the four rows of a tower group — the two boxes have to match. */
+.extra-rows {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: 5px;
+    min-width: 0;
+}
+
+.extra-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    position: relative;
+}
+
+/* Typed like .tower-skill-name, so an Extra reads as one of the sheet's
+   own specialties rather than as a filled-in field. It stays an input,
+   so the dashed rule and the placeholder stay with it. */
+.extra-name-input {
+    width: 100%;
+    border: none;
+    text-align: center;
+    font-size: 0.58rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-primary);
+    outline: none;
+    padding: 0 1px;
+    font-family: inherit;
+    /* Painted, not bordered: a real border-bottom plus the padding it
+       needs would make every Extra row 3px taller than a tower row. */
+    background: repeating-linear-gradient(to right,
+            var(--border-color) 0 3px, #00000000 3px 6px) no-repeat 0 100% / 100% 1px;
+}
+
+/* The hint is not a specialty name: left at normal weight so an empty
+   row is still legible as empty */
+.extra-name-input::placeholder {
+    color: var(--text-muted);
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+/* Named, it is a specialty and looks like one — the dashed rule was the
+   last thing marking it out as a field. Empty or being edited, the cue
+   comes back. :placeholder-shown is what tells the two apart. */
+.extra-name-input:not(:placeholder-shown) {
+    background-image: none;
+}
+
+.extra-name-input:focus {
+    background-image: repeating-linear-gradient(to right,
+            var(--accent) 0 3px, #00000000 3px 6px);
+}
+
+.extra-add-btn {
+    width: 100%;
+    background: none;
+    border: 1px dashed var(--border-color);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 0.6rem;
+    cursor: pointer;
+    padding: 2px;
+    transition: all 0.2s;
+}
+
+.extra-add-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+.extra-remove {
+    position: absolute;
+    right: -2px;
+    top: -2px;
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.extra-row:hover .extra-remove {
+    opacity: 1;
+}
+
+.extra-remove:hover {
+    color: #f43f5e;
+}
+

@@ -1,0 +1,160 @@
+/* ---------------- NPC names ---------------- */
+.npc-suggestions { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+
+.npc-suggestion { font-size: 0.8rem; }
+
+.npc-suggestion .g-icon { opacity: 0.6; font-size: 0.7rem; margin-right: 0.15rem; }
+
+/* Generation settings, folded away under the cog */
+.npc-settings {
+    display: none;
+    flex-direction: column;
+    gap: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--primary-faint);
+    padding: 0.55rem 0.6rem;
+}
+
+.npc-settings.open { display: flex; }
+
+.set-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.set-row > label {
+    flex: 0 0 5.2rem;
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+}
+
+.set-row select, .set-row input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    font-family: inherit;
+    font-size: 0.78rem;
+    color: var(--text-primary);
+    background: var(--panel-solid);
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    padding: 0.25rem 0.4rem;
+}
+
+.set-row select:focus, .set-row input:focus { outline: none; border-color: var(--ghost-color); }
+
+.seg { display: flex; gap: 0.25rem; flex: 1; }
+
+.seg button {
+    flex: 1;
+    font-size: 0.7rem;
+    padding: 0.25rem 0.2rem;
+}
+
+.seg button.on {
+    background: var(--primary-soft);
+    border-color: var(--ghost-color);
+    box-shadow: 0 0 7px var(--ghost-color-glow);
+}
+
+.set-check {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.set-check input { accent-color: var(--ghost-color); }
+
+.set-warn { font-size: 0.68rem; color: #fbbf24; }
+
+.npc-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 9px;
+    background: var(--primary-faint);
+}
+
+.npc-line { display: flex; align-items: center; gap: 0.4rem; }
+
+.npc-row .npc-name {
+    font-weight: 600;
+    font-size: 0.88rem;
+    flex: 0 0 auto;
+    max-width: 45%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.npc-row .g-icon { flex: 0 0 auto; opacity: 0.65; font-size: 0.72rem; }
+
+.npc-row input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.72rem;
+    padding: 0.2rem 0.4rem;
+    background: transparent;
+    border-color: transparent;
+}
+
+.npc-row input:hover, .npc-row input:focus { border-color: var(--border-color); background: var(--panel-solid); }
+
+.npc-region {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    flex: 0 0 auto;
+}
+
+/* Nature: the picker, the keyword line, and the description that
+   expands under it */
+.npc-nature-line { display: flex; align-items: center; gap: 0.4rem; }
+
+.npc-nature-line select {
+    font-family: inherit;
+    font-size: 0.72rem;
+    color: var(--text-primary);
+    background: var(--panel-solid);
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    padding: 0.15rem 0.3rem;
+    flex: 0 0 auto;
+    max-width: 8rem;
+}
+
+.npc-keywords {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.68rem;
+    color: var(--accent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.npc-desc {
+    font-size: 0.72rem;
+    line-height: 1.45;
+    color: var(--text-secondary);
+    border-left: 2px solid var(--border-color);
+    padding-left: 0.5rem;
+    margin-left: 0.1rem;
+}
+
+.npc-desc.clipped {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+

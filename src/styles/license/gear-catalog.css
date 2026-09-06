@@ -1,0 +1,346 @@
+/* ---------------- Gear catalogue ---------------- */
+/* Opens from inside the equipment window, so it has to sit above it */
+#gear-catalog-modal {
+    z-index: 260;
+}
+
+.modal-box.gear-catalog-box {
+    max-width: 560px;
+}
+
+/* Horizontal chip strip; it scrolls rather than wrapping to four rows */
+.gear-cat-row {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.gear-cat-chip {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: #00000033;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.72rem;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.gear-cat-chip:hover {
+    border-color: var(--ghost-color);
+    color: var(--text-primary);
+}
+
+.gear-cat-chip.active {
+    background: var(--primary-soft);
+    border-color: var(--ghost-color);
+    color: var(--text-primary);
+}
+
+.gear-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+    gap: 8px;
+    max-height: 46vh;
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.gear-choice {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: #00000033;
+    padding: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+
+.gear-choice:hover {
+    border-color: var(--ghost-color);
+    background: var(--primary-soft);
+    transform: translateY(-1px);
+}
+
+.gear-choice.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.gear-choice img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* The monochrome pack is solid black artwork with no background, which
+   would disappear against these dark wells — flip it to white. The
+   light theme puts them on a pale surface, so there they stay black
+   (see the light-theme block further down). */
+.mono-art {
+    filter: invert(1);
+}
+
+.gear-grid-note {
+    font-size: 0.75rem;
+    font-style: italic;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* Editor for whichever slot is selected, docked under the grid */
+.equip-editor {
+    border-top: 1px solid var(--border-color);
+    padding-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+.equip-editor-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.equip-editor-head i {
+    color: var(--ghost-color);
+}
+
+.equip-field-label {
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+/* Gear name: free text, so the trainer's own wording survives, but it
+   starts life as whatever was picked out of the catalogue */
+.equip-name-input {
+    width: 100%;
+}
+
+.equip-notes {
+    width: 100%;
+    min-height: 62px;
+    resize: vertical;
+    background: #0000004c;
+    border: 1px solid #ffffff1a;
+    border-radius: 8px;
+    padding: 7px 12px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.equip-notes:focus {
+    border-color: var(--ghost-color);
+}
+
+/* Five columns get too cramped on a phone: fold the weapons in beside
+   the armour and drop to three. */
+@media (max-width: 520px) {
+    #equip-slots {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        grid-template-areas:
+            "quick  helmet necklace"
+            "weapon armor  offhand"
+            "ring1  armor  ring2"
+            "gloves .      boots";
+    }
+
+    .equip-slot {
+        min-height: 62px;
+        font-size: 1rem;
+    }
+
+    .equip-slot .equip-art {
+        max-height: 66px;
+    }
+}
+
+/* CHARACTER / PLAYER data plate: one framed block, two rows, a drawn
+   pokeball at the head of each. It replaced two floating underlined
+   lines, whose 2px rule was a hardcoded white and so vanished on the
+   Light License theme. Everything here is a theme variable instead,
+   which is why the light theme needs no entry for it in the fix list
+   further down. */
+.license-plate {
+    /* Same width and centring as .photo-arch above it */
+    width: min(100%, 430px);
+    margin: 20px auto 0;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    background: var(--primary-faint);
+    overflow: hidden;
+}
+
+/* Fixed ball and label columns, so both rows' values start on the
+   same x however long the labels get */
+.plate-row {
+    display: grid;
+    grid-template-columns: 44px 112px 1fr auto;
+    align-items: center;
+    min-height: 52px;
+    transition: background 0.15s;
+}
+
+.plate-row+.plate-row {
+    border-top: 1px solid var(--border-color);
+}
+
+.pokeball-dot {
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    justify-self: center;
+    border-radius: 50%;
+    border: 2px solid var(--ghost-color);
+    /* Split at dead centre: the two halves are meant to read as equal,
+       and 42% left the white one visibly the taller of the two */
+    background: linear-gradient(to bottom, var(--ghost-color) 0%, var(--ghost-color) 50%,
+            #f8fafc 50%, #f8fafc 100%);
+    position: relative;
+    box-shadow: 0 0 8px var(--border-glow);
+}
+
+.pokeball-dot::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f8fafc;
+    border: 2px solid var(--bg-color);
+    transform: translate(-50%, -50%);
+}
+
+.plate-label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-secondary);
+    padding: 0 14px;
+    border-right: 1px solid var(--border-color);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+}
+
+.plate-value {
+    min-width: 0;
+    padding: 14px;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    outline: none;
+    caret-color: var(--accent);
+    white-space: nowrap;
+    overflow: hidden;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+}
+
+/* A band rather than a border swap: the frame is already drawing every
+   line here, and one more would only be a line a theme could hide
+   again.
+
+   It is painted on the ROW, keyed off the value's state, not on the
+   value itself. The gender toggle is its own grid column, so a band on
+   .plate-value stopped dead at the toggle's edge on the Character row
+   while running the full width on the Player row below it — two rows
+   highlighting to different widths. Selecting the row covers the
+   toggle's column too, and the two rows match. */
+.plate-row:has(> .plate-value:hover) {
+    background: var(--primary-faint);
+}
+
+.plate-row:has(> .plate-value:focus) {
+    background: var(--primary-soft);
+}
+
+[contenteditable][data-placeholder]:empty::before {
+    content: attr(data-placeholder);
+    opacity: 0.3;
+    font-style: italic;
+    font-weight: 400;
+}
+
+/* ♂/♀ gender toggle on the Name line: just the icon, no button chrome.
+   Blue for male, pink for female, neutral when genderless. */
+.gender-toggle {
+    flex-shrink: 0;
+    border: none;
+    background: none;
+    padding: 0 0 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* In the plate the row centres it, so the 4px that used to lift it off
+   the underline just pushes it up; it needs the row's inset instead. */
+.plate-row .gender-toggle {
+    padding: 0 14px 0 0;
+}
+
+.gender-toggle.unset {
+    color: var(--text-secondary);
+}
+
+.gender-toggle.male {
+    color: #60a5fa;
+}
+
+.gender-toggle.female {
+    color: #f472b6;
+}
+
+/* Small ♂/♀ glyph shown read-only on team slots */
+.team-gender {
+    font-size: 0.85rem;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.team-gender.male {
+    color: #60a5fa;
+}
+
+.team-gender.female {
+    color: #f472b6;
+}
+
+.license-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 22px;
+}
+

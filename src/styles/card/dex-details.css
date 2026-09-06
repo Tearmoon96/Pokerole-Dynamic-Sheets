@@ -1,0 +1,65 @@
+/* Dex Description Panel */
+.desc-panel {
+    background: #0d09144c;
+    border: 1px solid #ffffff0d;
+    border-radius: 20px;
+    padding: 20px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+    font-style: italic;
+    position: relative;
+}
+
+.desc-panel::before {
+    content: '"';
+    font-size: 3rem;
+    color: var(--border-glow);
+    position: absolute;
+    top: -10px;
+    left: 10px;
+    font-family: serif;
+}
+
+/* Moves Header & Filter Tabs. .moves-panel itself is display:contents -
+   see the grid at the top; only the stacked layout gives it a box. */
+.moves-head {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.moves-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ffffff1a;
+    padding-bottom: 10px;
+}
+
+.moves-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 2.75rem;
+    /* Matches .pokemon-name height (2.5rem x 1.1 line-height) so both titles sit on the same line */
+}
+
+.moves-count {
+    font-size: 0.85rem;
+    background: #ffffff0d;
+    padding: 2px 8px;
+    border-radius: 12px;
+    color: var(--text-secondary);
+    font-family: 'Fira Code', monospace;
+}
+
+.moves-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+

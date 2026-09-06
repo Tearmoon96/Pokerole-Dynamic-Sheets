@@ -1,0 +1,400 @@
+/* Skills & Specialties Panel */
+.skills-panel {
+    background: #0d09144c;
+    border: 1px solid #ffffff0d;
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.skills-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.skills-category {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.skills-category+.skills-category {
+    margin-top: 10px;
+}
+
+.category-title {
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    border-bottom: 1px dashed #ffffff14;
+    padding-bottom: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.category-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* The category icon is the on/off toggle for its rating dots */
+.cat-icon {
+    cursor: pointer;
+    padding: 2px;
+    transition: all 0.25s ease;
+}
+
+.cat-icon:hover {
+    color: var(--text-primary);
+}
+
+.cat-icon.active {
+    color: var(--text-primary);
+    text-shadow: 0 0 8px var(--ghost-color), 0 0 16px var(--ghost-color-glow);
+}
+
+.skill-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.skill-label {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.skill-dots {
+    display: flex;
+    gap: 4px;
+}
+
+.skill-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: #00000000;
+}
+
+.skill-dot.filled {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 6px var(--accent-glow);
+}
+
+/* Same zoom as the base-stat circles, so skills, categories and
+   specialties (including the extra/custom ones) all feel consistent */
+.skill-dot:hover {
+    transform: scale(1.45);
+    z-index: 1;
+}
+
+/* Custom Specialties list structure */
+.specialties-section {
+    margin-top: 10px;
+    border-top: 1px solid #ffffff14;
+    padding-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.specialties-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.specialties-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.custom-specialty-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #00000026;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid #ffffff05;
+}
+
+.custom-specialty-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.specialty-remove {
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    transition: color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.specialty-remove:hover {
+    color: #f43f5e;
+}
+
+.specialty-input-group {
+    display: flex;
+    gap: 8px;
+    margin-top: 5px;
+}
+
+.specialty-input {
+    flex: 1;
+    background: #0000004c;
+    border: 1px solid #ffffff1a;
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.8rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.specialty-input:focus {
+    border-color: var(--ghost-color);
+}
+
+.specialty-add-btn {
+    background: var(--border-color);
+    border: 1px solid var(--border-color);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.specialty-add-btn:hover {
+    background: var(--ghost-color);
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+/* Ability panels; with several abilities, click one to mark it in use */
+.ability-panel.ability-selectable {
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.ability-panel.ability-in-use {
+    border-color: var(--ghost-color);
+    box-shadow: 0 0 12px var(--ghost-color-glow);
+}
+
+.ability-panel.ability-idle {
+    opacity: 0.55;
+    filter: saturate(0.6);
+}
+
+.ability-panel.ability-idle:hover {
+    opacity: 0.85;
+}
+
+.ability-in-use-mark {
+    color: var(--ghost-color);
+    font-size: 1rem;
+    margin-left: 4px;
+    filter: drop-shadow(0 0 4px var(--ghost-color-glow));
+}
+
+/* Ability Panel (Static) */
+.ability-panel {
+    background: linear-gradient(135deg, var(--primary-faint) 0%, #0d091466 100%);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 20px;
+}
+
+.ability-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.ability-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--ghost-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ability-badge {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    font-weight: 600;
+    background: var(--border-glow);
+    color: var(--ghost-color);
+    padding: 2px 8px;
+    border-radius: 6px;
+    letter-spacing: 1px;
+}
+
+.ability-desc {
+    font-size: 0.85rem;
+    font-style: italic;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+
+.ability-effect {
+    font-size: 0.9rem;
+    line-height: 1.45;
+    color: #fff;
+}
+
+/* Details (Height/Weight/Evolution) */
+.details-panel {
+    background: #0d09144c;
+    border: 1px solid #ffffff0d;
+    border-radius: 20px;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.detail-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.detail-val {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* Evolutions block */
+.evolution-panel {
+    grid-column: span 2;
+    border-top: 1px solid #ffffff0d;
+    padding-top: 15px;
+    margin-top: 5px;
+}
+
+.evolution-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    /* CRITICAL: Prevent horizontal layout expansion pushing columns */
+    gap: 8px;
+    font-size: 0.82rem;
+    background: #00000033;
+    padding: 8px 12px;
+    border-radius: 12px;
+    border: 1px solid #ffffff05;
+}
+
+/* One chain per line when a Pokémon has several evolution paths */
+.evolution-step {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex-basis: 100%;
+}
+
+.evo-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Evolution names load that Pokémon's card */
+.evo-name.evo-link {
+    cursor: pointer;
+}
+
+.evo-name.evo-link:hover {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+.evo-arrow {
+    color: var(--text-secondary);
+    animation: pulse-arrow 2s infinite;
+}
+
+@keyframes pulse-arrow {
+
+    0%,
+    100% {
+        transform: translateX(0);
+        opacity: 0.5;
+    }
+
+    50% {
+        transform: translateX(2px);
+        opacity: 1;
+    }
+}
+
+.evo-method {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    background: var(--border-glow);
+    padding: 2px 6px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+/* Dex Description Panel */
+.desc-panel {
+    background: #0d09144c;
+    border: 1px solid #ffffff0d;
+    border-radius: 20px;
+    padding: 20px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+    font-style: italic;
+    position: relative;
+}
+
+.desc-panel::before {
+    content: '"';
+    font-size: 3rem;
+    color: var(--border-glow);
+    position: absolute;
+    top: -10px;
+    left: 10px;
+    font-family: serif;
+}
+

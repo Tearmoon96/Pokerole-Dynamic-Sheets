@@ -1,0 +1,245 @@
+/* Pokémon browser: themed grid of Box sprites */
+.poke-picker-box {
+    max-width: 680px;
+    width: 92%;
+}
+
+.poke-picker-search {
+    width: 100%;
+    margin-top: 12px;
+}
+
+.poke-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(102px, 1fr));
+    gap: 8px;
+    margin-top: 14px;
+    max-height: 62vh;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.poke-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 5px 4px 4px;
+    border-radius: 12px;
+    background: #ffffff05;
+    border: 1px solid #ffffff0d;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+}
+
+.poke-tile:hover {
+    background: var(--primary-soft);
+    border-color: var(--ghost-color);
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+.poke-tile img {
+    width: 80px;
+    height: 80px;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
+/* Home sprites are full-art renders and read large in a tile: shrink them
+   a touch so they sit closer to the other sprite kinds */
+.poke-tile img.sprite-home {
+    width: 62px;
+    height: 62px;
+    image-rendering: auto;
+}
+
+.poke-tile-name {
+    font-size: 0.85rem;
+    line-height: 1.25;
+    color: var(--text-primary);
+    display: block;
+    text-align: center;
+}
+
+/* The stone stays in normal inline flow right after the name, but
+   the negative right margin cancels its width: the line measures
+   as if the name were alone, so the name centers exactly like a
+   non-mega tile and the stone paints just beside it */
+.poke-tile-name .mega-stone-icon {
+    height: 22px;
+    width: 22px;
+    object-fit: contain;
+    vertical-align: middle;
+    margin-left: 2px;
+    margin-right: -24px;
+    /* Repeated from .mega-stone-icon: .poke-tile img sets pixelated and
+       is more specific than the base rule, so without this the tiles keep
+       the staircase edge at an even harsher 0.275x. */
+    image-rendering: auto;
+}
+
+.poke-tile-num {
+    font-size: 0.76rem;
+    font-family: 'Fira Code', monospace;
+    color: var(--text-muted);
+}
+
+/* Dual-type pages: badges are clickable theme switchers */
+.type-badge.type-switch {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.type-badge.type-switch:not(.theme-active) {
+    opacity: 0.55;
+    box-shadow: none !important;
+}
+
+.type-badge.type-switch:hover {
+    opacity: 1;
+}
+
+/* Mega form: the stone sprite stands in for the "(Mega Form)" suffix. It
+   sits in the sprite box next to the gender toggle and is sized to match
+   it; in the title it shifted the name off the header's centre axis. */
+.mega-stone-icon {
+    /* 28px, not the toggle's 1.2rem font-size: the sprite has transparent
+       margin baked in, so at the toggle's own height the stone inside it
+       came out visibly smaller than the glyph. */
+    height: 28px;
+    vertical-align: middle;
+    /* Deliberately not pixelated, unlike the sprite rules around it: the
+       stones are 80px renders drawn at 28 (and at 22 in the picker tiles),
+       so skipping the interpolation drops two pixels in three and leaves
+       the round edge looking like a staircase. */
+    image-rendering: auto;
+    /* Legible over the sprite behind it, like .gender-toggle's shadow */
+    filter: drop-shadow(0 1px 3px #000000cc);
+}
+
+.mega-stone-slot {
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Icon-only, the same round chip the theme and badge pickers use. The
+   type name moved to the title attribute — the icons are the pickers'
+   own, so the two read as one vocabulary. */
+.type-badge {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 0.95rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Inline glyphs are centred by their line box — built from the font's
+   ascent/descent — not by the icon itself, which leaves some sitting
+   visibly high. As a block with line-height 1 the box is the glyph. */
+.type-badge i {
+    display: block;
+    line-height: 1;
+}
+
+.type-badge.ghost {
+    background: var(--primary-soft);
+    border: 1px solid var(--ghost-color);
+    color: #d8b4fe;
+    box-shadow: 0 0 10px var(--border-glow);
+}
+
+.type-eff-btn {
+    background: #ffffff08;
+    border: 1px solid #ffffff14;
+    color: var(--text-secondary);
+    width: 46px;
+    height: 30px;
+    padding: 0;
+    /* Fixed size so all header tool buttons match exactly. flex-shrink
+       is off because .header-tools is a flex row: without it a cramped
+       column would squeeze the buttons to different widths instead of
+       wrapping them, and the row would stop looking like one set. */
+    flex-shrink: 0;
+    border-radius: 30px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.type-eff-btn:hover {
+    background: var(--ghost-color);
+    border-color: var(--ghost-color);
+    color: #fff;
+    box-shadow: 0 0 10px var(--ghost-color-glow);
+}
+
+/* Page theme, on the left of the types row. Same body and hover as the
+   header tool buttons, at the round size that matches the type chips
+   across the divider from it. */
+.theme-switch-btn {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: #ffffff08;
+    border: 1px solid #ffffff14;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.theme-switch-btn:hover {
+    background: var(--ghost-color);
+    border-color: var(--ghost-color);
+    color: #fff;
+    box-shadow: 0 0 10px var(--ghost-color-glow);
+}
+
+/* Dual-type pages split the toggle into an explicit pair, which then
+   joins the type chips as one radio set: whichever of the four is
+   driving the page is the lit one. Dimmed exactly like .type-switch. */
+.theme-switch-btn.pick:not(.theme-active) {
+    opacity: 0.55;
+    box-shadow: none;
+}
+
+.theme-switch-btn.pick:hover {
+    opacity: 1;
+}
+
+/* Dimming the others was not enough to say which theme is on. The
+   button's own body is #ffffff08 over a dark panel, so on the Dark
+   License 55% of it and 100% of it are the same grey — there was
+   nothing to compare. The lit one takes the filled body it already
+   shows on hover, which reads at a glance on both License pages and
+   gives the row exactly one member switched on, the way the type
+   chips do with their own colour. */
+.theme-switch-btn.theme-active {
+    background: var(--ghost-color);
+    border-color: var(--ghost-color);
+    color: #fff;
+    box-shadow: 0 0 10px var(--ghost-color-glow);
+}
+
+/* Heal: the one restorative button in the row, so it glows green —
+   the same #10b981 the move effects use for a change for the better */
+.type-eff-btn.heal-btn:hover {
+    background: #10b981;
+    border-color: #10b981;
+    box-shadow: 0 0 10px #10b98166;
+}
+

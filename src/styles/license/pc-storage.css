@@ -1,0 +1,370 @@
+/* ---------------- PC storage (boxes) ----------------
+   Named boxes of Pokémon the trainer owns but isn't carrying. The
+   window pairs the open box with the six team slots underneath, so a
+   deposit or a withdrawal is one drag (or one click) inside one view. */
+.modal-box.box-storage-box {
+    max-width: 720px;
+    width: 94%;
+}
+
+/* Chip strip; scrolls sideways rather than wrapping, like the gear
+   catalogue's categories */
+.box-tabs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    /* Setting overflow on one axis makes the other compute to `auto`
+       too, so this strip clips vertically as well as horizontally —
+       and the drop-target ring is painted 2px OUTSIDE a chip's border
+       box. Without room inside the scroll container it gets shaved off
+       the top of every chip, and off the left of the first. Pad the
+       inside, then pull the row back by the same amount so the chips
+       stay aligned with the search field below. */
+    padding: 3px 3px 7px;
+    margin: -3px -3px -3px;
+}
+
+.box-tab {
+    flex-shrink: 0;
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: #00000033;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.72rem;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.box-tab:hover {
+    border-color: var(--ghost-color);
+    color: var(--text-primary);
+}
+
+.box-tab.active {
+    background: var(--primary-soft);
+    border-color: var(--ghost-color);
+    color: var(--text-primary);
+}
+
+.box-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Takes the leftover width, and is allowed to give it all back so the
+   controls beside it wrap to their own line rather than being squashed */
+.box-toolbar .box-search {
+    flex: 1 1 180px;
+    min-width: 0;
+    margin: 0;
+}
+
+.box-count {
+    flex-shrink: 0;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.box-tool-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 4px 6px;
+    transition: all 0.2s;
+}
+
+.box-tool-btn:hover {
+    color: var(--text-primary);
+    background: var(--primary-soft);
+}
+
+.box-tool-btn.danger:hover {
+    color: #f43f5e;
+}
+
+/* Names the sprite set in use AND cycles it, so it has to read as a
+   button rather than a label — filled, outlined, with a cycle icon.
+   Styled off .team-edit-btn, the page's existing small action button. */
+.box-sprite-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--primary-soft);
+    border: 1px solid var(--ghost-color);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.62rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.box-sprite-btn:hover {
+    background: var(--ghost-color);
+    color: #fff;
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+.box-sprite-btn i {
+    font-size: 0.68rem;
+    opacity: 0.85;
+}
+
+/* The Custom switch shares the button shape but is two-state: filled
+   when uploaded art is showing, hollow and muted when it is not, so
+   its state reads at a glance without another label. */
+.box-custom-btn.off {
+    background: none;
+    border-color: var(--border-color);
+    color: var(--text-muted);
+}
+
+.box-custom-btn.off:hover {
+    background: none;
+    border-color: var(--ghost-color);
+    color: var(--text-secondary);
+    box-shadow: none;
+}
+
+.box-grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 10px;
+    min-height: 172px;
+    max-height: 40vh;
+    overflow-y: auto;
+    padding: 6px;
+}
+
+/* One source for the recessed sprite-well fill: the storage tiles, the
+   team circles and the drag ghost all draw it, and the light theme
+   swaps it in a single place rather than three. */
+:root {
+    --box-well: #00000059;
+}
+
+:root.light-theme {
+    --box-well: #0000000d;
+}
+
+/* The tile IS the sprite well — same round frame as a team slot. Name,
+   rank and gender are in the hover bubble (see monTipText), so the
+   grid reads as a wall of Pokémon rather than a wall of cards. */
+.box-tile {
+    width: 62px;
+    height: 62px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--box-well);
+    border: 1px solid var(--border-color);
+    box-shadow: inset 0 0 10px #00000080;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    cursor: grab;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.box-tile:hover {
+    border-color: var(--ghost-color);
+    box-shadow: inset 0 0 10px #00000080, 0 0 10px var(--ghost-color-glow);
+}
+
+.box-tile.selected {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 10px #00000080, 0 0 0 2px var(--accent);
+}
+
+.box-tile.dragging {
+    opacity: 0.4;
+}
+
+/* The copy handed to setDragImage (see setCircleDragImage). It has to
+   be rendered for the browser to snapshot it, so it is pushed out of
+   sight rather than hidden — display:none or visibility:hidden would
+   snapshot nothing.
+
+   The well fill is translucent, and a drag bitmap is composited by the
+   browser over whatever is beneath it, so paint it over an opaque
+   panel first: that reproduces exactly how the tile looks sitting in
+   the window, instead of a washed-out or near-black disc. Everything
+   else (border, inset shadow, sprite transform) comes from the clone. */
+.box-drag-ghost {
+    position: fixed;
+    left: -9999px;
+    top: 0;
+    /* No negative z-index: being off-screen already hides it, and
+       painting it behind the page risks a snapshot of an occluded
+       element rather than the tile itself. */
+    margin: 0;
+    opacity: 1;
+    pointer-events: none;
+    border-radius: 50%;
+    overflow: hidden;
+    /* The bitmap Chrome snapshots for the drag image is the element's
+       painted area, which is not the same as its clipped area: a sprite
+       scaled past the well still contributes ink, the bitmap comes out
+       bigger than the circle, and the hotspot handed to setDragImage
+       then lands somewhere other than the middle — the ghost trails the
+       cursor by tens of pixels. Containment makes the painted area the
+       border box, so the hotspot means what it says. */
+    contain: paint;
+    background-color: var(--panel-solid);
+    background-image: linear-gradient(var(--box-well), var(--box-well));
+}
+
+/* Fills the tile's content box (62 less the 1px border each side), so
+   the tile's own round clip cuts a true circle out of opaque uploaded
+   art. Do NOT round this element instead: border-radius clips in the
+   image's own coordinate space, i.e. *before* the transform below, so
+   a sprite scaled down would keep whatever the round mask had already
+   cut off and just shrink the hole along with it. Clipping has to
+   happen on the parent, after the scale — the same arrangement
+   .team-sprite-circle uses. */
+.box-tile img {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+    pointer-events: none;
+    transform: translate(var(--sprite-x, 0px), var(--sprite-y, 0px)) scale(var(--sprite-scale, 1));
+}
+
+/* No size rule of its own: the strip's wells are the same 62px as the
+   grid's, so one framing serves both. */
+
+.box-empty {
+    flex: 1 1 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 12px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-style: italic;
+    text-align: center;
+}
+
+.box-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding-top: 10px;
+    border-top: 1px solid #ffffff14;
+}
+
+.box-actions-name {
+    flex: 1;
+    min-width: 90px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.box-team-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px solid #ffffff14;
+}
+
+/* Pushed to the far end of the strip; wraps to its own right-aligned
+   line before the team circles are squashed */
+.box-strip-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.box-team-label {
+    flex-shrink: 0;
+    font-size: 0.56rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+}
+
+.box-team-slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* The same 62px as .box-tile, and it has to stay that way. The Box set
+   zooms in whole screen pixels per source pixel, which is an absolute
+   step — so the same sprite in a smaller well lands on a different
+   whole number and comes out a different size. Houndoom took 2× in a
+   62px well and only 1× in a 52px one: the identical Pokémon, 40%
+   smaller in the strip than in the grid right above it. Matching the
+   wells is what keeps one board looking like one board. */
+.box-team-slot {
+    width: 62px;
+    height: 62px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--box-well);
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.box-team-slot:hover {
+    border-color: var(--ghost-color);
+}
+
+/* Live target highlight while a Pokémon is dragged over it */
+.box-tab.drop-hover,
+.box-team-slot.drop-hover,
+.box-grid.drop-hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent);
+}
+
+.box-grid.drop-hover {
+    border-radius: 12px;
+}
+
+.box-team-slot img {
+    width: 60px;   /* fills the slot; clipped round by the parent — see .box-tile img */
+    height: 60px;
+    object-fit: contain;
+    pointer-events: none;
+    transform: translate(var(--sprite-x, 0px), var(--sprite-y, 0px)) scale(var(--sprite-scale, 1));
+}
+
+.box-team-slot i {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+

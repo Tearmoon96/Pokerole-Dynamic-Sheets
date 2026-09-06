@@ -1,0 +1,144 @@
+/* ---------------- The board: panels side by side ----------------
+   The whole screen is one horizontal strip of full-height columns,
+   meant to be stretched across wide / multiple displays. Each panel
+   scrolls vertically on its own; the board scrolls sideways. */
+.board {
+    flex: 1;
+    display: flex;
+    gap: 0.8rem;
+    padding: 0.8rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    min-height: 0;
+}
+
+/* Every panel grows by the same amount as the window widens: equal
+   basis, equal grow factor. min-width is what keeps them readable on a
+   narrow window instead — below five times this, the board scrolls
+   sideways rather than squeezing them all thin. */
+.panel {
+    flex: 1 1 390px;
+    min-width: 390px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    box-shadow: 0 0 18px var(--border-glow);
+    overflow: hidden;
+    /* the resize grabber is positioned against this */
+    position: relative;
+}
+
+/* A panel given a width of its own keeps it: applyLayout() writes
+   `flex: 0 0 <w>px` inline, which overrides the grow-and-share rule
+   above so the window widening no longer moves it. */
+.panel.dragging { opacity: 0.45; }
+
+/* The handle the panel is dragged by. Nothing else in the head starts
+   a drag, so a stray press on a button can never reorder the board. */
+.panel-grip {
+    flex: 0 0 auto;
+    cursor: grab;
+    color: var(--text-secondary);
+    opacity: 0.55;
+    font-size: 0.8rem;
+    padding: 0.15rem 0.1rem;
+}
+
+.panel-grip:hover { opacity: 1; color: var(--ghost-color); }
+.panel-grip:active { cursor: grabbing; }
+
+/* Held down while this panel's width is pinned */
+.panel-lock { flex: 0 0 auto; opacity: 0.55; }
+.panel-lock:hover { opacity: 1; }
+
+.panel.fixed-w .panel-lock {
+    opacity: 1;
+    border-color: var(--crit);
+    color: var(--crit);
+}
+
+/* Right-edge grabber. Sits inside the panel so the board's own gap
+   stays clear, and widens on hover so it is findable without being a
+   visible seam the rest of the time. */
+.panel-resize {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 7px;
+    cursor: col-resize;
+    /* above the body's own scrollbar, which sits in the same strip */
+    z-index: 5;
+}
+
+.panel-resize:hover, body.resizing .panel-resize {
+    background: linear-gradient(to right, transparent, var(--ghost-color));
+    opacity: 0.5;
+}
+
+/* A resize drag leaves the grabber the moment the pointer outruns it;
+   this keeps the whole page showing the same cursor until it ends, and
+   stops text selecting under the drag. */
+body.resizing { cursor: col-resize; user-select: none; }
+body.resizing .panel-body { pointer-events: none; }
+
+.panel-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--primary-faint);
+}
+
+.panel-head i.panel-icon { color: var(--ghost-color); width: 1.1rem; text-align: center; }
+
+.panel-head h2 {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    flex: 1;
+    /* the head gained a grip and a lock; the title is what gives way
+       when a narrow panel runs out of room, rather than the controls */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.7rem;
+    /* The resize grabber overlays the panel's right edge, which is
+       exactly where this body paints its scrollbar — and an overlaying
+       element takes the press, leaving the scrollbar undraggable. Step
+       the body in by the grabber's width so the two never share a
+       pixel. Matches .panel-resize's width. */
+    margin-right: 7px;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+/* Load-bearing. This is a column flex container with a bounded height,
+   where a flex item's default is to SHRINK to fit rather than overflow.
+   Without this the cards silently squash — and since several of them
+   clip their own overflow, their content just disappears — instead of
+   pushing past the bottom and giving the panel something to scroll.
+   Applies to every panel, so all five scroll the same way. */
+.panel-body > * { flex: 0 0 auto; }
+
+/* Slim scrollbars, same feel as the sheets */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--primary-soft); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ghost-color); }
+

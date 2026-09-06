@@ -1,0 +1,309 @@
+/* Pokémon browser: themed grid of Box sprites */
+.poke-picker-box {
+    max-width: 680px;
+    width: 92%;
+}
+
+.poke-picker-search {
+    width: 100%;
+    margin-top: 12px;
+}
+
+.poke-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(102px, 1fr));
+    gap: 8px;
+    margin-top: 14px;
+    max-height: 62vh;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.poke-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 5px 4px 4px;
+    border-radius: 12px;
+    background: #ffffff05;
+    border: 1px solid #ffffff0d;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+}
+
+.poke-tile:hover {
+    background: var(--primary-soft);
+    border-color: var(--ghost-color);
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+.poke-tile img {
+    width: 80px;
+    height: 80px;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
+/* Home sprites are full-art renders and read large in a tile: shrink them
+   a touch so they sit closer to the other sprite kinds */
+.poke-tile img.sprite-home {
+    width: 62px;
+    height: 62px;
+    image-rendering: auto;
+}
+
+.poke-tile-name {
+    font-size: 0.85rem;
+    line-height: 1.25;
+    color: var(--text-primary);
+    display: block;
+    text-align: center;
+}
+
+/* The stone stays in normal inline flow right after the name, but
+   the negative right margin cancels its width: the line measures
+   as if the name were alone, so the name centers exactly like a
+   non-mega tile and the stone paints just beside it */
+.poke-tile-name .mega-stone-icon {
+    height: 22px;
+    width: 22px;
+    object-fit: contain;
+    vertical-align: middle;
+    margin-left: 2px;
+    margin-right: -24px;
+    /* Repeated from .mega-stone-icon: .poke-tile img sets pixelated and
+       is more specific than the base rule, so without this the tiles keep
+       the staircase edge at an even harsher 0.275x. */
+    image-rendering: auto;
+}
+
+.poke-tile-num {
+    font-size: 0.76rem;
+    font-family: 'Fira Code', monospace;
+    color: var(--text-muted);
+}
+
+/* Dual-type pages: badges are clickable theme switchers */
+.type-badge.type-switch {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.type-badge.type-switch:not(.theme-active) {
+    opacity: 0.55;
+    box-shadow: none !important;
+}
+
+.type-badge.type-switch:hover {
+    opacity: 1;
+}
+
+/* Mega form: the stone sprite replaces the "(Mega Form)" suffix.
+   Interpolated, not pixelated, for the reason .line-item img gives: the
+   stones are 80px renders drawn at 34 here (22 in the picker tiles, 16
+   in a team slot), and nearest-neighbour turns the round edge into a
+   staircase. */
+.mega-stone-icon {
+    height: 34px;
+    image-rendering: auto;
+    vertical-align: middle;
+}
+
+.type-badge {
+    padding: 6px 16px;
+    border-radius: 30px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Page-theme picker rows. The two named License chips stack one per
+   row at the top; the 18 type chips below drop their label and render
+   as round icon buttons, so the whole picker stays a few rows tall
+   instead of a nine-row wall of names.
+
+   The named row is a single auto-width grid column rather than a flex
+   row: "Dark License" and "Light License" render a few pixels apart,
+   and the column takes the width of the wider chip so both fill it and
+   the pair reads as a matched set. */
+.theme-named-row {
+    display: grid;
+    grid-template-columns: auto;
+    justify-content: center;
+    gap: 8px;
+}
+
+.theme-named-row .theme-chip {
+    justify-content: center;
+}
+
+.theme-type-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 12px;
+}
+
+.theme-chip.icon-only {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border-radius: 50%;
+    justify-content: center;
+    font-size: 1rem;
+    transition: transform 0.15s;
+    /* .type-badge sets letter-spacing for its label; on a chip whose
+       only child is one glyph that becomes 1px of trailing space, and
+       centering the content box then sits the icon half a pixel left. */
+    letter-spacing: 0;
+}
+
+/* Inline glyphs are centered by their line box — built from the font's
+   ascent/descent — not by the icon itself, which leaves some sitting
+   visibly high. As a block with line-height 1 the box is the glyph. */
+.theme-chip.icon-only i {
+    display: block;
+    line-height: 1;
+}
+
+.theme-chip.icon-only:hover {
+    transform: scale(1.12);
+}
+
+.type-badge.ghost {
+    background: var(--primary-soft);
+    border: 1px solid var(--ghost-color);
+    color: #d8b4fe;
+    box-shadow: 0 0 10px var(--border-glow);
+}
+
+.type-eff-btn {
+    background: #ffffff08;
+    border: 1px solid #ffffff14;
+    color: var(--text-secondary);
+    width: 46px;
+    height: 30px;
+    padding: 0;
+    /* Fixed size so all header tool buttons match exactly */
+    border-radius: 30px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.type-eff-btn:hover {
+    background: var(--ghost-color);
+    border-color: var(--ghost-color);
+    color: #fff;
+    box-shadow: 0 0 10px var(--ghost-color-glow);
+}
+
+/* Full-sheet reset: destructive, so it glows red instead */
+.type-eff-btn.sheet-reset-btn:hover {
+    background: #f43f5e;
+    border-color: #f43f5e;
+    box-shadow: 0 0 10px #f43f5e66;
+}
+
+/* Save All while there are unsaved changes: amber tint + a corner dot */
+.type-eff-btn.has-unsaved {
+    color: #fbbf24;
+    border-color: #fbbf2466;
+    background: #f59e0b1f;
+    position: relative;
+}
+
+.type-eff-btn.has-unsaved::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #fbbf24;
+    box-shadow: 0 0 6px #fbbf24;
+}
+
+/* A newer release exists on GitHub: same corner dot as Save All, but in
+   the theme accent instead of amber (this is news, not a warning) */
+.type-eff-btn.has-update {
+    position: relative;
+}
+
+.type-eff-btn.has-update::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--ghost-color);
+    box-shadow: 0 0 6px var(--ghost-color);
+}
+
+/* Type effectiveness modal rows */
+.type-eff-box {
+    max-width: 480px;
+}
+
+.type-eff-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.type-eff-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.type-eff-row+.type-eff-row {
+    border-top: 1px solid #ffffff0d;
+    padding-top: 10px;
+}
+
+.type-eff-label {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    width: 56px;
+    flex-shrink: 0;
+    text-align: right;
+    padding-top: 3px;
+}
+
+.type-eff-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.type-eff-chip {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid;
+}
+
+.type-eff-none {
+    color: var(--text-muted);
+    padding-top: 2px;
+}
+

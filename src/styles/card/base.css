@@ -1,0 +1,82 @@
+:root {
+    /* Theme palette: applyTheme() overwrites every variable in this
+       block from the loaded Pokémon's typing. --ghost-color is the
+       primary (Type1) color, --accent the secondary (Type2, or a
+       lighter Type1 tint for single-type Pokémon). The defaults
+       below are the original Ghost purple. */
+    --bg-color: #0b0713;
+    --bg-top: #1e1233;
+    --card-bg: #191124b2;
+    --panel-strong: #191124f2;
+    --panel-medium: #191124e6;
+    --panel-soft: #191124cc;
+    --panel-solid: #191124;
+    --primary-faint: #a855f70d;
+    --border-color: #a855f740;
+    --border-glow: #a855f726;
+    --primary-soft: #a855f733;
+    --ghost-color: #a855f7;
+    --ghost-color-glow: #a855f766;
+    --text-primary: #f3e8ff;
+    --text-secondary: #c084fc;
+    --text-muted: #a21caf;
+    --accent: #22d3ee;
+    --accent-glow: #22d3ee4c;
+    --accent-faint: #22d3ee26;
+    --accent-soft: #22d3ee14;
+    --accent-border: #22d3ee40;
+    --trained-color: #22d3ee;
+    --trained-glow: #22d3ee4c;
+
+    --phys-color: #f97316;
+    --spec-color: #3b82f6;
+    --supp-color: #10b981;
+
+    /* Health and Willpower are one colour each, worn by the pool bar and
+       by the icon beside it — they must never disagree. The elemental
+       themes keep what they always had: the heart's own rose, and the
+       star on --accent, which is the secondary type (or the lighter
+       tint of the only type on a single-type Pokémon). The two License
+       themes name their own pair further down. */
+    --hp-color: #f43f5e;
+    --hp-glow: #f43f5e66;
+    --will-color: var(--accent);
+    --will-glow: var(--accent-glow);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: linear-gradient(135deg, var(--bg-top) 0%, var(--bg-color) 100%) no-repeat fixed;
+    font-family: 'Outfit', sans-serif;
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 60px 20px;
+    overflow-x: hidden;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0d0914cc;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--ghost-color);
+}
+

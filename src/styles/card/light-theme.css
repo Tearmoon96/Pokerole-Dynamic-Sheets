@@ -1,0 +1,568 @@
+/* ---------------- Light theme adjustments ----------------
+   applyTheme() adds .light-theme to <html> for the Light License
+   theme. The palette variables carry most of the page on their own;
+   what is left is everything written as white-alpha (invisible on a
+   pale body) or as near-black ink (a dark hole in a light one).
+
+   Every selector below is wrapped in :where(:root.light-theme), which
+   contributes no specificity of its own: each rule then ties with the
+   base rule it replaces and wins on source order alone, so the
+   :hover / :focus / .active rules further up the sheet keep working
+   instead of being outranked by a longer selector. */
+
+:root.light-theme {
+    /* Move-category inks: the dark-page trio drops to ~2.5:1 on a pale
+       badge, so each moves to a darker shade of itself */
+    --phys-color: #b45309;
+    --spec-color: #1d4ed8;
+    --supp-color: #047857;
+
+    /* HP on the very crimson the trainer sheet's HP / WILL / EXP banners
+       carry, Will on its own blue. Plain :root.light-theme, not
+       :where(): a zero-specificity selector would lose the variables
+       back to :root.
+
+       Opaque, not the banners' #c0272be6: the bar sits on a dark track,
+       so that translucent fill composited a shade darker than the
+       banners. This is roughly where the 90% crimson resolves over a
+       pale panel, and being opaque it holds wherever it lands — bar,
+       icon, or a filled stat circle. */
+    --hp-color: #c33e41;
+    --hp-glow: var(--ghost-color-glow);
+    --will-color: #3e6cf8;
+    --will-glow: #3e6cf866;
+}
+
+/* Every filled circle — base stats, socials, the loyalty/happiness
+   trackers, skills and specialties — takes the same crimson as the HP
+   bar. The theme's own --ghost-color and --trained-color sit a shade
+   apart, which on a pale panel reads as two arbitrary reds rather than
+   as base-vs-trained, so the light page collapses them to one. */
+:where(:root.light-theme) .dot.filled,
+:where(:root.light-theme) .dot.trained {
+    background-color: #c33e41;
+    border-color: #c33e41;
+    box-shadow: 0 0 8px #c33e414a;
+}
+
+/* Split off only to keep the skill circles' tighter 6px halo */
+:where(:root.light-theme) .skill-dot.filled {
+    background-color: #c33e41;
+    border-color: #c33e41;
+    box-shadow: 0 0 6px #c33e414a;
+}
+
+/* Hand-picked pair for the Dark License, whose own crimson sits too dark
+   behind a pool bar */
+:root.dark-license {
+    --hp-color: #ff4a4e;
+    --hp-glow: #ff4a4e66;
+    --will-color: #3c6cf8;
+    --will-glow: #3c6cf866;
+}
+
+:where(:root.light-theme) ::-webkit-scrollbar-track,
+:where(:root.light-theme) .moves-grid::-webkit-scrollbar-track {
+    background: #00000012;
+}
+
+/* Hairlines: panel frames, dividers, inputs and buttons were all drawn
+   as white-alpha borders */
+:where(:root.light-theme) .sprite-selectors,
+:where(:root.light-theme) .sprite-custom-btn,
+:where(:root.light-theme) .sprite-scale-btn,
+:where(:root.light-theme) .sprite-scale-reset,
+:where(:root.light-theme) .poke-tile,
+:where(:root.light-theme) .type-eff-btn,
+:where(:root.light-theme) .type-eff-row + .type-eff-row,
+:where(:root.light-theme) .pool-btn,
+:where(:root.light-theme) .pool-static-val,
+:where(:root.light-theme) .exp-input,
+:where(:root.light-theme) .pool-text-input,
+:where(:root.light-theme) .def-offset-btn,
+:where(:root.light-theme) .stats-edit-form,
+:where(:root.light-theme) .edit-input,
+:where(:root.light-theme) .form-btn.cancel,
+:where(:root.light-theme) .dot.locked,
+:where(:root.light-theme) .specialty-input,
+:where(:root.light-theme) .ability-pick-row,
+:where(:root.light-theme) .filter-picker-btn,
+:where(:root.light-theme) .move-edit-input,
+:where(:root.light-theme) .move-edit-textarea,
+:where(:root.light-theme) .offset-steppers,
+:where(:root.light-theme) .offset-step-btn:first-child,
+:where(:root.light-theme) .quick-move-val,
+:where(:root.light-theme) .move-rank-badge,
+:where(:root.light-theme) .move-effects-list,
+:where(:root.light-theme) .no-moves-msg,
+:where(:root.light-theme) .notepad-textarea {
+    border-color: #00000024;
+}
+
+/* The fainter inner hairlines stay faint, or the cards and the little
+   stat boxes turn into a grid of hard outlines */
+:where(:root.light-theme) .custom-specialty-row,
+:where(:root.light-theme) .evolution-flow,
+:where(:root.light-theme) .move-stats-grid,
+:where(:root.light-theme) .effect-detail,
+:where(:root.light-theme) .quick-move,
+:where(:root.light-theme) .move-card,
+:where(:root.light-theme) .ail-tile {
+    border-color: #00000014;
+}
+
+/* Panel bodies: #0d0914 at 30% is a dark hole on a pale card */
+:where(:root.light-theme) .tracker-panel,
+:where(:root.light-theme) .stats-panel,
+:where(:root.light-theme) .skills-panel,
+:where(:root.light-theme) .details-panel,
+:where(:root.light-theme) .desc-panel,
+:where(:root.light-theme) .notepad-panel {
+    background: #00000012;
+}
+
+/* The two recessed wells — the sprite box and the move list facing it —
+   keep their inset shadow, at an alpha that reads on a light ground,
+   and take it in the theme crimson rather than in black, so the hollow
+   they sit in is the same red the section banners are printed in.
+   Mixed rather than written as a literal, so it tracks --ghost-color
+   the way those banners do. One rule for both: they face each other
+   across the card and have to read as one material. */
+:where(:root.light-theme) .sprite-panel,
+:where(:root.light-theme) .moves-scroll {
+    background: #0000000d;
+    box-shadow: inset 0 0 20px
+        color-mix(in srgb, var(--ghost-color) 26%, transparent);
+}
+
+/* The same copy of the corner glow as on the dark page, at the light
+   fill. Later than the rule above and at equal specificity. */
+:where(:root.light-theme) .moves-scroll {
+    background: linear-gradient(#0000000d, #0000000d),
+        radial-gradient(circle 620px at 70px 100px,
+            var(--border-glow) 0%, transparent 100%);
+}
+
+/* Pop-overs were near-opaque #0d0914; they become the light panel */
+:where(:root.light-theme) .sprite-scale-editor,
+:where(:root.light-theme) .def-offset-pop {
+    background: var(--panel-strong);
+    box-shadow: 0 8px 24px #00000029;
+}
+
+:where(:root.light-theme) .move-card,
+:where(:root.light-theme) .quick-move {
+    background: #00000010;
+}
+
+:where(:root.light-theme) .ability-panel {
+    background: linear-gradient(135deg, var(--primary-faint) 0%, #00000012 100%);
+}
+
+/* Recessed fills: inputs, wells and chips that were near-black */
+:where(:root.light-theme) .nickname-input,
+:where(:root.light-theme) .exp-input,
+:where(:root.light-theme) .pool-text-input,
+:where(:root.light-theme) .edit-input,
+:where(:root.light-theme) .specialty-input,
+:where(:root.light-theme) .move-edit-input,
+:where(:root.light-theme) .move-edit-textarea,
+:where(:root.light-theme) .def-offset-btn,
+:where(:root.light-theme) .pokemon-picker-btn,
+:where(:root.light-theme) .sprite-custom-btn,
+:where(:root.light-theme) .sprite-scale-btn {
+    background: #0000000d;
+}
+
+:where(:root.light-theme) .nickname-input:hover,
+:where(:root.light-theme) .nickname-input:focus {
+    background: #00000017;
+}
+
+:where(:root.light-theme) .pool-static-val,
+:where(:root.light-theme) .stats-edit-form,
+:where(:root.light-theme) .evolution-flow,
+:where(:root.light-theme) .custom-specialty-row,
+:where(:root.light-theme) .move-stats-grid,
+:where(:root.light-theme) .effect-detail,
+:where(:root.light-theme) .no-moves-msg,
+:where(:root.light-theme) .ail-tile,
+:where(:root.light-theme) .wx-tab,
+:where(:root.light-theme) .quick-move-val,
+:where(:root.light-theme) .sprite-selectors,
+:where(:root.light-theme) .notepad-textarea,
+:where(:root.light-theme) .total-flag {
+    background: #00000012;
+}
+
+/* Darker than the other light-theme wells, and it has to be: the value
+   is centred, so on a low pool the white digits sit on this track and
+   not on the fill. #69 is the lightest alpha that still clears 3:1 for
+   them (the empty track lands on ~#959595). */
+:where(:root.light-theme) .pool-bar {
+    background: #00000069;
+}
+
+/* Sits over the bar it replaces, so it needs a solid light body */
+:where(:root.light-theme) .pool-max-input {
+    background: var(--panel-solid);
+    color: var(--text-primary);
+}
+
+/* White-alpha fills invert to black-alpha */
+:where(:root.light-theme) .pool-btn,
+:where(:root.light-theme) .moves-count,
+:where(:root.light-theme) .move-attr-tag,
+:where(:root.light-theme) .offset-step-btn,
+:where(:root.light-theme) .ability-remove-btn,
+:where(:root.light-theme) .sprite-scale-reset,
+:where(:root.light-theme) .dot.locked,
+:where(:root.light-theme) .filter-option:hover {
+    background: #00000012;
+}
+
+:where(:root.light-theme) .poke-tile,
+:where(:root.light-theme) .ability-pick-row,
+:where(:root.light-theme) .type-eff-btn,
+:where(:root.light-theme) .filter-picker-btn,
+:where(:root.light-theme) .form-btn.cancel,
+:where(:root.light-theme) .pokemon-name-text.editable:hover {
+    background: #0000000d;
+}
+
+:where(:root.light-theme) .form-btn.cancel:hover,
+:where(:root.light-theme) .status-icon:hover {
+    background: #0000001a;
+}
+
+:where(:root.light-theme) .pokemon-name-text.editable:focus {
+    background: #00000014;
+    -webkit-text-fill-color: var(--text-primary);
+    color: var(--text-primary);
+}
+
+/* The strike-through bar over a Disabled move */
+:where(:root.light-theme) .move-card.disabled::before {
+    background: #00000038;
+}
+
+/* Text that was white, on surfaces that no longer are */
+:where(:root.light-theme) .pokemon-name,
+:where(:root.light-theme) .blank-landing h1 {
+    background: none;
+    -webkit-text-fill-color: var(--text-primary);
+    color: var(--text-primary);
+    text-shadow: none;
+}
+
+:where(:root.light-theme) .ability-effect,
+:where(:root.light-theme) .effect-detail,
+:where(:root.light-theme) .edit-input,
+:where(:root.light-theme) .specialty-input,
+:where(:root.light-theme) .move-edit-input,
+:where(:root.light-theme) .move-edit-textarea {
+    color: var(--text-primary);
+}
+
+:where(:root.light-theme) select.move-edit-input option,
+:where(:root.light-theme) select.move-edit-input optgroup {
+    background: var(--panel-solid);
+    color: var(--text-primary);
+}
+
+:where(:root.light-theme) .status-icon i {
+    color: #00000045;
+}
+
+:where(:root.light-theme) .status-icon:hover i {
+    color: #000000b3;
+}
+
+:where(:root.light-theme) .notepad-textarea {
+    color-scheme: light;
+}
+
+/* The gender glyph floats over the sprite, so its halo has to flip too */
+:where(:root.light-theme) .gender-toggle {
+    text-shadow: 0 1px 3px #ffffffcc;
+}
+
+:where(:root.light-theme) .gender-toggle.male {
+    color: #2563eb;
+}
+
+:where(:root.light-theme) .gender-toggle.female {
+    color: #db2777;
+}
+
+/* The fills are themed by --hp-color / --will-color; all the light page
+   changes is the glow, which smears on a pale panel instead of reading
+   as a halo. */
+:where(:root.light-theme) .pool-bar-fill.health,
+:where(:root.light-theme) .pool-bar-fill.willpower {
+    box-shadow: none;
+}
+
+/* Same near-white as the text on those section bars. It has to survive
+   both grounds: the digits are centred, so on a low pool they sit on
+   the bar's own pale empty track, not on the fill — hence the shadow,
+   which is what carries them there. */
+:where(:root.light-theme) .pool-bar-value {
+    color: #fff5f5;
+    text-shadow: 0 1px 2px #000000b3, 0 0 3px #00000080;
+}
+
+/* ---- Buttons drawn for a dark page ----
+   Two failures: near-black text on a mid-tone themed fill, and white
+   text on a hover that only changes the border. */
+:where(:root.light-theme) .form-btn.save {
+    background: var(--ghost-color);
+    color: #fff;
+}
+
+:where(:root.light-theme) .form-btn.save:hover {
+    background: var(--ghost-color);
+    filter: none;
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+:where(:root.light-theme) .form-btn.reset {
+    background: #f43f5e14;
+    border-color: #f43f5e4d;
+    color: #b12341;
+}
+
+:where(:root.light-theme) .form-btn.reset:hover {
+    background: #f43f5e2e;
+}
+
+/* Its default body is --border-color, a pale crimson wash here */
+:where(:root.light-theme) .specialty-add-btn {
+    background: var(--ghost-color);
+    border-color: var(--ghost-color);
+    color: #fff;
+}
+
+:where(:root.light-theme) .evolve-btn.mega:hover {
+    color: #fff;
+}
+
+:where(:root.light-theme) .evolve-btn.revert {
+    color: #a3550a;
+}
+
+/* Hovers that never fill, so #fff had nothing to sit on */
+:where(:root.light-theme) .sprite-custom-btn:hover,
+:where(:root.light-theme) .sprite-scale-btn:hover,
+:where(:root.light-theme) .sprite-scale-reset:hover,
+:where(:root.light-theme) .def-offset-btn:hover {
+    color: var(--text-primary);
+}
+
+:where(:root.light-theme) .move-edit-btn:hover {
+    color: var(--ghost-color);
+    text-shadow: none;
+}
+
+:where(:root.light-theme) .move-trash-btn:hover {
+    color: #b12341;
+    text-shadow: none;
+}
+
+:where(:root.light-theme) .ability-remove-btn:hover {
+    color: #b12341;
+}
+
+/* Small state glyphs: the dark-page brights wash out on a pale chip */
+:where(:root.light-theme) .total-flag.buffed {
+    color: #047857;
+}
+
+/* Pain, and Pain at 1 HP. The dark page tells them apart with #fb923c
+   and #fb7185; darkened for paper they both landed near a burnt
+   red-brown, 30 degrees of hue apart, and the broken-heart glyph was
+   the same colour either way. These pull back apart — a true orange at
+   27 degrees against a true red at 351, and a lightness gap on top of
+   the hue, so the escalation reads at a glance. Both hold over 4:1 on
+   the light panel. */
+:where(:root.light-theme) .total-flag.pain,
+:where(:root.light-theme) .pain-quick.on .quick-move-name i,
+:where(:root.light-theme) .pain-quick.on .quick-move-val strong {
+    color: #cc5a00;
+}
+
+:where(:root.light-theme) .total-flag.pain.severe,
+:where(:root.light-theme) .pain-quick.severe .quick-move-name i,
+:where(:root.light-theme) .pain-quick.severe .quick-move-val strong {
+    color: #d10f2d;
+}
+
+/* The box's own wash follows the ink: at the dark page's alphas the
+   tint all but vanished against a pale panel. A plain outline here —
+   the light page shows its neighbours' hairline plainly, so Pain has
+   one in the same place. */
+:where(:root.light-theme) .pain-quick.on {
+    background-color: #cc5a001f;
+    border-color: #cc5a0059;
+}
+
+:where(:root.light-theme) .pain-quick.severe {
+    background-color: #d10f2d1f;
+    border-color: #d10f2d59;
+}
+
+/* ---- The red the printed license is made of ----
+   The palette alone left the light page reading as plain paper. These
+   put the crimson back where the sheet has it: solid bars over each
+   panel, red rules and red small-caps labels, the way the official
+   form prints its HP / WILL headers. Dark-page equivalents already
+   carry the theme in their glows, so all of this is light-only. */
+
+/* Section headings become solid bars, in the crimson the trainer sheet
+   paints its own banners with (.section-bar, .hwe-label) — the same hue
+   at 90%, which reads a touch softer than the flat --ghost-color this
+   used to carry. Kept as a literal so the two sheets stay in step. */
+:where(:root.light-theme) .stats-title {
+    background: #c0272be6;
+    color: #fff5f5;
+    border-bottom-color: transparent;
+    border-radius: 10px;
+    padding: 7px 12px;
+    box-shadow: 0 2px 8px var(--ghost-color-glow);
+}
+
+/* The collapse / edit chevrons sit on that bar now */
+:where(:root.light-theme) .stats-title .edit-stats-btn {
+    color: #fff5f5;
+}
+
+:where(:root.light-theme) .stats-title .edit-stats-btn:hover,
+:where(:root.light-theme) .stats-title .edit-stats-btn.active {
+    color: #fff;
+    text-shadow: 0 0 8px #ffffff80;
+}
+
+/* Move Learnset keeps its tall title line, so it takes a red rule under
+   it instead of a bar — a solid block that deep would swamp the column */
+:where(:root.light-theme) .moves-header {
+    border-bottom: 2px solid var(--ghost-color);
+}
+
+:where(:root.light-theme) .moves-count {
+    background: var(--primary-soft);
+    color: var(--ghost-color);
+}
+
+/* Small-caps labels in the theme red: the skill categories, the
+   specialties heading, and Height / Weight / Evolutions */
+:where(:root.light-theme) .category-title,
+:where(:root.light-theme) .specialties-title,
+:where(:root.light-theme) .detail-label {
+    color: var(--ghost-color);
+}
+
+:where(:root.light-theme) .category-title {
+    border-bottom-color: var(--accent-border);
+}
+
+/* On the dark page .cat-icon.active goes to --text-primary, which is
+   a brightening: grey glyph to white, plus the glow. Here the row is
+   already printed in the theme red and --text-primary is near-black,
+   so switching a category on drained the colour out of its icon and
+   the glow was left ringing a black glyph. The glow alone says it is
+   on; the icon keeps the colour it inherits from the row. Hover too,
+   or hovering an active one turned it black again. */
+:where(:root.light-theme) .cat-icon:hover,
+:where(:root.light-theme) .cat-icon.active {
+    color: inherit;
+}
+
+/* Red rules where the panels divide themselves */
+:where(:root.light-theme) .specialties-section,
+:where(:root.light-theme) .evolution-panel {
+    border-top-color: var(--border-color);
+}
+
+/* Panel frames take the themed hairline rather than a neutral one, so
+   every box on the page is outlined in a wash of the same red */
+:where(:root.light-theme) .tracker-panel,
+:where(:root.light-theme) .stats-panel,
+:where(:root.light-theme) .skills-panel,
+:where(:root.light-theme) .details-panel,
+:where(:root.light-theme) .desc-panel,
+:where(:root.light-theme) .notepad-panel,
+:where(:root.light-theme) .ability-panel {
+    border-color: var(--border-color);
+}
+
+/* The opening quote over the dex entry is --border-glow, near-invisible
+   on paper; at full crimson it becomes the flourish it was meant to be */
+:where(:root.light-theme) .desc-panel::before {
+    color: var(--primary-soft);
+}
+
+/* Tracker row icons are inline pastels picked for a dark page — Def and
+   Sp.Def land under 2:1 on a pale row. Darkened through a filter, which
+   is not set inline, so it reaches them without !important.
+
+   The HP and Will icons are exempt: they already carry --hp-color /
+   --will-color, which are picked for this page, and the filter was
+   pulling each one off the bar it is supposed to match. */
+:where(:root.light-theme) .tracker-label i:not(.pool-ink-hp):not(.pool-ink-will) {
+    filter: brightness(0.62) saturate(1.3);
+}
+
+/* The light/dark switch keeps the same body as the tool buttons below it */
+:where(:root.light-theme) .theme-switch-btn {
+    background: #0000000d;
+    border-color: #00000024;
+}
+
+/* One column: the card's padding drops to 24px, and a long centred name
+   shrunk to fit reaches almost to that edge — not enough to clear the
+   corner button, so the header starts lower down here. */
+@media (max-width: 900px) {
+    .card-container {
+        padding-top: 56px;
+    }
+}
+
+/* Drop shadows: 60% black under a pale card is a bruise, not a lift */
+:where(:root.light-theme) .card-container,
+:where(:root.light-theme) .modal-box {
+    box-shadow: 0 12px 40px 0 #0000002e, 0 0 30px 2px var(--border-glow);
+}
+
+:where(:root.light-theme) .filter-picker-menu,
+:where(:root.light-theme) .move-suggestions {
+    box-shadow: 0 8px 24px #00000029, 0 0 20px 2px var(--border-glow);
+}
+
+:where(:root.light-theme) #app-tooltip {
+    box-shadow: 0 8px 24px #00000029, 0 0 18px 1px var(--border-glow);
+}
+
+:where(:root.light-theme) .move-card:hover {
+    box-shadow: 0 4px 15px #00000014;
+}
+
+:where(:root.light-theme) .blank-btn {
+    box-shadow: 0 8px 24px #00000026;
+}
+
+:where(:root.light-theme) .blank-btn:hover {
+    box-shadow: 0 8px 24px #00000026, 0 0 18px var(--ghost-color-glow);
+}
+
+:where(:root.light-theme) .blank-btn.wild:hover {
+    box-shadow: 0 8px 24px #00000026, 0 0 18px #22c55e55;
+}
+
+:where(:root.light-theme) .wild-arrow,
+:where(:root.light-theme) .wild-indicator {
+    box-shadow: 0 8px 24px #00000026, 0 0 18px 1px var(--border-glow);
+}
+
+:where(:root.light-theme) .wild-pick-row {
+    background: #00000008;
+}

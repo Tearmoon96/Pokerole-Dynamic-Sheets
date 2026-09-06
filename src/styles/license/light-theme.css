@@ -1,0 +1,388 @@
+/* ---------------- Light theme adjustments ----------------
+   applyTheme() adds .light-theme to <html> for the Light License
+   theme. Most of the palette follows CSS variables already; these
+   rules fix the hairline dividers and translucent fills that were
+   written as white-alpha (invisible on a light background). */
+:root.light-theme .team-slot,
+:root.light-theme .team-slot-header,
+:root.light-theme .team-field input,
+:root.light-theme .hwe-box,
+:root.light-theme .hwe-label,
+:root.light-theme .achievements-box,
+:root.light-theme .achievements-title,
+:root.light-theme .achievement-input,
+:root.light-theme .line-item,
+:root.light-theme .bag-col-label,
+:root.light-theme .potion-tallies,
+:root.light-theme .heal-box,
+:root.light-theme .heal-box-val,
+:root.light-theme .other-box,
+:root.light-theme .tally-sq,
+:root.light-theme .ach-check,
+:root.light-theme .pokemon-picker-btn,
+:root.light-theme .extra-add-btn,
+:root.light-theme .exp-input,
+:root.light-theme .pool-text-input,
+:root.light-theme .specialty-input,
+:root.light-theme .tally-qty-input,
+:root.light-theme .pill-field,
+:root.light-theme .move-suggestions {
+    border-color: #00000024;
+}
+
+/* Header strips become solid themed-red bars with light text — this
+   adds the red the light theme was missing and gives each box a clear
+   top section (like the printed sheet's HP / WILL headers) */
+:root.light-theme .hwe-label,
+:root.light-theme .achievements-title {
+    background: #c0272be6;
+    color: #fff5f5;
+    border-bottom-color: transparent;
+}
+
+/* Section title bars (BAG, POKEMON TEAM, ...) go red too — slightly
+   translucent so the crimson reads a touch softer */
+:root.light-theme .section-bar {
+    background: #c0272be6;
+    border-color: #c0272bf2;
+    color: #fff;
+    text-shadow: none;
+    box-shadow: 0 2px 8px var(--ghost-color-glow);
+}
+
+/* Team-slot header keeps its dark name + edit button, so it gets a
+   soft red tint rather than a solid bar */
+:root.light-theme .team-slot-header {
+    background: var(--primary-soft);
+}
+
+/* Inner boxes: opaque light cards, clearly distinct from the panels */
+:root.light-theme .hwe-box,
+:root.light-theme .other-box,
+:root.light-theme .potion-tallies,
+:root.light-theme .heal-box,
+:root.light-theme .achievements-box,
+:root.light-theme .team-slot,
+:root.light-theme .notepad-textarea,
+:root.light-theme .pokemon-picker-btn,
+:root.light-theme .ach-check {
+    background: #00000012;
+}
+
+/* The red banner is a child of these boxes and overflow: hidden clips it
+   to the padding box, so with a border on the box it stopped 1px short of
+   the card's edge. That 1px of box fill under a #00000024 border is all
+   but invisible against the light body, but obvious against the red — so
+   the banner read as inset and left a step where the two meet.
+
+   Moving the hairline to an inset shadow fixes it without moving
+   anything: paint order is background, then inset shadow, then children.
+   So the banner — the only child here with a background of its own —
+   covers the ring and runs edge to edge, while the bodies below it
+   (.hwe-body, #achievements-list, .other-textarea are all transparent)
+   let it through. Border round the light part, none round the red.
+
+   The alpha is unchanged because the stack is: the ring still sits on
+   the box's own #00000012 fill, exactly as the border did. */
+:root.light-license .hwe-box,
+:root.light-license .other-box,
+:root.light-license .achievements-box {
+    border: none;
+    box-shadow: inset 0 0 0 1px #00000024;
+}
+
+/* The Healing Item chip sits on an already-tinted box, so it needs a
+   lighter fill of its own to stay legible; the green kit icon is a
+   dark-page color and gets the same halfway-to-black ink as typeInk. */
+:root.light-theme .heal-box-val {
+    background: #0000001f;
+}
+
+:root.light-theme .heal-box-label i {
+    color: #256f40;
+}
+
+:root.light-theme .notepad-textarea {
+    color-scheme: light;
+}
+
+/* The gradient license title is near-white; make it solid dark */
+:root.light-theme .license-title {
+    background: none;
+    -webkit-text-fill-color: var(--text-primary);
+    color: var(--text-primary);
+    text-shadow: none;
+}
+
+/* White button text is unreadable on the light-pink default fill;
+   give the Add buttons a solid crimson body on the light theme */
+:root.light-theme .specialty-add-btn {
+    background: var(--ghost-color);
+    border-color: var(--ghost-color);
+    color: #fff;
+}
+
+/* Recessed light-grey fills for inputs and the photo / sprite wells */
+:root.light-theme .exp-input,
+:root.light-theme .pool-text-input,
+:root.light-theme .pill-field,
+:root.light-theme .specialty-input,
+:root.light-theme .tally-qty-input,
+:root.light-theme .team-sprite-circle,
+:root.light-theme .equip-notes,
+:root.light-theme .equip-slot,
+:root.light-theme .gear-cat-chip,
+:root.light-theme .gear-choice,
+:root.light-theme .photo-arch {
+    background: #0000000d;
+}
+
+:root.light-theme .equip-slot.filled,
+:root.light-theme .gear-cat-chip.active,
+:root.light-theme .gear-choice:hover {
+    background: var(--primary-soft);
+}
+
+/* PC storage: the chips and the two divider rules are white-alpha,
+   which vanishes on a light body. (The sprite wells follow --box-well,
+   swapped where that variable is defined.) */
+:root.light-theme .box-tab {
+    background: #0000000d;
+}
+
+:root.light-theme .box-actions,
+:root.light-theme .box-team-strip {
+    border-color: #00000024;
+}
+
+:root.light-theme .box-tab.active {
+    background: var(--primary-soft);
+}
+
+/* Pale wells here, so the monochrome icons read as-drawn */
+:root.light-theme .mono-art {
+    filter: none;
+}
+
+/* HP / Will bars are too vivid on the light theme: mute the fills
+   and drop the saturated glow */
+/* Darker than the other light-theme wells, and it has to be: the value
+   is centred, so on a low pool the white digits sit on this track and
+   not on the fill. #69 is the lightest alpha that still clears 3:1 for
+   them (the empty track lands on ~#959595). Same as the card. */
+:root.light-theme .pool-bar {
+    background: #00000069;
+}
+
+/* Both fills are themed on their base rules; the light page only drops
+   the glow, which smears on a pale panel instead of reading as a halo */
+:root.light-theme .pool-bar-fill.health,
+:root.light-theme .pool-bar-fill.willpower {
+    box-shadow: none;
+}
+
+/* Light License: HP on the crimson of the section bars, Will on the
+   SPECIAL badge's blue. Plain :root.light-theme, not :where(): a
+   zero-specificity selector would lose the variables back to :root.
+
+   The crimson is opaque here, not the banners' #c0272be6: the bars sit
+   on a dark track, so the same translucent fill composited a shade
+   darker than the banners it was meant to match. #c54042 is what that
+   90% crimson resolves to over a pale panel. */
+:root.light-theme {
+    --hp-color: #c54042;
+    --hp-glow: var(--ghost-color-glow);
+    --will-color: #3e6cf8;
+    --will-glow: #3e6cf866;
+}
+
+/* Hand-picked pair for the Dark License, whose own crimson sits too dark
+   behind a pool bar */
+:root.dark-license {
+    --hp-color: #ff4a4e;
+    --hp-glow: #ff4a4e66;
+    --will-color: #3c6cf8;
+    --will-glow: #3c6cf866;
+}
+
+/* License themes only: no edge at all on the two pool bars, so each
+   reads as one clean band of colour. The elemental themes keep the
+   neutral white-alpha hairline.
+
+   Specificity, not order, is what carries this: (0,3,0) against the
+   (0,1,0) edge on .pool-bar and the light page's own :where()-flattened
+   hairline rule. Everything is border-box, so dropping the 1px leaves
+   the bar the same size on the outside and hands the room to the fill. */
+:root.light-license .pool-bar,
+:root.dark-license .pool-bar {
+    border: none;
+}
+
+:root.light-theme .move-suggestion:hover {
+    background: var(--primary-soft);
+}
+
+/* Same near-white as the text on the section bars, carried over the
+   empty track by the shadow — see the .pool-bar note above */
+:root.light-theme .pool-bar-value {
+    color: #fff5f5;
+    text-shadow: 0 1px 2px #000000b3, 0 0 3px #00000080;
+}
+
+/* ---- Buttons that were drawn for a dark page ----
+   Three separate failures, all invisible on a light background: a
+   white-alpha body, a near-black well, or near-black text sitting on
+   a mid-tone fill. Each hover state is restated because these
+   selectors outrank the plain `.class:hover` rules they override. */
+
+/* Done / Save: `color: #0b0713` on --accent is black-on-crimson here.
+   Solid themed body with white text, matching the Add buttons above. */
+:root.light-theme .form-btn.save {
+    background: var(--ghost-color);
+    color: #fff;
+}
+
+:root.light-theme .form-btn.save:hover {
+    background: var(--ghost-color);
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+/* Cancel's white-alpha body and border leave nothing but the label */
+:root.light-theme .form-btn.cancel {
+    background: #0000000d;
+    border-color: #00000029;
+    color: var(--text-primary);
+}
+
+:root.light-theme .form-btn.cancel:hover {
+    background: #0000001a;
+}
+
+/* Reset's pale rose text needs to darken to hold its own pale fill */
+:root.light-theme .form-btn.reset {
+    background: #f43f5e14;
+    border-color: #f43f5e4d;
+    color: #b12341;
+}
+
+:root.light-theme .form-btn.reset:hover {
+    background: #f43f5e2e;
+}
+
+/* Photo-arch corner controls (remove / resize) and the Equipment pill
+   are near-black chips with themed-secondary text — dark on dark once
+   the text goes dark. Flip to a light chip with a real border and a
+   drop shadow, since they float over whatever photo is behind them. */
+:root.light-theme .photo-remove-btn,
+:root.light-theme .photo-adjust-btn,
+:root.light-theme .photo-equip-btn {
+    background: var(--panel-strong);
+    border-color: #00000038;
+    color: var(--text-primary);
+    box-shadow: 0 1px 5px #00000033;
+}
+
+:root.light-theme .photo-adjust-btn:hover,
+:root.light-theme .photo-equip-btn:hover {
+    background: var(--ghost-color);
+    border-color: var(--ghost-color);
+    color: #fff;
+}
+
+:root.light-theme .photo-remove-btn:hover {
+    background: #f43f5e;
+    border-color: #f43f5e;
+    color: #fff;
+}
+
+/* Header tool buttons and the HP / Will / quantity steppers: same
+   white-alpha body, same disappearing act */
+:root.light-theme .type-eff-btn,
+:root.light-theme .pool-btn {
+    background: #0000000d;
+    border-color: #00000029;
+}
+
+:root.light-theme .type-eff-btn:hover,
+:root.light-theme .pool-btn:hover {
+    background: var(--ghost-color);
+    border-color: var(--ghost-color);
+    color: #fff;
+}
+
+:root.light-theme .type-eff-btn.sheet-reset-btn:hover {
+    background: #f43f5e;
+    border-color: #f43f5e;
+}
+
+/* Save All's unsaved-changes tint: restated so the rule above doesn't
+   outrank it, and darkened, since #fbbf24 amber washes out on a pale
+   body. The corner dot keeps the brighter amber to stay a signal. */
+:root.light-theme .type-eff-btn.has-unsaved {
+    color: #a3550a;
+    border-color: #d9770680;
+    background: #f59e0b2e;
+}
+
+/* Same treatment for the update dot: --ghost-color is tuned for a dark
+   page, and the pale accents drop to ~1.5:1 on a light body (see
+   typeInk), so darken it rather than trust the raw theme color. */
+:root.light-theme .type-eff-btn.has-update::after {
+    background: color-mix(in srgb, var(--ghost-color) 65%, #000);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--ghost-color) 45%, transparent);
+}
+
+:root.light-theme .type-eff-btn.has-unsaved::after {
+    background: #d97706;
+    box-shadow: 0 0 6px #d9770699;
+}
+
+/* Unearned gym badge slots: the white-alpha outline and glyph invert to
+   black-alpha, at the alphas that land on the same contrast the base
+   rule now targets (~2.5:1 outline, ~3:1 glyph). They run higher than
+   the dark theme's because dark ink on a pale field reads weaker than
+   the reverse at equal alpha. */
+:root.light-theme .badge-sq {
+    background: #0000000f;
+    border-color: #00000061;
+    color: #0000006b;
+}
+
+:root.light-theme .badge-sq:hover {
+    border-color: #000000a6;
+    color: #000000bf;
+}
+
+/* Equipment window: the bag well and the slots' face-flip corner
+   button are both black-alpha, which reads as a dark hole in an
+   otherwise light modal */
+:root.light-theme .equip-bag {
+    background: #0000000d;
+}
+
+:root.light-theme .equip-face-toggle {
+    background: #00000014;
+    color: var(--text-secondary);
+}
+
+:root.light-theme .equip-face-toggle:hover,
+:root.light-theme .equip-face-toggle:focus-visible {
+    color: var(--text-primary);
+}
+
+/* Row delete in both bags (the trainer's and the Adventurer Bag in the
+   equipment window): --text-secondary at 55% opacity is a faint grey on
+   a pale row. Same weight, drawn from --text-primary instead, which
+   takes it from ~2.3:1 to ~4.8:1 without turning it into a loud button.
+   The red hover is restated because this selector outranks it. */
+:root.light-theme .item-remove {
+    color: var(--text-primary);
+    opacity: 0.65;
+}
+
+:root.light-theme .item-remove:hover,
+:root.light-theme .item-remove:focus-visible {
+    color: #f43f5e;
+    opacity: 1;
+}
+

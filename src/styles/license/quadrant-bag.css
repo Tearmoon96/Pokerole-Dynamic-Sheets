@@ -1,0 +1,363 @@
+/* ---------------- Bag quadrant ---------------- */
+.bag-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 12px;
+    /* Sits above the later-DOM potion/badge panels (which the shared
+       .panel>* rule pins at z-index 1) so the add-item dropdown, a
+       child of this grid, is not painted over by them */
+    position: relative;
+    z-index: 5;
+}
+
+@media (max-width: 480px) {
+    .bag-columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+.bag-col {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bag-col-label {
+    text-align: center;
+    font-size: 0.62rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    border-bottom: 1px dashed #ffffff14;
+    padding-bottom: 4px;
+}
+
+.bag-list {
+    display: flex;
+    flex-direction: column;
+    min-height: 120px;
+}
+
+.line-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 1px dashed #ffffff1a;
+    padding: 4px 2px;
+}
+
+/* ItemSprites are 80px renders, not pixel art. Drawn at 20px with
+   `pixelated` the browser samples one pixel in four, which chews the
+   anti-aliased edge into a staircase and drops thin highlights
+   altogether. Let it interpolate. */
+.line-item img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    image-rendering: auto;
+    flex-shrink: 0;
+}
+
+.line-item-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.line-item .pool-btn {
+    width: 15px;
+    height: 15px;
+    font-size: 0.5rem;
+    opacity: 0;
+    transition: all 0.2s;
+}
+
+.line-item:hover .pool-btn {
+    opacity: 1;
+}
+
+.line-item-qty {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    min-width: 24px;
+    text-align: center;
+}
+
+/* Bare icon button, styled like the rulebook cards' delete. Without
+   these it falls back to the browser's default button chrome: a pale
+   grey-white fill and an arrow cursor instead of the pointing hand. */
+.item-remove {
+    flex: none;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: inherit;
+    cursor: pointer;
+    opacity: 0.55;
+    transition: all 0.15s;
+}
+
+.item-remove:hover,
+.item-remove:focus-visible {
+    color: #f43f5e;
+    opacity: 1;
+    outline: none;
+}
+
+.line-item .item-remove {
+    font-size: 0.7rem;
+    padding: 2px 3px;
+}
+
+.bag-empty {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 6px 2px;
+}
+
+.bag-add {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.bag-add-wrap {
+    position: relative;
+    flex: 1;
+    display: flex;
+}
+
+.bag-add-wrap .specialty-input {
+    width: 100%;
+    font-size: 0.75rem;
+    padding: 5px 10px;
+}
+
+.bag-add .specialty-add-btn {
+    font-size: 0.7rem;
+    padding: 5px 9px;
+}
+
+/* Potion satchel tallies: full-width so all 14 hyper-potion
+   charges fit on one row, with the notes box stacked below */
+.potions-row {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.potion-tallies {
+    background: #0d09144c;
+    border: 1px solid #ffffff0d;
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: 8px;
+}
+
+.tally-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tally-label {
+    width: 74px;
+    flex-shrink: 0;
+    font-size: 0.66rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-primary);
+}
+
+/* Manual count of how many of this potion are in the bag */
+.tally-qty-input {
+    width: 44px;
+    flex-shrink: 0;
+    background: #00000066;
+    border: 1px solid #ffffff26;
+    border-radius: 8px;
+    padding: 4px 6px;
+    color: var(--text-primary);
+    text-align: center;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.8rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.tally-qty-input:focus {
+    border-color: var(--accent);
+}
+
+.tally-squares {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Each square is one charge: lit (colored, via inline style) by
+   default, dim when toggled off. The number labels the charge. */
+.tally-sq {
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border-radius: 3px;
+    border: 1px solid #ffffff26;
+    background: #00000033;
+    color: var(--text-muted);
+    font-family: 'Fira Code', monospace;
+    font-size: 0.46rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.12s, filter 0.15s;
+}
+
+.tally-sq.on {
+    color: #fff;
+    text-shadow: 0 1px 2px #000000a6;
+}
+
+.tally-sq:hover {
+    transform: scale(1.14);
+    filter: brightness(1.1);
+}
+
+.other-box {
+    background: #0d09144c;
+    border: 1px solid #ffffff0d;
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.other-box .hwe-label {
+    flex-shrink: 0;
+}
+
+/* Healing Item pool (Clever + Medicine). A read-only derived value, so
+   it is a single slim bar above the satchel rather than another panel —
+   it sits with the potions because that is what it is rolled for. */
+.heal-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: #0d09144c;
+    border: 1px solid #ffffff0d;
+    border-radius: 14px;
+    padding: 9px 14px;
+    cursor: help;
+}
+
+.heal-box-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.66rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-primary);
+}
+
+.heal-box-label i {
+    color: #4ade80;
+}
+
+.heal-box-val {
+    flex-shrink: 0;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    background: #00000033;
+    border: 1px solid #ffffff0d;
+    border-radius: 8px;
+    padding: 3px 12px;
+}
+
+.heal-box-val strong {
+    color: var(--accent);
+    font-size: 0.9rem;
+}
+
+.other-textarea {
+    flex: 1;
+    width: 100%;
+    min-height: 70px;
+    background: none;
+    border: none;
+    outline: none;
+    resize: none;
+    color-scheme: dark;
+    padding: 8px 10px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.78rem;
+    line-height: 1.5;
+}
+
+/* Gym badge strip */
+.badge-strip {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 0 4px;
+}
+
+/* Unearned slot. The dashed outline and the ghost medal are the only
+   thing marking an empty slot, and they sit on a well that darkens the
+   panel under them, so the old #ffffff1a / #ffffff21 landed at 1.3:1 on
+   every theme — present in the markup, invisible on screen. These read
+   at roughly 2.5:1 / 3:1, clearly a slot without competing with the
+   earned badges beside them (those run 5:1 and up). */
+.badge-sq {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    border: 2px dashed #ffffff47;
+    background: #00000033;
+    color: #ffffff57;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.25s;
+}
+
+/* Hover has to stay a clear step above the new resting state */
+.badge-sq:hover {
+    border-color: #ffffff8c;
+    color: #ffffffa6;
+}
+
+.badge-sq.earned {
+    border-style: solid;
+}
+
+/* Notepad spans both columns */
+.notepad-panel.full-width {
+    grid-column: 1 / -1;
+}
+

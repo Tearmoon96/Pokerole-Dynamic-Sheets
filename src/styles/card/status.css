@@ -1,0 +1,101 @@
+/* Status ailment icons: exclusive ailments on the first row,
+   freely stackable conditions on the second */
+.status-track {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.status-track-row {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+/* The Status label lines up with the first row of icons instead of
+   centering against the two-row block */
+.tracker-row-status {
+    align-items: flex-start;
+}
+
+.tracker-row-status .tracker-label {
+    height: 24px;
+    /* Same height as a status icon: the flex centering inside the
+       label puts its text on the first icon row's midline */
+}
+
+.status-icon {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.status-icon i {
+    font-size: 0.85rem;
+    color: #ffffff40;
+    transition: color 0.2s, filter 0.2s;
+}
+
+.status-icon:hover {
+    background: #ffffff14;
+}
+
+.status-icon:hover i {
+    color: #ffffffb3;
+}
+
+/* An active status is a solid chip in that ailment's own color -
+   the same fill its tile in the reference window uses - with the
+   glyph inked for whichever of white/near-black reads on it. Both
+   are set inline by renderStatusTracker(). */
+.status-icon.active {
+    border: none;
+}
+
+/* Another mutually exclusive ailment is active: not selectable */
+.status-icon.locked {
+    opacity: 0.22;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* The burn degree, drawn over the flame. It is inked in the chip's
+   own color so it knocks out of the glyph rather than sitting on it. */
+.status-burn-degree {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 4px;
+    /* Optical center of the flame body sits slightly low */
+    font-family: 'Fira Code', monospace;
+    font-size: 0.55rem;
+    font-weight: 700;
+    pointer-events: none;
+}
+
+/* Aggravating stages - 3rd degree burn, badly poisoned - carry a pip
+   in the corner of their chip: at 24px the deeper color on its own is
+   easy to miss next to the milder stage it replaces. */
+.status-aggravating-pip {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    pointer-events: none;
+}
+

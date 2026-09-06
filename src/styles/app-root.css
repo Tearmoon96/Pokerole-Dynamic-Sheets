@@ -1,0 +1,13 @@
+/* React mounts into #root, which the original pages did not have: their <main>
+   was a direct child of <body>. Body is a centring flex container, so an extra
+   wrapper becomes the flex item and <main>'s `width: 100%` then resolves against
+   the wrapper's content-driven width instead of the body's — which moves the
+   whole sheet a few pixels and changes where the columns fall.
+
+   display: contents takes the wrapper back out of the layout, so <main> is the
+   flex child again exactly as before. Everything else React renders here is
+   either position: fixed (the modals and banners) or display: none (the file
+   inputs), so none of it becomes a stray flex item. */
+#root {
+    display: contents;
+}

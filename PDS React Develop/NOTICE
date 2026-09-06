@@ -1,0 +1,83 @@
+Pokerole Dynamic Sheets
+Copyright (c) 2026 Tearmoon
+
+This software (the HTML apps and their code) is released under the MIT License;
+see the LICENSE file. The credits and third-party terms below are separate from
+that license and are provided for attribution.
+
+--------------------------------------------------------------------------------
+Author
+--------------------------------------------------------------------------------
+- Tearmoon — https://github.com/Tearmoon96/Pokerole-Dynamic-Sheets
+
+--------------------------------------------------------------------------------
+Game data
+--------------------------------------------------------------------------------
+The bundled game database (app-data/*-db.js) is built from the Pokerole-Data
+dataset by Willowlark and contributors:
+- https://github.com/Willowlark/Pokerole-Data
+Thanks to Willowlark and everyone who compiled and maintains that dataset.
+
+--------------------------------------------------------------------------------
+Equipment icons
+--------------------------------------------------------------------------------
+The trainer equipment window draws on two icon packs. Both are used under the
+Creative Commons Attribution 3.0 Unported License (CC BY 3.0):
+- https://creativecommons.org/licenses/by/3.0/
+
+Only the subset that suits a Pokerole trainer is bundled; the picks are listed
+in app-data/equip-icons-db.js and app-data/equip-icons-mono-db.js.
+
+1. D&D Item Icons by Gwillewyn — the colour set
+   app-data/dnd-item-icons-by-gwill-main/
+   https://github.com/Gwillewyn/dnd-item-icons-by-gwill
+
+   The pack's own LICENSE file, reproduced here in full:
+
+     Most icons are adapted from artwork from game-icons.net licensed under a
+     CC 3.0 license.
+     https://creativecommons.org/licenses/by/3.0/
+     By extension the same license applies to any modifications by me.
+     No additional credit to me required.
+
+     ---
+
+     This work is licensed under the Creative Commons Attribution 3.0 Unported
+     License. To view a copy of this license, visit
+     http://creativecommons.org/licenses/by/3.0/ or send a letter to Creative
+     Commons, PO Box 1866, Mountain View, CA 94042, USA.
+
+   Gwillewyn asks for no additional credit, but thanks all the same. The pack's
+   per-icon credits are kept by its author in a public spreadsheet:
+   https://docs.google.com/spreadsheets/d/1cR6EdYqG6zh0LHJNNZz8uLUgzssg9XxTcS48HDh8cfk/edit
+
+2. game-icons.net — the monochrome set
+   app-data/dnd-monochrome-icons/
+   https://game-icons.net
+
+   Icons are released under CC BY 3.0, or CC0 where the author has said so.
+   game-icons.net asks that derivative work mention "Icons made by {author}",
+   so: the icons bundled here are made by Lorc, Delapouite, Caro Asercion,
+   Skoll, DarkZaitzev, Lucas, Cathelineau, Faithtoken, Irongamer, Carl Olsen,
+   GeneralAce135, Rihlsul and Seregacthtuf, plus one credited to the site's
+   various artists.
+
+   That is the list of authors whose work this project actually ships. The
+   complete contributor roster for the pack, with links, is in
+   app-data/dnd-monochrome-icons/license.txt.
+
+--------------------------------------------------------------------------------
+Game system
+--------------------------------------------------------------------------------
+Pokerole is a tabletop RPG created by the Pokerole Project:
+- https://www.pokeroleproject.com/
+All Pokerole rules, stats, and mechanics belong to the Pokerole design team.
+
+--------------------------------------------------------------------------------
+Trademarks
+--------------------------------------------------------------------------------
+Pokémon and all Pokémon character names are trademarks of Nintendo,
+The Pokémon Company, and Game Freak.
+
+This is a non-commercial, fan-made tool. It is not affiliated with, endorsed by,
+or sponsored by any of the above.

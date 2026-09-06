@@ -1,0 +1,49 @@
+:root {
+    /* The Dark License theme from trainer-license.html: crimson on warm
+       charcoal, mirroring the official printed sheet. Values copied from
+       CUSTOM_THEMES.License there — keep the two in step. */
+    --bg-color: #161514;
+    --bg-top: #231d1e;
+    --card-bg: #2b2928b0;
+    --panel-strong: #302e2df7;
+    --panel-solid: #302e2d;
+    --primary-faint: #c8383b10;
+    --border-color: #c8383b3a;
+    --border-glow: #c8383b1e;
+    --primary-soft: #c8383b33;
+    --ghost-color: #c8383b;
+    --ghost-color-glow: #c8383b59;
+    --text-primary: #f4efef;
+    --text-secondary: #c8b4b4;
+    --text-muted: #8a7c7c;
+    --accent: #e0645c;
+    --accent-glow: #e0645c4c;
+    --accent-faint: #e0645c26;
+    --accent-border: #e0645c40;
+    /* The License crimson sits too dark behind a pool bar, so both
+       pools take the same hand-picked pair the sheets use */
+    --hp-color: #ff4a4e;
+    --hp-glow: #ff4a4e66;
+    --will-color: #3c6cf8;
+    --will-glow: #3c6cf866;
+    --danger: #ef4444;
+    /* The teal of the License combat pills */
+    --ok: #3aa593;
+    --crit: #f0b429;
+    --crit-glow: #f0b42966;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+    margin: 0;
+    font-family: 'Outfit', sans-serif;
+    color: var(--text-primary);
+    background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-color) 60%) fixed;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+

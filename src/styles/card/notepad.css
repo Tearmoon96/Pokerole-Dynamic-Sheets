@@ -1,0 +1,67 @@
+/* Notepad panel */
+.notepad-panel {
+    background: #0d09144c;
+    border: 1px solid #ffffff0d;
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Fills the panel rather than setting its height: the row is sized by the
+   box on the left, and the expand toggle is what makes it taller. Hence
+   no drag-resize either - it would fight the row. */
+.notepad-textarea {
+    flex: 1;
+    min-height: 0;
+    resize: none;
+    color-scheme: dark;
+    /* Scrollbar renders dark instead of white */
+    background: #00000033;
+    border: 1px solid #ffffff0d;
+    border-radius: 12px;
+    padding: 12px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.notepad-textarea:focus {
+    border-color: var(--ghost-color);
+}
+
+/* Stacked, nothing sizes the row for it, so it carries its own height */
+@media (max-width: 900px) {
+    .notepad-textarea {
+        flex: none;
+        min-height: 220px;
+        resize: vertical;
+    }
+}
+
+/* Abilities, height/weight, evolutions and the dex flavour. These used
+   to close out the left column under Skills & Specialties; they sit
+   beside it now, starting level with Base Stats & Social. */
+.side-details {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    /* Natural height: it is the last thing in its column and has no box
+       of its own to stretch */
+    align-self: start;
+}
+
+/* Empty state helper */
+.no-moves-msg {
+    padding: 30px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    background: #00000026;
+    border-radius: 12px;
+    border: 1px dashed #ffffff14;
+}
+

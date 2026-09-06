@@ -1,0 +1,157 @@
+/* One grid for the whole sheet, not two independent columns: both sides
+   share the same six rows, so a panel on the right can be told to line
+   up with the panel beside it. The left stack is what sizes the rows;
+   every right-hand panel just names the row it belongs to.
+
+   minmax(0, ...) rather than plain 1fr: a grid track's minimum is its
+   content, so one wide move card would otherwise stretch the column and
+   push the layout past the card. This replaces the overflow:hidden the
+   two column wrappers used to carry. */
+.card-container {
+    width: 100%;
+    max-width: 1100px;
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    box-shadow: 0 12px 40px 0 #00000099, 0 0 30px 2px var(--border-glow);
+    padding: 40px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    /* Row 6 is the flexible one on purpose. .side-details spans rows 5
+       and 6, and an all-auto map splits its extra height between them —
+       which strands half the slack above Skills as a gap under Base
+       Stats. A flexible last row takes all of it, so the two left-hand
+       panels stay stacked and the leftover falls below them. */
+    grid-template-rows: repeat(5, auto) 1fr;
+    column-gap: 40px;
+    row-gap: 24px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* The two <section>s stay in the markup as grouping, but display:contents
+   lifts their panels out to become items of the grid above - that is what
+   lets a left and a right panel share a row. .moves-panel does the same so
+   its scrolling list can be placed apart from its header. */
+.left-column,
+.right-column,
+.moves-panel {
+    display: contents;
+}
+
+.left-column > *,
+.right-column > *,
+.moves-panel > * {
+    /* Over .card-container::before, which the column wrappers used to
+       clear with a z-index of their own */
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+}
+
+.left-column > * {
+    grid-column: 1;
+    /* Was .left-column's padding-right: keeps the gutter at 90px without
+       changing either track's width */
+    margin-right: 50px;
+}
+
+.right-column > *,
+.moves-panel > * {
+    grid-column: 2;
+}
+
+/* The row map. Left first, since those panels are what give each row its
+   height; the right-hand ones stretch into whatever they are given. */
+.pokemon-header { grid-row: 1; }
+.sprite-panel { grid-row: 2; }
+.tracker-panel.pools { grid-row: 3; }
+/* Over .stats-panel: every panel here is a z-index: 1 grid item, so an
+   autocomplete list inside this one is trapped in its stacking context
+   and the later sibling painted straight over it. */
+.tracker-panel.condition { grid-row: 4; z-index: 2; }
+.stats-panel { grid-row: 5; }
+.skills-panel { grid-row: 6; }
+
+/* Both left-hand panels keep their own height. .side-details opposite
+   them spans rows 5 and 6, so whenever it is the taller of the two the
+   grid hands its slack to those two rows — and a stretched panel shows
+   that slack as blank space inside itself. Collapsing Skills is what
+   made it obvious: the row shrank, side-details became the taller
+   column, and both Base Stats and the collapsed Skills box grew empty
+   padding. This keeps them from stretching; the 1fr row above is what
+   keeps the slack they no longer absorb from landing between them
+   instead of under them. Only in the two-column layout: below the
+   breakpoint the
+   columns are flex again, where align-self would size them by content
+   width instead. */
+@media (min-width: 901px) {
+
+    .stats-panel,
+    .skills-panel {
+        align-self: start;
+    }
+}
+
+.moves-head {
+    grid-row: 1;
+    /* Over .moves-scroll, a later sibling on the same z-index: the filter
+       popover hangs down out of this row and has to cover the cards. */
+    z-index: 3;
+}
+/* Sprite box top to pools box bottom */
+.moves-scroll { grid-row: 2 / span 2; }
+.notepad-panel { grid-row: 4; }
+.side-details { grid-row: 5 / -1; }
+
+/* Notes expanded: one row taller, which puts their bottom edge level with
+   Base Stats & Social and starts the abilities level with Skills. */
+.card-container.notes-tall .notepad-panel { grid-row: 4 / span 2; }
+.card-container.notes-tall .side-details { grid-row: 6 / -1; }
+
+@media (max-width: 900px) {
+    .card-container {
+        grid-template-columns: 1fr;
+        /* Empty rows are 0 tall but their gaps are not, so the six-row
+           map has to go, not just be ignored */
+        grid-template-rows: none;
+        padding: 24px;
+        gap: 30px;
+    }
+
+    /* One column over: back to two plain stacks. The grid-row rules above
+       go inert as soon as the parent is a flex container again. */
+    .left-column,
+    .right-column {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        min-width: 0;
+    }
+
+    .moves-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .left-column > * {
+        margin-right: 0;
+    }
+}
+
+/* Subtle background glow element */
+.card-container::before {
+    content: '';
+    position: absolute;
+    top: -20%;
+    left: -20%;
+    width: 60%;
+    height: 60%;
+    background: radial-gradient(circle, var(--border-glow) 0%, transparent 70%);
+    z-index: 0;
+    pointer-events: none;
+}
+

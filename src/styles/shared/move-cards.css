@@ -1,0 +1,358 @@
+/* Moves Cards Grid */
+.moves-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    overflow-y: auto;
+    max-height: 760px;
+    /* Safe scrollable max-height */
+    margin-top: 10px;
+    /* Keeps the faded scroll edge clear of the filter tabs */
+    padding: 20px 8px 20px 4px;
+    width: 100%;
+    max-width: 100%;
+    /* Fade cards out at the scroll edges instead of hard clipping */
+    -webkit-mask-image: linear-gradient(to bottom,
+            transparent 0,
+            #000 24px,
+            #000 calc(100% - 24px),
+            transparent 100%);
+    mask-image: linear-gradient(to bottom,
+            transparent 0,
+            #000 24px,
+            #000 calc(100% - 24px),
+            transparent 100%);
+}
+
+/* Collapsible Move Cards styling */
+.move-card {
+    background: #0d091466;
+    border: 1px solid #ffffff0a;
+    border-radius: 16px;
+    padding: 16px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    /* Header to body has no gap when collapsed */
+    cursor: grab;
+    /* Collapsed cards can be dragged to rearrange the list */
+    user-select: none;
+    flex-shrink: 0;
+    /* CRITICAL: Prevent shrinking */
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Left edge always shows the move's type color, set per card via --type-color */
+.move-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 4px;
+    background: var(--type-color, var(--text-secondary));
+    transition: all 0.3s ease;
+}
+
+.move-card:hover {
+    transform: translateY(-2px);
+    background: var(--panel-soft);
+    border-color: var(--border-color);
+    box-shadow: 0 4px 15px #0000004c;
+}
+
+.move-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.move-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.move-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.move-name {
+    font-size: 1.15rem;
+    font-weight: 700;
+    /* Follows the primary theme color (the selected type on dual-type pages) */
+    color: var(--text-primary);
+}
+
+.move-rank-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #ffffff0d;
+    color: var(--text-secondary);
+    border: 1px solid #ffffff14;
+}
+
+.move-badges {
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.move-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Category and type badges all share one width
+   (widest labels: "Physical" / "Fighting") */
+.move-badges .badge {
+    min-width: 84px;
+    text-align: center;
+}
+
+.badge.category-Physical {
+    background: #f9731626;
+    color: var(--phys-color);
+    border: 1px solid #f973164c;
+}
+
+.badge.category-Special {
+    background: #3b82f626;
+    color: var(--spec-color);
+    border: 1px solid #3b82f64c;
+}
+
+.badge.category-Support {
+    background: #10b98126;
+    color: var(--supp-color);
+    border: 1px solid #10b9814c;
+}
+
+.badge.type {
+    background: var(--border-glow);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.badge.type-Normal {
+    background: #9ca3af26;
+    color: #e5e7eb;
+    border: 1px solid #9ca3af4c;
+}
+
+.badge.type-Dark {
+    background: #37415126;
+    color: #9ca3af;
+    border: 1px solid #3741514c;
+}
+
+.badge.type-Psychic {
+    background: #ec489926;
+    color: #fbcfe8;
+    border: 1px solid #ec48994c;
+}
+
+.badge.type-Ice {
+    background: #06b6d426;
+    color: #a5f3fc;
+    border: 1px solid #06b6d44c;
+}
+
+.badge.type-Rock {
+    background: #b4530926;
+    color: #fde047;
+    border: 1px solid #b453094c;
+}
+
+.move-chevron {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    margin-right: 5px;
+    /* The arrow only expands/collapses, it never starts a drag */
+    cursor: pointer;
+}
+
+/* Collapsible Move card content */
+.move-card-content {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, margin-top 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
+/* Expanded card states */
+.move-card.expanded {
+    gap: 12px;
+    /* Add gap back when content expands */
+    background: var(--panel-medium);
+    border-color: var(--border-color);
+    /* Expanded cards only collapse on click, no dragging */
+    cursor: pointer;
+}
+
+.move-card.dragging {
+    opacity: 0.45;
+    cursor: grabbing;
+}
+
+.move-card.expanded .move-chevron {
+    transform: rotate(-180deg);
+    color: var(--ghost-color);
+}
+
+.move-card.expanded .move-card-content {
+    max-height: 800px;
+    /* High enough to allow absolute expansions */
+    opacity: 1;
+    margin-top: 8px;
+}
+
+.move-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 10px;
+    background: #00000026;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #ffffff05;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.8rem;
+}
+
+.move-stat-box {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.m-lbl {
+    color: var(--text-secondary);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+}
+
+.m-val {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Auto-calculated dice pool totals */
+.move-totals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.move-total {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.8rem;
+}
+
+.move-total strong {
+    font-size: 0.9rem;
+}
+
+.move-total.accuracy {
+    background: var(--primary-faint);
+    border: 1px solid var(--border-color);
+    color: var(--ghost-color);
+}
+
+.move-total.power {
+    background: #f9731614;
+    border: 1px solid #f9731640;
+    color: var(--phys-color);
+}
+
+.move-desc-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.move-effect {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: var(--text-primary);
+}
+
+.move-desc {
+    font-size: 0.78rem;
+    font-style: italic;
+    color: var(--text-secondary);
+    opacity: 0.8;
+    line-height: 1.3;
+}
+
+/* Added Effects Block */
+.move-effects-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px dashed #ffffff14;
+}
+
+.effect-detail {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: #e2d9f3;
+    background: #0000001f;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid #ffffff05;
+}
+
+/* Attributes Tag Row in Move Card */
+.move-attr-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.move-attr-tag {
+    font-size: 0.65rem;
+    background: #ffffff0f;
+    border: 1px solid var(--border-glow);
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+

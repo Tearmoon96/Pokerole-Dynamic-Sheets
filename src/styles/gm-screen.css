@@ -1,0 +1,22 @@
+/* The GM Screen.
+
+   Its own stylesheet: the board is nothing like the two character sheets — a row
+   of resizable panels rather than one centred card — and it shares only the
+   palette variables with them. Split out of the original inline <style> block
+   verbatim; import order is the order they appeared in. */
+@import './gm/base.css';
+@import './gm/topbar.css';
+@import './gm/board.css';
+@import './gm/shared.css';
+@import './gm/roster.css';
+@import './gm/move-panel.css';
+@import './gm/status-chips.css';
+@import './gm/combat.css';
+@import './gm/round-flags.css';
+@import './gm/ailment-popover.css';
+@import './gm/dice.css';
+@import './gm/notes.css';
+@import './gm/npc-names.css';
+@import './gm/confirm-dialog.css';
+@import './gm/toast.css';
+@import './app-root.css';

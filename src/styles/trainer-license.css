@@ -1,0 +1,15 @@
+/* The Trainer's License page. `shared.css` first: the quadrant rules below
+   override it in places and depend on landing afterwards. */
+@import './shared.css';
+@import './license/layout.css';
+@import './license/quadrant-license.css';
+@import './license/equipment.css';
+@import './license/gear-catalog.css';
+@import './license/quadrant-stats.css';
+@import './license/quadrant-team.css';
+@import './license/pc-storage.css';
+@import './license/quadrant-bag.css';
+@import './license/light-theme.css';
+@import './license/trainer-switcher.css';
+@import './license/tooltip.css';
+@import './app-root.css';

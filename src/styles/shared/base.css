@@ -1,0 +1,137 @@
+:root {
+    /* Theme palette: applyTheme() overwrites every variable in this
+       block from the loaded Pokémon's typing. --ghost-color is the
+       primary (Type1) color, --accent the secondary (Type2, or a
+       lighter Type1 tint for single-type Pokémon). The defaults
+       below are the original Ghost purple. */
+    --bg-color: #0b0713;
+    --bg-top: #1e1233;
+    --card-bg: #191124b2;
+    --panel-strong: #191124f2;
+    --panel-medium: #191124e6;
+    --panel-soft: #191124cc;
+    --panel-solid: #191124;
+    --primary-faint: #a855f70d;
+    --border-color: #a855f740;
+    --border-glow: #a855f726;
+    --primary-soft: #a855f733;
+    --ghost-color: #a855f7;
+    --ghost-color-glow: #a855f766;
+    --text-primary: #f3e8ff;
+    --text-secondary: #c084fc;
+    --text-muted: #a21caf;
+    --accent: #22d3ee;
+    --accent-glow: #22d3ee4c;
+    --accent-faint: #22d3ee26;
+    --accent-soft: #22d3ee14;
+    --accent-border: #22d3ee40;
+    --trained-color: #22d3ee;
+    --trained-glow: #22d3ee4c;
+
+    --phys-color: #f97316;
+    --spec-color: #3b82f6;
+    --supp-color: #10b981;
+
+    /* One colour per pool, same as pokemon-card.html: elemental themes
+       keep the heart's rose and the star's --accent, the two License
+       themes name their own pair below. */
+    --hp-color: #f43f5e;
+    --hp-glow: #f43f5e66;
+    --will-color: var(--accent);
+    --will-glow: var(--accent-glow);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: linear-gradient(135deg, var(--bg-top) 0%, var(--bg-color) 100%) no-repeat fixed;
+    font-family: 'Outfit', sans-serif;
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 60px 20px;
+    overflow-x: hidden;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0d0914cc;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--ghost-color);
+}
+
+.card-container {
+    width: 100%;
+    max-width: 1100px;
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    box-shadow: 0 12px 40px 0 #00000099, 0 0 30px 2px var(--border-glow);
+    padding: 40px;
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 40px;
+    position: relative;
+    overflow: hidden;
+}
+
+@media (max-width: 900px) {
+    .card-container {
+        grid-template-columns: 1fr;
+        padding: 24px;
+        gap: 30px;
+    }
+}
+
+/* Subtle background glow element */
+.card-container::before {
+    content: '';
+    position: absolute;
+    top: -20%;
+    left: -20%;
+    width: 60%;
+    height: 60%;
+    background: radial-gradient(circle, var(--border-glow) 0%, transparent 70%);
+    z-index: 0;
+    pointer-events: none;
+}
+
+.left-column {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    z-index: 1;
+    min-width: 0;
+    padding-right: 50px;
+    /* CRITICAL: Prevent grid column track overflow expansion */
+}
+
+.right-column {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    z-index: 1;
+    overflow: hidden;
+    min-width: 0;
+    /* CRITICAL: Prevent grid column track overflow expansion */
+}
+

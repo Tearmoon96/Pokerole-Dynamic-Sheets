@@ -1,0 +1,70 @@
+/* Type effectiveness modal rows */
+.type-eff-box {
+    max-width: 480px;
+}
+
+.type-eff-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.type-eff-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.type-eff-row+.type-eff-row {
+    border-top: 1px solid #ffffff0d;
+    padding-top: 10px;
+}
+
+.type-eff-label {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    width: 56px;
+    flex-shrink: 0;
+    text-align: right;
+    /* Nudged to the middle of a 30px chip. The row stays flex-start so
+       the label tracks the FIRST chip row when the chips wrap. */
+    padding-top: 7px;
+}
+
+.type-eff-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* Icon-only, matching the trainer sheet's theme picker: a bucket can
+   hold ten types, and at that count the names wrapped to three lines
+   and buried the row label. The type name is on the tooltip. */
+.type-eff-chip {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.88rem;
+    letter-spacing: 0;
+}
+
+/* Inline glyphs center on their line box — built from the font's
+   ascent/descent — not on the icon, which leaves some sitting high.
+   As a block with line-height 1 the box is the glyph itself. */
+.type-eff-chip i {
+    display: block;
+    line-height: 1;
+}
+
+.type-eff-none {
+    color: var(--text-muted);
+    padding-top: 6px;
+}
+

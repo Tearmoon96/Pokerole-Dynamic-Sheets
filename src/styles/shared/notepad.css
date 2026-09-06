@@ -1,0 +1,42 @@
+/* Notepad panel */
+.notepad-panel {
+    background: #0d09144c;
+    border: 1px solid #ffffff0d;
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.notepad-textarea {
+    min-height: 220px;
+    resize: vertical;
+    color-scheme: dark;
+    /* Native resize grip and scrollbar render dark instead of white */
+    background: #00000033;
+    border: 1px solid #ffffff0d;
+    border-radius: 12px;
+    padding: 12px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.notepad-textarea:focus {
+    border-color: var(--ghost-color);
+}
+
+/* Empty state helper */
+.no-moves-msg {
+    padding: 30px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    background: #00000026;
+    border-radius: 12px;
+    border: 1px dashed #ffffff14;
+}
+

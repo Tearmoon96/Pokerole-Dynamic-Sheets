@@ -1,0 +1,57 @@
+/* ---------------- Top bar ---------------- */
+.topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.45rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--panel-strong);
+}
+
+.topbar .logo {
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 1.05rem;
+}
+
+.topbar .logo i { color: var(--ghost-color); }
+
+.topbar .spacer { flex: 1; }
+
+/* Session file controls, top right. Fixed size: on a narrow window it
+   is the status text beside them that gives way, never the buttons. */
+.session-actions { display: flex; align-items: center; gap: 0.35rem; flex: 0 0 auto; }
+
+/* Which file Quick Save writes to */
+.session-status {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    opacity: 0.8;
+    min-width: 0;
+    max-width: 22rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.session-status.warn { color: #fca5a5; opacity: 1; }
+
+.topbar .version {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+#data-missing {
+    display: none;
+    flex: 0 0 auto;
+    background: #7f1d1d;
+    color: #fecaca;
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+}
+

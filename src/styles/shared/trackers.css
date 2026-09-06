@@ -1,0 +1,271 @@
+/* Tracker Panel: Health & Willpower */
+.tracker-panel {
+    background: #0d09144c;
+    border: 1px solid #ffffff0d;
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.tracker-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.tracker-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 125px;
+    /* Fixed width keeps all tracker bars starting at the same x;
+       wide enough for the longest label, "Disobedience" */
+    flex-shrink: 0;
+}
+
+.pool-btn {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid #ffffff1a;
+    background: #ffffff0d;
+    color: var(--text-secondary);
+    font-size: 0.6rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    touch-action: none;
+    /* Hold-to-repeat: stop touch-hold from scrolling/selecting */
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.pool-btn:hover {
+    background: var(--ghost-color);
+    border-color: var(--ghost-color);
+    color: #fff;
+}
+
+/* The FontAwesome +/- glyphs render optically high in these small
+   round buttons; nudge them onto the true center */
+.pool-btn i,
+#custom-adder-btn i {
+    transform: translateY(0.5px);
+}
+
+.pool-track {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.pool-bar {
+    flex: 1;
+    max-width: 110px;
+    /* Slightly shorter than the full track width */
+    height: 18px;
+    border-radius: 9px;
+    background: #00000066;
+    border: 1px solid #ffffff14;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    touch-action: none;
+    /* Bar is draggable: stop touch drags from scrolling the page */
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.pool-bar-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    transition: width 0.2s ease;
+}
+
+.pool-bar-value {
+    position: relative;
+    z-index: 1;
+    padding: 0 6px;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #fff;
+    text-shadow: 0 1px 2px #000000cc;
+    cursor: pointer;
+}
+
+.pool-max-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    background: #000000b3;
+    border: none;
+    color: #fff;
+    text-align: center;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.75rem;
+    outline: none;
+}
+
+/* Both fills match pokemon-card.html: HP on --ghost-color, the crimson
+   the section bars are painted with, and Will on the SPECIAL move
+   badge's blue rather than on whatever the theme accent happens to be. */
+.pool-bar-fill.health {
+    background: var(--hp-color);
+    box-shadow: 0 0 8px var(--hp-glow);
+}
+
+.pool-bar-fill.willpower {
+    background: var(--will-color);
+    box-shadow: 0 0 8px var(--will-glow);
+}
+
+.exp-input {
+    width: 80px;
+    background: #00000066;
+    border: 1px solid #ffffff26;
+    border-radius: 8px;
+    padding: 6px 8px;
+    color: var(--text-primary);
+    text-align: center;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.exp-input:focus {
+    border-color: var(--accent);
+}
+
+.pool-text-input {
+    flex: 1;
+    max-width: 170px;
+    background: #00000066;
+    border: 1px solid #ffffff26;
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.pool-text-input:focus {
+    border-color: var(--accent);
+}
+
+.pool-static-val {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: #00000033;
+    border: 1px solid #ffffff0d;
+    padding: 3px 12px;
+    border-radius: 8px;
+}
+
+/* Status ailment icons: exclusive ailments on the first row,
+   freely stackable conditions on the second */
+.status-track {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.status-track-row {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+/* The Status label lines up with the first row of icons instead of
+   centering against the two-row block */
+.tracker-row-status {
+    align-items: flex-start;
+}
+
+.tracker-row-status .tracker-label {
+    height: 24px;
+    /* Same height as a status icon: the flex centering inside the
+       label puts its text on the first icon row's midline */
+}
+
+.status-icon {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.status-icon i {
+    font-size: 0.85rem;
+    color: #ffffff40;
+    transition: color 0.2s, filter 0.2s;
+}
+
+.status-icon:hover {
+    background: #ffffff14;
+}
+
+.status-icon:hover i {
+    color: #ffffffb3;
+}
+
+.status-icon.active {
+    background: #ffffff0d;
+    border: 1px solid #ffffff1a;
+}
+
+/* Another mutually exclusive ailment is active: not selectable */
+.status-icon.locked {
+    opacity: 0.22;
+    cursor: default;
+    pointer-events: none;
+}
+
+.status-burn-degree {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 4px;
+    /* Optical center of the flame body sits slightly low */
+    font-family: 'Fira Code', monospace;
+    font-size: 0.55rem;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 0 3px #000, 0 1px 2px #000000cc;
+    pointer-events: none;
+}
+

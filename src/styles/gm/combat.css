@@ -1,0 +1,115 @@
+/* ---------------- Combat tracker ---------------- */
+.round-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border: 1px solid var(--accent-border);
+    background: var(--accent-faint);
+    color: var(--accent);
+    border-radius: 8px;
+    padding: 0.2rem 0.55rem;
+}
+
+.combat-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--primary-faint);
+}
+
+.combat-row.spent { opacity: 0.45; }
+
+.combat-row .c-sprite {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    image-rendering: auto;
+    flex: 0 0 auto;
+}
+
+.combat-row .c-icon {
+    width: 32px;
+    text-align: center;
+    color: var(--text-secondary);
+    flex: 0 0 auto;
+    font-size: 1rem;
+}
+
+.combat-row .c-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.83rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.combat-row .c-init {
+    /* Two digits is the whole range in practice; the padding is trimmed
+       with it so a paralysis-shifted "-9" still fits. */
+    width: 2.6rem;
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
+    text-align: center;
+    flex: 0 0 auto;
+}
+
+/* A status is shifting this Initiative (paralysis is −2). The field shows
+   the shifted number, which is the one the order is read from, in the
+   same amber the dice roller uses for a stand-out result. Focusing it
+   puts the rolled number back so it can be edited as rolled. */
+.combat-row .c-init.shifted {
+    color: var(--crit);
+    font-weight: 700;
+    border-color: var(--crit);
+    box-shadow: 0 0 5px var(--crit-glow);
+}
+
+.combat-row .c-init.shifted:focus {
+    color: var(--text-primary);
+    font-weight: 400;
+}
+
+.init-label {
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    display: block;
+    text-align: center;
+    margin-bottom: 1px;
+}
+
+.pips { display: flex; gap: 3px; flex: 0 0 auto; cursor: pointer; }
+
+.pip {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-color);
+    background: transparent;
+    transition: background 0.1s, border-color 0.1s;
+}
+
+.pip:hover { border-color: var(--ghost-color); }
+
+.pip.used {
+    background: var(--ghost-color);
+    border-color: var(--ghost-color);
+    box-shadow: 0 0 5px var(--ghost-color-glow);
+}
+
+/* A combat row carries its own status strip and, below it, the flags for
+   whatever wants resolving this round */
+.combat-row { flex-wrap: wrap; }
+.combat-row .c-body { flex: 1; min-width: 0; }
+
+.combat-row .status-chips { margin-top: 3px; }
+

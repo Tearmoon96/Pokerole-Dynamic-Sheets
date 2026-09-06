@@ -1,0 +1,301 @@
+/* ---------------- Multi-wild switcher ----------------
+   Several wild Pokémon open at once, switched the way the Trainer
+   License switches trainers: an arrow at each edge, a pill naming the
+   current one, and a list behind the pill. Each open sheet keeps its
+   own localStorage entry, so nothing is held only in this page. */
+.wild-arrow {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 42px;
+    height: 72px;
+    z-index: 90;
+    background: var(--panel-strong);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 24px #00000066, 0 0 20px 2px var(--border-glow);
+    transition: all 0.2s;
+}
+
+.wild-arrow.left {
+    left: 0;
+    border-radius: 0 16px 16px 0;
+    border-left: none;
+}
+
+.wild-arrow.right {
+    right: 0;
+    border-radius: 16px 0 0 16px;
+    border-right: none;
+}
+
+.wild-arrow:hover {
+    background: var(--primary-soft);
+    color: var(--text-primary);
+    box-shadow: 0 8px 24px #00000066, 0 0 18px var(--ghost-color-glow);
+}
+
+/* Sits just under the green wild banner, which owns the very top */
+.wild-indicator {
+    position: fixed;
+    top: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 90;
+    background: var(--panel-strong);
+    border: 1px solid #22c55e66;
+    border-radius: 20px;
+    box-shadow: 0 6px 20px #00000066, 0 0 16px var(--border-glow);
+    padding: 6px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.wild-indicator:hover {
+    border-color: #22c55e;
+    box-shadow: 0 6px 20px #00000066, 0 0 16px #22c55e55;
+}
+
+.wild-indicator i { color: #22c55e; }
+
+.wild-indicator .wi-count {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--primary-faint);
+    border: 1px solid var(--border-color);
+    padding: 1px 8px;
+    border-radius: 10px;
+}
+
+/* The list behind the pill */
+.wild-switch-box { max-width: 460px; }
+
+.wild-pick-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 46vh;
+    overflow-y: auto;
+}
+
+.wild-pick-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: #ffffff08;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.wild-pick-row:hover {
+    background: var(--primary-soft);
+    box-shadow: 0 0 8px var(--border-glow);
+}
+
+.wild-pick-row.current {
+    border-color: #22c55e;
+    background: #22c55e14;
+}
+
+.wild-pick-row img {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+    flex: 0 0 34px;
+}
+
+.wild-pick-name {
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.wild-pick-sub {
+    margin-left: auto;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    opacity: 0.8;
+    white-space: nowrap;
+}
+
+.wild-pick-close {
+    flex: 0 0 auto;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    opacity: 0.55;
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 2px 4px;
+    transition: all 0.15s;
+}
+
+.wild-pick-close:hover { color: #ef4444; opacity: 1; }
+
+/* The two ways to add one, above the list */
+.wild-switch-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* Three of them — New, folder, one file — on one row inside a 460px box */
+.wild-switch-actions .pokemon-picker-btn { flex: 1 1 118px; width: auto; }
+
+/* Evolve / Mega-evolve controls under the picker */
+.evolve-controls {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.evolve-controls:empty {
+    margin-top: 0;
+}
+
+.evolve-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--primary-soft);
+    border: 1px solid var(--ghost-color);
+    color: var(--text-primary);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.evolve-btn:hover {
+    background: var(--ghost-color);
+    color: #fff;
+    box-shadow: 0 0 10px var(--ghost-color-glow);
+}
+
+.evolve-btn.mega {
+    border-color: var(--accent);
+}
+
+.evolve-btn.mega:hover {
+    background: var(--accent);
+    color: #0b0713;
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.evolve-btn.revert {
+    border-color: #f59e0b;
+    color: #fbbf24;
+}
+
+.evolve-btn.revert:hover {
+    background: #f59e0b;
+    color: #0b0713;
+    box-shadow: 0 0 10px #f59e0b66;
+}
+
+/* Blank landing: shown when the card opens with no Pokémon loaded */
+.blank-landing {
+    position: fixed;
+    inset: 0;
+    z-index: 150;
+    background: linear-gradient(135deg, var(--bg-top) 0%, var(--bg-color) 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 24px;
+    text-align: center;
+}
+
+.blank-landing-icon {
+    font-size: 3rem;
+    color: var(--ghost-color);
+    filter: drop-shadow(0 0 16px var(--ghost-color-glow));
+}
+
+.blank-landing h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #fff 30%, var(--text-secondary) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.blank-landing p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    max-width: 440px;
+}
+
+.blank-landing-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    justify-content: center;
+    margin-top: 6px;
+}
+
+.blank-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 16px 26px;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 8px 24px #00000066;
+}
+
+.blank-btn i {
+    font-size: 1.25rem;
+    color: var(--ghost-color);
+}
+
+.blank-btn:hover {
+    border-color: var(--ghost-color);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px #00000066, 0 0 18px var(--ghost-color-glow);
+}
+
+.blank-btn.wild i {
+    color: #22c55e;
+}
+
+.blank-btn.wild:hover {
+    border-color: #22c55e;
+    box-shadow: 0 8px 24px #00000066, 0 0 18px #22c55e55;
+}
+

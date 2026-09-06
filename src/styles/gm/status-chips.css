@@ -1,0 +1,158 @@
+/* ---------------- Status chips ----------------
+   The same eight the Pokémon card shows under its HP bar, shrunk to a
+   strip that fits a roster row. Clicking one cycles it exactly as the
+   card does, and writes to the same status object, so a Pokémon
+   paralysed here is paralysed on its card. */
+.status-chips {
+    display: flex;
+    gap: 3px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+/* Combat splits them the way the card's tracker does: the five that
+   lock each other out on one line, the three that stack on the next.
+   A combat row is the cramped one, and the split says at a glance which
+   of these can be on together. */
+.status-chips.rows { flex-direction: column; gap: 3px; }
+.status-chips.rows .chip-row { display: flex; gap: 3px; }
+
+.status-chip {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    cursor: pointer;
+    opacity: 0.45;
+    position: relative;
+    transition: opacity 0.12s, border-color 0.12s, background 0.12s;
+    flex: 0 0 auto;
+}
+
+.status-chip:hover { opacity: 1; border-color: var(--ghost-color); }
+
+.status-chip.active {
+    opacity: 1;
+    border-color: transparent;
+}
+
+/* Greyed out because an exclusive status already holds the slot —
+   the card locks them the same way */
+.status-chip.locked { opacity: 0.15; cursor: default; }
+.status-chip.locked:hover { border-color: var(--border-color); }
+
+/* Burn degree / poison stage, in the corner of its own chip */
+.status-chip .stage {
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    font-family: 'Fira Code', monospace;
+    font-size: 7px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 1px 2px;
+    border-radius: 3px;
+    background: var(--panel-solid);
+    color: var(--text-primary);
+}
+
+.roster-stale {
+    padding: 0.4rem 0.6rem 0.6rem;
+    font-size: 0.72rem;
+    color: #fda4af;
+}
+
+.mon-list { border-top: 1px solid var(--border-color); }
+
+.mon-row {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--border-glow);
+}
+
+.mon-row:last-child { border-bottom: none; }
+
+.mon-sprite {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    image-rendering: auto;
+    flex: 0 0 auto;
+    filter: drop-shadow(0 1px 3px #000a);
+}
+
+/* The pixel-art sets: these are near their native size here, so
+   nearest-neighbour keeps their edges crisp instead of blurring them */
+.sprite-box, .sprite-token { image-rendering: pixelated; }
+
+.mon-main { flex: 1; min-width: 0; }
+
+/* The name may be trimmed, the type chips never: a long nickname must
+   not eat the two glyphs that say what the Pokémon is. */
+.mon-name {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.mon-name .name-text {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Typing as the round glyph chips the Pokémon card uses for its theme
+   switcher — the same icons and the same colours, just smaller. Here
+   they only say what the Pokémon is, so they are not clickable. */
+.type-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    border: 1px solid;
+    font-size: 8px;
+    margin-left: 3px;
+    vertical-align: middle;
+    flex: 0 0 auto;
+}
+
+/* An inline glyph is centred by its line box, not by the icon; as a
+   block with line-height 1 the box is the glyph */
+.type-chip i { display: block; line-height: 1; }
+
+.mon-actions { display: flex; gap: 0.3rem; flex: 0 0 auto; }
+
+.wild-tag {
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ok);
+    border: 1px solid var(--ok);
+    border-radius: 5px;
+    padding: 0.05rem 0.3rem;
+    margin-left: 0.4rem;
+}
+
+.roster-section-title {
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-secondary);
+    margin-top: 0.3rem;
+}
+

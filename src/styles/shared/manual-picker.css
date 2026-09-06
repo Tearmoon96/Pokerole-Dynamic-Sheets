@@ -1,0 +1,424 @@
+/* ---------------- Rulebook manual picker ---------------- */
+/* Compound selector so it beats the base `.modal-box { max-width: 360px }`
+   rule defined later in the stylesheet (equal specificity = source order). */
+.modal-box.manual-box {
+    max-width: 960px;
+    width: calc(100% - 40px);
+    max-height: 92vh;
+    overflow-y: auto;
+}
+
+.manual-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 2px 0;
+}
+
+.manual-version-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.manual-version-bar .lbl {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.manual-version-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.manual-ver-btn {
+    background: var(--primary-faint);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 5px 16px;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.manual-ver-btn:hover {
+    border-color: var(--ghost-color);
+    color: var(--text-primary);
+}
+
+.manual-ver-btn.active {
+    background: var(--primary-soft);
+    border-color: var(--ghost-color);
+    color: var(--text-primary);
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+.manual-open-start {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    background: var(--ghost-color);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.manual-open-start:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 0 12px var(--ghost-color-glow);
+}
+
+/* Left holds two quick-link cards per row, right holds one custom card,
+   so a 2:1 track ratio makes a custom card the same width as a
+   quick-link card — the two columns line up. */
+.manual-cols {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 22px;
+    align-items: start;
+}
+
+.manual-col-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+    min-height: 30px;
+}
+
+.manual-col-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.manual-card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.manual-custom-grid {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+/* Every bookmark box is the same size: fixed height, equal-width grid
+   tracks, a fixed-width page column, and a name clamped to two lines —
+   so length of the name or the page number never changes the box. */
+.manual-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 58px;
+    background: var(--primary-faint);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 8px 12px;
+}
+
+.manual-card .ic {
+    flex: none;
+    width: 22px;
+    text-align: center;
+    font-size: 1.15rem;
+    line-height: 1;
+}
+
+.manual-card .nm {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.84rem;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--text-primary);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Hovering a card reveals the whole name: the clamp is lifted and the box
+   grows to fit (long unbroken names wrap instead of overflowing). */
+.manual-card:hover {
+    border-color: var(--ghost-color);
+}
+
+.manual-card:hover .nm {
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    overflow: visible;
+    overflow-wrap: anywhere;
+}
+
+.manual-card .pg {
+    flex: none;
+    min-width: 46px;
+    text-align: right;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    opacity: 0.85;
+    white-space: nowrap;
+}
+
+.manual-open-btn {
+    flex: none;
+    background: var(--ghost-color);
+    border: none;
+    color: #fff;
+    padding: 5px 14px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.manual-open-btn:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+.manual-card .del {
+    flex: none;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    opacity: 0.55;
+    font-size: 0.85rem;
+    padding: 2px 4px;
+    transition: all 0.15s;
+}
+
+.manual-card .del:hover {
+    color: #f43f5e;
+    opacity: 1;
+}
+
+.manual-add-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: var(--ghost-color);
+    color: #fff;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.manual-add-btn:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+.manual-add-form {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.manual-add-form .manual-page-input {
+    width: 56px;
+    flex: none;
+}
+
+.manual-empty {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    opacity: 0.6;
+    font-style: italic;
+}
+
+.manual-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: var(--primary-faint);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 0.76rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+.manual-note i {
+    color: var(--ghost-color);
+    margin-top: 2px;
+}
+
+.manual-note code {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.72rem;
+    background: var(--primary-soft);
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+/* User-added editions: each version button carries a delete ×, and a
+   dashed "+" button + inline field let the user add a new Core Book
+   edition. */
+.manual-ver-btn.user {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.manual-ver-btn .ver-del {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: inherit;
+    opacity: 0.55;
+    cursor: pointer;
+    font-size: 0.72rem;
+    padding: 0;
+    line-height: 1;
+}
+
+.manual-ver-btn .ver-del:hover {
+    color: #f43f5e;
+    opacity: 1;
+}
+
+.manual-ver-add {
+    border-style: dashed;
+}
+
+.manual-add-version {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.manual-add-version .manual-ver-input {
+    width: 96px;
+}
+
+.manual-ver-cancel {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 2px 4px;
+}
+
+.manual-ver-cancel:hover {
+    color: var(--text-primary);
+}
+
+/* Small pencil that re-opens the quick-link page form for a user edition */
+.manual-edit-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: var(--primary-soft);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    font-size: 0.82rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.manual-edit-btn:hover {
+    border-color: var(--ghost-color);
+    color: var(--text-primary);
+}
+
+/* Quick-link fill modal: one row per default link, page field on the right */
+.modal-box.manual-quicklink-box {
+    max-width: 460px;
+}
+
+.manual-ql-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 52vh;
+    overflow-y: auto;
+    margin: 4px 0 6px;
+}
+
+.manual-ql-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--primary-faint);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 7px 12px;
+}
+
+.manual-ql-row .ic {
+    flex: none;
+    width: 22px;
+    text-align: center;
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.manual-ql-row .nm {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.manual-ql-row .manual-ql-page {
+    width: 64px;
+    flex: none;
+}
+
+.manual-ql-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+@media (max-width: 640px) {
+    .manual-cols {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .manual-card-grid {
+        grid-template-columns: 1fr;
+    }
+}
+

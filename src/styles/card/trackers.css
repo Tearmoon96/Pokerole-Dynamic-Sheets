@@ -1,0 +1,326 @@
+/* Tracker Panel: Health & Willpower */
+.tracker-panel {
+    background: #0d09144c;
+    border: 1px solid #ffffff0d;
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.tracker-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.tracker-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 125px;
+    /* Fixed width keeps all tracker bars starting at the same x;
+       wide enough for the longest label, "Disobedience" */
+    flex-shrink: 0;
+}
+
+.pool-btn {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid #ffffff1a;
+    background: #ffffff0d;
+    color: var(--text-secondary);
+    font-size: 0.6rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    touch-action: none;
+    /* Hold-to-repeat: stop touch-hold from scrolling/selecting */
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.pool-btn:hover {
+    background: var(--ghost-color);
+    border-color: var(--ghost-color);
+    color: #fff;
+}
+
+/* No nudge on the +/- glyphs. There used to be a translateY(0.5px)
+   here to "correct" them, but the font metrics say they need nothing:
+   measured against Font Awesome 6 Free at this size, the ink of both
+   fa-minus and fa-plus sits 37.5/100 em above the baseline, exactly
+   where the middle of the line box sits, so flex centring already
+   lands them true. Half a pixel is a twentieth of an 18px button, and
+   pushing them down by it is what made them look off. */
+
+.pool-track {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.pool-bar {
+    flex: 1;
+    max-width: 110px;
+    /* Slightly shorter than the full track width.
+
+       16px and no edge. It was 18px with a 1px border, which drew the
+       band of colour at 16px on the type themes and at 18 on the two
+       License ones, where the border is dropped — the same bar in two
+       heights depending on the theme. The border goes for good and the
+       height comes down to the band the type themes always showed, so
+       every theme draws the identical bar. Radius is half of it, so
+       the ends stay round. */
+    height: 16px;
+    border-radius: 8px;
+    background: #00000066;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    touch-action: none;
+    /* Bar is draggable: stop touch drags from scrolling the page */
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.pool-bar-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    transition: width 0.2s ease;
+}
+
+.pool-bar-value {
+    position: relative;
+    z-index: 1;
+    padding: 0 6px;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #fff;
+    text-shadow: 0 1px 2px #000000cc;
+    cursor: pointer;
+    /* No nudge, and trainer-license.html has none either — which is
+       what settled it: the digits read as centred there and low here.
+       There used to be a top: 1px, on the reading that the baseline
+       lands at 11.75px and the renderer rounds that down to 11. It
+       does not — it rounds to the nearest whole pixel, so 11.75 goes
+       to 12 and the digits were already where they belong. The extra
+       pixel pushed them past it.
+
+       What is left is the 0.17px their ink sits above the middle of
+       the line box, digits having no descender while the box still
+       reserves room for one. A sixth of a pixel, and not correctable
+       in whole ones — see .quick-move-val, where the padding is split
+       to take out the same error. */
+}
+
+.pool-max-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    background: #000000b3;
+    border: none;
+    color: #fff;
+    text-align: center;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.75rem;
+    outline: none;
+}
+
+.pool-bar-fill.health {
+    background: var(--hp-color);
+    box-shadow: 0 0 8px var(--hp-glow);
+}
+
+.pool-bar-fill.willpower {
+    background: var(--will-color);
+    box-shadow: 0 0 8px var(--will-glow);
+}
+
+/* Same two variables the bars use: the icon and its bar are one colour */
+.pool-ink-hp {
+    color: var(--hp-color);
+}
+
+.pool-ink-will {
+    color: var(--will-color);
+}
+
+.exp-input {
+    width: 80px;
+    background: #00000066;
+    border: 1px solid #ffffff26;
+    border-radius: 8px;
+    padding: 6px 8px;
+    color: var(--text-primary);
+    text-align: center;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9rem;
+    /* Same weight as .pool-static-val: the Def / Sp.Def numbers right
+       above it, so the column of values reads as one. */
+    font-weight: 600;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.exp-input:focus {
+    border-color: var(--accent);
+}
+
+.pool-text-input {
+    flex: 1;
+    max-width: 170px;
+    background: #00000066;
+    border: 1px solid #ffffff26;
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.pool-text-input:focus {
+    border-color: var(--accent);
+}
+
+/* Rank alone is bold, at the weight .pool-static-val gives Def / Sp.Def
+   and .exp-input gives EXP - it is a stat in that column, where Held
+   Item and Nature below it are plain fields. */
+#rank-input {
+    font-weight: 600;
+}
+
+.pool-static-val {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: #00000033;
+    border: 1px solid #ffffff0d;
+    padding: 3px 12px;
+    border-radius: 8px;
+}
+
+/* A defence that has been nudged says so in its own colour. The pair is
+   the file's existing vocabulary for better / worse - the same two hexes
+   the move effects use on a stat-stage change - and both are fixed
+   rather than themed, so they read on every type's palette. */
+.buffed {
+    color: #10b981;
+}
+
+.nerfed {
+    color: #f43f5e;
+}
+
+/* Def / Sp.Def offset popover. Opens on hovering anywhere in the row, so
+   the pointer never crosses dead space getting to it, and stays open
+   while the pointer is inside the popup itself. Right-aligned over the
+   value and pulled left into the panel: the value pill sits at the
+   panel's right edge, and a popup growing rightwards would hang off the
+   card. .tracker-panel sets no overflow, so it is free to overhang the
+   padding. Chrome is the documented target; this is plain CSS hover,
+   with no timers to get out of step with a re-render. */
+/* The popup is anchored to the value pill, not to the row, and opens to
+   its left: anchored to the row it covered the very number being
+   edited, and the pill's width changes with the digits so a fixed
+   offset from the row's right edge would drift. */
+.def-val-wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.def-offset-pop {
+    position: absolute;
+    right: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 4;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 7px;
+    background: #0d0914f2;
+    border: 1px solid var(--border-glow);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px #000000cc;
+}
+
+.def-row:hover .def-offset-pop,
+.def-offset-pop:hover {
+    display: flex;
+}
+
+.def-offset-btn {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid #ffffff26;
+    background: #00000066;
+    color: var(--text-secondary);
+    font-size: 0.56rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.def-offset-btn:hover {
+    color: #fff;
+    border-color: var(--ghost-color);
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+/* Tabular figures and a fixed width so stepping through the values
+   doesn't shuffle the buttons left and right under the pointer */
+.def-offset-val {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 26px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.def-offset-reset {
+    background: none;
+    border: none;
+    padding: 0 2px;
+    color: var(--text-muted);
+    font-family: inherit;
+    /* Its line box is what would set the popup's height if it grew;
+       kept under the 17px buttons so they stay the tallest thing in it */
+    line-height: 1.2;
+    font-size: 0.62rem;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.def-offset-reset:hover {
+    color: var(--text-primary);
+}
+

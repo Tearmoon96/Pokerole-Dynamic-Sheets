@@ -1,0 +1,171 @@
+/* Sprite Viewer */
+.sprite-panel {
+    background: #0d091480;
+    border: 1px solid var(--border-glow);
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    box-shadow: inset 0 0 20px #00000080;
+}
+
+.pokemon-sprite {
+    width: 180px;
+    height: 180px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 15px var(--ghost-color-glow));
+    animation: float 4s ease-in-out infinite;
+}
+
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+.sprite-selectors {
+    display: flex;
+    gap: 8px;
+    margin-top: 15px;
+    background: #0000004c;
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid #ffffff0d;
+}
+
+.sprite-btn {
+    background: #00000000;
+    border: none;
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.sprite-btn.active,
+.sprite-btn:hover {
+    background: var(--ghost-color);
+    color: #fff;
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+.sprite-btn.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.sprite-btn.disabled:hover {
+    background: #00000000;
+    color: var(--text-secondary);
+    box-shadow: none;
+}
+
+/* Team sprite editor modal */
+.sprite-modal-box {
+    max-width: 380px;
+    width: 92%;
+    text-align: center;
+}
+
+/* The preview is the real 62px team circle, magnified as a whole so the
+   sprite's size, position and clipping match the slot exactly — the
+   img keeps its 60px base + var transform from .team-sprite-circle img */
+.sprite-modal-preview {
+    transform: scale(1.7);
+    margin: 50px auto 44px;
+    cursor: default;
+}
+
+.sprite-modal-preview:hover {
+    border-color: var(--border-color);
+    box-shadow: inset 0 0 10px #00000080;
+}
+
+#sprite-modal-tabs {
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.sprite-modal-sliders {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 16px 2px 4px;
+}
+
+.sprite-modal-slider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sprite-modal-slider > span:first-child {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    width: 74px;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sprite-modal-slider input[type="range"] {
+    flex: 1;
+    accent-color: var(--ghost-color);
+    cursor: pointer;
+}
+
+.sprite-modal-num {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    width: 44px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Nickname toggle in the sprite modal */
+.sprite-modal-nickname {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 14px 2px 2px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.sprite-modal-nickname input {
+    accent-color: var(--ghost-color);
+    cursor: pointer;
+}
+
+.sprite-modal-nickname.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.sprite-modal-nickname.disabled input {
+    cursor: not-allowed;
+}
+
+.sprite-modal-nickname-val {
+    margin-left: auto;
+    font-style: italic;
+    color: var(--text-muted);
+    max-width: 55%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+

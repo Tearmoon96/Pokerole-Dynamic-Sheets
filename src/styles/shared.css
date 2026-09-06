@@ -1,0 +1,15 @@
+/* Everything pokemon-card.html and trainer-license.html draw in common.
+   Split out of the original inline <style> block verbatim — the rules are
+   byte-for-byte what they were, only the file they live in changed. Import
+   order is the order they appeared in, because plenty of them rely on it. */
+@import './shared/base.css';
+@import './shared/sprite-viewer.css';
+@import './shared/header.css';
+@import './shared/manual-picker.css';
+@import './shared/theme-picker.css';
+@import './shared/trackers.css';
+@import './shared/stats.css';
+@import './shared/skills-abilities.css';
+@import './shared/moves-ui.css';
+@import './shared/move-cards.css';
+@import './shared/notepad.css';

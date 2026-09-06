@@ -1,0 +1,311 @@
+/* Sprite Viewer.
+
+   Three rows, with the sprite in the middle one. The set tabs sit below
+   it and used to be the only thing in flow beside it, which pushed the
+   sprite ~23px above the box's centre line — visible whenever the tabs
+   were faded out, which is most of the time. The two 1fr tracks fix that:
+   in an auto-height grid they come out equal, so row 1 reserves exactly
+   the height row 3 needs and the sprite lands dead centre. */
+/* Translucent on purpose: the box takes its colour from the card under
+   it, .card-container::before glow included. That glow is a radial in
+   the card's top-left corner, clipped to a 60% x 60% box, so it lights
+   this well and cannot reach the move list opposite — which therefore
+   has to make the difference up. See .moves-scroll. */
+.sprite-panel {
+    background: #0d091480;
+    border: 1px solid var(--border-glow);
+    border-radius: 20px;
+    padding: 20px;
+    display: grid;
+    grid-template-rows: 1fr auto 1fr;
+    justify-items: center;
+    align-items: center;
+    position: relative;
+    box-shadow: inset 0 0 20px #00000080;
+}
+
+/* Fixed stage for the sprite. Zoom and nudge are a transform on the image
+   inside it, never a change of size: the box has to stay put whatever the
+   sprite does, even when a big sprite spills out over its edges. The
+   float animation lives out here so it cannot fight that transform. */
+.sprite-stage {
+    grid-row: 2;
+    width: 180px;
+    height: 180px;
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: float 4s ease-in-out infinite;
+}
+
+/* Three transforms, and the order matters. Rightmost runs first:
+
+     --sprite-frame-*  centres the ARTWORK, which is drawn low in its own
+                       canvas on most sets (a Home render is a standing
+                       pose with headroom above it). Inside the scale, so
+                       the correction grows with the zoom the way the
+                       off-centring itself does.
+     --sprite-scale    the user's zoom.
+     --sprite-*        the user's nudge, outside the scale so a slider
+                       step stays one screen pixel at any zoom.
+
+   Without the first one the box centres the <img>, not the Pokémon, and
+   every Home sprite sits ~25px low in a 180px stage. */
+.pokemon-sprite {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 0 15px var(--ghost-color-glow));
+    transform: translate(var(--sprite-x, 0px), var(--sprite-y, 0px))
+        scale(var(--sprite-scale, 1))
+        translate(var(--sprite-frame-x, 0px), var(--sprite-frame-y, 0px));
+}
+
+/* Symmetric around the resting position: 0 -> -10px would have the sprite
+   sit at or above centre for the whole cycle, so the bob itself put it
+   off the box's middle. Same 10px of travel, half of it either side. */
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(5px);
+    }
+
+    50% {
+        transform: translateY(-5px);
+    }
+}
+
+/* The set tabs are chrome rather than content, so they fade in with the
+   pointer like the resize control. Faded and not hidden: display:none
+   would resize the box every time the pointer crossed it. */
+.sprite-selectors {
+    grid-row: 3;
+    /* Top of their track, so they stay tucked under the sprite when the
+       grid row stretches the panel taller than its own content */
+    align-self: start;
+    display: flex;
+    gap: 4px;
+    margin-top: 15px;
+    background: #0000004c;
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid #ffffff0d;
+    max-width: 100%;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+
+.sprite-panel:hover .sprite-selectors,
+/* Keyboard users never hover: keep them up while one has focus */
+.sprite-selectors:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.sprite-btn {
+    background: #00000000;
+    border: none;
+    color: var(--text-secondary);
+    padding: 6px 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.sprite-btn.active,
+.sprite-btn:hover {
+    background: var(--ghost-color);
+    color: #fff;
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+/* A set with no art for this species — see SPRITE_SET_BLOCKED.
+   Matches the same rule in trainer-license.html. */
+.sprite-btn.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.sprite-btn.disabled:hover {
+    background: #00000000;
+    color: var(--text-secondary);
+    box-shadow: none;
+}
+
+/* Top-right of the sprite box: the mega stone, when there is one, and the
+   gender toggle. Both always visible. */
+.sprite-top-right {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 2;
+}
+
+/* Top-left of the sprite box, stacked downwards: resize, then the two
+   custom-image controls under it. */
+.sprite-top-left {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    z-index: 2;
+}
+
+/* Custom-image buttons (pen / trash): only when the custom tab is showing
+   AND the sprite box is hovered (like the resize control above them).
+   NB: the selector is qualified with .sprite-custom-btn so this hide rule
+   outweighs .sprite-custom-btn's own `display: flex` (equal specificity
+   would otherwise lose on source order, leaving the buttons always shown). */
+.sprite-custom-btn.custom-only {
+    display: none;
+}
+
+.sprite-panel.showing-custom:hover .custom-only {
+    display: flex;
+}
+
+.sprite-custom-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid #ffffff26;
+    background: #000000a6;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.sprite-custom-btn:hover {
+    color: #fff;
+    border-color: var(--ghost-color);
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+.sprite-custom-btn.danger:hover {
+    background: #f43f5e;
+    border-color: #f43f5e;
+}
+
+/* Resize (scale) control: top of the .sprite-top-left stack, revealed on
+   hover over the whole panel, plus a slider popover */
+.sprite-scale-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid #ffffff26;
+    background: #000000a6;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s;
+    z-index: 2;
+}
+
+.sprite-panel:hover .sprite-scale-btn {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.sprite-scale-btn:hover {
+    color: #fff;
+    border-color: var(--ghost-color);
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+/* Size / Horizontal / Vertical, the same three controls the trainer sheet
+   offers for a team sprite. It sits ABOVE the box, over the header's evolve
+   buttons: inside the box it covered the very sprite you are framing, which
+   made the sliders pointless. bottom:100% puts its foot on the box's top
+   edge, so it opens upwards into the header instead. */
+.sprite-scale-editor {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 8px);
+    z-index: 5;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    background: #0d0914f2;
+    border: 1px solid var(--border-glow);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px #000000cc;
+}
+
+.sprite-scale-editor.open {
+    display: flex;
+}
+
+.sprite-scale-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sprite-scale-row > span:first-child {
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    /* Wide enough for "HORIZONTAL", the longest of the three; at 62px it
+       was being clipped mid-word */
+    width: 76px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sprite-scale-range {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--ghost-color);
+    cursor: pointer;
+}
+
+.sprite-scale-val {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    width: 42px;
+    flex-shrink: 0;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.sprite-scale-reset {
+    background: #ffffff0d;
+    border: 1px solid #ffffff26;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.68rem;
+    padding: 4px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.sprite-scale-reset:hover {
+    color: #fff;
+    border-color: var(--ghost-color);
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+

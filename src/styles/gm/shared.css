@@ -1,0 +1,56 @@
+/* ---------------- Shared bits ---------------- */
+button {
+    font-family: inherit;
+    color: var(--text-primary);
+    background: var(--primary-faint);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+
+button:hover { background: var(--primary-soft); border-color: var(--ghost-color); }
+
+button.icon-btn {
+    padding: 0.25rem 0.45rem;
+    line-height: 1;
+}
+
+button.danger:hover { border-color: var(--danger); background: #ef444422; color: #fecaca; }
+
+button.accent { border-color: var(--accent-border); }
+button.accent:hover { background: var(--accent-faint); border-color: var(--accent); }
+
+input[type="text"], input[type="number"], textarea {
+    font-family: inherit;
+    color: var(--text-primary);
+    background: var(--panel-solid);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.82rem;
+}
+
+input:focus, textarea:focus { outline: none; border-color: var(--ghost-color); }
+
+input[type="number"] {
+    font-family: 'Fira Code', monospace;
+    -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+.muted { color: var(--text-secondary); opacity: 0.75; font-size: 0.75rem; }
+
+.empty-note {
+    text-align: center;
+    padding: 1rem 0.5rem;
+    color: var(--text-secondary);
+    opacity: 0.6;
+    font-size: 0.8rem;
+}
+

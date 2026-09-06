@@ -1,0 +1,553 @@
+/* Skills & Specialties Panel */
+.skills-panel {
+    background: #0d09144c;
+    border: 1px solid #ffffff0d;
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.skills-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.skills-category {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.skills-category+.skills-category {
+    margin-top: 10px;
+}
+
+.category-title {
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    border-bottom: 1px dashed #ffffff14;
+    padding-bottom: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.category-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* The category icon is the on/off toggle for its rating dots */
+.cat-icon {
+    cursor: pointer;
+    padding: 2px;
+    transition: all 0.25s ease;
+}
+
+.cat-icon:hover {
+    color: var(--text-primary);
+}
+
+.cat-icon.active {
+    color: var(--text-primary);
+    text-shadow: 0 0 8px var(--ghost-color), 0 0 16px var(--ghost-color-glow);
+}
+
+.skill-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.skill-label {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.skill-dots {
+    display: flex;
+    gap: 4px;
+}
+
+.skill-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    /* 2.5px matches the trainer card's specialty circles so every
+       specialty (Brawl, Channel, Clash, ... and custom extras) reads
+       the same across both sheets */
+    border: 2.5px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: #00000000;
+}
+
+.skill-dot.filled {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 6px var(--accent-glow);
+}
+
+/* Same zoom as the base-stat circles, so skills, categories and
+   specialties (including the extra/custom ones) all feel consistent */
+.skill-dot:hover {
+    transform: scale(1.45);
+    z-index: 1;
+}
+
+/* Custom Specialties list structure */
+.specialties-section {
+    margin-top: 10px;
+    border-top: 1px solid #ffffff14;
+    padding-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.specialties-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.specialties-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.custom-specialty-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #00000026;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid #ffffff05;
+}
+
+.custom-specialty-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.specialty-remove {
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    transition: color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.specialty-remove:hover {
+    color: #f43f5e;
+}
+
+.specialty-input-group {
+    display: flex;
+    gap: 8px;
+    margin-top: 5px;
+}
+
+.specialty-input {
+    flex: 1;
+    background: #0000004c;
+    border: 1px solid #ffffff1a;
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 0.8rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.specialty-input:focus {
+    border-color: var(--ghost-color);
+}
+
+.specialty-add-btn {
+    background: var(--border-color);
+    border: 1px solid var(--border-color);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.specialty-add-btn:hover {
+    background: var(--ghost-color);
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+/* Ability panels; with several abilities, click one to mark it in use */
+.ability-panel.ability-selectable {
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.ability-panel.ability-in-use {
+    border-color: var(--ghost-color);
+    box-shadow: 0 0 12px var(--ghost-color-glow);
+}
+
+.ability-panel.ability-idle {
+    opacity: 0.55;
+    filter: saturate(0.6);
+}
+
+.ability-panel.ability-idle:hover {
+    opacity: 0.85;
+}
+
+.ability-in-use-mark {
+    color: var(--ghost-color);
+    font-size: 1rem;
+    margin-left: 4px;
+    filter: drop-shadow(0 0 4px var(--ghost-color-glow));
+}
+
+/* Ability Panel (Static) */
+.ability-panel {
+    background: linear-gradient(135deg, var(--primary-faint) 0%, #0d091466 100%);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 20px;
+}
+
+.ability-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.ability-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--ghost-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ability-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ability-badge {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    font-weight: 600;
+    background: var(--border-glow);
+    color: var(--ghost-color);
+    padding: 2px 8px;
+    border-radius: 6px;
+    letter-spacing: 1px;
+}
+
+.ability-badge.custom {
+    background: #f59e0b26;
+    color: #fbbf24;
+}
+
+/* Remove (×) button on a custom ability panel */
+.ability-remove-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid var(--border-color);
+    background: #ffffff0d;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: all 0.2s;
+}
+
+.ability-remove-btn:hover {
+    background: #f43f5e33;
+    border-color: #f43f5e;
+    color: #fda4af;
+}
+
+/* "Add a custom ability" button under the ability panels */
+.add-ability-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 11px;
+    border-radius: 14px;
+    border: 1px dashed var(--border-glow);
+    background: var(--primary-faint);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.add-ability-btn:hover {
+    border-color: var(--ghost-color);
+    color: var(--ghost-color);
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+/* Ability picker modal: a searchable list of every ability */
+.ability-picker-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 14px;
+    max-height: 62vh;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.ability-pick-row {
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #ffffff05;
+    border: 1px solid #ffffff0d;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.ability-pick-row:hover {
+    background: var(--primary-soft);
+    border-color: var(--ghost-color);
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+.ability-pick-row.selected {
+    border-color: var(--ghost-color);
+    background: var(--border-glow);
+}
+
+.ability-pick-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ghost-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.ability-pick-effect {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.ability-pick-empty {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 24px;
+    font-size: 0.9rem;
+}
+
+.ability-desc {
+    font-size: 0.85rem;
+    font-style: italic;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+
+.ability-effect {
+    font-size: 0.9rem;
+    line-height: 1.45;
+    color: #fff;
+}
+
+/* Details (Height/Weight/Evolution) */
+.details-panel {
+    background: #0d09144c;
+    border: 1px solid #ffffff0d;
+    border-radius: 20px;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.detail-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.detail-val {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* Evolutions block */
+.evolution-panel {
+    grid-column: span 2;
+    border-top: 1px solid #ffffff0d;
+    padding-top: 15px;
+    margin-top: 5px;
+}
+
+/* One chain per row, every row on the same five tracks — name, arrow,
+   method, arrow, name. Each row used to centre itself, so a long name
+   on one line pushed its method tag out of line with the one below it;
+   on a shared grid the tags sit in one column down the middle. The two
+   1fr edges take the slack, which centres the group, and the names
+   align inwards so they meet their arrows. */
+.evolution-flow {
+    display: grid;
+    /* CRITICAL: Prevent horizontal layout expansion pushing columns */
+    grid-template-columns: 1fr auto auto auto 1fr;
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 6px;
+    font-size: 0.82rem;
+    background: #00000033;
+    padding: 8px 12px;
+    border-radius: 12px;
+    border: 1px solid #ffffff05;
+}
+
+/* Each chain is its own row but borrows the parent's columns, so the
+   cells line up across rows without the steps being flattened away */
+.evolution-step {
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
+    align-items: center;
+}
+
+.evolution-step .evo-name:first-child {
+    justify-self: end;
+}
+
+.evolution-step .evo-name:last-child {
+    justify-self: start;
+}
+
+/* The method, plus the gender badge on the evolutions that carry one:
+   one cell, so a chain with a badge still has the same five columns */
+.evo-mid {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+/* "Does not evolve" has no chain to lay out */
+.evo-empty {
+    grid-column: 1 / -1;
+    justify-self: center;
+}
+
+/* One column: a chain can be wider than the card is, and the grid's
+   name tracks will not shrink below their content. Back to the old
+   centred wrap there — with the panel that narrow there is nothing to
+   line up against anyway. */
+@media (max-width: 900px) {
+
+    .evolution-flow,
+    .evolution-step {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .evolution-step {
+        flex-basis: 100%;
+    }
+}
+
+.evo-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Evolutions locked to one gender (Gallade, Froslass, Vespiquen…): just
+   the ♂/♀ icon, blue or pink like the gender toggle */
+.evo-gender {
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 5px;
+    border-radius: 12px;
+    border: 1px solid currentColor;
+}
+
+.evo-gender.male {
+    color: #60a5fa;
+    background: #60a5fa1a;
+}
+
+.evo-gender.female {
+    color: #f472b6;
+    background: #f472b61a;
+}
+
+.evo-arrow {
+    color: var(--text-secondary);
+    animation: pulse-arrow 2s infinite;
+}
+
+@keyframes pulse-arrow {
+
+    0%,
+    100% {
+        transform: translateX(0);
+        opacity: 0.5;
+    }
+
+    50% {
+        transform: translateX(2px);
+        opacity: 1;
+    }
+}
+
+.evo-method {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    background: var(--border-glow);
+    padding: 2px 6px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+

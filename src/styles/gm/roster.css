@@ -1,0 +1,171 @@
+/* ---------------- Roster: trainers & wilds ---------------- */
+.roster-card {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--primary-faint);
+    overflow: hidden;
+}
+
+/* The two action buttons sit in the top-right corner and the expander
+   chevron in the bottom-right, both inset from the edge. They are
+   absolute so the name and pool bars keep the full width of the row;
+   the padding on the right is what reserves their column. */
+.trainer-head {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    padding-right: 4.6rem;
+    cursor: pointer;
+    user-select: none;
+    /* The theme's red, permanently rather than only under the pointer.
+       The team strip below is a child of the card and not of this, so
+       it keeps its paler wash and still reads as a separate shelf. */
+    background: var(--primary-soft);
+}
+
+/* On that red the buttons' own faint wash disappears, so they sit on a
+   dark plate instead. Only their surround changes — the glyphs keep the
+   colour they have everywhere else on the screen. */
+.trainer-head .icon-btn,
+.trainer-head .pool-step {
+    background: #00000059;
+    border-color: #c8383b73;
+}
+
+.trainer-head .icon-btn:hover {
+    background: #00000080;
+    border-color: var(--ghost-color);
+}
+
+.trainer-photo {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border-color);
+    background: var(--panel-solid);
+    flex: 0 0 auto;
+}
+
+.trainer-photo.placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+}
+
+.trainer-main { flex: 1; min-width: 0; }
+
+.trainer-name {
+    font-weight: 800;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.trainer-rank {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+}
+
+.pool-bars { display: flex; flex-direction: column; gap: 3px; margin-top: 3px; }
+
+.pool-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.68rem;
+}
+
+.pool-bar .pool-tag {
+    width: 2rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    flex: 0 0 auto;
+}
+
+/* No edge, like the License themes' own bars: each reads as one clean
+   band of colour against the track */
+.pool-track {
+    flex: 1;
+    height: 7px;
+    border-radius: 4px;
+    background: #00000059;
+    overflow: hidden;
+}
+
+/* display MATTERS: the fill is a <span> inside .pool-track, and the
+   track is only blockified because it is a flex item — it is not itself
+   a flex container, so without this the fill stays an inline box, drops
+   width and height on the floor, and paints nothing. The bars then read
+   as flat dark bands: the track's own background showing through. */
+.pool-fill {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.2s;
+}
+
+/* The two pools take the same colours the Dark License theme gives them
+   on the trainer sheet, and are otherwise identical: same track height,
+   same radius, same glow. */
+.pool-fill.hp { background: var(--hp-color); box-shadow: 0 0 6px var(--hp-glow); }
+.pool-fill.will { background: var(--will-color); box-shadow: 0 0 6px var(--will-glow); }
+
+/* − value + as one tight unit. Its own small gap, rather than the row's
+   0.4rem, is what keeps the three touching; the group as a whole is
+   what the row's gap separates from the track. */
+.pool-steps {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    flex: 0 0 auto;
+}
+
+/* Fixed width so the buttons line up down the column whatever the
+   numbers are, and centred inside it — right-aligned text put all the
+   slack of a short value ("6 / 6" in a box sized for "10 / 10") on the
+   left, which is exactly where the − button is. */
+.pool-num {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.68rem;
+    /* min-, not a hard width: a hand-edited pool in the hundreds would
+       overflow a fixed box instead of widening it */
+    min-width: 3.1rem;
+    text-align: center;
+    flex: 0 0 auto;
+}
+
+/* Quick ±1 on a pool. Small, but a real target: these get hammered all
+   through a fight. Shift-click steps by 5. */
+.pool-step {
+    flex: 0 0 auto;
+    width: 1.15rem;
+    height: 1.15rem;
+    padding: 0;
+    border-radius: 5px;
+    font-size: 0.6rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.55;
+    transition: opacity 0.12s, background 0.12s, border-color 0.12s;
+}
+
+.pool-bar:hover .pool-step { opacity: 1; }
+
+.pool-step.plus:hover { border-color: var(--ok); color: var(--ok); background: #3aa59322; }
+.pool-step.minus:hover { border-color: var(--danger); color: #fca5a5; background: #ef444422; }
+

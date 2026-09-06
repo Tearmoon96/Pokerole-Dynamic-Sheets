@@ -1,0 +1,68 @@
+/* ---------------- Round-start flags ----------------
+   One per thing that needs resolving at the top of the round. Hovering
+   opens the ailment panel with the roll already worked out. */
+.round-flags {
+    flex: 0 0 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px dashed var(--border-glow);
+}
+
+.round-flag {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.63rem;
+    font-weight: 600;
+    border: 1px solid;
+    border-radius: 6px;
+    padding: 1px 5px;
+    cursor: help;
+}
+
+.round-flag .dmg {
+    font-family: 'Fira Code', monospace;
+    font-weight: 700;
+}
+
+/* The one-click "deal it" button, inside the flag it belongs to. It
+   wears the ailment's own colour so the number and the button that
+   applies it read as one thing, and it takes the pointer back from the
+   flag (which is cursor:help and only opens the rules popover). */
+.round-flag .dmg-apply {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-family: inherit;
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 1px 4px;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.12s, background 0.12s;
+}
+
+.round-flag .dmg-apply:hover {
+    opacity: 1;
+    background: #ffffff26;
+}
+
+/* Already dealt this Round. The flag stays readable — the damage is
+   still the number to deal if it is dealt again — but it stops
+   competing with the ones still waiting. */
+.round-flag.dealt {
+    opacity: 0.45;
+}
+
+.round-flag.dealt .dmg {
+    text-decoration: line-through;
+}
+

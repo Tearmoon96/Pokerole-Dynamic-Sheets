@@ -1,0 +1,1078 @@
+/* Popover to choose which filter tabs are visible */
+.filter-picker {
+    position: relative;
+}
+
+.filter-picker-btn {
+    width: 28px;
+    height: 28px;
+    background: #ffffff08;
+    border: 1px solid #ffffff14;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+/* The + is not off-centre — measured against the font, it has 8.80px of
+   gap on all four sides of its 28px button. It is small: FontAwesome
+   draws fa-plus in a 416-unit box where fa-filter takes 512 and
+   fa-rotate-left 464, so at one font-size it renders 10.4px of ink
+   beside their 12.8 and 11.6, and the extra moat around it is what
+   reads as adrift. Scaled to land at 11.96px, in among the other two. */
+#custom-adder-btn i {
+    font-size: 1.15em;
+}
+
+.filter-picker-btn:hover,
+.filter-picker-btn.open,
+/* A rank filter other than All is active */
+.filter-picker-btn.filtering {
+    background: var(--ghost-color);
+    border-color: var(--ghost-color);
+    color: #fff;
+    box-shadow: 0 0 8px var(--ghost-color-glow);
+}
+
+.filter-picker-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 140px;
+    background: var(--panel-strong);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px #00000099, 0 0 20px 2px var(--border-glow);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 50;
+}
+
+.filter-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.filter-option:hover {
+    background: #ffffff0d;
+}
+
+.filter-option .dot {
+    flex-shrink: 0;
+}
+
+/* The Pinned filter is a cross-cutting option, set off from the ranks above */
+.filter-option.pinned-filter {
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+}
+
+.filter-option.pinned-filter .pinned-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Custom move picker */
+.custom-move-adder {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.custom-move-adder .specialty-input {
+    min-width: 200px;
+}
+
+/* Themed autocomplete replacing the unstylable native datalist */
+.move-search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+    max-width: 340px;
+    display: flex;
+}
+
+.move-search-wrap .specialty-input {
+    width: 100%;
+}
+
+.move-suggestions {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 100%;
+    max-height: 260px;
+    overflow-y: auto;
+    background: var(--panel-strong);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px #00000099, 0 0 20px 2px var(--border-glow);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 60;
+}
+
+.move-suggestion {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.move-suggestion:hover {
+    background: var(--primary-soft);
+}
+
+.move-suggestion-type {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.move-suggestion-more {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-style: italic;
+    color: var(--text-muted);
+}
+
+/* Held item and nature searches: same themed dropdown, anchored to the
+   input's right edge so the wider panel stays inside the column */
+.item-search-wrap {
+    position: relative;
+    flex: 1;
+    max-width: 170px;
+    display: flex;
+}
+
+.item-search-wrap .pool-text-input {
+    width: 100%;
+    max-width: none;
+}
+
+/* Both are names of a thing, so they carry the same weight the skill
+   and specialty names do */
+#held-item-input,
+#nature-input {
+    font-weight: 700;
+}
+
+.item-suggestions {
+    left: auto;
+    right: 0;
+    width: 250px;
+}
+
+.move-suggestion img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    image-rendering: pixelated;
+    flex-shrink: 0;
+}
+
+.move-suggestion .item-suggestion-name {
+    flex: 1;
+    text-align: left;
+}
+
+/* Nature list: one short name per row, so it needs nowhere near the
+   width the item list takes */
+.nature-suggestions {
+    left: auto;
+    right: 0;
+    width: 150px;
+}
+
+.custom-move-status {
+    font-size: 0.75rem;
+    font-style: italic;
+    color: var(--text-secondary);
+    flex-basis: 100%;
+}
+
+/* Edit button on every move, revealed only while expanded */
+.move-edit-btn {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 4px 6px;
+    margin-right: 2px;
+    transition: all 0.2s;
+}
+
+.move-card.expanded .move-edit-btn {
+    display: block;
+}
+
+.move-edit-btn:hover {
+    color: #fff;
+    text-shadow: 0 0 8px var(--accent);
+}
+
+/* Pin button: always visible so a move can be pinned without
+   expanding it; the tack tilts and lights up while pinned */
+.move-pin-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 4px 6px;
+    margin-right: 2px;
+    opacity: 0.5;
+    transform: rotate(45deg);
+    transition: all 0.2s;
+}
+
+.move-pin-btn:hover {
+    color: var(--accent);
+    opacity: 1;
+    transform: rotate(0deg);
+}
+
+.move-card.pinned .move-pin-btn {
+    color: var(--accent);
+    opacity: 1;
+    transform: rotate(0deg);
+    text-shadow: 0 0 8px var(--accent);
+}
+
+/* A pinned card gets a subtle accent frame so it reads as anchored */
+.move-card.pinned {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--border-glow);
+}
+
+/* Disable button: like the pin, always visible so a Move can be
+   disabled straight from a collapsed card. It is not painted in the
+   Disable ailment's own color the way the status chips are - that
+   color is #292829, which on this page would be an invisible mark. */
+.move-disable-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 4px 6px;
+    margin-right: 2px;
+    opacity: 0.5;
+    transition: all 0.2s;
+}
+
+.move-disable-btn:hover {
+    color: #f43f5e;
+    opacity: 1;
+}
+
+.move-card.disabled .move-disable-btn {
+    color: #f43f5e;
+    opacity: 1;
+    text-shadow: 0 0 8px #f43f5e;
+}
+
+/* A disabled Move stays where it is and stays readable - the rules
+   only forbid performing it, and it comes back. So it is struck
+   through and faded rather than hidden. The fade goes on the header
+   only: putting it on the card would take the ban icon down with it,
+   and putting it on the body would make a card you deliberately
+   opened hard to read. */
+.move-card.disabled .move-meta,
+.move-card.disabled .move-rank-badge {
+    opacity: 0.42;
+}
+
+.move-card.disabled .move-name {
+    text-decoration: line-through;
+    text-decoration-thickness: 2px;
+}
+
+/* The type stripe down the left edge goes grey, so a disabled card
+   reads as off at a glance in a long list. A flat white tint rather
+   than a theme variable - every one of those is a saturated color,
+   and one of them replacing the type color would read as a highlight
+   instead of an absence. */
+.move-card.disabled::before {
+    background: #ffffff2e;
+}
+
+/* Move editor form inside the modal */
+.move-edit-box {
+    max-width: 460px;
+}
+
+.move-edit-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.move-edit-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.move-edit-field.span-2 {
+    grid-column: span 2;
+}
+
+.move-edit-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+}
+
+.move-edit-input,
+.move-edit-textarea {
+    width: 100%;
+    background: #00000066;
+    border: 1px solid #ffffff26;
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.move-edit-input:focus,
+.move-edit-textarea:focus {
+    border-color: var(--accent);
+}
+
+.move-edit-textarea {
+    resize: vertical;
+    min-height: 70px;
+}
+
+select.move-edit-input {
+    cursor: pointer;
+}
+
+select.move-edit-input option,
+select.move-edit-input optgroup {
+    background: var(--panel-solid);
+    color: #fff;
+}
+
+/* Themed up/down steppers for the offset fields, replacing the browser's
+   default grey number-spinner so they match the rest of the modal */
+.offset-input::-webkit-outer-spin-button,
+.offset-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.offset-input {
+    -moz-appearance: textfield;
+    appearance: textfield;
+    padding-right: 30px;   /* clear the stepper column */
+}
+
+.offset-input-wrap {
+    position: relative;
+    display: flex;
+}
+
+.offset-steppers {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    bottom: 1px;
+    width: 22px;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid #ffffff26;
+    border-radius: 0 7px 7px 0;
+    overflow: hidden;
+}
+
+.offset-step-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff0d;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.6rem;
+    padding: 0;
+    transition: all 0.15s;
+}
+
+.offset-step-btn:first-child {
+    border-bottom: 1px solid #ffffff1a;
+}
+
+.offset-step-btn:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+.offset-step-btn:active {
+    background: var(--accent);
+    filter: brightness(1.15);
+}
+
+/* Trash button on custom moves, revealed only while expanded */
+.move-trash-btn {
+    display: none;
+    background: none;
+    border: none;
+    color: #f43f5e;
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 4px 6px;
+    margin-right: 6px;
+    transition: all 0.2s;
+}
+
+.move-card.expanded .move-trash-btn {
+    display: block;
+}
+
+.move-trash-btn:hover {
+    color: #fff;
+    text-shadow: 0 0 8px #f43f5e;
+}
+
+/* Confirmation modal, themed via the same palette variables */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: #000000a6;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+/* The Pokémon picker can be opened from the blank landing (z-index 150),
+   so it must sit above it or the click appears to do nothing */
+#poke-picker-modal {
+    z-index: 250;
+}
+
+/* The "load another Pokémon" confirmation opens on top of the picker
+   (z-index 250), so it has to sit above it to be visible */
+#load-warn-modal {
+    z-index: 300;
+}
+
+/* The wild switcher opens over the blank landing (150) and under the
+   species picker (250) it can open in turn; the close confirmation has
+   to clear the switcher itself. */
+#wild-switch-modal {
+    z-index: 200;
+}
+
+#close-wild-modal {
+    z-index: 300;
+}
+
+.modal-box {
+    position: relative;
+    background: var(--panel-strong);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 12px 40px 0 #00000099, 0 0 30px 2px var(--border-glow);
+    padding: 24px;
+    max-width: 360px;
+    width: calc(100% - 48px);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.modal-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.modal-title i {
+    color: #f43f5e;
+}
+
+.modal-text {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.45;
+}
+
+.modal-text strong {
+    color: var(--text-primary);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.modal-close-btn {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 4px;
+    transition: color 0.2s;
+}
+
+.modal-close-btn:hover {
+    color: #f43f5e;
+}
+
+/* Ailments reference window: one color-coded tile per status. Each
+   tile carries the four things the rules give a status - Effect,
+   Treatment, Duration and its modifier - and is painted in that
+   status's own color, the same one its icon under the HP bar uses.
+   --ail is that color, --ail-ink and --ail-wash it lightened for the
+   band labels and thinned for their background; all three set inline. */
+.ailments-box {
+    /* Three tile columns on a full-screen window, two on a smaller one,
+       one on a narrow one - the grid below picks, no media queries */
+    max-width: 1180px;
+}
+
+.ailments-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    /* Every tile spans the seven rows its header and three label/text
+       pairs need and subgrids onto them, so a band sits at the same
+       height in every tile on the row rather than wherever the text
+       above it happened to end. That means tiles on a row share a
+       height too - align-items: start would shrink them back to their
+       own content and stagger the bands again. */
+    column-gap: 12px;
+    row-gap: 12px;
+    max-height: 72vh;
+    overflow-y: auto;
+    padding-right: 6px;
+}
+
+.ail-tile {
+    grid-row: span 7;
+    display: grid;
+    grid-template-rows: subgrid;
+    /* A subgrid inherits its parent's gutters, which would open a 12px
+       seam between every band and its text. The 12px is wanted only
+       between one row of tiles and the next, and that gutter belongs
+       to the parent, so it survives. */
+    row-gap: 0;
+    background: #00000026;
+    border: 1px solid #ffffff08;
+    border-radius: 12px;
+    overflow: hidden;
+    /* The banner's color carried on around the whole tile. An outline
+       rather than a border because an outline takes up no space, so
+       the tiles stay exactly the size they were; drawn inset so it
+       covers that 1px border and, being painted above the children,
+       sits over the full-width band backgrounds instead of under
+       them - an inset box-shadow would end up behind them. */
+    outline: 2px solid var(--ail);
+    outline-offset: -2px;
+}
+
+/* Weather reuses the ailment tiles and their subgrid row-matching, but
+   spans a different number of rows: a weather carries two bands (where
+   it's found, effects) and an environment one. Every tile within a tab
+   carries the same ones, which is what the matching needs - the class
+   on the grid says how many, set by renderWeather(). */
+/* Three tiles to a row at most, so the five weathers fall as the book
+   groups them - Sunny, Rain, Snowy over Sandstorm, Hail. auto-fill
+   divides by the larger of 290px and 30%: on a wide window the 30%
+   caps it at three, on a narrow one the 290px still drops it to two
+   and then one. */
+#weather-content {
+    grid-template-columns: repeat(auto-fill, minmax(max(290px, 30%), 1fr));
+}
+
+/* Left as they are, but centred in a bar that the equalizer may have
+   made taller than one line of text */
+#weather-content .ail-band {
+    display: flex;
+    align-items: center;
+}
+
+#weather-content.wx-rows-5 .ail-tile {
+    grid-row: span 5;
+}
+
+#weather-content.wx-rows-3 .ail-tile {
+    grid-row: span 3;
+}
+
+/* Subgrid levels the bands of the tiles on one row against each other;
+   equalizeWeatherTiles() then levels one row against the next, so every
+   tile in the window ends up the height of the tallest. Until it runs -
+   and if it bails out - this is the row-by-row look, not a broken one. */
+
+/* The book's preamble to the optional challenges. Outside the grid: a
+   full-width item in it would occupy a row of its own and throw the
+   tiles' rows out of step with the track cycle the equalizer sets. */
+.wx-note {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--text-secondary);
+}
+
+/* The book's icon badges, written out at the foot of an effect. Kept
+   inside the effect's own band rather than given one of their own, so
+   every environment tile carries the same rows. */
+.wx-mods {
+    margin: 6px 0 0;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.wx-mods strong {
+    color: var(--ail-ink);
+}
+
+/* The three groups the weather window is split into. Chips lifted from
+   the PC storage strip in trainer-license.html (.box-tab), minus its
+   horizontal scroll: that padding/negative-margin dance was there to
+   keep a drag & drop ring from being clipped, and nothing here drags. */
+.wx-tabs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.wx-tab {
+    flex-shrink: 0;
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: #00000033;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.72rem;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.wx-tab:hover {
+    border-color: var(--ghost-color);
+    color: var(--text-primary);
+}
+
+.wx-tab.active {
+    background: var(--primary-soft);
+    border-color: var(--ghost-color);
+    color: var(--text-primary);
+}
+
+/* Name over a second line - the weather's flavor text, the
+   environment's subtitle - so one banner shape serves both, the way
+   the book draws them. .ail-tile-name gives up its flex here, since
+   this wrapper is what stretches now. */
+.wx-head-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.wx-head-text .ail-tile-name {
+    flex: none;
+}
+
+.wx-sub {
+    font-size: 0.68rem;
+    font-style: italic;
+    line-height: 1.3;
+    opacity: 0.85;
+}
+
+.wx-list {
+    margin: 0;
+    padding-left: 1.05em;
+    display: grid;
+    gap: 5px;
+}
+
+/* No subgrid: tiles size themselves again and the bands stagger, which
+   is merely the old look rather than a collapsed one */
+@supports not (grid-template-rows: subgrid) {
+    .ailments-content {
+        align-items: start;
+    }
+
+    .ail-tile,
+    #weather-content.wx-rows-5 .ail-tile,
+    #weather-content.wx-rows-3 .ail-tile {
+        display: block;
+        grid-row: auto;
+    }
+}
+
+/* Background and text color are the status color and its ink, set
+   inline, as is the hairline: Disable's #292829 is so close to the
+   tile behind it that without one the header has no visible edge. */
+.ail-tile-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+}
+
+.ail-tile-icons {
+    display: flex;
+    gap: 2px;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
+.ail-tile-name {
+    flex: 1;
+    min-width: 0;
+    font-weight: 700;
+    font-size: 0.88rem;
+    line-height: 1.2;
+}
+
+.ail-tile-mod {
+    flex-shrink: 0;
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 999px;
+}
+
+.ail-band {
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    color: var(--ail-ink);
+    background: var(--ail-wash);
+}
+
+.ail-text {
+    font-size: 0.78rem;
+    color: var(--text-primary);
+    line-height: 1.45;
+    padding: 7px 10px 9px;
+}
+
+.ail-text strong {
+    color: var(--accent);
+}
+
+
+.ailment-immune {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ailment-immune.active {
+    color: #10b981;
+}
+
+.form-btn.danger {
+    background: #f43f5e;
+    color: #fff;
+}
+
+.form-btn.danger:hover {
+    background: #fb7185;
+    box-shadow: 0 0 8px #f43f5e66;
+}
+
+/* Universal quick moves: Evasion / Clash on the first line,
+   Initiative / Pain on the second */
+.quick-moves-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    /* Last thing in the header row, so any slack left by a short title
+       goes above it and the tiles sit right on top of the move list */
+    margin-top: auto;
+}
+
+/* Wild mode only. The extra buttons make the left column — and so grid
+   row 1 — taller than the moves header needs, and the auto margin above
+   then pushes the four tiles to the bottom of that taller row, stranding
+   them a long way down the page. Pinning them to the top puts the slack
+   below them instead. The move list is unaffected either way: it starts
+   at row 2, level with the sprite box. */
+.card-container.wild-card .quick-moves-stack {
+    margin-top: 0;
+}
+
+.quick-moves-row {
+    display: flex;
+    gap: 10px;
+}
+
+.quick-move {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: #0d091466;
+    border: 1px solid #ffffff0a;
+    border-radius: 12px;
+    padding: 10px 14px;
+}
+
+.quick-move-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.quick-move-name i {
+    color: var(--text-secondary);
+}
+
+.quick-move-vals {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.quick-move-val {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    background: #00000033;
+    /* 3.22 / 2.78, not 3 / 3, and the pair still sums to 6 so the pill
+       keeps its height. Symmetric padding centres the LINE BOX, not
+       the digits: Fira Code reserves 0.265em under the baseline for
+       descenders that figures do not have, while only 0.235em of its
+       0.935em ascent clears their flat tops. The ink therefore sits
+       half that difference above the middle — 0.015em, 0.216px at the
+       0.9rem the number is set in. Splitting the padding by exactly
+       that puts it back. Same metrics as the note on .pool-bar-value,
+       which is where they were measured. */
+    padding: 3.22px 10px 2.78px;
+    border-radius: 8px;
+    border: 1px solid #ffffff0d;
+    white-space: nowrap;
+}
+
+/* Body text, like the move names beside them. --accent is the theme
+   hue, and a pool total painted in it read as if the number meant
+   something; Pain is the one that does, and it says so from its own
+   rules below, which are more specific and later than this. */
+.quick-move-val strong {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+/* Pain penalty. Always on screen, even at 0 — an empty slot said
+   nothing, while a visible "0" says the rule exists and is not biting
+   yet. At 0 it inherits .quick-move untouched, so it reads as one of
+   the four; the colour only arrives with the penalty. No cursor: help
+   either — the blue question mark it draws beside the pointer is not
+   worth it when every other box here explains itself with a plain
+   tooltip and the default arrow. */
+/* Measured identical to Evasion/Clash/Initiative — 280.25 x 49, same
+   padding, same 1px border. It only READS as bigger, and colouring the
+   border is what does it. Those three carry a 4%-white edge that is
+   invisible on a dark page, so their silhouette ends at the fill;
+   tinting THIS one's border put a visible ring at the one place where
+   they show nothing, and a ring around a shape reads as sitting
+   outside it. So the edge is drawn one way here and another on the
+   Dark License, and the split is not cosmetic: that is the only theme
+   whose panels are dark enough to swallow the #ffffff0a hairline the
+   quick-move boxes carry. Everywhere else — every type theme, and the
+   Light License — the neighbours show a real 1px outline, so Pain
+   takes a real 1px outline too, in its own colour, and the four boxes
+   end at the same pixel. The Dark License case is right below. */
+.pain-quick.on {
+    background-color: #fb923c14;
+    border-color: #fb923c40;
+}
+
+.pain-quick.on .quick-move-name i,
+.pain-quick.on .quick-move-val strong {
+    color: #fb923c;
+}
+
+/* At 1 HP the penalty doubles. One step louder than the orange state
+   so the escalation is felt, but nowhere near the old 40% edge — the
+   red hue and the doubled number already do the shouting. */
+.pain-quick.severe {
+    background-color: #f43f5e17;
+    border-color: #f43f5e4d;
+}
+
+.pain-quick.severe .quick-move-name i,
+.pain-quick.severe .quick-move-val strong {
+    color: #fb7185;
+}
+
+/* Dark License. Its neighbours' hairline is invisible, so an outline
+   in Pain's colour would be a ring at the one place the other three
+   show nothing, and a ring around a shape reads as sitting outside
+   it. The edge moves inside instead — and the border it vacates is
+   made transparent AND cut out of the fill, or the tint paints that
+   1px and leaves a band standing proud of the ring. Both halves are
+   needed: transparent alone still shows the fill through it.
+
+   Later in the file than the two rules above and at the same (0,2,0),
+   so it wins on order; .severe restates only the ring colour, and its
+   border stays transparent from .on, which is always set with it. */
+:where(:root.dark-license) .pain-quick.on {
+    background-clip: padding-box;
+    border-color: transparent;
+    box-shadow: inset 0 0 0 1px #fb923c40;
+}
+
+:where(:root.dark-license) .pain-quick.severe {
+    box-shadow: inset 0 0 0 1px #f43f5e4d;
+}
+
+/* Moves Cards List. It fills the rows it spans - sprite box top to pools
+   box bottom - and scrolls inside them, so it carries no max-height and
+   no margin of its own; either one would break that alignment.
+
+   The list is taken out of flow and the empty .moves-scroll is what the
+   grid stretches. An auto row grows to its content, and a full learnset
+   runs to thousands of pixels, so a list laid out in flow here would
+   stretch rows 2 and 3 and drag the sprite and pool boxes down with it.
+   Out of flow it contributes no height at all, the rows stay sized by
+   the panels on the left, and top/bottom:0 pins the list to the box
+   those rows produced. */
+.moves-scroll {
+    position: relative;
+    min-height: 0;
+    /* Same recessed frame as the sprite box facing it. The chrome lives
+       out here rather than on the list itself: the list is masked at its
+       scroll edges, and that mask would eat the border and the shadow
+       along with the cards. overflow:hidden trims the scrollbar to the
+       rounded corners. */
+    /* Same fill, border and inset shadow as the sprite box, over a copy
+       of the glow this box never receives.
+
+       .card-container::before is clipped to a box 60% of the card wide
+       starting at -20%, so it stops around the left column's right edge:
+       the sprite box sits inside it, this one begins well past it. Both
+       fills are translucent, so the two wells end up different colours —
+       on a type theme --border-glow is the raw type colour at 15%, and
+       the gap is plain on Fire.
+
+       A flat wash of the average will not do it. The sprite box is lit
+       brightest at its top-left and falls off across its width, and a
+       large box in one even tone reads as a different colour however the
+       average is tuned. So this is the same radial, placed where the
+       sprite box sees it: 70px in from the left edge, because that box
+       starts at the card's 40px padding and the glow centres at 110.
+       The two boxes share a top edge — both start at grid-row 2 — so the
+       vertical offset carries over unchanged and they fall off in step.
+
+       The centre offset and radius follow the card's height, which the
+       gradient is sized from and CSS cannot read here; these are a full
+       sheet's. Being a little off only shifts where the falloff lands,
+       which is a far smaller error than tinting the box flat. */
+    background: linear-gradient(#0d091480, #0d091480),
+        radial-gradient(circle 620px at 70px 100px,
+            var(--border-glow) 0%, transparent 100%);
+    border: 1px solid var(--border-glow);
+    border-radius: 20px;
+    box-shadow: inset 0 0 20px #00000080;
+    overflow: hidden;
+}
+
+/* The page-wide track is #0d0914cc — the same ink as the box but at 80%
+   against the box's 50%, which drew a darker strip down this edge. Match
+   the box instead, and let the glow layer below show through it. */
+.moves-grid::-webkit-scrollbar-track {
+    background: #0d091480;
+}
+
+.moves-grid {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    overflow-y: auto;
+    /* Wider on the left than it was: the cards now sit inside a frame
+       instead of running to the column edge. The 8px on the right is the
+       scrollbar's own width. */
+    padding: 20px 8px 20px 14px;
+    /* Fade cards out at the scroll edges instead of hard clipping */
+    -webkit-mask-image: linear-gradient(to bottom,
+            transparent 0,
+            #000 24px,
+            #000 calc(100% - 24px),
+            transparent 100%);
+    mask-image: linear-gradient(to bottom,
+            transparent 0,
+            #000 24px,
+            #000 calc(100% - 24px),
+            transparent 100%);
+}
+
+/* Stacked, there is no row to fill, so the list goes back in flow as a
+   capped scroller and the wrapper is just a passthrough */
+@media (max-width: 900px) {
+    .moves-grid {
+        position: static;
+        max-height: 760px;
+        margin-top: 10px;
+    }
+}
+

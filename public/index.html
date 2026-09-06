@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pokerole Dynamic Sheets</title>
+    <meta name="description" content="Character sheets and a wild-encounter builder for the Pokerole TTRPG.">
+    <meta name="theme-color" content="#161514">
+    <link rel="manifest" href="manifest.webmanifest">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Fira+Code:wght@400;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!--
+        The landing page. Deliberately has no <script> at all: it lives in
+        public/ and is copied verbatim into the build, so it costs nothing and
+        cannot break the three real pages. Its only job is that the bare site URL
+        answers with something instead of a 404.
+    -->
+    <style>
+        :root {
+            --bg-color: #161514;
+            --bg-top: #231d1e;
+            --panel: #302e2d;
+            --border: #4a4443;
+            --text: #efe9e7;
+            --text-dim: #a9a09d;
+            --ghost: #c8383b;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            padding: 2.5rem 1.25rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2rem;
+            background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-color) 60%) fixed;
+            color: var(--text);
+            font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+        }
+
+        header { text-align: center; max-width: 34rem; }
+
+        h1 {
+            margin: 0 0 0.5rem;
+            font-size: clamp(1.6rem, 5vw, 2.3rem);
+            font-weight: 800;
+            letter-spacing: 0.01em;
+        }
+
+        h1 .mark { color: var(--ghost); }
+
+        header p {
+            margin: 0;
+            color: var(--text-dim);
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        nav {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+            gap: 1rem;
+            width: 100%;
+            max-width: 52rem;
+        }
+
+        a.card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            padding: 1.25rem 1.35rem;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--panel);
+            color: inherit;
+            text-decoration: none;
+            transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+        }
+
+        a.card:hover,
+        a.card:focus-visible {
+            border-color: var(--ghost);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px #0007;
+            outline: none;
+        }
+
+        a.card .title {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            font-weight: 700;
+            font-size: 1.02rem;
+        }
+
+        a.card .title i { color: var(--ghost); width: 1.15rem; text-align: center; }
+
+        a.card .sub {
+            margin: 0;
+            color: var(--text-dim);
+            font-size: 0.84rem;
+            line-height: 1.45;
+        }
+
+        footer {
+            color: var(--text-dim);
+            font-size: 0.78rem;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        footer a { color: var(--text-dim); }
+
+        /* The sheets are dense, two-column layouts built for a desktop window;
+           saying so is kinder than letting someone discover it on a phone. */
+        .note {
+            font-family: 'Fira Code', ui-monospace, monospace;
+            font-size: 0.74rem;
+            opacity: 0.75;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Pokerole <span class="mark">Dynamic Sheets</span></h1>
+        <p>Character sheets and a wild-encounter builder for the Pokerole tabletop RPG.
+            Your data stays in plain <code>.json</code> files on your own computer.</p>
+    </header>
+
+    <nav>
+        <a class="card" href="trainer-license.html">
+            <span class="title"><i class="fa-solid fa-id-card"></i> Trainer's License</span>
+            <p class="sub">Stats, skills, team, PC storage, bag and equipment. Start here.</p>
+        </a>
+        <a class="card" href="pokemon-card.html">
+            <span class="title"><i class="fa-solid fa-paw"></i> Pokémon Card</span>
+            <p class="sub">One Pokémon's sheet — a team member, a boxed one, or a wild encounter.</p>
+        </a>
+        <a class="card" href="gm-screen.html">
+            <span class="title"><i class="fa-solid fa-chess-board"></i> GM Screen</span>
+            <p class="sub">Roster, combat tracker, dice, NPC name generator and session notes.</p>
+        </a>
+    </nav>
+
+    <footer>
+        <p class="note">Best in Chrome or Edge — saving straight back to your folder needs the
+            File System Access API. Designed for a desktop window.</p>
+        <p>A free, non-commercial fan tool.
+            Pokerole is made by the <a href="https://www.pokeroleproject.com/">Pokerole Project</a>.</p>
+    </footer>
+</body>
+
+</html>

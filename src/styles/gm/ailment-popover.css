@@ -1,0 +1,93 @@
+/* ---------------- Ailment popover ----------------
+   Unlike the move tooltip this one takes the pointer: it carries a Roll
+   button, so it cannot be click-through. It stays open while the
+   pointer is over the flag or over the panel itself. */
+.ail-pop {
+    position: fixed;
+    z-index: 70;
+    width: 310px;
+    max-height: 80vh;
+    overflow: hidden;
+    background: var(--panel-strong);
+    border: 1px solid var(--ghost-color);
+    border-radius: 12px;
+    box-shadow: 0 8px 28px #000c;
+    padding: 0.6rem 0.7rem;
+    font-size: 0.78rem;
+    display: none;
+}
+
+.ail-pop.open { display: block; }
+
+.ail-pop-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 800;
+    font-size: 0.85rem;
+    margin-bottom: 0.35rem;
+}
+
+.ail-pop-mod {
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-radius: 5px;
+    padding: 0.05rem 0.3rem;
+    margin-left: auto;
+}
+
+.ail-band {
+    font-size: 0.58rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    margin-top: 0.4rem;
+}
+
+.ail-text { font-size: 0.74rem; line-height: 1.45; color: var(--text-secondary); }
+.ail-text strong { color: var(--text-primary); }
+
+.ail-roll {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.55rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-glow);
+}
+
+.ail-roll button {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-color: var(--accent-border);
+    background: var(--accent-faint);
+    color: var(--accent);
+}
+
+.ail-roll button:hover { border-color: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+
+.ail-roll-out {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.7rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.ail-roll-out .win { color: var(--ok); font-weight: 700; }
+.ail-roll-out .lose { color: var(--danger); font-weight: 700; }
+.ail-roll-out .banked { color: var(--crit); font-weight: 700; }
+
+.combat-row .c-move { display: flex; flex-direction: column; gap: 2px; flex: 0 0 auto; }
+
+.combat-row .c-move button, .combat-row .c-remove, .combat-row .c-tip {
+    padding: 0.05rem 0.3rem;
+    font-size: 0.6rem;
+    border-radius: 5px;
+}
+
+.add-row { display: flex; gap: 0.4rem; }
+.add-row input { flex: 1; min-width: 0; }
+

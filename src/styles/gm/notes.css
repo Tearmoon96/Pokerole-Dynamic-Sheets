@@ -1,0 +1,93 @@
+/* ---------------- Notes ----------------
+   A stack of note sheets, each folding open and shut on its own, the
+   way a phone's notes app lists them. Several can be open at once —
+   this is a screen meant to be spread across displays, so an accordion
+   that closes one to open another would fight the point of it. */
+.note-sheet {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--primary-faint);
+    overflow: hidden;
+}
+
+.note-sheet.open { border-color: var(--primary-soft); }
+
+.note-head {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.4rem 0.5rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.note-head:hover { background: var(--primary-soft); }
+
+.note-chevron {
+    flex: 0 0 auto;
+    width: 0.9rem;
+    text-align: center;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.note-head:hover .note-chevron { opacity: 1; color: var(--ghost-color); }
+
+.note-head > .icon-btn { margin-left: auto; }
+
+/* Reads as a heading until you put the pointer on it, then as a field.
+   Shut, it yields half the row to the preview; open, there is no
+   preview and it takes the width instead. */
+.note-title {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 45%;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 0.1rem 0.3rem;
+}
+
+.note-title:hover, .note-title:focus {
+    border-color: var(--border-color);
+    background: var(--panel-solid);
+}
+
+.note-sheet.open .note-title { flex: 1 1 auto; max-width: 100%; }
+
+.note-title::placeholder { color: var(--text-muted); font-weight: 400; }
+
+/* The first line of the body, so a shut note still says what it holds */
+.note-preview {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.note-body {
+    display: block;
+    width: 100%;
+    border: none;
+    border-top: 1px solid var(--border-glow);
+    border-radius: 0;
+    background: transparent;
+    resize: none;
+    overflow: hidden;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    padding: 0.55rem 0.6rem;
+    min-height: 5rem;
+}
+
+.note-body:focus { border-color: transparent; border-top-color: var(--border-color); }
+
