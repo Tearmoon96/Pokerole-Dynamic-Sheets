@@ -3,7 +3,7 @@ import { genId } from './defaults';
 import { normalizeState } from './normalize';
 import { markSaved, trainerFileName, trainerJson } from './workingSet';
 import type { WorkingTrainer } from './workingSet';
-import { ensureWorkingFolderScaffold, getDirHandle, rememberDirHandle } from '../lib/fileSystem';
+import { dirEntries, ensureWorkingFolderScaffold, getDirHandle, rememberDirHandle } from '../lib/fileSystem';
 
 /* Reading and writing the trainer .json files.
 
@@ -46,7 +46,7 @@ export async function pickWorkingFolder(): Promise<FolderLoad> {
     const loaded: WorkingTrainer[] = [];
     const diag = blankDiag();
     try {
-        for await (const entry of (handle as unknown as AsyncIterable<FileSystemHandle>)) {
+        for await (const entry of dirEntries(handle)) {
             if (entry.kind !== 'file' || !entry.name.toLowerCase().endsWith('.json')) continue;
             diag.json++;
             try {

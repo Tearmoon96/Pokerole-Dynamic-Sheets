@@ -1,4 +1,5 @@
 import { idbDel, idbGet, idbSet } from '../state/idb';
+import { dirEntries } from '../lib/fileSystem';
 import { WILD_MARKER, WILD_OPEN_KEY, wildSheetKey } from './cardContext';
 import type { CardSheet } from './types';
 import type { PokedexEntry } from '../data/types';
@@ -169,7 +170,7 @@ export async function collectJsonFiles(
     dir: FileSystemDirectoryHandle, depth: number,
 ): Promise<File[]> {
     const out: File[] = [];
-    for await (const entry of (dir as unknown as AsyncIterable<FileSystemHandle>)) {
+    for await (const entry of dirEntries(dir)) {
         if (entry.kind === 'file') {
             if (entry.name.toLowerCase().endsWith('.json')) {
                 out.push(await (entry as FileSystemFileHandle).getFile());

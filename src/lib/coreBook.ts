@@ -1,4 +1,5 @@
 import { IDB_COREBOOK_KEY, idbGet, idbSet } from '../state/idb';
+import { dirEntries } from './fileSystem';
 import { CORE_BOOK_DIR_NAME, MANUALS, manualJsonFor } from './manuals';
 import type { ManualBookmark } from './manuals';
 
@@ -47,7 +48,7 @@ export async function loadCoreBookVersions(): Promise<CoreBookVersion[]> {
     const dir = await coreBookDir(false);
     if (!dir) return out;
     try {
-        for await (const entry of (dir as unknown as AsyncIterable<FileSystemHandle>)) {
+        for await (const entry of dirEntries(dir)) {
             if (entry.kind !== 'file') continue;
             const mtch = entry.name.match(/^Pokerole Core Book (.+)\.json$/i);
             if (!mtch) continue;

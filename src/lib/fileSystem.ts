@@ -13,6 +13,27 @@ export type CustomImageKind = 'Trainers' | 'Pokemons';
     still on screen, so they are cached by path instead. */
 const customImgUrlCache: Record<string, string> = {};
 
+/* The entries of a directory, as handles.
+
+   Iterating a FileSystemDirectoryHandle DIRECTLY does not give you this. The
+   interface is declared `async iterable<USVString, FileSystemHandle>`, so its
+   default async iterator is entries() and yields [name, handle] PAIRS. A pair
+   has no `.kind`, so a loop written as
+
+       for await (const entry of handle)          // WRONG
+           if (entry.kind !== 'file') continue;
+
+   skips every single file and reports the folder as empty — which is exactly
+   what happened: opening a folder full of trainers said there were none.
+
+   values() is the one that yields bare handles, and it is what the original
+   pages used. TypeScript's lib.dom declares none of values/entries/the
+   iterator, so a cast is unavoidable; keeping the cast in one place is what
+   stops the wrong one being written again in the next loader. */
+export function dirEntries(dir: FileSystemDirectoryHandle): AsyncIterable<FileSystemHandle> {
+    return (dir as unknown as { values(): AsyncIterable<FileSystemHandle> }).values();
+}
+
 export function hasFileSystemAccess(): boolean {
     return typeof window.showDirectoryPicker === 'function';
 }

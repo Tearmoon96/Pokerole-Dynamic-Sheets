@@ -4,7 +4,7 @@ import { normalizeState } from './normalize';
 import { trainerJson } from './workingSet';
 import type { WorkingTrainer } from './workingSet';
 import { IDB_HANDLE_KEY, idbGet } from './idb';
-import { rememberDirHandle } from '../lib/fileSystem';
+import { dirEntries, rememberDirHandle } from '../lib/fileSystem';
 import type { TrainerState } from './types';
 
 /* Restoring the previous browser session, and checking it against disk.
@@ -79,7 +79,7 @@ export async function verifyRestoreAgainstDisk(trainers: WorkingTrainer[]): Prom
 
     const disk: Record<string, DiskTrainer> = {};
     try {
-        for await (const entry of (handle as unknown as AsyncIterable<FileSystemHandle>)) {
+        for await (const entry of dirEntries(handle)) {
             if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.json')) {
                 try {
                     const parsed = JSON.parse(await (await (entry as FileSystemFileHandle).getFile()).text());
