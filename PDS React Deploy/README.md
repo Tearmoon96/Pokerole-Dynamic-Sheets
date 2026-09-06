@@ -2,6 +2,8 @@
 
 Character sheets and a wild-encounter builder for the [Pokerole](https://www.pokeroleproject.com/) tabletop RPG, running entirely in your browser. There are two pages — one for trainers, one for individual Pokémon — and they talk to each other. No install, no sign-up, no server. Your data stays in plain `.json` files on your own computer. The app is developed with the dataset version 3.0 and the manual version of reference is the 3.0, but almost everything can be manually changed and adapted to other versions.
 
+**[Open it in your browser →](https://tearmoon96.github.io/Pokerole-Dynamic-Sheets/)** — nothing to download, and it keeps working offline once you've opened it. Or grab a release to run it from your own disk.
+
 ## What's in here
 
 Two HTML files, each a standalone app:
