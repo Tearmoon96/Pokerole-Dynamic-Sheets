@@ -17,10 +17,13 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!--
-        The landing page. Deliberately has no <script> at all: it lives in
-        public/ and is copied verbatim into the build, so it costs nothing and
-        cannot break the three real pages. Its only job is that the bare site URL
-        answers with something instead of a 404.
+        The landing page. It lives in public/ and is copied verbatim into the
+        build, so it costs nothing and cannot break the real pages. Its only job
+        is that the bare site URL answers with something instead of a 404.
+
+        It carries exactly one script, at the bottom: the rolling table is the
+        only page that cannot work from the disk, and its card is greyed out
+        when this file is opened over file://. Nothing else here needs one.
     -->
     <style>
         :root {
@@ -99,10 +102,17 @@
         a.card .title {
             display: flex;
             align-items: center;
+            /* The badge on the rolling-table card is one more flex item, and
+               without a wrap here it squeezed the name instead — "Rolling
+               Table" broke across two lines while the badge kept its width. */
+            flex-wrap: wrap;
             gap: 0.55rem;
             font-weight: 700;
             font-size: 1.02rem;
         }
+
+        /* Whatever else shares the line, the name itself stays on one. */
+        a.card .title .name { white-space: nowrap; }
 
         a.card .title i { color: var(--ghost); width: 1.15rem; text-align: center; }
 
@@ -111,6 +121,42 @@
             color: var(--text-dim);
             font-size: 0.84rem;
             line-height: 1.45;
+        }
+
+        /* Greyed out and inert rather than pretending it will work. Two things
+           reach this: the rolling table, which is not finished, and (once it is)
+           an offline copy of it, which has no origin a relay would accept. */
+        a.card.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        /* A badge on the title, so the state is legible before the small print.
+           Kept at full opacity against the card's 0.5 so it stays readable —
+           `opacity` on the card multiplies through to every descendant, and a
+           0.5 badge on a 0.5 card is what made the first attempt unreadable. */
+        .wip-tag {
+            display: inline-block;
+            margin-left: 0.5rem;
+            padding: 0.1rem 0.5rem;
+            border: 1px solid var(--ghost);
+            border-radius: 999px;
+            color: var(--ghost);
+            font-family: 'Fira Code', ui-monospace, monospace;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+
+        .wip-note {
+            display: block;
+            margin-top: 0.35rem;
+            color: var(--ghost);
+            font-weight: 600;
         }
 
         footer {
@@ -141,16 +187,31 @@
 
     <nav>
         <a class="card" href="trainer-license.html">
-            <span class="title"><i class="fa-solid fa-id-card"></i> Trainer's License</span>
+            <span class="title"><i class="fa-solid fa-id-card"></i> <span class="name">Trainer's License</span></span>
             <p class="sub">Stats, skills, team, PC storage, bag and equipment. Start here.</p>
         </a>
         <a class="card" href="pokemon-card.html">
-            <span class="title"><i class="fa-solid fa-paw"></i> Pokémon Card</span>
+            <span class="title"><i class="fa-solid fa-paw"></i> <span class="name">Pokémon Card</span></span>
             <p class="sub">One Pokémon's sheet — a team member, a boxed one, or a wild encounter.</p>
         </a>
         <a class="card" href="gm-screen.html">
-            <span class="title"><i class="fa-solid fa-chess-board"></i> GM Screen</span>
+            <span class="title"><i class="fa-solid fa-chess-board"></i> <span class="name">GM Screen</span></span>
             <p class="sub">Roster, combat tracker, dice, NPC name generator and session notes.</p>
+        </a>
+        <!-- Shipped greyed out and unclickable on purpose: the page exists but the
+             relay it needs is not deployed, so every join would fail. It gets its
+             href back in the same commit that turns the relay on. -->
+        <a class="card disabled" id="card-table" aria-disabled="true">
+            <span class="title">
+                <i class="fa-solid fa-dice"></i>
+                <span class="name">Rolling Table</span>
+                <span class="wip-tag">Work in progress</span>
+            </span>
+            <p class="sub">A shared dice table: join with a lobby id and a password, and
+                everyone sees every roll.
+                <span class="wip-note">Not live yet &mdash; still being built. It needs a
+                    server of its own, which is not running, so this one stays closed.</span>
+            </p>
         </a>
     </nav>
 
@@ -160,6 +221,12 @@
         <p>A free, non-commercial fan tool.
             Pokerole is made by the <a href="https://www.pokeroleproject.com/">Pokerole Project</a>.</p>
     </footer>
+    <!-- The rolling-table card used to be greyed here, at runtime, for a page
+         opened off the disk. It now ships that way for everyone — it is not
+         finished — so there is nothing left to decide on load. Put the check
+         back alongside the href when the relay goes up: a shared lobby needs
+         the network by definition, and a file:// page has no origin a relay
+         would accept. -->
 </body>
 
 </html>
