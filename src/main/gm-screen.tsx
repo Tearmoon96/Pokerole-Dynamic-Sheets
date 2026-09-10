@@ -11,6 +11,7 @@ import { GmApp } from '../components/gm/GmApp';
 import { installTooltips } from '../lib/tooltip';
 import { initDevice } from '../lib/device';
 import { registerServiceWorker } from '../pwa/register';
+import { UpdatePrompt } from '../pwa/UpdatePrompt';
 import type { AppData } from '../data/types';
 
 import '../styles/gm-screen.css';
@@ -56,7 +57,11 @@ function Root() {
    the page starts in the right class instead of reflowing into it. */
 initDevice();
 
-createRoot(document.getElementById('root')!).render(<StrictMode><Root /></StrictMode>);
+/* UpdatePrompt sits OUTSIDE Root: it has to render while the page is still
+   booting, and it reads its own store rather than any provider. */
+createRoot(document.getElementById('root')!).render(
+    <StrictMode><Root /><UpdatePrompt /></StrictMode>,
+);
 
 installTooltips();
 registerServiceWorker();

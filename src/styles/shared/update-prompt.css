@@ -1,0 +1,108 @@
+/* The "a new version is ready" bar.
+
+   Bottom-centre and fixed, so it does not move the sheet under the pointer and
+   does not sit where either page keeps its own chrome — the card's status strip
+   and the trainer nav are both at the top, and the GM board's toast comes in at
+   the top right.
+
+   Its colours are literals rather than the theme variables every other panel
+   uses, and that is on purpose: it is drawn on four pages whose palettes are set
+   by the loaded Pokemon's typing, so a themed bar would be a different colour on
+   every sheet and occasionally unreadable against the page behind it. */
+.update-prompt {
+    position: fixed;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    /* Above everything that is page chrome rather than a dialog: the card's
+       full-screen `.blank-landing` is 150 and the trainer switcher's pill is
+       120, and being under either meant a visitor sitting on the card's empty
+       state would never see the offer at all. It clears `.modal-overlay` (100)
+       too — a centred modal does not reach the bottom 8px, and the bar has a
+       "Later" if it ever does. The gear catalogue (260) and the tooltip layer
+       still win, both of which are transient. */
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    max-width: min(34rem, calc(100vw - 24px));
+    padding: 0.55rem 0.7rem 0.55rem 0.85rem;
+    border: 1px solid #ffffff2e;
+    border-radius: 999px;
+    background: #171a21f2;
+    color: #e8eaf0;
+    font-family: inherit;
+    font-size: 0.82rem;
+    box-shadow: 0 10px 30px #000000a6;
+}
+
+.update-prompt-icon {
+    flex: 0 0 auto;
+    color: #7dd3fc;
+    font-size: 0.85rem;
+}
+
+.update-prompt-text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.update-prompt button {
+    flex: 0 0 auto;
+    border-radius: 999px;
+    padding: 0.28rem 0.8rem;
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.update-prompt-go {
+    border: 1px solid #38bdf8;
+    background: #38bdf82e;
+    color: #bae6fd;
+}
+
+.update-prompt-go:hover {
+    background: #38bdf84d;
+    color: #ffffff;
+}
+
+.update-prompt-later {
+    border: 1px solid transparent;
+    background: none;
+    color: #9aa3b2;
+}
+
+.update-prompt-later:hover {
+    border-color: #ffffff2e;
+    color: #e8eaf0;
+}
+
+/* A phone has no room for a pill: full width, and the buttons get a line of
+   their own so they reach the 30px the touch layer asks of every control. */
+@media (max-width: 560px) {
+    .update-prompt {
+        left: 8px;
+        right: 8px;
+        bottom: 8px;
+        max-width: none;
+        transform: none;
+        flex-wrap: wrap;
+        border-radius: 14px;
+        padding: 0.6rem 0.7rem;
+    }
+
+    .update-prompt-text {
+        flex: 1 0 100%;
+    }
+
+    .update-prompt button {
+        min-height: 32px;
+    }
+
+    .update-prompt-go {
+        margin-left: auto;
+    }
+}

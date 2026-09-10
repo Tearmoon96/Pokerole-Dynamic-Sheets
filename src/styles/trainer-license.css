@@ -19,3 +19,6 @@
    behind a data-device or data-pointer attribute that a desktop never has. */
 @import './responsive/base.css';
 @import './responsive/sheets.css';
+
+/* The "new version is ready" bar, on every page that registers a worker. */
+@import './shared/update-prompt.css';
