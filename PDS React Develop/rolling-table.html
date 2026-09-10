@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <!-- viewport-fit=cover is what makes env(safe-area-inset-*) report real
+         numbers on a notched phone; without it they are always 0 and the
+         sheet runs under the notch and the home indicator. Zoom is left
+         enabled on purpose - maximum-scale=1 is the usual way to stop iOS
+         zooming a small field on focus, and taking pinch-zoom away from
+         everyone is not an acceptable price. src/styles/responsive/base.css
+         fixes that with a 16px font floor instead. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Pokerole Rolling Table</title>
+    <meta name="description" content="A shared dice table for the Pokerole TTRPG: everyone sees every roll.">
+    <meta name="theme-color" content="#161514">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Fira+Code:wght@400;600&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!--
+        No window.DATA_BASE here, unlike the other three pages: the rolling
+        table draws no sprites and reads no database, so it never touches
+        app-data/ at all. That is also why it boots instantly.
+    -->
+  <script defer src="./assets/rolling-table-BAmT09Rd.js"></script>
+<link rel="manifest" href="./manifest.webmanifest"></head>
+
+<body>
+    <div id="root"></div>
+</body>
+
+</html>

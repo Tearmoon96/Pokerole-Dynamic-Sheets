@@ -2,6 +2,8 @@ import { useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useGm } from '../../gm/GmContext';
 import { PANEL_MAX_W, PANEL_MIN_W } from '../../gm/constants';
+import { useActivePanel } from '../../gm/phoneBoard';
+import { reorderHandle, reorderItem } from '../../lib/touchDrag';
 
 /* One board panel: a head with a grip, a title, its own buttons and the width
    lock, then the body, then the right-edge resize grabber.
@@ -20,6 +22,8 @@ export function Panel({ panelKey, icon, title, actions, children, onReorder }: {
 }) {
     const { state, store } = useGm();
     const ref = useRef<HTMLElement>(null);
+    /* null on anything wider than a phone, where every panel is on screen. */
+    const activePanel = useActivePanel();
     const width = state.layout.widths[panelKey];
     const fixed = width > 0;
 
@@ -74,10 +78,22 @@ export function Panel({ panelKey, icon, title, actions, children, onReorder }: {
        can never start from a button or a field in the head. */
     const draggable = useRef(false);
 
+    /* Pulled out so the grip's own onPointerDown can call it: spreading
+       reorderHandle() and then writing onPointerDown after it would
+       otherwise silently drop the touch handler. */
+    const touchGrab = (reorderHandle({ itemKey: panelKey, group: 'gm-panel', onReorder })
+        .onPointerDown ?? (() => {})) as (e: React.PointerEvent<HTMLElement>) => void;
+
     return (
         <section
-            className={'panel' + (fixed ? ' fixed-w' : '')}
+            className={'panel' + (fixed ? ' fixed-w' : '')
+                + (activePanel === panelKey ? ' phone-active' : '')}
             id={'panel-' + panelKey}
+            /* Marks this panel as both a thing that can be picked up and a
+               place another can land, for the touch path — the native drag
+               below never fires from a finger. The grab itself is on the
+               grip, further down, exactly as the native one is. */
+            {...reorderItem('gm-panel', panelKey)}
             ref={ref}
             /* Inline, so it beats the .panel rule's `flex: 1 1 390px`. min-width
                has to go with it or the floor would win back any width set below
@@ -106,6 +122,11 @@ export function Panel({ panelKey, icon, title, actions, children, onReorder }: {
                     className="panel-grip"
                     title="Hold and drag to reorder the panels"
                     onPointerDown={(e) => {
+                        /* Both routes start here. touchGrab is the long-press
+                           one and ignores a mouse; the lines under it arm the
+                           native drag and ignore a finger. */
+                        touchGrab(e);
+                        if (e.pointerType !== 'mouse') return;
                         draggable.current = true;
                         const panel = e.currentTarget.closest('.panel') as HTMLElement | null;
                         if (panel) panel.draggable = true;

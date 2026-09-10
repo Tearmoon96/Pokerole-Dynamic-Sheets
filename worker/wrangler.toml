@@ -1,0 +1,25 @@
+# The Rolling Table relay.
+#
+# Deployed separately from the site: GitHub Pages serves files and runs no code,
+# so the shared lobby needs somewhere for messages to meet. This is that place
+# and nothing more — it cannot read a single roll (see src/index.ts).
+
+name = "pokerole-rolling-table"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+
+# One Durable Object per lobby: a room is a tiny actor that holds the open
+# sockets and copies each message to the others. `idFromName(addr)` is what
+# makes everyone who derived the same room address land in the same actor.
+[[durable_objects.bindings]]
+name = "TABLE_ROOM"
+class_name = "TableRoom"
+
+# SQLite-backed classes are the ones the free plan allows. Do not change this
+# tag or the class name after the first deploy — migrations are append-only.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TableRoom"]
+
+[observability]
+enabled = true

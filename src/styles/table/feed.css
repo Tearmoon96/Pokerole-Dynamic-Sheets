@@ -1,0 +1,155 @@
+/* ---------------- Rolling table: the feed and the controls ---------------- */
+
+.roll-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* .roll-result comes from gm/dice.css; these only add what a shared feed needs
+   on top of the GM screen's single-roll box. */
+.feed-row .roll-label { align-items: baseline; gap: 0.75rem; }
+
+.feed-who {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.feed-note {
+    font-weight: 500;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+.feed-meta {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+/* Your own rolls, so a busy feed still reads at a glance. */
+.feed-row.mine { border-color: var(--accent-border); }
+
+/* A roll only this browser can see: the GM's, with "hide my rolls" on. Dashed,
+   because nothing about it was published. */
+.feed-row.hidden-roll {
+    border-style: dashed;
+    background: transparent;
+}
+
+.feed-private {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: var(--crit);
+}
+
+/* ---------------- Controls ---------------- */
+
+.roll-controls {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--card-bg);
+    padding: 0.7rem;
+}
+
+.roll-note { width: 100%; }
+
+#roll-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.waiting-note,
+.scripted-note { margin: 0; line-height: 1.45; }
+
+.scripted-note { color: var(--crit); opacity: 0.9; }
+
+.host-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    border-top: 1px solid var(--border-glow);
+    padding-top: 0.55rem;
+}
+
+.check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.check input { margin-top: 0.15rem; accent-color: var(--ghost-color); }
+
+.check span {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.check em {
+    font-style: normal;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.script-target {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+}
+
+.script-target input { width: 4rem; text-align: center; }
+
+.script-target label {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+}
+
+/* ---------------- Requests in flight ---------------- */
+
+.pending-strip {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.pending-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    border: 1px dashed var(--border-color);
+    border-radius: 999px;
+    padding: 0.15rem 0.3rem 0.15rem 0.55rem;
+}
+
+.clear-feed {
+    flex: 0 0 auto;
+    align-self: flex-start;
+}

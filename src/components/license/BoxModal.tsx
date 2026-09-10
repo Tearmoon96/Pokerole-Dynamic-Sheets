@@ -18,6 +18,7 @@ import { stripMegaSuffix } from '../../lib/sprites';
 import { boxedCardUrl, openCard } from '../../lib/navigation';
 import type { PokedexEntry } from '../../data/types';
 import type { MonEntry, TrainerState } from '../../state/types';
+import { reorderHandle, reorderItem } from '../../lib/touchDrag';
 
 /* PC storage: six renameable boxes, with the team strip in the same window so a
    deposit or withdrawal is one drag — or one click on a selected Pokémon. */
@@ -91,6 +92,33 @@ export function BoxModal({ open, onClose }: { open: boolean; onClose: () => void
         },
     });
 
+    /* The touch route for the same three drops, since a finger fires no
+       dragstart and the whole box screen is otherwise dead on a tablet.
+
+       The native handlers above each close over their own target, which a
+       long-press drag cannot read off the DOM — so every drop target names
+       itself with a key instead and this dispatches on it. A tile inside the
+       grid resolves to the grid, which is what dropping onto one means. */
+    const touchDrop = (uid: string, target: string) => {
+        if (target.startsWith('box:')) {
+            applyMove((s) => moveMonToBox(s, uid, Number(target.slice(4))));
+            return;
+        }
+        if (target.startsWith('slot:')) {
+            const i = Number(target.slice(5));
+            const found = findMon(sheet, uid);
+            if (!found) return;
+            if (found.inBox) applyMove((s) => withdrawFromBox(s, uid, i));
+            else store.update((s) => swapTeamSlots(s, found.idx, i));
+            return;
+        }
+        applyMove((s) => moveMonToBox(s, uid, activeBoxIdx(s)));
+    };
+
+    const touchSource = (uid: string | undefined) => uid
+        ? reorderHandle({ itemKey: uid, group: 'pc-mon', onReorder: touchDrop })
+        : {};
+
     const dragSourceProps = (uid: string | undefined) => ({
         draggable: true,
         onDragStart: (e: React.DragEvent<HTMLDivElement>) => {
@@ -153,6 +181,7 @@ export function BoxModal({ open, onClose }: { open: boolean; onClose: () => void
                                 store.update((s) => { s.activeBox = bi; });
                             }}
                             {...dropTargetProps((uid) => applyMove((s) => moveMonToBox(s, uid, bi)))}
+                            {...reorderItem('pc-mon', 'box:' + bi)}
                         >
                             {b.name}
                         </button>
@@ -178,6 +207,7 @@ export function BoxModal({ open, onClose }: { open: boolean; onClose: () => void
                     className="box-grid"
                     id="box-grid"
                     {...dropTargetProps((uid) => applyMove((s) => moveMonToBox(s, uid, activeBoxIdx(s))))}
+                    {...reorderItem('pc-mon', 'grid')}
                 >
                     {!entries.length ? (
                         <div className="box-empty">
@@ -200,6 +230,8 @@ export function BoxModal({ open, onClose }: { open: boolean; onClose: () => void
                                     openCard(boxedCardUrl(sheet, e.mon.dexId, e.mon.uid!));
                                 }}
                                 {...dragSourceProps(e.mon.uid)}
+                                {...reorderItem('pc-mon', 'grid')}
+                                {...touchSource(e.mon.uid)}
                             >
                                 {p && (
                                     <MonSprite
@@ -277,6 +309,8 @@ export function BoxModal({ open, onClose }: { open: boolean; onClose: () => void
                                         : 'Empty team slot — drop a stored Pokémon here to withdraw it'}
                                     onClick={p ? () => applyMove((s) => depositToBox(s, i, activeBoxIdx(s))) : undefined}
                                     {...(p ? dragSourceProps(slot.uid) : {})}
+                                    {...reorderItem('pc-mon', 'slot:' + i)}
+                                    {...(p ? touchSource(slot.uid) : {})}
                                     {...dropTargetProps((uid) => {
                                         const found = findMon(sheet, uid);
                                         if (!found) return;

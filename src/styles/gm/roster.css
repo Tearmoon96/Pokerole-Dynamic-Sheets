@@ -6,17 +6,22 @@
     overflow: hidden;
 }
 
-/* The two action buttons sit in the top-right corner and the expander
-   chevron in the bottom-right, both inset from the edge. They are
-   absolute so the name and pool bars keep the full width of the row;
-   the padding on the right is what reserves their column. */
+/* The action buttons sit in the top-right corner and the expander chevron in
+   the bottom-right, both inset from the edge and both absolute, so the name and
+   the pool bars keep the full width of the row.
+
+   What reserves their columns is padding — but on the BANDS they actually
+   overhang, not on the head. Insetting the whole head was the first way and the
+   wrong one: the buttons are only as tall as the name's line, the chevron only
+   as tall as the chip strip, and a reserve wide enough for either left the two
+   pool bars between them holding 160px of tag, numbers and ± buttons in 180px,
+   which is a 20px stub of coloured track. Each band pays for what covers it. */
 .trainer-head {
     position: relative;
     display: flex;
     align-items: center;
     gap: 0.6rem;
     padding: 0.5rem 0.6rem;
-    padding-right: 4.6rem;
     cursor: pointer;
     user-select: none;
     /* The theme's red, permanently rather than only under the pointer.
@@ -59,6 +64,23 @@
 
 .trainer-main { flex: 1; min-width: 0; }
 
+/* Two things keep a long name off the four buttons floating above it, and it
+   needs BOTH — the first alone was shipped and did not work.
+
+   `padding-right` reserves their column, which is what stops a name that fits
+   from running up to them. It does nothing about one that does not fit:
+   `overflow: hidden` clips at the PADDING box, so the browser paints the
+   overflowing glyphs straight through the reserve and over the buttons. A
+   44-character name covered all four.
+
+   So the text also has to be able to truncate, and for that it needs an
+   element of its own — `.name-text` below. As a bare text node it was an
+   ANONYMOUS flex item, and `text-overflow` never applies to one of those: it
+   applies to a block container's own inline content, and the anonymous item is
+   neither addressable nor shrinkable (its min-width is auto, so with
+   `white-space: nowrap` its min-content is the whole unbreakable string).
+   `text-overflow: ellipsis` on this container was therefore inert, which is
+   why it is gone from here and sits on the span instead. */
 .trainer-name {
     font-weight: 800;
     font-size: 0.95rem;
@@ -67,15 +89,32 @@
     gap: 0.45rem;
     white-space: nowrap;
     overflow: hidden;
+    padding-right: 8rem;
+}
+
+/* Where the truncation actually happens. Same shape as `.mon-name .name-text`,
+   which had it right all along — which is why a wild's row never had this bug
+   and a trainer's head did. */
+.trainer-name .name-text {
+    min-width: 0;
+    overflow: hidden;
     text-overflow: ellipsis;
 }
 
+/* Never trimmed — the rank is two or three letters and says what the trainer
+   IS, so the name gives way first. */
 .trainer-rank {
+    flex: 0 0 auto;
     font-size: 0.65rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--text-secondary);
+}
+
+/* The chip strip is the band the expander chevron overhangs. */
+.trainer-head .status-chips {
+    padding-right: 2.2rem;
 }
 
 .pool-bars { display: flex; flex-direction: column; gap: 3px; margin-top: 3px; }

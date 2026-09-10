@@ -1,0 +1,239 @@
+/* ============================================================
+   The mobile / tablet wrapper, part 1: rules every page shares.
+
+   Imported LAST on all four pages, so it settles ties against the
+   desktop rules it is adapting rather than depending on specificity
+   tricks to beat them.
+
+   Nothing in this layer touches the desktop layout. Every rule sits
+   behind either data-device (how much room there is) or data-pointer
+   (what is doing the pointing), both stamped on <html> by
+   src/lib/device.ts, and the desktop combination is never selected.
+   That is also why `compare-ui` still measures the original: it shoots
+   at 1400px with a mouse, which is data-device="desktop".
+   ============================================================ */
+
+:root {
+    /* Zero on every device without a notch or a home indicator, so these
+       are safe to add unconditionally. They only report real numbers once
+       the page asks for viewport-fit=cover, which all four now do. */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+}
+
+/* Safari on iPhone inflates the text of any block it decides is too
+   narrow to read, which silently undoes half a responsive layout — a
+   column set to fit turns out to hold 20px text. This turns the guess
+   off and leaves the sizes as written. */
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+/* ---------- Touch reordering (src/lib/touchDrag.ts) ---------- */
+
+.touch-dragging {
+    opacity: 0.55;
+    transform: scale(0.98);
+    transition: transform 0.12s ease;
+}
+
+.touch-drop-target {
+    outline: 2px dashed var(--ghost-color, #a855f7);
+    outline-offset: -2px;
+}
+
+/* The gesture is live: nothing should select or long-press-menu under
+   the finger that is holding an item. */
+body.touch-reordering {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+
+/* ============================================================
+   Touch ergonomics — keyed on the POINTER, never on the width.
+
+   A desktop window dragged narrow gets the stacked layout further
+   down, but keeps its small precise controls: the mouse has not
+   changed. Only a real touch screen gets the finger-sized ones.
+   ============================================================ */
+
+@media (pointer: coarse) {
+
+    /* THE iOS ZOOM RULE. Safari on iPhone and iPad zooms the whole page
+       in when a field with a font under 16px takes focus, and does not
+       zoom back out when it blurs — the user is left stranded at 1.3x
+       with the layout hanging off both edges. It is the single most
+       common way a working desktop form "breaks" on iOS, it is a
+       property of the FONT SIZE alone, and 16px is the exact threshold.
+
+       Fixing it by disabling zoom (maximum-scale=1) is the usual
+       shortcut and is not an option here: it takes pinch-zoom away from
+       people who need it, and current iOS ignores it anyway. */
+    /* !important, and it is load-bearing rather than lazy. A media query
+       adds NO specificity, so a bare `input` here (0,0,1) loses to every
+       one of the ~20 rules that set these fonts — `.extra-name-input` is
+       (0,1,0) and `#rank-input` is an id, (1,0,0), which no selector
+       written here could out-rank at all. And there is no case where a
+       field on a touch screen wants to be under 16px: the rule has no
+       legitimate exception to make room for.
+
+       max(16px, 1em) rather than a flat 16px so a field that was already
+       LARGER than the body text keeps its emphasis instead of shrinking
+       to the floor. */
+    input,
+    select,
+    textarea {
+        font-size: max(16px, 1em) !important;
+    }
+
+    /* Hit areas, without moving anything.
+
+       A centred overlay makes the target a finger's width while the
+       button keeps the size the design gave it, so no row re-wraps and
+       no panel grows. The alternative — min-height: 44px on every
+       button — would blow this app's dense chip rows apart.
+
+       Capped at 36px rather than the usual 44 because several of these
+       sit shoulder to shoulder (the +/- pool steps are 18px and
+       adjacent): overlays wider than the gap would cover the button
+       next door and the later sibling would swallow every tap. */
+    .pool-btn,
+    .ach-check,
+    .gender-toggle,
+    .sprite-btn,
+    .sprite-scale-btn,
+    .filter-picker-btn,
+    .move-disable-btn,
+    .move-pin-btn {
+        position: relative;
+    }
+
+    .pool-btn::after,
+    .ach-check::after,
+    .gender-toggle::after,
+    .sprite-btn::after,
+    .sprite-scale-btn::after,
+    .filter-picker-btn::after,
+    .move-disable-btn::after,
+    .move-pin-btn::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: max(100%, 36px);
+        height: max(100%, 36px);
+        transform: translate(-50%, -50%);
+        /* Invisible, and never the thing that paints — purely a target. */
+        background: none;
+        pointer-events: auto;
+    }
+
+    /* Where the overlay is not enough.
+
+       Two small controls side by side cannot BOTH have a 36px overlay:
+       the overlays meet in the middle and the later sibling swallows
+       taps meant for the earlier one, which is worse than a small
+       target — it is the WRONG target. Measuring found this on every
+       tight +/- pair.
+
+       So the packed controls get real size instead of a bigger hit
+       area. It costs a few pixels of layout, which the single-column
+       phone layout has to spare and the desktop never sees. */
+    .pool-btn,
+    .pool-step,
+    .ach-check,
+    .item-remove,
+    .team-clear-btn,
+    /* The GM screen's chrome. These were on the overlay list and had to
+       come off it: a panel head packs a grip, three or four .icon-btns
+       and the width lock into one row, and 36px overlays on 29px
+       buttons overlap so heavily that the neighbour swallows the tap —
+       measured at 0 of 4 probes reaching the intended button. Real size
+       is the only thing that works in a row that dense. */
+    .icon-btn,
+    .c-remove,
+    .c-tip,
+    .tip-btn {
+        min-width: 30px;
+        min-height: 30px;
+    }
+
+    /* The 16px font floor above leaves these a pixel or two under a
+       comfortable target; nothing depends on their exact height. */
+    input,
+    select {
+        min-height: 30px;
+    }
+
+    .team-edit-btn,
+    .extra-add-btn,
+    .extra-name-input,
+    .box-tool-btn {
+        min-height: 30px;
+    }
+
+    /* One square per potion charge, at 14px. Their row already wraps,
+       so growing them costs a second line at worst — and a 14px square
+       is not something a fingertip can pick out of a row of ten. */
+    .tally-sq {
+        width: 26px;
+        height: 26px;
+        font-size: 0.6rem;
+    }
+
+    /* Momentum scrolling inside every panel that scrolls, and no
+       pull-to-refresh firing when a list is already at its top —
+       on a sheet that is unsaved, a stray refresh is data loss. */
+    .panel-body,
+    .moves-scroll,
+    .modal-box,
+    .board {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+    }
+
+    /* A hover style that latches is worse than none: on touch the
+       :hover state sticks to whatever was tapped last until something
+       else is tapped, so a button stays lit long after the user moved
+       on. These are the ones where that reads as "still selected". */
+    .trainer-arrow:hover,
+    .wild-arrow:hover {
+        background: var(--panel-strong);
+        color: var(--text-secondary);
+    }
+}
+
+/* ============================================================
+   Viewport height on a phone browser.
+
+   100vh is the WRONG height on mobile: it means the viewport with the
+   URL bar hidden, so while the bar is showing — which is most of the
+   time — anything sized 100vh runs off the bottom of the screen. dvh
+   is the one that tracks the bar sliding in and out. The 100vh line
+   stays first as the fallback for anything that predates dvh.
+   ============================================================ */
+
+@supports (height: 100dvh) {
+
+    /* Scoped to the two touch classes, not applied to every page.
+
+       It was unguarded at first, and `compare-ui` caught it: on the GM
+       screen it moved the pinned-moves tooltip 2px up, because the
+       tooltip is placed against its anchor row and the anchor had
+       shifted. Desktop 100dvh and 100vh are the same number, so it read
+       as a no-op — and was not. That is the whole reason every rule in
+       this layer carries a data-device or a pointer gate. */
+    html[data-device="phone"] body,
+    html[data-device="tablet"] body {
+        min-height: 100dvh;
+    }
+
+    html[data-device="phone"] .modal-box,
+    html[data-device="tablet"] .modal-box {
+        max-height: 88dvh;
+    }
+}

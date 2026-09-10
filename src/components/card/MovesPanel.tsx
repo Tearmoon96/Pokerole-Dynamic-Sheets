@@ -9,6 +9,7 @@ import {
 } from '../../card/moves';
 import type { CardMove } from '../../card/moves';
 import { painPenalty, resolvePoolValue } from '../../card/pools';
+import { reorderHandle, reorderItem } from '../../lib/touchDrag';
 
 /* The move learnset: the filter controls, the three universal rolls, and the
    list itself. */
@@ -341,6 +342,20 @@ export function MovesPanel({ speciesMoves, onEditMove, onDeleteMove }: {
                                 dragProps={{
                                     /* Only collapsed cards are draggable. */
                                     draggable: !isExpanded,
+                                    /* The touch route. A finger never fires
+                                       dragstart, so without these the move
+                                       list cannot be reordered on a phone or
+                                       a tablet at all. The card is both the
+                                       thing picked up and the handle, so both
+                                       go on it — and, like the native drag,
+                                       only while it is collapsed. */
+                                    ...reorderItem('card-move', move.Name),
+                                    ...reorderHandle({
+                                        itemKey: move.Name,
+                                        group: 'card-move',
+                                        onReorder: commitOrder,
+                                        enabled: !isExpanded,
+                                    }),
                                     onDragStart: (e) => {
                                         dragName.current = move.Name;
                                         (e.currentTarget as HTMLElement).classList.add('dragging');

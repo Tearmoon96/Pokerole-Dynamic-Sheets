@@ -16,7 +16,14 @@
 @import './gm/ailment-popover.css';
 @import './gm/dice.css';
 @import './gm/notes.css';
+@import './gm/folders.css';
 @import './gm/npc-names.css';
 @import './gm/confirm-dialog.css';
 @import './gm/toast.css';
 @import './app-root.css';
+
+/* The mobile / tablet wrapper, last so it settles ties against the desktop
+   rules above rather than needing to out-specify them. Every rule in it is
+   behind a data-device or data-pointer attribute that a desktop never has. */
+@import './responsive/base.css';
+@import './responsive/gm.css';

@@ -136,9 +136,15 @@ export function computeMoveTotals(
 }
 
 export function painPenalty(dex: PokedexEntry | null, sheet: Partial<CardSheet> | null): number {
-    const hp = (sheet && sheet.hp) || 0;
-    if (hp <= 1) return 2;
-    if (hp <= Math.floor(monPoolMax(dex, sheet, 'hp') / 2)) return 1;
+    return painFromHp((sheet && sheet.hp) || 0, monPoolMax(dex, sheet, 'hp'));
+}
+
+/** The same rule off a bare pool, for a trainer — who has HP and takes the
+    penalty exactly as a Pokemon does, but whose maximum comes from
+    `trainerPoolMax` and not from any species. */
+export function painFromHp(cur: number, max: number): number {
+    if (cur <= 1) return 2;
+    if (cur <= Math.floor(max / 2)) return 1;
     return 0;
 }
 
@@ -171,7 +177,15 @@ export function pinnedMoveObjects(
         .map((m) => applyMoveOverrides(sheet, m));
 }
 
-export const ROLLABLE_QUICK = ['eva', 'clash-s', 'clash-sp'];
+/* Which of the quick chips are dice pools rather than target numbers. DEF and
+   SP.DEF are what an attacker rolls AGAINST — there is no roll to make with
+   them — so they stay plain text.
+
+   `init` is new against the legacy page, which showed Dexterity + Alert and
+   left the GM to count it out: the combat tracker asks for an initiative roll
+   by hand, and the number it wants was already on screen next to a button that
+   would not roll it. */
+export const ROLLABLE_QUICK = ['init', 'eva', 'clash-s', 'clash-sp'];
 
 export function ordSuffix(n: number): string {
     if (n % 100 >= 11 && n % 100 <= 13) return 'th';

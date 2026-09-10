@@ -1,0 +1,382 @@
+/* ============================================================
+   The mobile / tablet wrapper, part 2: the two character sheets
+   (Trainer's License and Pokémon card).
+
+   Reference sizes: a 6.7" phone upright is ~412x915 CSS px, a 10.5"
+   tablet on its side ~1112x834.
+
+   The tablet is the easy one — both sheets are already two columns at
+   1112 and stay that way. Almost everything below is the phone.
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   Phone: one column, everything else follows from that.
+   ------------------------------------------------------------ */
+
+html[data-device="phone"] {
+    /* Named because the banner has to cancel it exactly to go full-bleed. */
+    --page-pad-x: 10px;
+}
+
+html[data-device="phone"] body {
+    /* 60px of top padding is a sixth of a phone screen spent on nothing.
+       The safe-area values are what keep the sheet clear of a notch in
+       landscape and of the home indicator at the bottom. */
+    padding: 12px calc(var(--page-pad-x) + var(--safe-right))
+             calc(24px + var(--safe-bottom)) calc(var(--page-pad-x) + var(--safe-left));
+
+    /* Block, not the desktop's centring flex row.
+
+       The card page puts a status strip above the sheet — "Wild Pokemon,
+       belongs to no trainer", or which trainer's team you are editing — as
+       a position:fixed bar. On a desktop the body's 60px of top padding
+       leaves room for it. On a phone that padding is gone, the bar wraps to
+       two lines, and it lands directly on the Pokemon's name.
+
+       Putting it back in the flow is what fixes that, and a flow needs a
+       block container: as a flex ITEM the bar would sit beside the sheet
+       instead of above it. Both sheets are width:100% at this size, so
+       nothing is centred by the flex box that is not centred without it. */
+    display: block;
+}
+
+html[data-device="phone"] .card-container,
+html[data-device="phone"] .license-container {
+    /* The centring the flex container used to do. */
+    margin-inline: auto;
+}
+
+/* Out of position:fixed and back into the flow, so it pushes the sheet down
+   rather than covering the top of it. !important because the position is set
+   inline on the element, and an inline style beats any selector. */
+html[data-device="phone"] .card-banner {
+    position: static !important;
+    /* Cancels the body's own side padding, so the strip still spans the full
+       width the way it does pinned. */
+    margin-left: calc(-1 * (var(--page-pad-x) + var(--safe-left)));
+    margin-right: calc(-1 * (var(--page-pad-x) + var(--safe-right)));
+    margin-bottom: 12px;
+}
+
+html[data-device="phone"] .panel,
+html[data-device="phone"] .card-container {
+    padding: 14px;
+    border-radius: 16px;
+}
+
+/* THE GRID BLOWOUT.
+
+   A grid track of `1fr` will not shrink below the widest thing in it:
+   `1fr` is really `minmax(auto, 1fr)`, and `auto` there means min-content.
+   So two `1fr` columns holding a 180px-wide label pair stay 360px wide
+   inside a 322px panel, and .panel's overflow:hidden then cuts the
+   right-hand one off — silently, with no scrollbar to reveal it. That
+   is what hid a third of the Social attributes on a phone.
+
+   min-width: 0 on the items is the fix at the root: it lets a track
+   reach the size the fr unit actually asked for. Applied to the grids
+   that were measured overflowing, not blanket-applied, so nothing that
+   was laying out correctly can start collapsing. */
+html[data-device="phone"] .q2-grid > *,
+html[data-device="phone"] .team-grid6 > *,
+html[data-device="phone"] .bag-columns > *,
+html[data-device="phone"] .hwe-row > *,
+html[data-device="phone"] .license-container > * {
+    min-width: 0;
+}
+
+/* Stacked outright rather than squeezed: two columns of five-dot
+   attribute pills on a 390px-wide panel leaves each label breaking
+   mid-word. The quadrant reads far better as one column. */
+html[data-device="phone"] .q2-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+        "combat"
+        "social"
+        "skills"
+        "ach"
+        "natrank"
+        "extra";
+}
+
+html[data-device="phone"] .team-grid6,
+html[data-device="phone"] .bag-columns {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+/* The title is `white-space: nowrap` and absolutely centred, so on a
+   narrow sheet it runs straight out through both edges of the panel.
+   Wrapping it costs a second line and keeps the whole name. */
+html[data-device="phone"] .license-title {
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+    white-space: normal;
+}
+
+html[data-device="phone"] .license-title-group {
+    position: static;
+    transform: none;
+    gap: 10px;
+}
+
+html[data-device="phone"] .license-header {
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+html[data-device="phone"] .license-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+}
+
+/* Tools were a column down the right-hand side; on one column they read
+   better as a row under the title, where they get full width. */
+html[data-device="phone"] .license-tools {
+    flex-direction: row;
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+}
+
+/* The photo arch is 330px tall — over a third of a phone screen before
+   any of the sheet is reached. */
+html[data-device="phone"] .photo-arch {
+    height: 210px;
+    width: min(100%, 260px);
+}
+
+/* The HP / Will rows.
+
+   .tracker-label is a fixed 125px so every bar starts at the same x, and
+   .pool-bar takes what is left. On a 412px screen that left 24px of bar
+   between two +/- buttons the touch rules had just grown to 30px — the
+   number inside it no longer fit, and a bar you are meant to be able to
+   drag was thinner than the finger dragging it. The label gives up the
+   room instead; it is the part that can be read from context. */
+html[data-device="phone"] .tracker-label {
+    width: 88px;
+    font-size: 0.85rem;
+}
+
+html[data-device="phone"] .pool-bar {
+    min-width: 74px;
+}
+
+/* The HP / WILL / EXP strip is three boxes across. Each holds a value
+   between a minus and a plus, and at a third of a 412px screen — 120px —
+   two 30px buttons and the number do not fit. Stacked, each gets the
+   full width and the row reads as three lines instead of three
+   half-legible columns. */
+html[data-device="phone"] .hwe-row {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+/* CHARACTER / PLAYER rows under the photo. Fixed 44px ball and 112px
+   label columns plus an auto column for the gender toggle come to 3px
+   more than the plate is wide, so the toggle lost its right edge. The
+   labels are short enough to give the 3px back. */
+html[data-device="phone"] .plate-row {
+    grid-template-columns: 40px 84px minmax(0, 1fr) auto;
+}
+
+/* ---------- The switcher ----------
+   The trainer and wild switchers are position:fixed at the left and
+   right edges, vertically centred, 46px wide. On a 412px screen that
+   is 92px of the width — a fifth of it — sitting permanently on top of
+   the sheet, right where a thumb scrolls.
+
+   On a phone the three pieces become one row pinned across the TOP
+   instead: an arrow in each corner with the name pill between them. The
+   sheet is given matching headroom below, so the row covers nothing. */
+html[data-device="phone"] .trainer-arrow,
+html[data-device="phone"] .wild-arrow {
+    width: 34px;
+    height: 40px;
+    top: calc(8px + var(--safe-top));
+    bottom: auto;
+    transform: none;
+    opacity: 0.9;
+}
+
+/* `top: auto` is the whole point of this rule, not a tidy-up.
+
+   Both pills are position:fixed with a `top` of their own (14px and
+   40px). Setting `bottom` here WITHOUT clearing that top leaves a fixed
+   box with both offsets resolved and `height: auto` — which does not
+   mean "sit at the bottom", it means STRETCH from one to the other. The
+   pill became a full-height slab covering the entire sheet, with the
+   trainer name floating in the middle of it. */
+/* Both pills carry a `top` of their own (14px and 40px), so this rule
+   only has to override it — but a `bottom` here without clearing that
+   top would leave a fixed box with BOTH offsets resolved and
+   height:auto, which does not mean "sit at the top", it means STRETCH
+   between the two. That shipped once: the pill became a full-height
+   slab covering the whole sheet with the trainer's name floating in the
+   middle of it. `bottom: auto` is what keeps it a pill. */
+html[data-device="phone"] .trainer-indicator,
+html[data-device="phone"] .wild-indicator {
+    top: calc(12px + var(--safe-top));
+    bottom: auto;
+    /* Clears both corner arrows, so a long name never lands underneath
+       the one you are reaching for. */
+    max-width: calc(100vw - 96px);
+    width: max-content;
+}
+
+/* Headroom for that pinned row — but only on a sheet that HAS one. Both
+   switchers exist only while more than one trainer or wild is loaded, and
+   reserving the space unconditionally would leave every ordinary sheet
+   opening on a 56px gap. */
+html[data-device="phone"] body:has(.trainer-indicator),
+html[data-device="phone"] body:has(.wild-indicator) {
+    padding-top: calc(56px + var(--safe-top));
+}
+
+/* ---------- Dialogs ----------
+   Near enough full-bleed: a 360px-wide modal centred on a 412px screen
+   wastes both margins, and several of these hold a search field and a
+   list that need every pixel. */
+html[data-device="phone"] .modal-box {
+    width: calc(100vw - 20px);
+    max-width: calc(100vw - 20px);
+    max-height: 88vh;
+    padding-bottom: calc(14px + var(--safe-bottom));
+}
+
+/* ---------- Move cards ----------
+   The header is a two-part row: name and badges on the left, the pools
+   and buttons on the right — and the right half is `flex-shrink: 0`, so
+   on a card narrower than the two of them together it does not give way,
+   it overflows, and .move-card's overflow:hidden then cuts the damage
+   pool off the end. Letting the row wrap puts the right half on its own
+   line instead, which is where it belongs at this width. */
+html[data-device="phone"] .move-card-header {
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+html[data-device="phone"] .move-meta {
+    min-width: 0;
+}
+
+html[data-device="phone"] .move-header-right {
+    flex-shrink: 1;
+    flex-wrap: wrap;
+}
+
+/* Two quick-move tiles side by side, each flex: 1 with content wider
+   than half a phone. */
+html[data-device="phone"] .quick-moves-row {
+    flex-wrap: wrap;
+}
+
+html[data-device="phone"] .quick-move {
+    min-width: 0;
+    flex-basis: 100%;
+}
+
+/* Accuracy and damage pills side by side inside a tile that is now
+   full width; they still need to be allowed to drop to a second line
+   on the narrowest phones. */
+html[data-device="phone"] .quick-move-vals {
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+/* The flex twin of the grid blowout further up: a flex item's default
+   min-width is `auto`, meaning min-content, so an input set to `flex: 1`
+   will not shrink below the width of its own placeholder — and the 16px
+   font floor for touch made that placeholder wider. The row then pushes
+   the Add button off the end of the card. */
+html[data-device="phone"] .specialty-input,
+html[data-device="phone"] .specialty-input-group,
+html[data-device="phone"] .bag-add-wrap input {
+    min-width: 0;
+}
+
+/* Move browsers and pickers: one card per row on a phone. The
+   auto-fill floor of 290px is wider than the space available, which
+   makes the grid a single column anyway — but with the track still
+   290px wide, so it overflowed. */
+html[data-device="phone"] .ailments-content,
+html[data-device="phone"] #weather-content,
+html[data-device="phone"] .moves-list {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+/* ------------------------------------------------------------
+   Tablet, landscape 10.5" (~1112x834).
+
+   Both sheets already hold their two-column layout at this width and
+   look right, so this is trim rather than re-layout: the desktop
+   padding assumes a window that can spare 60px at the top, and a
+   tablet's is shorter than a laptop's.
+   ------------------------------------------------------------ */
+
+html[data-device="tablet"] body {
+    padding: 24px calc(16px + var(--safe-right)) calc(28px + var(--safe-bottom)) calc(16px + var(--safe-left));
+}
+
+html[data-device="tablet"] .q2-grid > *,
+html[data-device="tablet"] .team-grid6 > *,
+html[data-device="tablet"] .bag-columns > *,
+html[data-device="tablet"] .hwe-row > *,
+html[data-device="tablet"] .license-container > * {
+    min-width: 0;
+}
+
+/* Upright, a 10.5" tablet is 834 across — under the 980 the license
+   splits at and the 900 the card splits at, so both are already one
+   column there. This only keeps the padding sensible. */
+html[data-device="tablet"][data-orient="portrait"] body {
+    padding-top: 16px;
+}
+
+/* ------------------------------------------------------------
+   The last two undersized controls on the card, measured rather
+   than guessed: the moves filter button and the per-move disable
+   toggle. Both sit next to a neighbour, so the transparent hit
+   overlay in base.css only reached them from three sides — the
+   fourth was the neighbour's overlay winning. Real size settles
+   it, and the rows they are in have the width to give.
+   ------------------------------------------------------------ */
+@media (pointer: coarse) {
+
+    .filter-picker-btn,
+    .move-disable-btn {
+        min-width: 30px;
+        min-height: 30px;
+    }
+}
+
+/* ------------------------------------------------------------
+   The seam down the middle of the card.
+
+   .card-container::before is a corner glow: a box 60% of the card's
+   width and 60% of its height, holding
+   `radial-gradient(circle, <tint> 0%, transparent 70%)`, clipped by the
+   card's own overflow: hidden.
+
+   `circle` with no size keyword means farthest-corner. On a desktop
+   card, roughly 1100x1400, that circle is not much wider than the box
+   and the tint really has faded out by the time it reaches the edges.
+   On a phone the card is one column and enormously tall — measured at
+   469 x 4657, so the glow box is 280 x 2793 — and the circle is sized
+   off a corner 1400px away. 70% of that is ~980px, while the box's own
+   half-width is 140. The tint is therefore still at very nearly full
+   strength where the box ends, and overflow: hidden slices it into a
+   hard vertical line down the whole page with a lighter half on the
+   left and a darker half on the right.
+
+   The same bug was found and fixed on the License panels, where the
+   answer was `ellipse closest-side` — an ellipse that reaches
+   transparent exactly at the box's own edges. Here the glow is simply
+   dropped: at this size it is a full-height wash rather than the corner
+   highlight it was drawn to be, and one flat panel colour is what was
+   asked for. Phone and tablet only; the desktop card keeps its glow.
+   ------------------------------------------------------------ */
+html[data-device="phone"] .card-container::before,
+html[data-device="tablet"] .card-container::before {
+    display: none;
+}

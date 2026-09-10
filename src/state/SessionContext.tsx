@@ -226,6 +226,16 @@ export async function createTrainerFile(
     if (!fname.toLowerCase().endsWith('.json')) fname += '.json';
 
     const fresh = defaultState();
+    /* The file's own name is the trainer's name to start with — naming the
+       file "Ash" and then finding an "Unnamed" trainer inside it is a small
+       thing to have to fix by hand every time.
+
+       Only a starting value: the two are not bound together afterwards, so
+       renaming the trainer leaves the file alone, which is what you want when
+       the file is called `ash-backup` or the trainer changes their name
+       mid-campaign. */
+    fresh.name = fname.replace(/\.json$/i, '').trim() || fresh.name;
+
     const entry: WorkingTrainer = { id: fresh.id, handle: null, fileName: fname, data: fresh };
 
     // Write to disk first; only add the trainer if the save succeeds

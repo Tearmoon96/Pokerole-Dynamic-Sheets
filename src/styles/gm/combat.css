@@ -13,9 +13,17 @@
     padding: 0.2rem 0.55rem;
 }
 
+/* A combat row is a sprite, a stack of bands, and the round flags under
+   both. It is NOT a single line of controls: the pools, the initiative
+   field and the pips all want a fixed amount of room, and a panel is
+   resizable down to 260px, so laying them side by side means the row runs
+   out of width long before the window does. It did — the pool bars, which
+   cannot shrink below their own min-content, spilled straight over the
+   initiative field. Bands wrap; a squeezed line overlaps. */
 .combat-row {
     display: flex;
-    align-items: center;
+    flex-wrap: wrap;
+    align-items: flex-start;
     gap: 0.5rem;
     padding: 0.4rem 0.5rem;
     border: 1px solid var(--border-color);
@@ -41,6 +49,38 @@
     font-size: 1rem;
 }
 
+/* The three bands. Each is the row's width minus the sprite, which is the
+   whole point: a pool bar with its ± buttons needs ~150px and gets it at
+   every panel width instead of being handed whatever a shared line has
+   left over. */
+.combat-row .c-main {
+    flex: 1 1 0;
+    min-width: 0;
+    display: grid;
+    /* A grid rather than a stack of flex rows because the row's buttons
+       want to be in two different places: beside the status strip where a
+       mouse can hit a 20px target, and up beside the name on a phone,
+       where finger-sized ones no longer fit on the strip's line. Named
+       areas move them without React rendering anything different. */
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "head  head"
+        "pools pools"
+        "strip actions";
+    align-items: center;
+    gap: 0.25rem 0.45rem;
+}
+
+.combat-row .c-head {
+    grid-area: head;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    /* the sprite is 32px; matching it keeps the name and the sprite on one
+       optical line however tall the initiative field grows */
+    min-height: 32px;
+}
+
 .combat-row .c-name {
     flex: 1;
     min-width: 0;
@@ -49,6 +89,32 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* A <label>, so the tiny "Init" caption is part of the field's own target
+   rather than a decoration next to it. */
+.combat-row .c-init-wrap {
+    flex: 0 0 auto;
+    display: block;
+    cursor: text;
+}
+
+/* The status glyphs and the five action pips. Wraps internally when the
+   panel is narrow, which is the only place this row is allowed to reflow. */
+.combat-row .c-strip {
+    grid-area: strip;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.45rem;
+}
+
+.combat-row .c-actions {
+    grid-area: actions;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    justify-self: end;
 }
 
 .combat-row .c-init {
@@ -106,10 +172,38 @@
     box-shadow: 0 0 5px var(--ghost-color-glow);
 }
 
-/* A combat row carries its own status strip and, below it, the flags for
-   whatever wants resolving this round */
-.combat-row { flex-wrap: wrap; }
-.combat-row .c-body { flex: 1; min-width: 0; }
+/* Sits in the action strip, which does its own spacing */
+.combat-row .status-chips { margin-top: 0; }
 
-.combat-row .status-chips { margin-top: 3px; }
 
+/* The HP / Will bars on a combat row. A band of their own across the full
+   width of the row, rather than a column sharing a line with the initiative
+   field and the pips — sharing is what used to leave them too little to fit
+   in and send them over their neighbours. Tighter than the roster's only in
+   type size and the gap between the two. */
+.c-pools {
+    grid-area: pools;
+    margin: 0;
+    gap: 0.15rem;
+}
+
+.c-pools .pool-bar {
+    font-size: 0.66rem;
+}
+
+.c-pools .pool-tag {
+    width: 2rem;
+}
+
+/* Trimmed from the roster's 3.1rem. A combat row is the narrowest place
+   these bars appear, and every millimetre taken off the fixed parts is one
+   the coloured track keeps at a 260px panel. */
+.c-pools .pool-num {
+    min-width: 2.7rem;
+}
+
+/* The track is what gives way when there is genuinely no room, rather than
+   the numbers spilling over the neighbour. */
+.c-pools .pool-track {
+    min-width: 18px;
+}

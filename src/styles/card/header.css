@@ -230,6 +230,19 @@
     margin-top: 10px;
 }
 
+/* A wild sheet groups its seven tools into two deliberate rows rather than
+   letting the window decide where the line breaks. `width: 100%` is what puts
+   each group on a line of its own inside the wrapping row above — the rows are
+   flex items here, and without it the two sit side by side and the split
+   achieves nothing. */
+.header-tools .tool-row {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    width: 100%;
+}
+
 /* Wild mode only now that "Load another Pokémon" is a header tool:
    the Export / Import pair below the header. */
 .pokemon-picker {
@@ -281,6 +294,16 @@
     gap: 6px;
     padding: 6px 8px;
     font-size: 0.75rem;
+}
+
+/* Evolve and Mega Evolve are direct children of that 2-column grid, so each
+   one landed in a single column — Evolve sat under Import, hard left, looking
+   like a fifth action rather than the one that changes the species. Spanning
+   both columns and centring in them puts it back under the middle. Stays
+   centred when there are two of them (Evolve + Mega), which then stack. */
+#wild-export-wrap .evolve-btn {
+    grid-column: 1 / -1;
+    justify-self: center;
 }
 
 /* Reset throws the sheet away, so it warns on hover instead of glowing

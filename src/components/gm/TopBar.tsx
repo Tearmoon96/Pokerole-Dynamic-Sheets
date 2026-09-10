@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGm } from '../../gm/GmContext';
+import { PANEL_TABS } from '../../gm/phoneBoard';
+import { HomeButton } from '../common/HomeButton';
 import { useGmConfirm } from './ConfirmDialog';
 import { useToast } from '../common/Toast';
 import { useAppData } from '../../data/AppDataContext';
@@ -24,7 +26,7 @@ export function TopBar() {
     useEffect(() => {
         let live = true;
         readSessionHandle().then((h) => {
-            if (live && h) { setHandle(h); setStatus({ text: h.name, warn: false }); }
+            if (live && h) setHandle(h);   // remembered silently: the name is not shown
         });
         return () => { live = false; };
     }, []);
@@ -94,19 +96,60 @@ export function TopBar() {
         setHandle(h);
         await rememberSessionHandle(h);
         store.replace(sessionToState(parsed, upsertWorkingTrainer));
-        setStatus({ text: h.name, warn: false });
+        setStatus({ text: '', warn: false });
         toast('<i class="fa-solid fa-folder-open"></i> Session loaded from ' + escapeHtml(h.name) + '.');
     };
 
     return (
         <>
             <div className="topbar">
+                <HomeButton className="icon-btn" />
                 <span className="logo"><i className="fa-solid fa-chess-board"></i> Pokerole GM Screen</span>
+
+                {/* One toggle per board section, lit while the section is on.
+                    Switching one off drops it from the board entirely rather
+                    than collapsing it, so the panels left over share its width
+                    — .panel is `flex: 1 1 390px`, which does that by itself. */}
+                <div className="section-toggles" role="group" aria-label="Show or hide board sections">
+                    {PANEL_TABS.map((t) => {
+                        const on = !state.layout.hidden.includes(t.key);
+                        return (
+                            <button
+                                key={t.key}
+                                className={'section-toggle' + (on ? ' on' : '')}
+                                aria-pressed={on}
+                                title={(on ? 'Hide' : 'Show') + ' ' + t.label}
+                                onClick={() => store.update((s) => {
+                                    const hidden = on
+                                        ? [...s.layout.hidden, t.key]
+                                        : s.layout.hidden.filter((k) => k !== t.key);
+                                    s.layout = { ...s.layout, hidden };
+                                })}
+                            >
+                                <i className={'fa-solid ' + t.icon}></i>
+                            </button>
+                        );
+                    })}
+                </div>
+
                 <span className="spacer"></span>
                 <span className={'session-status' + (status.warn ? ' warn' : '')} id="session-status">
                     {status.text}
                 </span>
                 <div className="session-actions">
+                    <button
+                        className="icon-btn"
+                        onClick={() => store.update((s) => {
+                            /* Widths only. Which panels are on, and the order
+                               they sit in, are both deliberate arrangements
+                               with controls of their own; wiping them here
+                               would make this button a surprise. */
+                            s.layout = { ...s.layout, widths: {} };
+                        })}
+                        title="Give every section its default width again"
+                    >
+                        <i className="fa-solid fa-table-columns"></i> Reset tabs
+                    </button>
                     <button
                         className="icon-btn"
                         onClick={() => { void saveAs(); }}
@@ -152,7 +195,7 @@ export function TopBar() {
                     setHandle(null);
                     await forgetSessionHandle();
                     store.replace(sessionToState(parsed, upsertWorkingTrainer));
-                    setStatus({ text: 'Loaded ' + file.name + ' — use Save to link a file.', warn: false });
+                    setStatus({ text: 'Loaded — use Save to link a file.', warn: false });
                 }}
             />
         </>

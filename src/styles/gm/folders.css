@@ -1,0 +1,286 @@
+/* ---------------- Folders ----------------
+   Shared by the Notes panel and the Trainers & Wilds roster. Both group a flat
+   list the same way, so both draw it the same way. */
+
+.folder-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+/* Space between one folder and the next, but not above the first. */
+.folder-group + .folder-group {
+    margin-top: 0.5rem;
+}
+
+.folder-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.4rem;
+    border: 1px solid var(--border-color);
+    border-radius: 9px;
+    background: var(--primary-faint);
+}
+
+.folder-twist {
+    flex: 0 0 auto;
+    width: 20px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    cursor: pointer;
+    padding: 0;
+}
+
+.folder-icon {
+    color: var(--ghost-color);
+    font-size: 0.85rem;
+    flex: 0 0 auto;
+}
+
+/* Renamed in place: a folder's name is the only thing about it worth editing,
+   and a dialog for one text field would be heavier than the thing it edits. */
+.folder-name {
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 2px 6px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+.folder-name:hover { border-color: var(--border-color); }
+
+.folder-name:focus {
+    outline: none;
+    border-color: var(--ghost-color);
+    background: #00000033;
+}
+
+.folder-count {
+    flex: 0 0 auto;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.66rem;
+    color: var(--text-secondary);
+    background: #00000040;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    padding: 1px 7px;
+}
+
+/* The up/down pairs, on a folder and on an item. Same shape in both so the
+   gesture reads as one thing wherever it appears. */
+.folder-move,
+.item-move {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    flex: 0 0 auto;
+}
+
+.folder-move button,
+.item-move button {
+    width: 20px;
+    height: 18px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #00000033;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    color: var(--text-secondary);
+    font-size: 0.58rem;
+    cursor: pointer;
+}
+
+.folder-move button:hover:not(:disabled),
+.item-move button:hover:not(:disabled) {
+    border-color: var(--ghost-color);
+    color: var(--ghost-color);
+}
+
+.folder-move button:disabled,
+.item-move button:disabled {
+    opacity: 0.28;
+    cursor: default;
+}
+
+/* Where an item is filed. A menu rather than a drag target: it works the
+   same under a thumb, and it lists every destination without hunting. But it
+   shows as a folder icon the width of the arrows next to it, not as a box
+   spelling out "— no folder —": these panels are narrow by design, and the
+   widest folder name was setting the width of a control that is pressed once
+   in a while, on every row, forever. */
+.item-folder-pick {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: #00000033;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.62rem;
+    cursor: pointer;
+}
+
+.item-folder-pick:hover { border-color: var(--ghost-color); color: var(--ghost-color); }
+
+/* Lit while the item is inside a folder, so a glance down the strip says
+   which rows are filed without opening anything. */
+.item-folder-pick.filed { color: var(--ghost-color); border-color: var(--ghost-color); }
+
+/* Held down while its own menu is open, the same way .tip-btn is. */
+.item-folder-pick.on {
+    background: var(--primary-soft);
+    border-color: var(--ghost-color);
+    color: var(--ghost-color);
+}
+
+/* ---- The picker's menu ----
+   Drawn by the page rather than by the browser. A native <select> popup takes
+   its colours from the SELECT and nothing else — no radius, no font, no accent
+   on the highlighted row — so however the closed control was styled it opened
+   as a pale system box with a blue selection bar. See the note on FolderMenu
+   in FolderBits.tsx before turning this back into a <select>.
+
+   Fixed, in a portal on <body>: the panel it belongs to clips its own
+   overflow, and `.touch-dragging` puts a transform on a panel being
+   reordered, which would capture even a fixed child. Above the toast, the
+   move panel and the ailment popover, below the confirm dialog — a menu the
+   GM just opened should be the top thing on screen unless it is modal. */
+.folder-menu {
+    position: fixed;
+    z-index: 75;
+    min-width: 9.5rem;
+    max-width: min(18rem, calc(100vw - 16px));
+    /* Earning back the one thing the native popup did for free. */
+    max-height: min(16rem, 60vh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.25rem;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--panel-solid);
+    box-shadow: 0 12px 28px #000000a6, 0 0 16px var(--border-glow);
+    outline: none;
+}
+
+.folder-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    padding: 0.34rem 0.45rem;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: none;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.75rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.folder-menu-item > i { flex: 0 0 auto; width: 0.9rem; text-align: center; font-size: 0.7rem; color: var(--text-secondary); }
+.folder-menu-item .fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-menu-item .tick { color: var(--ghost-color); }
+
+/* One highlight for both, so the pointer and the arrow keys cannot disagree
+   about which row Enter would take. */
+.folder-menu-item:hover,
+.folder-menu-item.active {
+    background: var(--primary-soft);
+    border-color: var(--ghost-color);
+}
+
+.folder-menu-item.on,
+.folder-menu-item.on > i { color: var(--ghost-color); }
+
+/* Reads as the absence of a folder rather than as one more of them. */
+.folder-menu-none { color: var(--text-secondary); font-style: italic; }
+
+/* Indent what is inside a folder, so the nesting is visible without a box
+   around it — the panels are narrow and a second border would cost width the
+   content needs. */
+.folder-group > .note-sheet.nested,
+.folder-group > .roster-card {
+    margin-left: 0.55rem;
+}
+
+.folder-group > .note-sheet.nested,
+.folder-group > .folder-bar ~ .roster-card {
+    border-left: 2px solid var(--border-color);
+}
+
+/* Both roster cards carry their reorder controls in a strip of their own
+   rather than in with their other buttons. A wild's card is a bare MonRow —
+   no header of its own, unlike a trainer card — and squeezing two more
+   buttons and a folder picker onto that row trimmed the Pokemon's name to a
+   single letter.
+
+   Letting `.mon-actions` wrap instead was tried first and looked worse: the
+   row is [sprite][main][actions] and a wrap collapsed the main column to
+   nothing. That was down to `.mon-main` being `flex: 1` with no basis, so
+   the browser had no reason to ever break the line — it now has one, and
+   the actions DO wrap on a narrow panel. This strip stays regardless: the
+   reorder controls belong with the card, not with the row's own buttons. */
+.card-move-strip {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.4rem 0;
+}
+
+/* ---------------- Just moved ----------------
+   The row an up/down press just reordered, marked for a moment. Without it a
+   press on a list of five similar cards is silent: the thing that moved looks
+   exactly like the thing it swapped with, and the only way to tell it worked
+   is to re-read the order.
+
+   An overlay rather than a background of its own, because every row this lands
+   on already paints one — a roster card, a note sheet, a folder bar, a combat
+   row — and animating `background` would fight each of them. `border-radius:
+   inherit` keeps the tint inside whatever corner the row has, and
+   `pointer-events: none` keeps it out of the way of the buttons underneath
+   while it fades. */
+.just-moved {
+    position: relative;
+}
+
+.just-moved::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-radius: inherit;
+    pointer-events: none;
+    background: var(--ghost-color);
+    box-shadow: 0 0 0 2px var(--ghost-color) inset;
+    opacity: 0;
+    animation: gm-just-moved 0.85s ease-out;
+}
+
+@keyframes gm-just-moved {
+    0% { opacity: 0.34; }
+    100% { opacity: 0; }
+}
+
+/* An opacity fade is not motion, so it stays; the duration comes down to
+   little more than an acknowledgement. */
+@media (prefers-reduced-motion: reduce) {
+    .just-moved::after { animation-duration: 0.35s; }
+}

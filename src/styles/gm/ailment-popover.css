@@ -80,6 +80,8 @@
 .ail-roll-out .lose { color: var(--danger); font-weight: 700; }
 .ail-roll-out .banked { color: var(--crit); font-weight: 700; }
 
+/* Stacked, because two chevrons one above the other are the same height as
+   the status strip they sit beside and so cost the row nothing. */
 .combat-row .c-move { display: flex; flex-direction: column; gap: 2px; flex: 0 0 auto; }
 
 .combat-row .c-move button, .combat-row .c-remove, .combat-row .c-tip {

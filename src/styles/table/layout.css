@@ -1,0 +1,234 @@
+/* ---------------- Rolling table: page frame ---------------- */
+
+/* gm/base.css makes <body> a column flex container. This page fills it. */
+#root {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.table-page {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.table-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.55rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--panel-strong);
+    flex: 0 0 auto;
+}
+
+.table-bar h1 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.table-bar h1 i { color: var(--ghost-color); }
+
+.bar-spacer { flex: 1; }
+
+/* Connection state. The dot carries the meaning; the words carry it again for
+   anyone who cannot separate the colours. */
+.conn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.conn i { font-size: 0.5rem; }
+
+.conn-live i { color: var(--ok); }
+.conn-waiting i { color: var(--crit); }
+.conn-connecting i { color: var(--crit); opacity: 0.7; }
+.conn-offline i { color: var(--danger); }
+
+.role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--crit);
+    color: var(--crit);
+    background: #f0b42914;
+}
+
+.table-banner,
+.table-notice {
+    margin: 0;
+    padding: 0.5rem 1rem;
+    font-size: 0.78rem;
+    border-bottom: 1px solid var(--border-glow);
+    flex: 0 0 auto;
+}
+
+.table-banner { background: #ef44441a; color: #fca5a5; }
+.table-notice { background: var(--primary-faint); color: var(--text-secondary); }
+
+.table-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.table-side {
+    flex: 0 0 19rem;
+    width: 19rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    overflow-y: auto;
+}
+
+.table-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.feed-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+
+/* ---------------- Side panels ---------------- */
+
+.credentials,
+.member-list {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--card-bg);
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.side-title {
+    margin: 0;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.side-title .count {
+    margin-left: auto;
+    font-family: 'Fira Code', monospace;
+    color: var(--text-muted);
+}
+
+.cred-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.cred-label {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    flex: 0 0 4.2rem;
+}
+
+.cred-value {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.74rem;
+    color: var(--text-primary);
+    background: var(--panel-solid);
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    padding: 0.22rem 0.4rem;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+/* The masked password is 32 bullets; letting it stretch the sidebar would push
+   the copy button off the edge. */
+.cred-value.secret { letter-spacing: 0.04em; }
+
+button.wide {
+    width: 100%;
+    justify-content: center;
+}
+
+/* ---------------- Members ---------------- */
+
+.member-list ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.member-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.28rem 0.35rem;
+    border-radius: 7px;
+    font-size: 0.82rem;
+}
+
+.member-list li.me { background: var(--primary-faint); }
+
+.member-list .who {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.member-list .host-mark { color: var(--crit); font-size: 0.75rem; }
+
+.member-list .you {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    padding: 0 0.35rem;
+}
+
+@media (max-width: 900px) {
+    .table-body { flex-direction: column; overflow-y: auto; }
+    .table-side { flex: 0 0 auto; width: auto; overflow: visible; }
+    .feed-scroll { overflow: visible; }
+}

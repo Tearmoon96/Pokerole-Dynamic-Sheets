@@ -5,10 +5,12 @@ import { CRIT_MARGIN } from '../../gm/constants';
 import { HISTORY_LIMIT, roll } from '../../gm/dice';
 import type { RollMeta } from '../../gm/dice';
 import {
-    ROLLABLE_QUICK, computeMoveTotals, ordSuffix, painPenalty, pinnedMoveObjects,
+    ROLLABLE_QUICK, computeMoveTotals, ordSuffix, painFromHp, painPenalty, pinnedMoveObjects,
 } from '../../gm/moves';
 import { resolvePoolValue } from '../../gm/pools';
-import { participantForToken, trainerIdAt, wildLiveSheet } from '../../gm/entities';
+import {
+    entityPool, entityRef, participantForToken, trainerIdAt, wildLiveSheet,
+} from '../../gm/entities';
 import { workingTrainerData } from '../../gm/workingSet';
 import { monShownName } from '../../gm/entities';
 import { typeColors } from '../../lib/themeTables';
@@ -24,6 +26,72 @@ const CAT_COLORS: Record<string, string> = {
 };
 
 interface TipTarget { dexId: string; sheet: Partial<CardSheet>; owner: string }
+
+/* Initiative, evasion and the two clashes: the pools that belong to the
+   CHARACTER rather than to a move, which is why a trainer has them just as a
+   Pokemon does and why this is a component rather than a closure inside the
+   Pokemon panel. `value` is the only thing that differs between the two — a
+   species-backed sheet on one side, a flat trainer .json on the other — and
+   EntityRef already hands both over behind the same signature.
+
+   Defence and Special Defence ride along as plain numbers. They are what an
+   attacker rolls against; there is no roll to make with them. */
+function QuickRolls({ who, value, pain, doRoll }: {
+    who: string;
+    value: (n: string) => number;
+    pain: number;
+    doRoll: (dice: number, meta: RollMeta) => void;
+}) {
+    const clash = value('Clash');
+
+    const chip = (key: string, label: string, dice: number, tip: string, what: string) => {
+        const body = <>{label} <strong>{dice}</strong></>;
+        if (!ROLLABLE_QUICK.includes(key) || dice <= 0) {
+            return <span key={key} title={tip}>{body}</span>;
+        }
+        return (
+            <button
+                key={key}
+                className="tip-roll"
+                title={tip + ' — click to roll ' + dice + 'd6'}
+                onClick={() => doRoll(dice, { who, what, pain })}
+            >
+                {body}
+            </button>
+        );
+    };
+
+    return (
+        <>
+            {chip('init', 'INIT', value('Dexterity') + value('Alert'),
+                'Dexterity + Alert', 'Initiative')}
+            {chip('eva', 'EVA', value('Dexterity') + value('Evasion'),
+                'Dexterity + Evasion', 'Evasion')}
+            {chip('clash-s', 'CLASH-S', value('Strength') + clash,
+                'Strength + Clash', 'Clash (Strength)')}
+            {chip('clash-sp', 'CLASH-SP', value('Special') + clash,
+                'Special + Clash', 'Clash (Special)')}
+            <span title="Defence is Vitality">DEF <strong>{value('Vitality')}</strong></span>
+            <span title="Special Defence is Insight">SP.DEF <strong>{value('Insight')}</strong></span>
+        </>
+    );
+}
+
+/* The pain badge, shown by both panels on the same terms. */
+function PainChip({ pain }: { pain: number }) {
+    if (!pain) return null;
+    return (
+        <span
+            className="tip-pain"
+            title={'At half HP or less every Skill, Accuracy and Damage roll loses a success; '
+                + 'at 1 HP it loses two. It comes off the successes, not the pool, and every roll '
+                + 'started from this panel already has it taken off — the struck-out dice in the '
+                + 'result are the ones it cost.'}
+        >
+            PAIN −{pain}
+        </span>
+    );
+}
 
 export function MovePanel({ token, onClose }: { token: string | null; onClose: () => void }) {
     const { state, store } = useGm();
@@ -112,10 +180,7 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
         };
     }, [token, onClose]);
 
-    if (!token || !target) return <div className="mon-tooltip" id="mon-tooltip" style={{ display: 'none' }} />;
-
-    const dex = dexById(target.dexId);
-    const sheet = target.sheet;
+    if (!token) return <div className="mon-tooltip" id="mon-tooltip" style={{ display: 'none' }} />;
 
     const doRoll = (dice: number, meta: RollMeta) => {
         /* An empty pool is not a roll of one die — the same rule the ailment
@@ -126,6 +191,59 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
             s.dice = { count: dice, sides: 6, history: [entry, ...s.dice.history].slice(0, HISTORY_LIMIT) };
         });
     };
+
+    /* A trainer gets the same panel minus the half of it that is about moves:
+       they have no learnset and no pinned list, but Initiative, Evasion and the
+       two Clashes are theirs exactly as they are a Pokemon's, off the same
+       attributes and skills. Resolved through EntityRef, which already reads a
+       trainer's flat .json and a Pokemon's species-backed sheet the same way. */
+    const asTrainer = entityRef(state, dexById, token);
+    if (asTrainer && asTrainer.kind === 'trainer') {
+        const hp = entityPool(asTrainer, 'hp');
+        const tPain = hp ? painFromHp(hp.cur, hp.max) : 0;
+        const tPart = participantForToken(state, dexById, token);
+        const tAct = tPart ? Math.max(1, (tPart.acted as number) || 0) : null;
+        return (
+            <div className="mon-tooltip" id="mon-tooltip" ref={ref} style={{ display: 'block' }}>
+                <button className="tip-close" title="Close" onClick={onClose}>
+                    <i className="fa-solid fa-xmark"></i>
+                </button>
+                <div className="tip-head">{asTrainer.name}</div>
+                <div className="tip-sub">
+                    Trainer{asTrainer.rank ? ' · ' + asTrainer.rank : ''}
+                </div>
+                <div className="tip-quick">
+                    <QuickRolls
+                        who={asTrainer.name}
+                        value={asTrainer.value}
+                        pain={tPain}
+                        doRoll={doRoll}
+                    />
+                    <PainChip pain={tPain} />
+                </div>
+                {tAct && (
+                    <div
+                        className="tip-action"
+                        title={`Each action in a round is harder than the last: the ${tAct}${ordSuffix(tAct)} `
+                            + `needs ${tAct} ${tAct === 1 ? 'success' : 'successes'} to land. Advancing `
+                            + 'the round resets it.'}
+                    >
+                        Action <strong>{tAct}</strong> · needs{' '}
+                        <strong>{tAct}</strong> {tAct === 1 ? 'success' : 'successes'}
+                    </div>
+                )}
+                <div className="tip-empty">
+                    A trainer has no move list. Their Pokémon carry theirs — open one from the
+                    roster or from the combat tracker.
+                </div>
+            </div>
+        );
+    }
+
+    if (!target) return <div className="mon-tooltip" id="mon-tooltip" style={{ display: 'none' }} />;
+
+    const dex = dexById(target.dexId);
+    const sheet = target.sheet;
 
     if (!dex) {
         return (
@@ -139,7 +257,6 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
     }
 
     const val = (n: string) => resolvePoolValue(dex, sheet, n) || 0;
-    const clash = val('Clash');
     const pain = painPenalty(dex, sheet);
     const who = monShownName(dexById, target.dexId, sheet);
 
@@ -153,21 +270,6 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
     const act = participant ? { n: Math.max(1, (participant.acted as number) || 0) } : null;
     const need = act ? act.n : null;
 
-    const quick = (key: string, label: string, dice: number, tip: string) => {
-        const body = <>{label} <strong>{dice}</strong></>;
-        if (!ROLLABLE_QUICK.includes(key) || dice <= 0) return <span title={tip}>{body}</span>;
-        return (
-            <button
-                className="tip-roll"
-                title={tip + ' — click to roll ' + dice + 'd6'}
-                onClick={() => doRoll(dice, { who, what: label === 'EVA' ? 'Evasion'
-                    : label === 'CLASH-S' ? 'Clash (Strength)' : 'Clash (Special)', pain })}
-            >
-                {body}
-            </button>
-        );
-    };
-
     const moves = pinnedMoveObjects(dex, sheet, data.moves);
     const types = [dex.Type1, dex.Type2].filter(Boolean).join(' / ');
 
@@ -179,23 +281,8 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
             <div className="tip-head">{who}</div>
             <div className="tip-sub">{types}{target.owner ? ' · ' + target.owner : ''}</div>
             <div className="tip-quick">
-                <span title="Dexterity + Alert">INIT <strong>{val('Dexterity') + val('Alert')}</strong></span>
-                {quick('eva', 'EVA', val('Dexterity') + val('Evasion'), 'Dexterity + Evasion')}
-                {quick('clash-s', 'CLASH-S', val('Strength') + clash, 'Strength + Clash')}
-                {quick('clash-sp', 'CLASH-SP', val('Special') + clash, 'Special + Clash')}
-                <span title="Defence is Vitality">DEF <strong>{val('Vitality')}</strong></span>
-                <span title="Special Defence is Insight">SP.DEF <strong>{val('Insight')}</strong></span>
-                {!!pain && (
-                    <span
-                        className="tip-pain"
-                        title={'At half HP or less every Skill, Accuracy and Damage roll loses a success; '
-                            + 'at 1 HP it loses two. It comes off the successes, not the pool, and every roll '
-                            + 'started from this panel already has it taken off — the struck-out dice in the '
-                            + 'result are the ones it cost.'}
-                    >
-                        PAIN −{pain}
-                    </span>
-                )}
+                <QuickRolls who={who} value={val} pain={pain} doRoll={doRoll} />
+                <PainChip pain={pain} />
             </div>
 
             {act && (

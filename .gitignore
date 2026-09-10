@@ -69,3 +69,8 @@ dist-pwa/
 
 # Screenshots and scratch files from scripts/compare-ui.sh
 .verify/
+
+# The relay's local dev state: miniflare's sqlite for `wrangler dev`, rebuilt on
+# every run and holding whatever lobbies were opened while testing.
+worker/.wrangler/
+worker/node_modules/

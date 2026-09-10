@@ -56,8 +56,8 @@ const LEGACY_PAGES: string[] = [];
    The built pages sit at the top of the project — that is where the app is
    opened from — and the dev server would happily serve those static files
    instead of the entries in src/pages/, so `npm run dev` would show the last
-   build rather than the code being edited. This rewrites the three names onto
-   their sources before Vite's static handler ever sees them. */
+   build rather than the code being edited. This rewrites every page name onto
+   its source before Vite's static handler ever sees it. */
 function devPageAliases(pages: string[]) {
     return {
         name: 'pokerole-dev-page-aliases',
@@ -77,7 +77,7 @@ function devPageAliases(pages: string[]) {
 }
 
 
-export const PAGES = ['trainer-license', 'pokemon-card', 'gm-screen'];
+export const PAGES = ['trainer-license', 'pokemon-card', 'gm-screen', 'rolling-table'];
 const FIRST_PAGE = PAGES[0];
 
 export default defineConfig(({ command }) => {

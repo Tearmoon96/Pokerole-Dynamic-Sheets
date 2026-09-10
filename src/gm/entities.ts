@@ -142,6 +142,29 @@ export function entityRef(
     return null;
 }
 
+/** Current and maximum HP or Will for whatever an EntityRef points at.
+
+    `ref.value()` is NOT this: that resolves dice pools — "insight", "brawl" —
+    and answers `trainerPoolMax` for the word "hp", which is the ceiling and
+    never the current value. The roster reads the two apart by hand in three
+    places; this is that branching in one, so a combat row does not become a
+    fourth copy of it.
+
+    null for a hand-typed combatant: there is no sheet behind it to hold a
+    pool, and inventing one would be a bar that means nothing. */
+export function entityPool(
+    ref: EntityRef, key: 'hp' | 'will',
+): { cur: number; max: number } | null {
+    if (ref.kind === 'trainer' && ref.data) {
+        return { cur: ref.data[key] || 0, max: trainerPoolMax(ref.data, key) };
+    }
+    if ((ref.kind === 'mon' || ref.kind === 'wild') && ref.sheet) {
+        const sheet = ref.sheet as unknown as Record<string, number>;
+        return { cur: sheet[key] || 0, max: monPoolMax(ref.dex ?? null, ref.sheet, key) };
+    }
+    return null;
+}
+
 /* The address a combat row should be drawn and clicked through. Falls back to
    the participant itself when its source has gone — a row whose trainer was
    removed keeps a working status strip of its own instead of rendering none. */

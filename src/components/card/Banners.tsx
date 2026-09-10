@@ -3,7 +3,14 @@ import { readWorking } from '../../card/persistence';
 
 /* The fixed strip across the top that says what kind of card this is. Both are
    inline-styled exactly as they were: they sit above everything the stylesheet
-   knows about and were never given classes. */
+   knows about.
+
+   They now carry a `card-banner` class as well. Nothing in the desktop CSS
+   matches it — the inline style is still what paints them — but the phone
+   layer needs a handle: pinned to the top of a 412px screen this strip wraps
+   to two lines and lands squarely on the Pokémon's name, so on a phone it is
+   taken out of `position: fixed` and put back in the flow, where it pushes the
+   card down instead of covering it. */
 
 const BANNER_STYLE: React.CSSProperties = {
     position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200, textAlign: 'center',
@@ -29,7 +36,7 @@ export function TrainerBanner() {
             && b.mons.some((m) => m && m.uid === ctx.monUid)));
 
     return (
-        <div style={{ ...BANNER_STYLE, borderBottom: '1px solid var(--border-color)' }}>
+        <div className="card-banner" style={{ ...BANNER_STYLE, borderBottom: '1px solid var(--border-color)' }}>
             <i className={'fa-solid ' + (inBox ? 'fa-box-archive' : 'fa-id-card')}></i>
             {' '}Editing a Pokémon in <strong>{tname}</strong>’s {inBox ? 'PC storage' : 'team'}
             {' '}— changes save to that trainer
@@ -39,7 +46,7 @@ export function TrainerBanner() {
 
 export function WildBanner() {
     return (
-        <div style={{ ...BANNER_STYLE, borderBottom: '1px solid #22c55e66' }}>
+        <div className="card-banner" style={{ ...BANNER_STYLE, borderBottom: '1px solid #22c55e66' }}>
             <i className="fa-solid fa-paw"></i> Wild Pokémon — belongs to no trainer.
             Export it, then Capture it on a trainer sheet to make it yours.
         </div>

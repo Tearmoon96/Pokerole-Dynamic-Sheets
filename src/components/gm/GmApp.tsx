@@ -12,6 +12,8 @@ import { AilmentPopover } from './AilmentPopover';
 import { STATUS_ICONS } from '../../gm/ailments';
 import { entityRef, writeStatus } from '../../gm/entities';
 import { WORKING_KEY } from '../../state/constants';
+import { ActivePanelCtx, PANEL_TABS } from '../../gm/phoneBoard';
+import { useDeviceClass } from '../../lib/device';
 import type { PokedexEntry } from '../../data/types';
 import type { GmStatus } from '../../gm/ailments';
 
@@ -22,6 +24,13 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
     const { state, store } = useGm();
     const { data } = useAppData();
     const [tipToken, setTipToken] = useState<string | null>(null);
+
+    /* The phone board shows one panel at a time behind a tab bar — five
+       390px panels side by side on a 412px screen means four of them are
+       off-screen with nothing to say so. Every other size keeps the strip. */
+    const device = useDeviceClass();
+    const onPhone = device === 'phone';
+    const [activeTab, setActiveTab] = useState<string>('roster');
 
     const dexById = useCallback((id: string): PokedexEntry | null =>
         data.pokemon.find((p) => p._id === id) || null, [data.pokemon]);
@@ -113,6 +122,23 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
         notes: <NotesPanel key="notes" onReorder={reorder} />,
     };
 
+    /* Tabs follow the board's own order, so dragging panels on a desktop and
+       then picking the tablet up gives the same order in the bar. A panel key
+       with no tab entry is skipped rather than rendering a blank button. */
+    /* Hidden sections are dropped here rather than collapsed in CSS: .panel is
+       `flex: 1 1 390px`, so a panel that is not in the DOM has its width shared
+       out among the rest with no extra rule. */
+    const shown = state.layout.order.filter((k) => !state.layout.hidden.includes(k));
+
+    const tabs = shown
+        .map((k) => PANEL_TABS.find((t) => t.key === k))
+        .filter((t): t is typeof PANEL_TABS[number] => Boolean(t));
+
+    /* Falls back to the first tab if the selected panel is not in the current
+       order — otherwise a board saved without, say, the dice panel would open
+       on a tab that shows nothing at all. */
+    const active = tabs.some((t) => t.key === activeTab) ? activeTab : (tabs[0]?.key ?? 'roster');
+
     return (
         <>
             <TopBar />
@@ -122,9 +148,36 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
                 species data are unavailable. Keep gm-screen.html inside the app folder.
             </div>
 
-            <main className="board" id="board">
-                {state.layout.order.map((k) => PANELS[k]).filter(Boolean)}
-            </main>
+            {onPhone && (
+                <nav className="gm-tabs" aria-label="Board panels">
+                    {tabs.map((t) => (
+                        <button
+                            key={t.key}
+                            className={'gm-tab' + (t.key === active ? ' active' : '')}
+                            aria-current={t.key === active ? 'page' : undefined}
+                            onClick={() => setActiveTab(t.key)}
+                        >
+                            <i className={'fa-solid ' + t.icon}></i>{t.label}
+                        </button>
+                    ))}
+                </nav>
+            )}
+
+            {/* Every panel stays mounted and the unselected ones are hidden in
+                CSS, rather than rendering only the active one: unmounting would
+                throw away each panel's scroll position and any half-typed field
+                in it every time the GM glanced at another tab. */}
+            <ActivePanelCtx.Provider value={onPhone ? active : null}>
+                <main className="board" id="board">
+                    {shown.map((k) => PANELS[k]).filter(Boolean)}
+                    {!shown.length && (
+                        <div className="board-empty">
+                            Every section is hidden. Switch one back on with the
+                            icons beside the title.
+                        </div>
+                    )}
+                </main>
+            </ActivePanelCtx.Provider>
 
             <MovePanel token={tipToken} onClose={() => setTipToken(null)} />
             <AilmentPopover />

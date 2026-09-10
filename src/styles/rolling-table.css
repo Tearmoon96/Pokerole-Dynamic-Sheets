@@ -1,0 +1,18 @@
+/* The Rolling Table.
+
+   Shares the GM screen's palette and its dice rendering — a roll should look
+   the same whether it was thrown on the solo board or at a shared table — and
+   adds only the layout this page needs. gm/dice.css is imported rather than
+   copied so the two cannot drift. */
+@import './gm/base.css';
+@import './gm/shared.css';
+@import './gm/dice.css';
+@import './table/layout.css';
+@import './table/join.css';
+@import './table/feed.css';
+
+/* The mobile / tablet wrapper, last so it settles ties against the desktop
+   rules above rather than needing to out-specify them. Every rule in it is
+   behind a data-device or data-pointer attribute that a desktop never has. */
+@import './responsive/base.css';
+@import './responsive/table.css';

@@ -3,7 +3,14 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- viewport-fit=cover is what makes env(safe-area-inset-*) report real
+         numbers on a notched phone; without it they are always 0 and the
+         sheet runs under the notch and the home indicator. Zoom is left
+         enabled on purpose - maximum-scale=1 is the usual way to stop iOS
+         zooming a small field on focus, and taking pinch-zoom away from
+         everyone is not an acceptable price. src/styles/responsive/base.css
+         fixes that with a 16px font floor instead. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Pokerole Trainer's License</title>
     <meta name="description" content="Trainer's License character sheet for the Pokerole TTRPG system.">
     <meta name="theme-color" content="#161514">

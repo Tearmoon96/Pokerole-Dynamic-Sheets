@@ -12,6 +12,7 @@ import { SessionProvider } from '../state/SessionContext';
 import { LicenseApp } from '../components/license/LicenseApp';
 import { registerServiceWorker } from '../pwa/register';
 import { installTooltips } from '../lib/tooltip';
+import { initDevice } from '../lib/device';
 import type { AppData } from '../data/types';
 
 import '../styles/trainer-license.css';
@@ -56,6 +57,10 @@ function Root() {
         </AppDataProvider>
     );
 }
+
+/* Stamps data-device / data-pointer on <html> before the first paint, so
+   the page starts in the right class instead of reflowing into it. */
+initDevice();
 
 createRoot(document.getElementById('root')!).render(<StrictMode><Root /></StrictMode>);
 

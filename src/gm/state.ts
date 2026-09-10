@@ -1,4 +1,5 @@
 import { DEFAULT_NAME_OPTS, GM_KEY, PANEL_KEYS, PANEL_MAX_W, PANEL_MIN_W } from './constants';
+import { normalizeFolders } from './folders';
 import type { GmLayout, GmState } from './types';
 
 export function uid(): string {
@@ -12,11 +13,15 @@ export function defaultGmState(): GmState {
         combat: { round: 1, participants: [] },
         notes: '',
         noteSheets: [],
+        noteFolders: [],
+        rosterOrder: [],
+        rosterFolders: [],
+        rosterFolderOf: {},
         npcs: [],
         dice: { count: 2, sides: 6, history: [] },
         expanded: {},
         nameOpts: { ...DEFAULT_NAME_OPTS },
-        layout: { order: PANEL_KEYS.slice(), widths: {} },
+        layout: { order: PANEL_KEYS.slice(), widths: {}, hidden: [] },
     };
 }
 
@@ -41,7 +46,13 @@ export function normalizeLayout(raw: unknown): GmLayout {
             widths[k] = Math.round(Math.max(PANEL_MIN_W, Math.min(PANEL_MAX_W, n)));
         }
     });
-    return { order, widths };
+    /* Same treatment as `order`: only real panel keys survive, so a stale or
+       hand-edited file cannot hide something that no longer exists — or, worse,
+       leave a key in here that no toggle can reach to switch back on. */
+    const hidden = (Array.isArray(r.hidden) ? r.hidden : [])
+        .filter((k, i, a) => PANEL_KEYS.includes(k) && a.indexOf(k) === i);
+
+    return { order, widths, hidden };
 }
 
 /* Fold a stored blob onto the defaults. Both routes in — localStorage and a
@@ -69,6 +80,37 @@ export function normalizeGmState(raw: unknown): GmState {
     if (!Array.isArray(s.combat.participants)) s.combat.participants = [];
     if (!Array.isArray(s.dice.history)) s.dice.history = [];
     if (!s.expanded || typeof s.expanded !== 'object') s.expanded = {};
+
+    s.noteFolders = normalizeFolders(r.noteFolders);
+    s.rosterFolders = normalizeFolders(r.rosterFolders);
+
+    /* rosterOrder is rebuilt against what is actually loaded rather than
+       trusted: it names entries by key, and a session file can easily hold a
+       key for a trainer that is no longer in the working set, or be missing one
+       that is. Anything unknown is dropped and anything new is appended, the
+       same contract normalizeLayout keeps for the panels — a roster entry can
+       never end up loaded but unrenderable. */
+    const keys = [
+        ...s.trainerIds.map((id) => 't:' + id),
+        ...s.wilds.map((w) => 'w:' + w.gid),
+    ];
+    const known = new Set(keys);
+    const order: string[] = [];
+    (Array.isArray(r.rosterOrder) ? r.rosterOrder : []).forEach((k) => {
+        if (known.has(k) && !order.includes(k)) order.push(k);
+    });
+    keys.forEach((k) => { if (!order.includes(k)) order.push(k); });
+    s.rosterOrder = order;
+
+    const folderIds = new Set(s.rosterFolders.map((f) => f.gid));
+    const filed: Record<string, string> = {};
+    const rawFiled = (r.rosterFolderOf && typeof r.rosterFolderOf === 'object')
+        ? r.rosterFolderOf as Record<string, unknown> : {};
+    Object.keys(rawFiled).forEach((k) => {
+        const v = String(rawFiled[k] || '');
+        if (known.has(k) && folderIds.has(v)) filed[k] = v;
+    });
+    s.rosterFolderOf = filed;
     if (!(s.combat.round > 0)) s.combat.round = 1;
     s.layout = normalizeLayout(r.layout);
     return s;

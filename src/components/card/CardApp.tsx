@@ -32,6 +32,7 @@ import {
 import { wildSheetKey } from '../../card/cardContext';
 import { readSpriteFile, spriteUploadDir } from '../../card/customSprite';
 import type { CardMove } from '../../card/moves';
+import { HomeButton } from '../common/HomeButton';
 
 /* The whole Pokémon card.
 
@@ -269,48 +270,78 @@ export function CardApp() {
         </>
     );
 
-    const tools = (
+    /* Each tool button once, so the two orders below cannot drift apart. */
+    const toolHome = <HomeButton key="home" className="type-eff-btn" />;
+
+    const toolTypeEff = (
+        <button key="type" className="type-eff-btn" onClick={() => setTypeEffOpen(true)} title="Type Effectiveness">
+            <i className="fa-solid fa-shield"></i>
+        </button>
+    );
+
+    const toolAilments = (
+        <button key="ail" className="type-eff-btn" onClick={() => setAilmentsOpen(true)} title="Ailments & Conditions">
+            <i className="fa-solid fa-kit-medical"></i>
+        </button>
+    );
+
+    const toolWeather = (
+        <button key="wx" className="type-eff-btn" onClick={() => setWeatherOpen(true)} title="Weather and Environments">
+            <i className="fa-solid fa-cloud-sun-rain"></i>
+        </button>
+    );
+
+    const toolHeal = (
+        <button
+            key="heal"
+            className="type-eff-btn heal-btn"
+            onClick={() => setHealOpen(true)}
+            title="Heal: full HP and Will, every status cleared"
+        >
+            <i className="fa-solid fa-heart-circle-plus"></i>
+        </button>
+    );
+
+    /* A team member's slot is fixed, so this is hidden in trainer mode. */
+    const toolLoad = ctx.inTrainerMode ? null : (
+        <button
+            key="load"
+            className="type-eff-btn"
+            id="load-picker"
+            onClick={() => setPicker({ wild: ctx.wildMode })}
+            /* On a wild card the magnifier opens another wild sheet
+               rather than replacing this one. */
+            title={ctx.wildMode ? 'Open another wild Pokémon' : 'Load another Pokémon'}
+        >
+            <i className="fa-solid fa-magnifying-glass"></i>
+        </button>
+    );
+
+    const toolWildSheets = !ctx.wildMode ? null : (
+        <button
+            key="sheets"
+            className="type-eff-btn"
+            id="wild-sheets-btn"
+            onClick={() => setWildSwitcherOpen(true)}
+            title="Open wild Pokémon sheets"
+        >
+            <i className="fa-solid fa-layer-group"></i>
+        </button>
+    );
+
+    /* A wild sheet carries all seven of these, and as one wrapping row they
+       broke wherever the window happened to put them. Split by what they do
+       instead: the first row moves you between sheets (and heals the one you
+       are on), the second opens the three reference tables. Only wild mode has
+       enough buttons for the split to be worth making — the other two modes
+       are five or six and stay a single centred row. */
+    const tools = ctx.wildMode ? (
         <>
-            <button className="type-eff-btn" onClick={() => setTypeEffOpen(true)} title="Type Effectiveness">
-                <i className="fa-solid fa-shield"></i>
-            </button>
-            <button className="type-eff-btn" onClick={() => setAilmentsOpen(true)} title="Ailments & Conditions">
-                <i className="fa-solid fa-kit-medical"></i>
-            </button>
-            <button className="type-eff-btn" onClick={() => setWeatherOpen(true)} title="Weather and Environments">
-                <i className="fa-solid fa-cloud-sun-rain"></i>
-            </button>
-            <button
-                className="type-eff-btn heal-btn"
-                onClick={() => setHealOpen(true)}
-                title="Heal: full HP and Will, every status cleared"
-            >
-                <i className="fa-solid fa-heart-circle-plus"></i>
-            </button>
-            {/* A team member's slot is fixed, so this is hidden in trainer mode. */}
-            {!ctx.inTrainerMode && (
-                <button
-                    className="type-eff-btn"
-                    id="load-picker"
-                    onClick={() => setPicker({ wild: ctx.wildMode })}
-                    /* On a wild card the magnifier opens another wild sheet
-                       rather than replacing this one. */
-                    title={ctx.wildMode ? 'Open another wild Pokémon' : 'Load another Pokémon'}
-                >
-                    <i className="fa-solid fa-magnifying-glass"></i>
-                </button>
-            )}
-            {ctx.wildMode && (
-                <button
-                    className="type-eff-btn"
-                    id="wild-sheets-btn"
-                    onClick={() => setWildSwitcherOpen(true)}
-                    title="Open wild Pokémon sheets"
-                >
-                    <i className="fa-solid fa-layer-group"></i>
-                </button>
-            )}
+            <div className="tool-row">{toolHome}{toolWildSheets}{toolLoad}{toolHeal}</div>
+            <div className="tool-row">{toolTypeEff}{toolAilments}{toolWeather}</div>
         </>
+    ) : (
+        <>{toolHome}{toolTypeEff}{toolAilments}{toolWeather}{toolHeal}{toolLoad}</>
     );
 
     return (

@@ -1,0 +1,370 @@
+/* ============================================================
+   The mobile / tablet wrapper, part 3: the GM screen.
+
+   This is the page the two reference sizes pull hardest apart. The
+   board is a horizontal strip of 390px-wide panels meant to be spread
+   across a wide monitor:
+
+     - on a 10.5" tablet on its side (1112px) that is still the right
+       shape. Narrowing the panels a little is enough to fit three at
+       once instead of two and a sliver.
+
+     - on a 6.7" phone upright (412px) it is not. One panel fills the
+       screen and the other four are off to the right with nothing to
+       say they exist — the GM has to guess to pan. So on a phone the
+       board stops being a strip and becomes one panel at a time behind
+       a tab bar, which is the same information with a way to reach it.
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   Tablet, landscape 10.5"
+   ------------------------------------------------------------ */
+
+html[data-device="tablet"] .panel {
+    /* 1112 / 3 = 370 before gaps. Three panels visible instead of two
+       and an edge, which is what a GM actually wants in front of them:
+       roster, combat and dice at the same time. */
+    flex: 1 1 330px;
+    min-width: 330px;
+}
+
+/* Combat is the one panel a shared width does not suit. Every other panel
+   is a list of one-line entries; a combat row carries a name, an initiative
+   field, two pool bars, eight status glyphs, five action pips and four
+   buttons, and at 330px with finger-sized controls the status strip breaks
+   in two and the name is trimmed to about four characters. 400px is what it
+   takes for the strip to sit on one line, and three panels still fit across
+   a 10.5" tablet with it. */
+html[data-device="tablet"] #panel-combat {
+    flex: 1 1 400px;
+    min-width: 400px;
+}
+
+html[data-device="tablet"] .board {
+    padding: 0.6rem;
+    gap: 0.6rem;
+    padding-bottom: calc(0.6rem + var(--safe-bottom));
+}
+
+html[data-device="tablet"] .topbar {
+    padding-left: calc(1rem + var(--safe-left));
+    padding-right: calc(1rem + var(--safe-right));
+}
+
+/* ------------------------------------------------------------
+   Phone, portrait 6.7"
+   ------------------------------------------------------------ */
+
+/* The URL bar slides in and out as you scroll, and 100vh means the
+   height WITHOUT it — so a full-height board is taller than the screen
+   for most of the time it is on it, and the bottom of every panel sits
+   under the browser chrome. dvh is the one that tracks it. */
+@supports (height: 100dvh) {
+    html[data-device="phone"] body {
+        height: 100dvh;
+    }
+}
+
+html[data-device="phone"] .topbar {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: calc(0.4rem + var(--safe-top)) calc(0.6rem + var(--safe-right)) 0.4rem calc(0.6rem + var(--safe-left));
+}
+
+html[data-device="phone"] .topbar .logo {
+    font-size: 0.85rem;
+    gap: 0.35rem;
+}
+
+html[data-device="phone"] .topbar .version,
+html[data-device="phone"] .session-status {
+    display: none;
+}
+
+html[data-device="phone"] .topbar .spacer {
+    flex: 1;
+}
+
+/* ---------- One panel at a time ----------
+   .board is a flex row of five; on a phone it shows whichever one the
+   tab bar has selected and hides the rest. Hidden rather than
+   unmounted on purpose: a panel keeps its scroll position and any
+   half-typed field when the GM flicks to another tab and back. */
+html[data-device="phone"] .board {
+    padding: 0.5rem;
+    padding-bottom: calc(0.5rem + var(--safe-bottom));
+    gap: 0;
+    overflow-x: hidden;
+}
+
+html[data-device="phone"] .board > .panel {
+    display: none;
+}
+
+html[data-device="phone"] .board > .panel.phone-active {
+    display: flex;
+    flex: 1 1 auto;
+    /* The desktop floor is wider than the screen. */
+    min-width: 0;
+    width: 100%;
+}
+
+/* Both are meaningless with one panel filling the screen: there is
+   nothing to reorder against and nothing to take width from. */
+html[data-device="phone"] .panel-grip,
+html[data-device="phone"] .panel-lock,
+html[data-device="phone"] .panel-resize {
+    display: none;
+}
+
+/* ---------- The tab bar ---------- */
+.gm-tabs {
+    display: none;
+}
+
+html[data-device="phone"] .gm-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0.3rem;
+    padding: 0.4rem calc(0.5rem + var(--safe-right)) 0.4rem calc(0.5rem + var(--safe-left));
+    border-bottom: 1px solid var(--border-color);
+    background: var(--panel-strong);
+    /* Five tabs at a readable size are wider than 412px, so the bar
+       itself pans — the panels no longer have to. */
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+}
+
+html[data-device="phone"] .gm-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.gm-tab {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    /* 40px tall: a fingertip's worth without eating the board. */
+    min-height: 40px;
+    padding: 0 0.7rem;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: #0000002e;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.gm-tab i {
+    font-size: 0.85rem;
+}
+
+.gm-tab.active {
+    background: var(--primary-soft);
+    border-color: var(--ghost-color);
+    color: var(--text-primary);
+    box-shadow: 0 0 10px var(--border-glow);
+}
+
+/* ---------- Popovers ----------
+   Both are position:fixed at a hard pixel width — 330px and 310px —
+   which is most of a 412px screen and runs off the edge as soon as the
+   anchor is anywhere right of centre. */
+html[data-device="phone"] .mon-tooltip,
+html[data-device="phone"] .ail-pop {
+    width: calc(100vw - 20px);
+    max-width: calc(100vw - 20px);
+    left: 10px !important;
+    right: 10px;
+    max-height: 70vh;
+}
+
+@supports (height: 100dvh) {
+    html[data-device="phone"] .mon-tooltip,
+    html[data-device="phone"] .ail-pop {
+        max-height: 70dvh;
+    }
+}
+
+/* The dice controls are the one thing on this page a player watches
+   over the GM's shoulder; they should not be the thing that shrinks.
+   .dice-config is a row of labelled steppers that runs out of room
+   long before a phone's width is used up. */
+html[data-device="phone"] .dice-config {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+/* The one control on this page with no class of its own: the plus at the
+   end of the combat "add a combatant" row, styled entirely by the
+   generic button rules. 21x16 is a target a finger cannot pick out of a
+   row that also holds a text field, and there is no selector for it
+   other than its position. */
+@media (pointer: coarse) {
+    .add-row > button,
+    /* The NPC generator's gender segments. Unselected ones carry an
+       EMPTY class attribute, so they have no selector of their own
+       either — the whole group has to be named through its container. */
+    .seg > button,
+    /* The folder and item reorder arrows. They are 20x18 by design on a
+       desktop, sitting in a dense row; a thumb needs more than that, and the
+       panels are full width on a phone so there is room to give. */
+    .folder-move > button,
+    .item-move > button,
+    /* A folder's own expand/collapse chevron. 20x14 by design in a dense bar,
+       and a thumb aimed at it lands on the folder icon beside it instead —
+       measured, once --folders made the bar visible to the audit at all. */
+    .folder-twist {
+        min-width: 30px;
+        min-height: 30px;
+    }
+
+    /* The folder picker is an icon box the same size as those arrows. */
+    .item-folder-pick,
+    .dice-chip {
+        min-width: 30px;
+        min-height: 30px;
+    }
+
+    /* The initiative list's up/down arrows sit in the row's action strip,
+       beside the status chips and the pips. Stacked they would be 60px of
+       height against the chips' 35 and would set the strip's height on
+       their own, so on a touch screen they go side by side instead and
+       both get a full 30px square. The strip wraps if the panel is too
+       narrow for that, which is what it is there for. */
+    /* Finger-sized, the four buttons are ~130px wide — more than the status
+       strip has left beside 5 pips and 8 chips, so they move up onto the
+       name's line, which on a touch-width panel has room to spare. */
+    .combat-row .c-main {
+        grid-template-areas:
+            "head  actions"
+            "pools pools"
+            "strip strip";
+    }
+
+    /* .combat-row .c-move is two classes deep, so this has to be too. */
+    .combat-row .c-move {
+        flex-direction: row;
+    }
+
+    .c-move > button {
+        min-width: 32px;
+        min-height: 30px;
+    }
+
+    /* The five action pips and the eight status glyphs are what this panel
+       is actually tapped on all evening, and they were 13px and 16px — the
+       two worst targets on the page, and invisible to the audit until its
+       probe stopped looking only at <button>. Five of each at 26px with
+       their gaps is 287px of the ~325px a phone panel gives the row, so
+       both fit on one strip and the row grows by one glyph's height.
+       30px each does not fit and never will: that is 310px before the gap
+       between the two groups. */
+    .pips {
+        gap: 3px;
+    }
+
+    .pip {
+        width: 26px;
+        height: 26px;
+        border-width: 2px;
+    }
+
+    .status-chip {
+        width: 26px;
+        height: 26px;
+        font-size: 12px;
+    }
+
+    .status-chip .stage {
+        font-size: 9px;
+        padding: 1px 3px;
+    }
+
+    /* What is left of a pool bar after 30px ± buttons, a 2rem tag and a
+       3.1rem number box is the coloured track, and inside a 330px tablet
+       panel that came to a 30px nub. The tag holds "WILL" and the number
+       box "10 / 10"; both have slack at this font size, and the track gets
+       what they give back. */
+    .pool-bar .pool-tag {
+        width: 1.8rem;
+    }
+
+    .pool-bar .pool-num {
+        min-width: 2.7rem;
+    }
+
+    /* The picker's menu replaced a native <select>, whose popup a phone drew
+       as its own full-width sheet with rows a thumb could hit. This is our
+       list now, so the rows have to be that size themselves. */
+    .folder-menu-item {
+        min-height: 34px;
+        font-size: 0.8rem;
+    }
+
+    /* Wider too: a menu anchored to a 30px button is easy to open and fiddly
+       to choose from at the desktop's 9.5rem. */
+    .folder-menu {
+        min-width: 12rem;
+    }
+
+    /* Trimming the pool ± buttons to 26px of height to buy back a few pixels
+       of row was tried and reverted: HP and WILL are 3px apart, so a probe
+       aimed just below the − on one bar lands on the other one. The 30px
+       square from base.css stays. */
+
+    /* A trainer card's three buttons are ABSOLUTE, top-right, and what keeps
+       the pool bars out from under them is the head's own padding-right —
+       4.6rem, measured against 24px buttons. Finger-sized they are 30px and
+       need 6.7rem, so on a touch screen the bars ran straight under them.
+
+       roster.css reserves each band against what overhangs it rather than
+       insetting the whole head; these are the same reserves at finger size.
+       The buttons are 30px here and there are four of them since the roll
+       panel gained a trainer view. */
+    .trainer-name {
+        padding-right: 8.6rem;
+        /* And as TALL as they are, or the first pool bar starts under them —
+           measured at a 6px overlap, which is enough to sit the buttons on
+           top of the HP track. */
+        min-height: 30px;
+        align-items: center;
+    }
+
+    .trainer-head .status-chips {
+        padding-right: 3.2rem;
+    }
+
+    /* Same row, the expander chevron: an <i>, so no button rule reaches it
+       and the tap probe never looks at it either. */
+    .trainer-toggle {
+        width: 2rem;
+        padding: 0.45rem 0;
+    }
+
+    /* A Pokemon's row carries up to five buttons beside its pools; at a
+       finger's size that is 200px, and a phone panel has ~300px of row. The
+       bigger basis is what makes the line break so the pools get the row to
+       themselves instead of sharing it down to a stub.
+
+       12rem and not more: the SPRITE shares this line, so a basis wide
+       enough to push the buttons off must still leave the 40px sprite plus
+       the gap beside it. At 14rem a 330px tablet panel broke the wrong line
+       and stranded the sprite alone above the name. */
+    .mon-main {
+        flex-basis: 12rem;
+    }
+
+    /* Sits inside a round-flag pill, so its height is what the pill
+       allows; widening it is the part that helps. */
+    .dmg-apply {
+        min-width: 44px;
+        min-height: 24px;
+    }
+}

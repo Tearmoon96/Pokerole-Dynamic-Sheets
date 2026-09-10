@@ -17,11 +17,12 @@ const ROOT = process.cwd();
 const SRC = join(ROOT, 'PDS React Develop');
 const OUT = join(ROOT, 'PDS React Deploy');
 
-/* Files copied as-is from the top of the develop folder. The three pages plus
+/* Files copied as-is from the top of the develop folder. The four pages plus
    index.html are the app; NOTICE is not optional — the monochrome icon pack is
    CC BY 3.0 and that file carries its attribution. */
 const TOP_FILES = [
     'index.html', 'trainer-license.html', 'pokemon-card.html', 'gm-screen.html',
+    'rolling-table.html',
     'manifest.webmanifest', 'sw.js',
     'pwa-icon-192.png', 'pwa-icon-512.png',
     'README.md', 'LICENSE', 'NOTICE',

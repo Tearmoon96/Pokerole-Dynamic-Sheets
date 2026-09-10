@@ -55,3 +55,60 @@
     font-size: 0.85rem;
 }
 
+
+/* ---------------- Section toggles ----------------
+   One per board section, sitting with the title. Lit means the section is
+   on the board; clicking drops it, and the panels left over share the room
+   it was taking. */
+.section-toggles {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: 0.6rem;
+    padding-left: 0.6rem;
+    border-left: 1px solid var(--border-color);
+    flex: 0 0 auto;
+}
+
+.section-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    background: #00000033;
+    /* Off reads as off: dim, flat, and no glow. */
+    color: var(--text-muted);
+    opacity: 0.5;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.section-toggle:hover {
+    opacity: 0.85;
+    border-color: var(--ghost-color);
+}
+
+.section-toggle.on {
+    background: var(--primary-soft);
+    border-color: var(--ghost-color);
+    color: var(--ghost-color);
+    opacity: 1;
+    box-shadow: 0 0 8px var(--border-glow);
+}
+
+/* Nothing left on the board — the only way back is the toggles above, so
+   the message has to say where they are. */
+.board-empty {
+    margin: auto;
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    max-width: 22rem;
+    line-height: 1.5;
+}

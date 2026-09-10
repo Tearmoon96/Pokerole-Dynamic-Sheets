@@ -24,3 +24,9 @@
 @import './card/tooltip.css';
 @import './card/light-theme.css';
 @import './app-root.css';
+
+/* The mobile / tablet wrapper, last so it settles ties against the desktop
+   rules above rather than needing to out-specify them. Every rule in it is
+   behind a data-device or data-pointer attribute that a desktop never has. */
+@import './responsive/base.css';
+@import './responsive/sheets.css';

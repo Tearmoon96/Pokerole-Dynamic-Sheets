@@ -1,0 +1,141 @@
+/* ---------------- Rolling table: joining ---------------- */
+
+.join-screen {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    overflow-y: auto;
+}
+
+.join-card {
+    width: 100%;
+    max-width: 27rem;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    background: var(--card-bg);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.join-card h1 {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.join-card h1 i { color: var(--ghost-color); }
+
+.join-card .lede {
+    margin: 0;
+    font-size: 0.84rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+.join-tabs {
+    display: flex;
+    gap: 0.4rem;
+    border-bottom: 1px solid var(--border-glow);
+    padding-bottom: 0.6rem;
+}
+
+.join-tabs button { flex: 1; }
+
+.join-tabs button.selected {
+    background: var(--primary-soft);
+    border-color: var(--ghost-color);
+    color: var(--text-primary);
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.field > span {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+}
+
+.field input { width: 100%; }
+
+.field input.mono { font-family: 'Fira Code', monospace; font-size: 0.78rem; }
+
+.field em {
+    font-style: normal;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+button.big {
+    padding: 0.55rem;
+    font-size: 0.92rem;
+    font-weight: 800;
+    justify-content: center;
+    width: 100%;
+}
+
+.join-error {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #fca5a5;
+    border: 1px solid var(--danger);
+    background: #ef44441a;
+    border-radius: 9px;
+    padding: 0.45rem 0.6rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+}
+
+.setup-warning {
+    margin: 0;
+    font-size: 0.76rem;
+    line-height: 1.5;
+    color: var(--crit);
+    border: 1px solid var(--crit);
+    background: #f0b42914;
+    border-radius: 9px;
+    padding: 0.45rem 0.6rem;
+}
+
+.setup-warning.local { color: var(--ok); border-color: var(--ok); background: #3aa5931a; }
+
+.setup-warning code {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.72rem;
+}
+
+/* ---------------- The offline copy's version of this page ---------------- */
+
+.offline-card .site-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.6rem;
+    border-radius: 10px;
+    border: 1px solid var(--accent-border);
+    background: var(--accent-faint);
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.offline-card .site-link:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 10px var(--accent-glow);
+}

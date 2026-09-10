@@ -72,6 +72,7 @@
 
 .mon-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.55rem;
     padding: 0.4rem 0.6rem;
@@ -93,7 +94,15 @@
    nearest-neighbour keeps their edges crisp instead of blurring them */
 .sprite-box, .sprite-token { image-rendering: pixelated; }
 
-.mon-main { flex: 1; min-width: 0; }
+/* A basis rather than `flex: 1`, and it is the whole reason the row can
+   wrap. A pool bar with its ± buttons cannot shrink below about 11rem, and
+   a wild's row carries five buttons beside it — so on a narrow panel the
+   old `flex: 1` let this column be squeezed to nothing while the bars
+   inside it kept their width and printed straight over the buttons. With a
+   basis the browser breaks the line instead: the buttons drop underneath
+   and everything keeps its size. min-width stays 0 so that once the line
+   HAS broken the column can still give ground rather than overflow. */
+.mon-main { flex: 1 1 11rem; min-width: 0; }
 
 /* The name may be trimmed, the type chips never: a long nickname must
    not eat the two glyphs that say what the Pokémon is. */
@@ -133,7 +142,14 @@
    block with line-height 1 the box is the glyph */
 .type-chip i { display: block; line-height: 1; }
 
-.mon-actions { display: flex; gap: 0.3rem; flex: 0 0 auto; }
+.mon-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    flex: 0 0 auto;
+    /* right-aligned whether it shares the name's line or has its own */
+    margin-left: auto;
+}
 
 .wild-tag {
     font-size: 0.6rem;

@@ -1,4 +1,4 @@
-/* Builds the three pages and puts them where the app is opened from.
+/* Builds the pages and puts them where the app is opened from.
 
    One Vite pass per page, because each bundle has to be a classic script:
    Rollup will not code-split an iife, and an ES module cannot be loaded from
@@ -12,7 +12,7 @@ import { join } from 'node:path';
 const ROOT = process.cwd();
 const OUT = join(ROOT, 'dist-pwa');
 const APP = join(ROOT, 'PDS React Develop');
-const PAGES = ['trainer-license', 'pokemon-card', 'gm-screen'];
+const PAGES = ['trainer-license', 'pokemon-card', 'gm-screen', 'rolling-table'];
 
 for (const page of PAGES) {
     process.env.PAGE = page;

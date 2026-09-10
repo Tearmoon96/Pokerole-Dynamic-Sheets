@@ -9,6 +9,7 @@ import { GmStoreProvider } from '../gm/GmContext';
 import { GmStore } from '../gm/store';
 import { GmApp } from '../components/gm/GmApp';
 import { installTooltips } from '../lib/tooltip';
+import { initDevice } from '../lib/device';
 import { registerServiceWorker } from '../pwa/register';
 import type { AppData } from '../data/types';
 
@@ -50,6 +51,10 @@ function Root() {
         </AppDataProvider>
     );
 }
+
+/* Stamps data-device / data-pointer on <html> before the first paint, so
+   the page starts in the right class instead of reflowing into it. */
+initDevice();
 
 createRoot(document.getElementById('root')!).render(<StrictMode><Root /></StrictMode>);
 

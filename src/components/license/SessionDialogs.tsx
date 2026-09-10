@@ -205,17 +205,25 @@ function NewTrainerModal() {
     const s = useSession();
     const store = useStore();
     const toast = useToast();
-    const [name, setName] = useState('trainer-new.json');
+    /* The BASE name only — the extension is not in here and cannot be typed
+       over. It used to be part of one plain text field, which let you delete
+       it: `createTrainerFile` then quietly put it back, so the box said one
+       thing and the folder got another. */
+    const [base, setBase] = useState('trainer-new');
     const ref = useRef<HTMLInputElement>(null);
     const open = s.dialogs.newTrainerName != null;
 
+    const stripExt = (v: string) => v.replace(/\.json$/i, '');
+
     useEffect(() => {
         if (!open) return;
-        setName(s.dialogs.newTrainerName || 'trainer-new.json');
+        setBase(stripExt(s.dialogs.newTrainerName || 'trainer-new.json'));
         const id = window.setTimeout(() => { ref.current?.focus(); ref.current?.select(); }, 0);
         return () => clearTimeout(id);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
+
+    const fileName = base.trim() + '.json';
 
     return (
         <Modal
@@ -226,18 +234,25 @@ function NewTrainerModal() {
             <ModalTitle icon="fa-file-circle-plus" centered={false}>Save new trainer</ModalTitle>
             <p className="modal-text">
                 A new trainer needs its own <strong>.json</strong> file before it can auto-save.
-                Name the file, then it's saved into your working folder:
+                Name the file, then it's saved into your working folder. The trainer starts
+                out named after the file — you can rename either one afterwards.
             </p>
-            <input
-                ref={ref}
-                type="text"
-                id="new-trainer-filename"
-                className="specialty-input"
-                style={{ width: '100%' }}
-                placeholder="trainer-name.json"
-                value={name}
-                onChange={(e) => setName(e.currentTarget.value)}
-            />
+            {/* The extension sits outside the field as a label, so there is
+                nothing there to select or delete. */}
+            <div className="filename-field">
+                <input
+                    ref={ref}
+                    type="text"
+                    id="new-trainer-filename"
+                    className="specialty-input"
+                    placeholder="trainer-name"
+                    value={base}
+                    /* Paste of a full "ash.json" still does the right thing. */
+                    onChange={(e) => setBase(stripExt(e.currentTarget.value))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                />
+                <span className="filename-ext">.json</span>
+            </div>
             <div className="modal-actions">
                 <button className="form-btn cancel" onClick={() => s.setDialogs({ ...s.dialogs, newTrainerName: null })}>
                     Cancel
@@ -245,7 +260,7 @@ function NewTrainerModal() {
                 <button
                     className="form-btn save"
                     onClick={async () => {
-                        const entry = await createTrainerFile(name, toast);
+                        const entry = await createTrainerFile(fileName, toast);
                         if (!entry) return;
                         store.addTrainer(entry);
                         s.setDialogs({ ...s.dialogs, newTrainerName: null });

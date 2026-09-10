@@ -7,12 +7,15 @@ import { useGmConfirm } from './ConfirmDialog';
 import { useAppData } from '../../data/AppDataContext';
 import { useToast } from '../common/Toast';
 import { uid } from '../../gm/state';
+import { useFlash } from '../../gm/useFlash';
 import { defaultStatus, ailmentByKey } from '../../gm/ailments';
 import {
     MAX_ACTIONS, initOffset, roundFlags, syncRoundState,
 } from '../../gm/combat';
-import { adjustPool, entityRef, participantToken as sharedParticipantToken, resolveToken, writeStatus }
-    from '../../gm/entities';
+import {
+    adjustPool, entityPool, entityRef, participantToken as sharedParticipantToken, resolveToken, writeStatus,
+} from '../../gm/entities';
+import { PoolBar } from './RosterBits';
 import type { GmCombatant } from '../../gm/types';
 import type { PokedexEntry } from '../../data/types';
 
@@ -29,6 +32,11 @@ export function CombatPanel({ onReorder, onOpenTip, cycleStatus }: {
     const confirm = useGmConfirm();
     const toast = useToast();
     const [draft, setDraft] = useState('');
+    /* Same acknowledgement the roster and the notes give: the initiative list
+       is the one place a mis-press is most costly to spot, since every row is
+       the same shape and the order is the whole point of the panel. Flashed by
+       pid, which is the row's own identity and survives the reorder. */
+    const [moved, flash] = useFlash();
 
     const dexById = (id: string): PokedexEntry | null =>
         data.pokemon.find((p) => p._id === id) || null;
@@ -69,6 +77,15 @@ export function CombatPanel({ onReorder, onOpenTip, cycleStatus }: {
                 (p as unknown as Record<string, string>).pid === pid ? fn(p) : p),
         };
     });
+
+    /* Same gesture as the roster's bars, writing to the same sheets: a combat
+       row and a roster row for one Pokemon are two views of one pool, and
+       either updates the other. Shift for five, so a big hit is one click. */
+    const stepPool = (token: string) => (key: 'hp' | 'will', delta: number, e: React.MouseEvent) => {
+        e.stopPropagation();
+        adjustPool(state, dexById, token, key, e.shiftKey ? delta * 5 : delta, () => store.save());
+        store.refresh();
+    };
 
     const applyRoundDamage = (token: string, ailKey: string, dmg: number, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -190,6 +207,7 @@ export function CombatPanel({ onReorder, onOpenTip, cycleStatus }: {
                         <CombatRow
                             key={(p as unknown as Record<string, string>).pid}
                             p={p}
+                            moved={moved === (p as unknown as Record<string, string>).pid}
                             idx={idx}
                             total={parts.length}
                             round={round}
@@ -202,13 +220,16 @@ export function CombatPanel({ onReorder, onOpenTip, cycleStatus }: {
                                 const n = parseInt(v, 10);
                                 return { ...x, init: isNaN(n) ? undefined : n };
                             })}
-                            onMove={(dir) => store.update((s) => {
-                                const list = s.combat.participants.slice();
-                                const j = idx + dir;
-                                if (j < 0 || j >= list.length) return;
-                                [list[idx], list[j]] = [list[j], list[idx]];
-                                s.combat = { ...s.combat, participants: list };
-                            })}
+                            onMove={(dir) => {
+                                flash((p as unknown as Record<string, string>).pid);
+                                store.update((s) => {
+                                    const list = s.combat.participants.slice();
+                                    const j = idx + dir;
+                                    if (j < 0 || j >= list.length) return;
+                                    [list[idx], list[j]] = [list[j], list[idx]];
+                                    s.combat = { ...s.combat, participants: list };
+                                });
+                            }}
                             onRemove={() => store.update((s) => {
                                 s.combat = {
                                     ...s.combat,
@@ -220,6 +241,7 @@ export function CombatPanel({ onReorder, onOpenTip, cycleStatus }: {
                             onOpenTip={onOpenTip}
                             cycleStatus={cycleStatus}
                             onDeal={applyRoundDamage}
+                            onPool={stepPool(resolveToken(state, participantToken(p)) || participantToken(p))}
                         />
                     ))}
                 </div>
@@ -252,8 +274,10 @@ export function CombatPanel({ onReorder, onOpenTip, cycleStatus }: {
     );
 }
 
-function CombatRow({ p, idx, total, round, token, dexById, onPip, onInit, onMove, onRemove, onOpenTip, cycleStatus, onDeal }: {
+function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit, onMove, onRemove, onOpenTip, cycleStatus, onDeal, onPool }: {
     p: GmCombatant;
+    /** True for the moment after an up/down press landed on this row. */
+    moved: boolean;
     idx: number;
     total: number;
     round: number;
@@ -266,6 +290,7 @@ function CombatRow({ p, idx, total, round, token, dexById, onPip, onInit, onMove
     onOpenTip: (token: string) => void;
     cycleStatus: (token: string, key: string, e: React.MouseEvent) => void;
     onDeal: (token: string, ailKey: string, dmg: number, e: React.MouseEvent) => void;
+    onPool: (key: 'hp' | 'will', delta: number, e: React.MouseEvent) => void;
 }) {
     const { state } = useGm();
     const rec = p as unknown as Record<string, unknown>;
@@ -274,6 +299,9 @@ function CombatRow({ p, idx, total, round, token, dexById, onPip, onInit, onMove
     const acted = (p.acted as number) || 0;
     const init = rec.init as number | null | undefined;
     const dexId = rec.dexId as string | null;
+
+    const hp = ref ? entityPool(ref, 'hp') : null;
+    const will = ref ? entityPool(ref, 'will') : null;
 
     const mod = initOffset(status);
     /* The field carries the shifted number, because that is the one the order is
@@ -287,67 +315,102 @@ function CombatRow({ p, idx, total, round, token, dexById, onPip, onInit, onMove
 
     return (
         <div
-            className={'combat-row ' + (acted >= MAX_ACTIONS ? 'spent' : '')}
+            className={'combat-row ' + (acted >= MAX_ACTIONS ? 'spent' : '') + (moved ? ' just-moved' : '')}
             data-tip={rec.kind !== 'trainer' && ref ? token : undefined}
         >
             {dexId
                 ? <GmSprite dex={dexById(dexId)} dexId={dexId} className="c-sprite" />
                 : <i className={'fa-solid ' + kindIcon + ' c-icon'}></i>}
-            <div className="c-body">
-                <div className="c-name" title={String(rec.label || '')}>{String(rec.label || '')}</div>
-                {ref && (
-                    <StatusChips
-                        status={status}
-                        twoRows
-                        onCycle={(key, e) => cycleStatus(token, key, e)}
-                    />
+            {/* Everything but the sprite and the round flags stacks inside
+                here, in three bands that each get the row's full width:
+                name + initiative, the pools, then the action strip. The
+                previous single flex line put all of them side by side, and
+                a pool bar cannot shrink below its own min-content — so the
+                moment the panel was narrower than about 550px the bars
+                spilled out over the initiative field and the pips. */}
+            <div className="c-main">
+                <div className="c-head">
+                    <div className="c-name" title={String(rec.label || '')}>{String(rec.label || '')}</div>
+                    <label className="c-init-wrap">
+                        <span className="init-label">Init</span>
+                        <input
+                            type="number"
+                            className={'c-init ' + (shifted && !editing ? 'shifted' : '')}
+                            value={shown}
+                            title={shifted && !editing
+                                ? `Rolled ${init}, ${mod} from paralysis: 2 points off Dexterity, and so off Initiative`
+                                : undefined}
+                            onFocus={() => setEditing(true)}
+                            onBlur={() => setEditing(false)}
+                            onChange={(e) => onInit(e.currentTarget.value)}
+                        />
+                    </label>
+                </div>
+                {/* Absent for a hand-typed combatant, which has no sheet behind
+                    it to hold a pool. */}
+                {hp && will && (
+                    <div className="pool-bars c-pools">
+                        <PoolBar tag="HP" cls="hp" cur={hp.cur} max={hp.max}
+                            onStep={(d, e) => onPool('hp', d, e)} />
+                        <PoolBar tag="WILL" cls="will" cur={will.cur} max={will.max}
+                            onStep={(d, e) => onPool('will', d, e)} />
+                    </div>
                 )}
+                <div className="c-strip">
+                    {ref && (
+                        <StatusChips
+                            status={status}
+                            twoRows
+                            onCycle={(key, e) => cycleStatus(token, key, e)}
+                        />
+                    )}
+                    <div className="pips">
+                        {Array.from({ length: MAX_ACTIONS }, (_, i) => (
+                            <span
+                                key={i}
+                                className={'pip ' + (i < acted ? 'used' : '')}
+                                title={acted + '/' + MAX_ACTIONS + ' actions used'}
+                                onClick={() => onPip(i)}
+                            />
+                        ))}
+                    </div>
+                </div>
+                {/* A grid area of its own, so the stylesheet can put it beside
+                    the strip on a mouse-sized row and up beside the name on a
+                    finger-sized one, without the DOM changing under React. */}
+                <div className="c-actions">
+                    <div className="c-move">
+                        <button disabled={idx === 0} title="Move up" onClick={() => onMove(-1)}>
+                            <i className="fa-solid fa-chevron-up"></i>
+                        </button>
+                        <button disabled={idx === total - 1} title="Move down" onClick={() => onMove(1)}>
+                            <i className="fa-solid fa-chevron-down"></i>
+                        </button>
+                    </div>
+                    {/* A trainer used to be the one row without this: the panel
+                        had nothing to show them, being built around a move
+                        list. It now carries their Initiative, Evasion and Clash
+                        pools, so they get the button — with the glyph and the
+                        wording that say so, because a trainer still has no
+                        moves of their own. */}
+                    {ref && (
+                        <button
+                            className="c-tip tip-btn"
+                            data-tip-for={token}
+                            title={rec.kind === 'trainer'
+                                ? 'Initiative, evasion and clash rolls'
+                                : 'Pinned moves, accuracy and damage'}
+                            onClick={() => onOpenTip(token)}
+                        >
+                            <i className={'fa-solid '
+                                + (rec.kind === 'trainer' ? 'fa-dice-d6' : 'fa-list-ul')}></i>
+                        </button>
+                    )}
+                    <button className="c-remove danger" title="Remove from combat" onClick={onRemove}>
+                        <i className="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
             </div>
-            <div>
-                <span className="init-label">Init</span>
-                <input
-                    type="number"
-                    className={'c-init ' + (shifted && !editing ? 'shifted' : '')}
-                    value={shown}
-                    title={shifted && !editing
-                        ? `Rolled ${init}, ${mod} from paralysis: 2 points off Dexterity, and so off Initiative`
-                        : undefined}
-                    onFocus={() => setEditing(true)}
-                    onBlur={() => setEditing(false)}
-                    onChange={(e) => onInit(e.currentTarget.value)}
-                />
-            </div>
-            <div className="pips">
-                {Array.from({ length: MAX_ACTIONS }, (_, i) => (
-                    <span
-                        key={i}
-                        className={'pip ' + (i < acted ? 'used' : '')}
-                        title={acted + '/' + MAX_ACTIONS + ' actions used'}
-                        onClick={() => onPip(i)}
-                    />
-                ))}
-            </div>
-            <div className="c-move">
-                <button disabled={idx === 0} title="Move up" onClick={() => onMove(-1)}>
-                    <i className="fa-solid fa-chevron-up"></i>
-                </button>
-                <button disabled={idx === total - 1} title="Move down" onClick={() => onMove(1)}>
-                    <i className="fa-solid fa-chevron-down"></i>
-                </button>
-            </div>
-            {rec.kind !== 'trainer' && ref && (
-                <button
-                    className="c-tip tip-btn"
-                    data-tip-for={token}
-                    title="Pinned moves, accuracy and damage"
-                    onClick={() => onOpenTip(token)}
-                >
-                    <i className="fa-solid fa-list-ul"></i>
-                </button>
-            )}
-            <button className="c-remove danger" title="Remove from combat" onClick={onRemove}>
-                <i className="fa-solid fa-xmark"></i>
-            </button>
             {!!flags.length && (
                 <div className="round-flags">
                     {flags.map((f) => {

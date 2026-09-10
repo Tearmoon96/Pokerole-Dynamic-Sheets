@@ -92,7 +92,7 @@ export async function writeSession(handle: FileSystemFileHandle, json: string): 
         await w.write(json);
         await w.close();
         const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        return { ok: true, status: handle.name + ' — saved ' + time, warn: false };
+        return { ok: true, status: 'Saved ' + time, warn: false };
     } catch (e) {
         /* Moved, deleted, or a drive that went away: forget it so the next save
            asks for a file instead of failing again */
