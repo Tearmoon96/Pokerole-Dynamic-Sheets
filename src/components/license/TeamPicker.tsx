@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal, ModalClose, ModalTitle } from '../common/Modal';
 import { TileSprite } from '../common/TileSprite';
+import { PokeTileGrid } from '../common/PokeTileGrid';
 import { MegaStoneIcon, megaStoneOf } from '../common/MonName';
 import { useSheetStore } from '../../state/SheetContext';
 import { useAppData } from '../../data/AppDataContext';
@@ -59,11 +60,14 @@ export function TeamPicker({ slot, onClose }: { slot: number | null; onClose: ()
                 value={query}
                 onChange={(e) => setQuery(e.currentTarget.value)}
             />
-            <div className="poke-picker-grid" id="team-picker-grid">
-                {matches.map((p) => {
+            {/* Windowed, and keyed by Image — same two reasons as the card's
+                browser: 1200 Home renders is about a gigabyte of decoded
+                bitmap, and `_id` has a duplicate in the dataset. */}
+            <PokeTileGrid items={matches} id="team-picker-grid">
+                {(p) => {
                     const stone = megaStoneOf(p);
                     return (
-                        <div className="poke-tile" key={p._id} onClick={() => choose(p._id)}>
+                        <div className="poke-tile" key={p.Image} title={p.Name} onClick={() => choose(p._id)}>
                             <TileSprite image={p.Image} />
                             <span className="poke-tile-name">
                                 {/* Mega forms: the base name + the stone sprite instead of
@@ -74,8 +78,8 @@ export function TeamPicker({ slot, onClose }: { slot: number | null; onClose: ()
                             <span className="poke-tile-num">#{p.DexID}</span>
                         </div>
                     );
-                })}
-            </div>
+                }}
+            </PokeTileGrid>
         </Modal>
     );
 }

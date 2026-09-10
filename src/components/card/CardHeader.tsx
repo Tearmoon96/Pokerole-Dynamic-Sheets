@@ -25,7 +25,11 @@ export function CardHeader({ wildMode, tools, evolveControls, wildActions }: {
     const displayName = (!wildMode && sheet.nickname) ? sheet.nickname : shownName;
     const nameRef = useRef<HTMLSpanElement>(null);
 
-    useEffect(() => { document.title = 'Pokerole Card - ' + displayName; }, [displayName]);
+    /* The tab says what the page IS, not which Pokemon happens to be loaded in
+       it. It used to append the name, so opening the card from the index landed
+       on "Pokerole Card - Misdreavus" — whatever the last session left behind —
+       which reads as a bookmark to that Pokemon rather than as the tool. */
+    useEffect(() => { document.title = 'Pokerole PkCard'; }, []);
     useFitName([displayName, p._id]);
 
     useEffect(() => {

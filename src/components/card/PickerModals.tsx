@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal, ModalClose } from '../common/Modal';
 import { TileSprite } from '../common/TileSprite';
+import { PokeTileGrid } from '../common/PokeTileGrid';
 import { MegaStoneIcon, megaStoneOf } from '../common/MonName';
 import { useCard } from '../../card/CardContext';
 import { useAppData } from '../../data/AppDataContext';
@@ -59,11 +60,15 @@ export function PokePicker({ open, wildMode, onClose, onPick, wildImport }: {
                 value={query}
                 onChange={(e) => setQuery(e.currentTarget.value)}
             />
-            <div className="poke-picker-grid" id="poke-picker-grid">
-                {matches.map((p) => {
+            {/* Keyed by Image, not by _id. `_id` is NOT unique — the dataset
+                ships two entries as "tauros" — and a duplicate React key makes
+                reconciliation reuse the wrong element when the filter changes.
+                Image is unique across all 1200 and stable. */}
+            <PokeTileGrid items={matches} id="poke-picker-grid">
+                {(p) => {
                     const stone = megaStoneOf(p);
                     return (
-                        <div className="poke-tile" key={p._id} data-id={p._id} title={p.Name} onClick={() => onPick(p._id)}>
+                        <div className="poke-tile" key={p.Image} data-id={p._id} title={p.Name} onClick={() => onPick(p._id)}>
                             <TileSprite image={p.Image} />
                             <span className="poke-tile-name">
                                 {speciesShownName(p)}
@@ -72,8 +77,8 @@ export function PokePicker({ open, wildMode, onClose, onPick, wildImport }: {
                             <span className="poke-tile-num">#{p.DexID || p.Number}</span>
                         </div>
                     );
-                })}
-            </div>
+                }}
+            </PokeTileGrid>
         </Modal>
     );
 }
@@ -155,6 +160,9 @@ export function EvolveChooser({ chooser, onClose, onChoose }: {
                 Your trained points and everything else on the sheet carry over; only the base stats,
                 caps and ability change to the new form.
             </p>
+            {/* A handful of targets, so this one is not windowed — but it still
+                needs the scroll wrapper, which is where the max-height lives. */}
+            <div className="poke-picker-scroll">
             <div className="poke-picker-grid" id="evolve-grid">
                 {(chooser?.list || []).map((e) => {
                     const p = data.pokemon.find((x) => x._id === e.id);
@@ -177,6 +185,7 @@ export function EvolveChooser({ chooser, onClose, onChoose }: {
                         </div>
                     );
                 })}
+            </div>
             </div>
         </Modal>
     );

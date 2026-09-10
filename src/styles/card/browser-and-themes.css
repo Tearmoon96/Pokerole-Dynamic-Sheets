@@ -9,21 +9,36 @@
     margin-top: 12px;
 }
 
-.poke-picker-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(102px, 1fr));
-    gap: 8px;
+/* The scroller is the wrapper, not the grid: PokeTileGrid reserves the rows it
+   is not rendering as padding on the grid, and padding on the element that also
+   scrolls would move the scrollbar's own extent around under it. */
+.poke-picker-scroll {
     margin-top: 14px;
     max-height: 62vh;
     overflow-y: auto;
     padding-right: 4px;
 }
 
+.poke-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(102px, 1fr));
+    gap: 8px;
+}
+
+/* A FIXED height, and that is load-bearing rather than cosmetic: PokeTileGrid
+   windows the list by row, which needs one row height to exist. Tiles used to
+   range 110-144px — two different sprite box sizes, and names wrapping to one
+   line or three — so there was no such number and a windowed grid would drift
+   out of step with its own scrollbar. 144px is the tallest they reached, so
+   nothing that fitted before is squeezed now. */
 .poke-tile {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 2px;
+    height: 144px;
+    box-sizing: border-box;
     padding: 5px 4px 4px;
     border-radius: 12px;
     background: #ffffff05;
@@ -47,18 +62,32 @@
 }
 
 /* Home sprites are full-art renders and read large in a tile: shrink them
-   a touch so they sit closer to the other sprite kinds */
+   a touch so they sit closer to the other sprite kinds. The BOX stays 80px and
+   the padding does the shrinking, so every tile reserves the same height for
+   its sprite whichever pack answered — which is half of what makes the row
+   height above a single number. */
 .poke-tile img.sprite-home {
-    width: 62px;
-    height: 62px;
+    width: 80px;
+    height: 80px;
+    padding: 9px;
+    box-sizing: border-box;
     image-rendering: auto;
 }
 
+/* Two lines at most — the other half of the fixed row height. A handful of
+   form names ("Tauros (Paldean Form) (Combat Form)") ran to three lines and
+   made their own row taller than every other. The tile carries the full name
+   as its `title`, so nothing is lost, and the clamp bounds the height no
+   matter what the dataset grows. */
 .poke-tile-name {
     font-size: 0.85rem;
     line-height: 1.25;
     color: var(--text-primary);
-    display: block;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
     text-align: center;
 }
 
