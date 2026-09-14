@@ -1,13 +1,23 @@
 import { IDB_COREBOOK_KEY, idbGet, idbSet } from '../state/idb';
 import { dirEntries } from './fileSystem';
-import { CORE_BOOK_DIR_NAME, MANUALS, manualJsonFor } from './manuals';
+import { MANUALS, manualJsonFor } from './manuals';
 import type { ManualBookmark } from './manuals';
 
-/* User-added editions are NOT stored on the trainer. Their default quick links
-   live in the Core Book folder as one JSON file per edition, named like its PDF
-   ("Pokerole Core Book <label>.json"). The folder sits beside the working
-   folder, so it needs its own read/write handle — picked once and cached in
-   IndexedDB. (Custom bookmarks stay on the trainer.) */
+/* The manuals folder: wherever the reader keeps their Core Book PDFs.
+
+   By default the picker opens "Pokerole Core Book/<file>.pdf" by a relative
+   URL, which only works when the folder sits beside the pages — and never on
+   the hosted site, where the PDFs are not shipped at all. Choosing a folder
+   (the button in the manual picker) gives a handle instead: the PDF is read
+   through it and opened from a blob URL, so the book can live anywhere, and
+   the edition list is whatever "Pokerole Core Book <label>.pdf" files the
+   folder holds.
+
+   User-added editions are NOT stored on the trainer. Their default quick
+   links live in that same folder as one JSON file per edition, named like its
+   PDF ("Pokerole Core Book <label>.json"), so every trainer shares them.
+   (Custom bookmarks stay on the trainer.) The handle is picked once and
+   cached in IndexedDB. */
 
 export interface CoreBookVersion { label: string; bookmarks: ManualBookmark[] }
 
@@ -23,11 +33,6 @@ export async function coreBookDir(pick: boolean): Promise<FileSystemDirectoryHan
         try {
             handle = await window.showDirectoryPicker({ id: 'pokerole-corebook', mode: 'readwrite' });
         } catch { return null; }   // user cancelled the picker
-        if (handle.name !== CORE_BOOK_DIR_NAME) {
-            alert('Please choose the "' + CORE_BOOK_DIR_NAME + '" folder (you chose "'
-                + handle.name + '").');
-            return null;
-        }
     }
     if (!handle.queryPermission) return null;
     let perm = await handle.queryPermission({ mode: 'readwrite' });
@@ -40,28 +45,93 @@ export async function coreBookDir(pick: boolean): Promise<FileSystemDirectoryHan
     return handle;
 }
 
-/** Read every "Pokerole Core Book <label>.json" into a list. Uses a cached
-    handle only (never pops the picker), so opening the manual with no folder
-    authorized just shows the built-in editions. */
-export async function loadCoreBookVersions(): Promise<CoreBookVersion[]> {
-    const out: CoreBookVersion[] = [];
+/** Choose (or re-choose) the manuals folder. Null when the picker was
+    cancelled or the browser has no File System Access API. */
+export async function pickCoreBookDir(): Promise<FileSystemDirectoryHandle | null> {
+    if (!window.showDirectoryPicker) return null;
+    let handle: FileSystemDirectoryHandle;
+    try {
+        handle = await window.showDirectoryPicker({ id: 'pokerole-corebook', mode: 'readwrite' });
+    } catch { return null; }
+    coreBookHandle = handle;
+    await idbSet(IDB_COREBOOK_KEY, handle);
+    return coreBookDir(false);
+}
+
+/** The folder's name, for the picker to show, or null when none is chosen
+    (or the cached one cannot be reached without asking). */
+export async function coreBookDirName(): Promise<string | null> {
+    const dir = await coreBookDir(false);
+    return dir ? dir.name : null;
+}
+
+export interface CoreBookFolder {
+    /** User-added editions, from their JSON files and from any PDF the folder
+        holds that no built-in edition claims. */
+    versions: CoreBookVersion[];
+    /** Every PDF file name in the folder, so the picker can say which
+        editions are actually there to open. */
+    pdfs: Set<string>;
+}
+
+/** Read the manuals folder: every "Pokerole Core Book <label>.json" and
+    every PDF. Uses a cached handle only (never pops the picker), so opening
+    the manual with no folder chosen just shows the built-in editions. */
+export async function loadCoreBookFolder(): Promise<CoreBookFolder> {
+    const out: CoreBookFolder = { versions: [], pdfs: new Set() };
     const dir = await coreBookDir(false);
     if (!dir) return out;
+    const isBuiltIn = (label: string) => MANUALS.some((m) => m.label.toLowerCase() === label.toLowerCase());
+    const pdfLabels: string[] = [];
     try {
         for await (const entry of dirEntries(dir)) {
             if (entry.kind !== 'file') continue;
+            if (/\.pdf$/i.test(entry.name)) {
+                out.pdfs.add(entry.name);
+                const m = entry.name.match(/^Pokerole Core Book (.+)\.pdf$/i);
+                if (m && !isBuiltIn(m[1])) pdfLabels.push(m[1]);
+                continue;
+            }
             const mtch = entry.name.match(/^Pokerole Core Book (.+)\.json$/i);
             if (!mtch) continue;
             const label = mtch[1];
-            if (MANUALS.some((m) => m.label.toLowerCase() === label.toLowerCase())) continue;
+            if (isBuiltIn(label)) continue;
             try {
                 const data = JSON.parse(await (await (entry as FileSystemFileHandle).getFile()).text());
-                out.push({ label, bookmarks: Array.isArray(data.bookmarks) ? data.bookmarks : [] });
+                out.versions.push({ label, bookmarks: Array.isArray(data.bookmarks) ? data.bookmarks : [] });
             } catch { /* skip an unreadable / invalid edition file */ }
         }
-        out.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
-    } catch (e) { console.warn('Reading Core Book editions failed', e); }
+        /* A PDF with no quick-link file yet is still an edition: it shows up
+           with an empty list, and the pen on it writes the file. */
+        pdfLabels.forEach((label) => {
+            if (!out.versions.some((v) => v.label.toLowerCase() === label.toLowerCase())) {
+                out.versions.push({ label, bookmarks: [] });
+            }
+        });
+        out.versions.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+    } catch (e) { console.warn('Reading the manuals folder failed', e); }
     return out;
+}
+
+/** Kept for callers that only want the editions. */
+export async function loadCoreBookVersions(): Promise<CoreBookVersion[]> {
+    return (await loadCoreBookFolder()).versions;
+}
+
+/** Open a PDF out of the chosen folder in a new tab, at `page`. False when
+    there is no folder, or the folder has no such file — the caller then
+    falls back to the relative URL beside the pages. The blob URL is never
+    revoked: the tab it opened in needs it for as long as it is open. */
+export async function openCoreBookPdf(file: string, page: number): Promise<boolean> {
+    const dir = await coreBookDir(false);
+    if (!dir) return false;
+    try {
+        const fh = await dir.getFileHandle(file);
+        const blob = await fh.getFile();
+        const url = URL.createObjectURL(blob.type ? blob : new Blob([blob], { type: 'application/pdf' }));
+        window.open(url + '#page=' + (page || 1), '_blank');
+        return true;
+    } catch { return false; }
 }
 
 /** Create or overwrite one edition's default-quick-links file. */

@@ -7,7 +7,8 @@ import {
 } from '../../lib/manuals';
 import type { Manual, ManualBookmark } from '../../lib/manuals';
 import {
-    deleteCoreBookVersionFile, loadCoreBookVersions, writeCoreBookVersion,
+    coreBookDirName, deleteCoreBookVersionFile, loadCoreBookFolder, openCoreBookPdf,
+    pickCoreBookDir, writeCoreBookVersion,
 } from '../../lib/coreBook';
 import type { CoreBookVersion } from '../../lib/coreBook';
 import { isHostedOrigin } from '../../data/paths';
@@ -22,6 +23,10 @@ export function ManualPicker({ open, onClose }: { open: boolean; onClose: () => 
     const { sheet, store } = useSheetStore();
 
     const [versions, setVersions] = useState<CoreBookVersion[]>([]);
+    /* The chosen manuals folder, and the PDFs it holds. Null: none chosen,
+       and the manuals open by the relative URL beside the pages. */
+    const [folderName, setFolderName] = useState<string | null>(null);
+    const [pdfs, setPdfs] = useState<Set<string>>(new Set());
     const [current, setCurrent] = useState(MANUALS[0].label);
     /* A just-typed edition, shown as a button before its file exists. */
     const [pendingLabel, setPendingLabel] = useState<string | null>(null);
@@ -62,9 +67,32 @@ export function ManualPicker({ open, onClose }: { open: boolean; onClose: () => 
         setAddingVersion(false);
         setAddFormOpen(false);
         let live = true;
-        loadCoreBookVersions().then((v) => { if (live) setVersions(v); });
+        void readFolder(() => live);
         return () => { live = false; };
     }, [open]);
+
+    const readFolder = async (live: () => boolean = () => true) => {
+        const name = await coreBookDirName();
+        const folder = await loadCoreBookFolder();
+        if (!live()) return;
+        setFolderName(name);
+        setVersions(folder.versions);
+        setPdfs(folder.pdfs);
+    };
+
+    const chooseFolder = async () => {
+        if (!window.showDirectoryPicker) {
+            alert('This browser cannot open a folder. Choosing the manuals folder needs the File '
+                + 'System Access API (Chrome or Edge).');
+            return;
+        }
+        const dir = await pickCoreBookDir();
+        if (!dir) return;
+        await readFolder();
+    };
+
+    /** Is this edition's PDF in the chosen folder? */
+    const inFolder = pdfs.has(manual.file);
 
     useEffect(() => {
         if (!allManuals().some((m) => m.label === current)) setCurrent(MANUALS[0].label);
@@ -84,21 +112,23 @@ export function ManualPicker({ open, onClose }: { open: boolean; onClose: () => 
        so probing a local copy would report every manual missing when it is
        sitting right there. */
     useEffect(() => {
-        if (!open || !isHostedOrigin()) { setPdfMissing(false); return; }
+        if (!open || !isHostedOrigin() || inFolder) { setPdfMissing(false); return; }
         let live = true;
         setPdfMissing(false);
         fetch(encodeURI(MANUAL_FOLDER + manual.file), { method: 'HEAD' })
             .then((r) => { if (live) setPdfMissing(!r.ok); })
             .catch(() => { if (live) setPdfMissing(true); });
         return () => { live = false; };
-    }, [open, manual.file]);
+    }, [open, manual.file, inFolder]);
 
-    const openManualAt = (page: number) => {
+    /* From the chosen folder when it has the file; otherwise the relative URL
+       beside the pages, as before the folder existed. */
+    const openManualAt = async (page: number) => {
+        if (inFolder && await openCoreBookPdf(manual.file, page)) return;
         if (pdfMissing) {
             alert('"' + manual.file + '" is not part of this site — the Core Book is not ours '
-                + 'to hand out.\n\nDownload the app to read it alongside your sheets: put your '
-                + 'own PDF in the "' + CORE_BOOK_DIR_NAME + '" folder next to the pages, named '
-                + 'exactly "' + manual.file + '".');
+                + 'to hand out.\n\nClick "Manuals folder" and choose the folder where you keep '
+                + 'your own copy, named exactly "' + manual.file + '".');
             return;
         }
         const url = encodeURI(MANUAL_FOLDER + manual.file) + '#page=' + (page || 1);
@@ -194,6 +224,17 @@ export function ManualPicker({ open, onClose }: { open: boolean; onClose: () => 
                         >
                             <i className="fa-solid fa-plus"></i> Version
                         </button>
+                        <button
+                            className={'manual-ver-btn manual-folder-btn' + (folderName ? ' chosen' : '')}
+                            id="manual-folder-btn"
+                            title={folderName
+                                ? 'Manuals open from “' + folderName + '” — click to choose another folder'
+                                : 'Choose the folder where your Core Book PDFs are'}
+                            onClick={() => { void chooseFolder(); }}
+                        >
+                            <i className={'fa-solid ' + (folderName ? 'fa-folder-open' : 'fa-folder')}></i>
+                            {' '}{folderName ? folderName : 'Manuals folder'}
+                        </button>
                     </div>
                     <div
                         className="manual-add-version"
@@ -229,8 +270,8 @@ export function ManualPicker({ open, onClose }: { open: boolean; onClose: () => 
                     }}>
                         <i className="fa-solid fa-circle-info"></i>{' '}
                         The Core Book PDF is not part of this site — it is not ours to hand out.
-                        The quick links below still show you the page numbers; download the app to
-                        read the book beside your sheets.
+                        Click <strong>Manuals folder</strong> to open your own copy from wherever you
+                        keep it; until then the quick links only show you the page numbers.
                     </p>
                 )}
 
@@ -318,9 +359,21 @@ export function ManualPicker({ open, onClose }: { open: boolean; onClose: () => 
                 <div className="manual-note">
                     <i className="fa-solid fa-circle-info"></i>
                     <span id="manual-note-text">
-                        Manuals open from the <code>{CORE_BOOK_DIR_NAME}</code> folder next to this app.
-                        Put this edition’s PDF there, named exactly <code>{manual.file}</code> — otherwise
-                        the browser will show a “file not found” page.
+                        {folderName ? (
+                            <>
+                                Manuals open from your <code>{folderName}</code> folder
+                                {inFolder
+                                    ? <>, where <code>{manual.file}</code> was found.</>
+                                    : <>. This edition’s PDF is not in it — name it exactly <code>{manual.file}</code>,
+                                        or choose another folder.</>}
+                            </>
+                        ) : (
+                            <>
+                                Manuals open from the <code>{CORE_BOOK_DIR_NAME}</code> folder next to this app.
+                                Put this edition’s PDF there, named exactly <code>{manual.file}</code> — or
+                                click <strong>Manuals folder</strong> above to open them from wherever you keep them.
+                            </>
+                        )}
                         {manual.userAdded && (
                             <> Its quick links are saved in that folder as <code>{manualJsonFor(manual.label)}</code>.</>
                         )}

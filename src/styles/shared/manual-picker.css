@@ -315,6 +315,19 @@
     border-style: dashed;
 }
 
+/* The manuals-folder button: dashed like the add button until a folder is
+   chosen, then solid with the folder's name on it. */
+.manual-folder-btn {
+    border-style: dashed;
+    font-style: normal;
+    max-width: 14rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.manual-folder-btn.chosen { border-style: solid; }
+
 .manual-add-version {
     display: flex;
     align-items: center;
