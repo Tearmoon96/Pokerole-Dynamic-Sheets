@@ -1,5 +1,5 @@
 import type { PokedexEntry } from '../data/types';
-import { defaultStats } from './defaults';
+import { SOCIAL_STAT_KEYS, defaultStats } from './defaults';
 import type { CardSheet, StatDefault } from './types';
 
 /* Resolving a written pool like "Dexterity + Brawl" into a number.
@@ -17,7 +17,11 @@ export function statDefaults(p: PokedexEntry): Record<string, StatDefault> {
     return defaultStats(p);
 }
 
+/** Social attributes have no base to override: every Pokémon starts at 0 in
+    all five. A sheet may still carry one (the edit form once wrote 1 there)
+    and it is ignored, here and in the GM screen's mirror of this function. */
 export function getStatBase({ pokemon, sheet }: StatSource, key: string): number {
+    if ((SOCIAL_STAT_KEYS as readonly string[]).includes(key)) return 0;
     return sheet.customBaseStats[key] !== undefined
         ? sheet.customBaseStats[key] : defaultStats(pokemon)[key].base;
 }

@@ -15,9 +15,11 @@ export const SOCIAL_STATS = ['tough', 'cool', 'beauty', 'cute', 'clever'];
 /** Social attributes have no source in the Pokédex JSONs, so their base is 0 and
     every dot is user-set — same as the card's defaultStats. */
 export function statBase(dex: PokedexEntry | null, sheet: Partial<CardSheet> | null, key: string): number {
+    /* Social first: a stale override on a social key is ignored, as the card
+       ignores it — see getStatBase there. */
+    if (SOCIAL_STATS.includes(key)) return 0;
     const custom = sheet && sheet.customBaseStats;
     if (custom && custom[key] !== undefined) return custom[key];
-    if (SOCIAL_STATS.includes(key)) return 0;
     return (dex && (dex as unknown as Record<string, number>)[key.charAt(0).toUpperCase() + key.slice(1)]) || 0;
 }
 

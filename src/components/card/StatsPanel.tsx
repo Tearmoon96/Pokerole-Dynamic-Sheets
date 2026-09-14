@@ -77,9 +77,15 @@ function StatRow({ statKey, totalDots }: { statKey: string; totalDots: number })
     );
 }
 
-function EditRow({ statKey, max, draft, setDraft }: {
+/* A social attribute has no base to edit: every Pokémon starts at 0 in all
+   five, and only the cap is the sheet's to change. The form used to offer a
+   base there too, and its save did `parseInt(base) || 1` — so a 0 became 1
+   the moment ANY stat was edited, and the first social dot turned into a
+   base dot nothing could click off. */
+function EditRow({ statKey, max, social, draft, setDraft }: {
     statKey: string;
     max: number;
+    social?: boolean;
     draft: Record<string, { base: string; cap: string }>;
     setDraft: (next: Record<string, { base: string; cap: string }>) => void;
 }) {
@@ -91,15 +97,17 @@ function EditRow({ statKey, max, draft, setDraft }: {
         <div className="edit-row">
             <span className="edit-label">{STAT_LABELS[statKey]}</span>
             <div className="edit-inputs">
-                <div className="edit-input-wrapper">
-                    <span className="edit-input-label">Base</span>
-                    <input
-                        type="number" className="edit-input" min="1" max={max}
-                        id={'edit-base-' + statKey}
-                        value={row.base}
-                        onChange={(e) => set('base', e.currentTarget.value)}
-                    />
-                </div>
+                {!social && (
+                    <div className="edit-input-wrapper">
+                        <span className="edit-input-label">Base</span>
+                        <input
+                            type="number" className="edit-input" min="1" max={max}
+                            id={'edit-base-' + statKey}
+                            value={row.base}
+                            onChange={(e) => set('base', e.currentTarget.value)}
+                        />
+                    </div>
+                )}
                 <div className="edit-input-wrapper">
                     <span className="edit-input-label">Cap</span>
                     <input
@@ -139,12 +147,20 @@ export function StatsPanel() {
             withPoolsFollowingStats(pokemon, s, () => {
                 const bases: Record<string, number> = {};
                 const caps: Record<string, number> = {};
-                ALL_KEYS.forEach((k) => {
-                    bases[k] = parseInt(draft[k]?.base ?? '', 10) || 1;
-                    caps[k] = parseInt(draft[k]?.cap ?? '', 10) || 1;
+                /* A blank or unreadable field keeps what the sheet has; a 0 is
+                   a 0, never coerced upward. Social bases are not written at
+                   all — see EditRow. */
+                const num = (v: string | undefined, fallback: number, min: number) => {
+                    const n = parseInt(v ?? '', 10);
+                    return isNaN(n) ? fallback : Math.max(min, n);
+                };
+                COMBAT_STAT_KEYS.forEach((k) => {
+                    bases[k] = num(draft[k]?.base, getStatBase(src, k), 1);
                 });
-                // Ensure base does not exceed max cap
-                ALL_KEYS.forEach((k) => { if (bases[k] > caps[k]) caps[k] = bases[k]; });
+                ALL_KEYS.forEach((k) => {
+                    caps[k] = num(draft[k]?.cap, getStatMax(src, k), 1);
+                    if ((bases[k] || 0) > caps[k]) caps[k] = bases[k];
+                });
                 s.customBaseStats = bases;
                 s.customMaxStats = caps;
             });
@@ -199,7 +215,7 @@ export function StatsPanel() {
                 {/* Social attribute edit rows: shown while the social view is active */}
                 <div className="edit-rows-group" id="social-edit-rows" style={{ display: social ? 'flex' : 'none' }}>
                     {SOCIAL_STAT_KEYS.map((k) => (
-                        <EditRow key={k} statKey={k} max={5} draft={draft} setDraft={setDraft} />
+                        <EditRow key={k} statKey={k} max={5} social draft={draft} setDraft={setDraft} />
                     ))}
                 </div>
                 <div className="form-actions">

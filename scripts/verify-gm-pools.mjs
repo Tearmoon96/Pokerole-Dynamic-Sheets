@@ -46,7 +46,11 @@ const ALL_MOVES = db('moves-db.js', 'ALL_MOVES');
 const SHEETS = [
     {},
     { trainedStats: { strength: 2, vitality: 3, insight: 1, tough: 2 }, hpMaxBonus: 2, willMaxBonus: -1 },
-    { customBaseStats: { strength: 5, tough: 3 }, skills: { brawl: 3, clash: 4, nature: 2 },
+    /* No social key in customBaseStats: a social attribute's base is always 0
+       now, on the card and here, and an override on one is ignored — the
+       original honoured it, so a fixture carrying one would only measure
+       that deliberate difference. */
+    { customBaseStats: { strength: 5 }, skills: { brawl: 3, clash: 4, nature: 2 },
       categoryRatings: { fight: 2, knowledge: 4 }, specialties: [{ name: 'Sneaking', value: 3 }],
       loyalty: 4, happiness: 2, disobedience: 1 },
     { hpMax: 17, willMax: 9 },

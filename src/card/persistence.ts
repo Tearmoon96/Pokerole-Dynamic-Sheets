@@ -85,6 +85,14 @@ export function normalizeCardSheet(p: PokedexEntry, parsed: Partial<CardSheet> |
         });
     }
     sheet.socialBaseZeroMigrated = true;
+    /* The stats editor used to write every social base as 1 (`parseInt(x) ||
+       1`) whenever any stat was saved, which put an unclickable base dot on
+       all five. A social attribute has no base but 0; drop any override. */
+    if (sheet.customBaseStats) {
+        const cleaned = { ...sheet.customBaseStats };
+        (['tough', 'cool', 'beauty', 'cute', 'clever'] as const).forEach((key) => { delete cleaned[key]; });
+        sheet.customBaseStats = cleaned;
+    }
 
     /* Pool sizes used to be stored as absolute numbers, which froze HP and Will
        the moment either was resized by hand — raising Vitality (or evolving)
