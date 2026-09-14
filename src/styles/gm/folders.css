@@ -23,15 +23,10 @@
     background: var(--primary-faint);
 }
 
+/* A <button>, so it needs the generic button rule turned off; the plate it
+   wears instead is in expanders.css, with the note and trainer carets. */
 .folder-twist {
     flex: 0 0 auto;
-    width: 20px;
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    font-size: 0.7rem;
-    cursor: pointer;
-    padding: 0;
 }
 
 .folder-icon {
@@ -76,7 +71,10 @@
 }
 
 /* The up/down pairs, on a folder and on an item. Same shape in both so the
-   gesture reads as one thing wherever it appears. */
+   gesture reads as one thing wherever it appears — and a shape that is not
+   the expanders' one: outlined chevrons on a bordered key, against the solid
+   caret on its own plate that opens a folder, a note or a trainer's team.
+   See expanders.css for the other half of that split. */
 .folder-move,
 .item-move {
     display: flex;
@@ -85,26 +83,34 @@
     flex: 0 0 auto;
 }
 
+/* Deliberately a key you can see when nothing is hovering it. At
+   `--text-secondary` on a 20% black wash inside a `--border-color` hairline
+   these were three greys within a few percent of each other — legible as a
+   shape only once the pointer was already on one, which is no use to someone
+   looking for where the control IS. The plate is darker, the border is the
+   theme's red at full strength rather than its 23% wash, and the glyph is the
+   page's own text colour. */
 .folder-move button,
 .item-move button {
-    width: 20px;
-    height: 18px;
+    width: 22px;
+    height: 20px;
     padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #00000033;
-    border: 1px solid var(--border-color);
+    background: #0000006e;
+    border: 1px solid #c8383b80;
     border-radius: 5px;
-    color: var(--text-secondary);
-    font-size: 0.58rem;
+    color: var(--text-primary);
+    font-size: 0.62rem;
     cursor: pointer;
 }
 
 .folder-move button:hover:not(:disabled),
 .item-move button:hover:not(:disabled) {
+    background: var(--primary-soft);
     border-color: var(--ghost-color);
-    color: var(--ghost-color);
+    color: var(--accent);
 }
 
 .folder-move button:disabled,
@@ -122,7 +128,7 @@
 .item-folder-pick {
     flex: 0 0 auto;
     width: 22px;
-    height: 18px;
+    height: 20px;
     display: flex;
     align-items: center;
     justify-content: center;

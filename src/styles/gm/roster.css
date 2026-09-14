@@ -112,9 +112,10 @@
     color: var(--text-secondary);
 }
 
-/* The chip strip is the band the expander chevron overhangs. */
+/* The chip strip is the band the expander caret overhangs. Its plate ends
+   2.25rem in from the right edge, so the reserve has to clear that. */
 .trainer-head .status-chips {
-    padding-right: 2.2rem;
+    padding-right: 2.5rem;
 }
 
 .pool-bars { display: flex; flex-direction: column; gap: 3px; margin-top: 3px; }

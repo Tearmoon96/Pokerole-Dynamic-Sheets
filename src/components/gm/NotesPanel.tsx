@@ -213,7 +213,7 @@ function NoteSheet({ note, moved, nested, folders, canUp, canDown, autoFocus, on
         <div className={'note-sheet' + (note.open ? ' open' : '') + (nested ? ' nested' : '')
             + (moved ? ' just-moved' : '')}>
             <div className="note-head" onClick={onToggle}>
-                <i className={'fa-solid fa-chevron-' + (note.open ? 'down' : 'right') + ' note-chevron'}></i>
+                <i className={'fa-solid fa-caret-' + (note.open ? 'down' : 'right') + ' note-chevron'}></i>
                 <input
                     ref={titleRef}
                     className="note-title"

@@ -1,0 +1,60 @@
+/* ---------------- Expanders ----------------
+   The one look every expand/collapse control on the board wears: a folder's
+   twist, a note's head, the caret that opens a trainer's team, and the one
+   that folds the generator's options.
+
+   It is a SOLID caret in a plate of its own, and both halves of that are the
+   point. The three of them used to be bare thin chevrons at 70% opacity in
+   `--text-secondary` — the same glyph, the same weight and very nearly the
+   same colour as the reorder arrows sitting a few pixels away on the same
+   card. A trainer's row was the worst of it: chevron-up / chevron-down for
+   "show the team", directly under a strip of chevron-up / chevron-down for
+   "move this trainer". Nothing but position told them apart.
+
+   So they differ now on all three of the things a glance actually uses:
+
+   - SHAPE — a filled triangle against the reorder arrows' outlined chevron;
+   - DIRECTION — right when shut, down when open, the disclosure idiom. It
+     never points up, which is what the move arrows own;
+   - WEIGHT — full opacity in the accent, on a dark plate with a lit border,
+     rather than a dim glyph floating on the row's red.
+
+   Shared here rather than repeated in notes.css, folders.css and
+   move-panel.css so the three cannot drift apart again; each of those keeps
+   only where its own caret sits. */
+.folder-twist,
+.note-chevron,
+.trainer-toggle,
+.gen-twist {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.45rem;
+    height: 1.2rem;
+    padding: 0;
+    background: #0000006e;
+    /* The accent at 60%, not `--accent-border`'s 25%: the plate has to be
+       findable at rest, and a quarter-strength hairline on the trainer
+       head's red is not. */
+    border: 1px solid #e0645c99;
+    border-radius: 6px;
+    color: var(--accent);
+    font-size: 0.8rem;
+    line-height: 1;
+    opacity: 1;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+/* Lit from anywhere on the row, not only from the caret itself: the whole
+   head is the click target on all three, so the row is what the pointer is
+   usually over. */
+.folder-bar:hover .folder-twist,
+.folder-twist:hover,
+.note-head:hover .note-chevron,
+.trainer-head:hover .trainer-toggle,
+.gen-options-head:hover .gen-twist {
+    background: var(--accent-faint);
+    border-color: var(--accent);
+    color: var(--text-primary);
+}

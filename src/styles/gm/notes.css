@@ -23,16 +23,12 @@
 
 .note-head:hover { background: var(--primary-soft); }
 
+/* The look is shared with the folder twist and the trainer caret — see
+   expanders.css. Only its place in this row belongs here. */
 .note-chevron {
     flex: 0 0 auto;
-    width: 0.9rem;
-    text-align: center;
-    font-size: 0.72rem;
-    color: var(--text-secondary);
-    opacity: 0.7;
+    margin-right: 0.1rem;
 }
-
-.note-head:hover .note-chevron { opacity: 1; color: var(--ghost-color); }
 
 .note-head > .icon-btn { margin-left: auto; }
 

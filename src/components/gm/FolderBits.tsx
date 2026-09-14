@@ -30,7 +30,7 @@ export function FolderBar({ folder, moved, count, canUp, canDown, onToggle, onRe
                 title={folder.open ? 'Collapse this folder' : 'Expand this folder'}
                 onClick={onToggle}
             >
-                <i className={'fa-solid fa-chevron-' + (folder.open ? 'down' : 'right')}></i>
+                <i className={'fa-solid fa-caret-' + (folder.open ? 'down' : 'right')}></i>
             </button>
             <i className={'fa-solid ' + (folder.open ? 'fa-folder-open' : 'fa-folder') + ' folder-icon'}></i>
             <input

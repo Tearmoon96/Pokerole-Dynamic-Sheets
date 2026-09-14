@@ -26,5 +26,6 @@ export const PANEL_TABS: { key: string; icon: string; label: string }[] = [
     { key: 'combat', icon: 'fa-khanda', label: 'Combat' },
     { key: 'dice', icon: 'fa-dice', label: 'Dice' },
     { key: 'npc', icon: 'fa-address-book', label: 'NPCs' },
+    { key: 'generator', icon: 'fa-paw', label: 'Generator' },
     { key: 'notes', icon: 'fa-pen-nib', label: 'Notes' },
 ];

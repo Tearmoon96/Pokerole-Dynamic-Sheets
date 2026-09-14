@@ -4,7 +4,7 @@ export const DEFAULT_NAME_OPTS = { region: 'Mixed', gender: 'any', letter: '', w
 
 /** The panels, in the order they ship. Every id in the markup is
     `panel-<key>`, and layout.order is a permutation of this list. */
-export const PANEL_KEYS = ['roster', 'combat', 'dice', 'npc', 'notes'];
+export const PANEL_KEYS = ['roster', 'combat', 'dice', 'npc', 'generator', 'notes'];
 
 /* A hand-set width is clamped into this range: below the floor a panel stops
    being usable, and the ceiling is only there so one stray drag cannot leave a

@@ -212,14 +212,15 @@ html[data-device="phone"] .dice-config {
        EMPTY class attribute, so they have no selector of their own
        either — the whole group has to be named through its container. */
     .seg > button,
-    /* The folder and item reorder arrows. They are 20x18 by design on a
+    /* The folder and item reorder arrows. They are 22x20 by design on a
        desktop, sitting in a dense row; a thumb needs more than that, and the
        panels are full width on a phone so there is room to give. */
     .folder-move > button,
     .item-move > button,
-    /* A folder's own expand/collapse chevron. 20x14 by design in a dense bar,
-       and a thumb aimed at it lands on the folder icon beside it instead —
-       measured, once --folders made the bar visible to the audit at all. */
+    /* A folder's own expand/collapse caret. Roughly 23x19 by design in a
+       dense bar, and a thumb aimed at it lands on the folder icon beside it
+       instead — measured, once --folders made the bar visible to the audit
+       at all. */
     .folder-twist {
         min-width: 30px;
         min-height: 30px;
@@ -341,11 +342,12 @@ html[data-device="phone"] .dice-config {
         padding-right: 3.2rem;
     }
 
-    /* Same row, the expander chevron: an <i>, so no button rule reaches it
-       and the tap probe never looks at it either. */
+    /* Same row, the expander caret: an <i>, so no button rule reaches it
+       and the tap probe never looks at it either. It carries its own height
+       now rather than padding around a glyph, so that is what grows. */
     .trainer-toggle {
         width: 2rem;
-        padding: 0.45rem 0;
+        height: 1.8rem;
     }
 
     /* A Pokemon's row carries up to five buttons beside its pools; at a
@@ -366,5 +368,42 @@ html[data-device="phone"] .dice-config {
     .dmg-apply {
         min-width: 44px;
         min-height: 24px;
+    }
+}
+
+/* The Pokémon generator's chips — moves to pin, stats to favour — are pill
+   buttons about 22px tall by design, in clouds of up to fifty. A thumb
+   needs more, and there is room: the clouds wrap. The clear-species × is a
+   bare icon box the same size as the folder arrows above. */
+@media (pointer: coarse) {
+    .gen-chip,
+    .gen-species-clear {
+        min-height: 30px;
+    }
+
+    /* The "clear" links beside the Moves and Favour titles are 26x14 of
+       bare text on a desktop. Padding rather than a box: they are meant to
+       read as links, not as one more button. */
+    .gen-link {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 0.5rem;
+    }
+
+    .gen-species-clear {
+        min-width: 30px;
+    }
+
+    .gen-actions > button,
+    .gen-type-mode > button,
+    .gen-stage > button {
+        min-width: 30px;
+        min-height: 30px;
+    }
+
+    .gen-twist {
+        min-width: 30px;
+        min-height: 30px;
     }
 }

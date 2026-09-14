@@ -7,6 +7,7 @@ import { CombatPanel } from './CombatPanel';
 import { DicePanel } from './DicePanel';
 import { NpcPanel } from './NpcPanel';
 import { NotesPanel } from './NotesPanel';
+import { GeneratorPanel } from './GeneratorPanel';
 import { MovePanel } from './MovePanel';
 import { AilmentPopover } from './AilmentPopover';
 import { STATUS_ICONS } from '../../gm/ailments';
@@ -17,7 +18,7 @@ import { useDeviceClass } from '../../lib/device';
 import type { PokedexEntry } from '../../data/types';
 import type { GmStatus } from '../../gm/ailments';
 
-/* The board: five panels side by side, in whatever order and at whatever widths
+/* The board: six panels side by side, in whatever order and at whatever widths
    the GM has left them. */
 
 export function GmApp({ dataOk }: { dataOk: boolean }) {
@@ -119,6 +120,7 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
             />
         ),
         npc: <NpcPanel key="npc" onReorder={reorder} />,
+        generator: <GeneratorPanel key="generator" onReorder={reorder} />,
         notes: <NotesPanel key="notes" onReorder={reorder} />,
     };
 

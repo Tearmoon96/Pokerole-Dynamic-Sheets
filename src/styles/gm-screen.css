@@ -17,7 +17,9 @@
 @import './gm/dice.css';
 @import './gm/notes.css';
 @import './gm/folders.css';
+@import './gm/expanders.css';
 @import './gm/npc-names.css';
+@import './gm/generator.css';
 @import './gm/confirm-dialog.css';
 @import './gm/toast.css';
 @import './app-root.css';

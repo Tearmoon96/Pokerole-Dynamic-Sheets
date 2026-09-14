@@ -91,15 +91,15 @@ than imported, so Vite never parses or bundles them. One line in each page shell
 | `src/main/` | One entry per page — mounts React and wires the providers |
 | `src/components/license/` | Trainer sheet UI (30 files) |
 | `src/components/card/` | Pokémon card UI (21 files) |
-| `src/components/gm/` | GM screen UI (14 files) |
+| `src/components/gm/` | GM screen UI (15 files) |
 | `src/components/table/` | Rolling table UI |
 | `src/components/common/` | Shared widgets — toast, modal, pickers, sprites |
 | `src/state/` | Trainer sheet store, working set, trainer file I/O, PC boxes, IndexedDB |
 | `src/card/` | Card logic: pools, moves, evolution, type chart, weather, ailments, wild import |
-| `src/gm/` | GM logic: entities and tokens, combat, ailments, dice, names, session files, folders |
+| `src/gm/` | GM logic: entities and tokens, combat, ailments, dice, names, the random Pokémon generator and its habitat table, session files, folders |
 | `src/table/` | Rolling table: crypto, identity, protocol, validation, transport, session |
 | `src/data/` | Loading `app-data/`, and the context that serves it to components |
-| `src/lib/` | Cross-page helpers: themes, sprites, colour, gear, file system, manuals, update check, device class, touch reordering |
+| `src/lib/` | Cross-page helpers: themes, sprites, colour, gear, file system, manuals, update check, device class, touch reordering, the rank table |
 | `src/hooks/` | Small React hooks — theme, document title, drag ghosts, name fitting |
 | `src/styles/` | All CSS, split by page (`license/`, `card/`, `gm/`, `shared/`), plus `responsive/` — the phone and tablet layer |
 | `src/pwa/` | Service-worker registration |
@@ -199,8 +199,8 @@ Three things it fixes that no amount of narrowing does on its own:
   GM board's panels, the card's move list and the PC storage boxes were inert
   on every phone and tablet. [`src/lib/touchDrag.ts`](src/lib/touchDrag.ts) adds
   a long-press route into the same `onReorder` the native path uses.
-- **The GM board.** Five 390px panels side by side is right on a 10.5" tablet
-  and wrong on a 412px phone, where four of them sit off-screen with nothing to
+- **The GM board.** Six 390px panels side by side is right on a 10.5" tablet
+  and wrong on a 412px phone, where five of them sit off-screen with nothing to
   say so. On a phone the board becomes one panel behind a tab bar
   ([`src/gm/phoneBoard.ts`](src/gm/phoneBoard.ts)); panels stay mounted and
   hidden so none loses its scroll position or a half-typed field.

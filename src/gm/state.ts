@@ -1,5 +1,7 @@
 import { DEFAULT_NAME_OPTS, GM_KEY, PANEL_KEYS, PANEL_MAX_W, PANEL_MIN_W } from './constants';
 import { normalizeFolders } from './folders';
+import { DEFAULT_GEN_OPTS, RECENT_ROLLS } from './generator';
+import type { GmGenOpts } from './generator';
 import type { GmLayout, GmState } from './types';
 
 export function uid(): string {
@@ -21,6 +23,9 @@ export function defaultGmState(): GmState {
         dice: { count: 2, sides: 6, history: [] },
         expanded: {},
         nameOpts: { ...DEFAULT_NAME_OPTS },
+        genOpts: { ...DEFAULT_GEN_OPTS, moves: [], favour: [] },
+        generated: [],
+        genRecent: [],
         layout: { order: PANEL_KEYS.slice(), widths: {}, hidden: [] },
     };
 }
@@ -55,6 +60,31 @@ export function normalizeLayout(raw: unknown): GmLayout {
     return { order, widths, hidden };
 }
 
+/* The generator's settings, each field back to its own type. The two lists
+   are rebuilt rather than trusted so a hand-edited file cannot leave a number
+   where a move name goes; the two sliders are clamped to their range. */
+function normalizeGenOpts(raw: unknown): GmGenOpts {
+    const r = (raw && typeof raw === 'object') ? raw as Partial<GmGenOpts> : {};
+    const o: GmGenOpts = { ...DEFAULT_GEN_OPTS, ...r };
+    const strings = (v: unknown) => (Array.isArray(v) ? v : []).filter((x): x is string => typeof x === 'string');
+    o.moves = strings(r.moves);
+    o.favour = strings(r.favour);
+    const pct = (v: unknown, dflt: number) => {
+        const n = Number(v);
+        return isFinite(n) ? Math.round(Math.max(0, Math.min(100, n))) : dflt;
+    };
+    o.itemChance = pct(r.itemChance, DEFAULT_GEN_OPTS.itemChance);
+    o.bias = pct(r.bias, DEFAULT_GEN_OPTS.bias);
+    o.attackShare = pct(r.attackShare, DEFAULT_GEN_OPTS.attackShare);
+    (['species', 'rank', 'rankFrom', 'rankTo', 'habitat', 'type', 'type2', 'typeMode', 'ability', 'gender', 'nature',
+        'item', 'moveMix', 'stage'] as const)
+        .forEach((k) => { if (typeof o[k] !== 'string') o[k] = DEFAULT_GEN_OPTS[k]; });
+    o.legendaries = !!o.legendaries;
+    o.paradox = !!o.paradox;
+    o.biasMoves = !!o.biasMoves;
+    return o;
+}
+
 /* Fold a stored blob onto the defaults. Both routes in — localStorage and a
    session file — go through here, so a file written by an older version, or one
    somebody hand-edited, still arrives with every field present and of the right
@@ -65,6 +95,9 @@ export function normalizeGmState(raw: unknown): GmState {
     s.combat = Object.assign({ round: 1, participants: [] }, r.combat);
     s.dice = Object.assign({ count: 2, sides: 6, history: [] }, r.dice);
     s.nameOpts = Object.assign({}, DEFAULT_NAME_OPTS, r.nameOpts);
+    s.genOpts = normalizeGenOpts(r.genOpts);
+    s.genRecent = (Array.isArray(r.genRecent) ? r.genRecent : [])
+        .map(Number).filter((n) => isFinite(n) && n > 0).slice(0, RECENT_ROLLS);
     /* Notes used to be one textarea in gmState.notes. The first load after that
        became a stack of sheets carries the old text into sheet one; `notes` is
        emptied so it cannot migrate twice into a duplicate. */
@@ -74,7 +107,7 @@ export function normalizeGmState(raw: unknown): GmState {
             : [];
         s.notes = '';
     }
-    (['trainerIds', 'wilds', 'npcs', 'noteSheets'] as const).forEach((k) => {
+    (['trainerIds', 'wilds', 'npcs', 'noteSheets', 'generated'] as const).forEach((k) => {
         if (!Array.isArray(s[k])) (s as unknown as Record<string, unknown>)[k] = [];
     });
     if (!Array.isArray(s.combat.participants)) s.combat.participants = [];

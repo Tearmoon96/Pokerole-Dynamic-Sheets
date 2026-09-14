@@ -1,5 +1,6 @@
 import type { CardSheet } from '../card/types';
 import type { GmFolder } from './folders';
+import type { GmGenOpts } from './generator';
 
 /* The GM screen's own saved state.
 
@@ -98,5 +99,14 @@ export interface GmState {
     /** trainerId -> bool */
     expanded: Record<string, boolean>;
     nameOpts: GmNameOpts;
+    /** The random Pokémon generator's settings. */
+    genOpts: GmGenOpts;
+    /** What it has rolled and the GM has not yet kept or discarded. The same
+        shape as a roster wild, because keeping one is a move between the two
+        lists and nothing else. */
+    generated: GmWild[];
+    /** Dex numbers of its last rolls, newest first, so a species sits out
+        the next RECENT_ROLLS draws. */
+    genRecent: number[];
     layout: GmLayout;
 }
