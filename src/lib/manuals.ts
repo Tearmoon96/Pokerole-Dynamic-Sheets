@@ -58,6 +58,10 @@ export const MANUALS: Manual[] = [
     },
 ];
 
+/** The edition the picker opens on: the current one, 3.0. The list stays in
+    the order the editions came out, so this is not simply its first entry. */
+export const DEFAULT_MANUAL: Manual = MANUALS.find((m) => m.label === '3.0') || MANUALS[0];
+
 // Same set of quick links as the built-in editions (1.25 / 3.0). A
 // user-added edition reuses these icons + labels; the user supplies only
 // the page numbers, so every edition offers the same jump points.

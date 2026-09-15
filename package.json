@@ -1,7 +1,7 @@
 {
   "name": "pokerole-dynamic-sheets",
   "private": true,
-  "version": "1.5.0",
+  "version": "2.0.0",
   "type": "module",
   "description": "Character sheets and a wild-encounter builder for the Pokerole TTRPG.",
   "scripts": {

@@ -13,7 +13,11 @@ desktop.ini
 # root, so this branch does not carry a second copy. Restore it into a fresh
 # checkout with:
 #     git archive origin/main app-data | tar -x -C "PDS React Develop"
-PDS React Develop/app-data/
+# version.js is the one exception: APP_VERSION is source, not dataset, and the
+# copy on `main` belongs to the old app (1.5.0). The restore above overwrites
+# it — take this branch's copy back afterwards.
+PDS React Develop/app-data/*
+!PDS React Develop/app-data/version.js
 
 # Release staging, built by tools/make-release.sh on the dev-data branch. It has
 # to sit inside the project: gh runs on the host and cannot see the sandbox /tmp.

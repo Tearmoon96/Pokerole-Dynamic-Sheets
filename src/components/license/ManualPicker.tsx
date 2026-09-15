@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Modal, ModalClose } from '../common/Modal';
 import { useSheetStore } from '../../state/SheetContext';
 import {
-    CORE_BOOK_DIR_NAME, MANUALS, MANUAL_FOLDER, MANUAL_QUICKLINK_TEMPLATE,
+    CORE_BOOK_DIR_NAME, DEFAULT_MANUAL, MANUALS, MANUAL_FOLDER, MANUAL_QUICKLINK_TEMPLATE,
     manualFileFor, manualJsonFor,
 } from '../../lib/manuals';
 import type { Manual, ManualBookmark } from '../../lib/manuals';
@@ -27,7 +27,7 @@ export function ManualPicker({ open, onClose }: { open: boolean; onClose: () => 
        and the manuals open by the relative URL beside the pages. */
     const [folderName, setFolderName] = useState<string | null>(null);
     const [pdfs, setPdfs] = useState<Set<string>>(new Set());
-    const [current, setCurrent] = useState(MANUALS[0].label);
+    const [current, setCurrent] = useState(DEFAULT_MANUAL.label);
     /* A just-typed edition, shown as a button before its file exists. */
     const [pendingLabel, setPendingLabel] = useState<string | null>(null);
     const [addingVersion, setAddingVersion] = useState(false);
@@ -57,7 +57,7 @@ export function ManualPicker({ open, onClose }: { open: boolean; onClose: () => 
         return MANUALS.concat(users);
     };
 
-    const manual = allManuals().find((m) => m.label === current) || MANUALS[0];
+    const manual = allManuals().find((m) => m.label === current) || DEFAULT_MANUAL;
 
     /* Built-ins appear instantly; folder-backed editions fill in once the Core
        Book folder is read. */
@@ -95,7 +95,7 @@ export function ManualPicker({ open, onClose }: { open: boolean; onClose: () => 
     const inFolder = pdfs.has(manual.file);
 
     useEffect(() => {
-        if (!allManuals().some((m) => m.label === current)) setCurrent(MANUALS[0].label);
+        if (!allManuals().some((m) => m.label === current)) setCurrent(DEFAULT_MANUAL.label);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [versions, pendingLabel]);
 
@@ -180,7 +180,7 @@ export function ManualPicker({ open, onClose }: { open: boolean; onClose: () => 
                 s.manualBookmarks = next;
             });
         }
-        if (current === label) setCurrent(MANUALS[0].label);
+        if (current === label) setCurrent(DEFAULT_MANUAL.label);
     };
 
     const customList = (sheet.manualBookmarks && sheet.manualBookmarks[current]) || [];

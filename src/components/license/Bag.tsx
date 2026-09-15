@@ -5,6 +5,7 @@ import { useToast } from '../common/Toast';
 import { ItemSprite } from '../common/ItemSprite';
 import { Suggestions } from '../common/Suggestions';
 import { itemIdentityKey } from '../../lib/gear';
+import { rowKey } from '../../lib/rowKey';
 import type { BagItem, TrainerState } from '../../state/types';
 
 type BagKey = 'bagOut' | 'bagBattle';
@@ -69,7 +70,7 @@ function BagColumn({ bagKey, label }: { bagKey: BagKey; label: string }) {
                     return (
                         <div
                             className="line-item"
-                            key={idx}
+                            key={rowKey(items, idx)}
                             title={dbItem && dbItem.Description ? dbItem.Name + '\n' + dbItem.Description : undefined}
                         >
                             <ItemSprite image={dbItem?.Image} />

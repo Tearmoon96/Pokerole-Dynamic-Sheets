@@ -7,6 +7,7 @@ import { useToast } from '../common/Toast';
 import { EQUIP_SLOTS } from '../../state/constants';
 import { defaultEquipment } from '../../state/defaults';
 import { isMonoIcon, itemIdentityKey, normalizeIconName } from '../../lib/gear';
+import { rowKey } from '../../lib/rowKey';
 import type { GearIcon, GearIndex } from '../../lib/gear';
 import type { EquipSlotDef } from '../../state/constants';
 import type { EquipSlotEntry, TrainerState } from '../../state/types';
@@ -250,17 +251,19 @@ function FaceToggle({ currentKey, otherName, onFlip }: {
 const EQUIP_BAG_SUGGESTIONS = 8;
 
 function GearArt({ file, gear }: { file: string; gear: GearIndex }) {
-    const [broken, setBroken] = useState(false);
+    /* Which file failed, not whether one did: a row reused for another item
+       must not stay blank because the previous item's art was missing. */
+    const [broken, setBroken] = useState<string | null>(null);
     /* Pack renamed or removed: drop the image rather than show a broken one,
        the name still says what it is */
-    if (!file || broken) return null;
+    if (!file || broken === file) return null;
     return (
         <img
             loading="lazy"
             alt=""
             className={isMonoIcon(file) ? 'mono-art' : undefined}
             src={gear.iconUrl(file)}
-            onError={() => setBroken(true)}
+            onError={() => setBroken(file)}
         />
     );
 }
@@ -327,7 +330,7 @@ function EquipBag() {
                 {items.map((entry, idx) => {
                     const found = findGear(entry.name);
                     return (
-                        <div className="line-item" key={idx} title={found ? found.n + '\n' + found.c : undefined}>
+                        <div className="line-item" key={rowKey(items, idx)} title={found ? found.n + '\n' + found.c : undefined}>
                             <GearArt file={entry.icon || found?.f || ''} gear={gear} />
                             <span className="line-item-name">{entry.name}</span>
                             <button
