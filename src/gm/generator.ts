@@ -40,15 +40,19 @@ export interface GmGenOpts {
     type2: string;
     /** 'any', or 'single' for one type only, 'dual' for two. Random species only. */
     typeMode: string;
-    /** Whether the Legendary species are in the random pool at all. */
+    /** Whether the Legendary species (and the Ultra Beasts) are in the
+        random pool at all. */
     legendaries: boolean;
+    /** Whether the Mythical species — Mew, Celebi, Jirachi and the rest of
+        the event-only ones — are in the random pool. */
+    mythicals: boolean;
     /** Whether the Paradox Pokémon — the past and future ones out of Area
         Zero — are in the random pool. Off, a time paradox never walks in. */
     paradox: boolean;
-    /** '' for any; 'first' for a species with nothing before it in its line,
-        'second' for the second stage of its line, 'final' for one that
-        evolves no further. Random species only. */
-    stage: string;
+    /** The stages of its line a random species may be at: any of 'first'
+        (nothing before it), 'second' (the second stage of its line) and
+        'final' (evolves no further). Empty, or all three, means any. */
+    stages: string[];
     /** '' one of the species' standard abilities; 'hidden' the hidden one
         allowed too; anything else is an ability by name. */
     ability: string;
@@ -80,7 +84,7 @@ export interface GmGenOpts {
 
 export const DEFAULT_GEN_OPTS: GmGenOpts = {
     species: '', rank: '', rankFrom: 'Rookie', rankTo: 'Advanced', habitat: '', type: '', type2: '',
-    typeMode: 'any', legendaries: false, paradox: false, stage: '',
+    typeMode: 'any', legendaries: false, mythicals: false, paradox: false, stages: [],
     ability: '', gender: 'random', nature: '', itemChance: 25, item: '', moves: [],
     moveMix: 'random', attackShare: 60, biasMoves: true, favour: [], bias: 60,
 };
@@ -154,7 +158,44 @@ export function isBattleForm(p: PokedexEntry): boolean {
     return BATTLE_FORM.test(p._id) || p.Name === 'Minior Core';
 }
 
-/** The twenty Paradox Pokémon, which the dex files under their own category.
+/* The three tiers of "not an ordinary wild", by dex number — a form shares
+   its base's number. They are listed here rather than read off the dex's
+   `Legendary` flag because that flag is one bit for all three and has gaps:
+   it is unset on Type: Null, Silvally, Cosmog, Kubfu and Terapagos, and on
+   Phione, Meltan, Melmetal and Poipole. The card and the pickers still show
+   the flag; only the generator's boxes go by these. */
+
+/** The Legendaries proper, every generation's, plus the Ultra Beasts, which
+    are not Legendary in name but are met the same way and are under the same
+    box here. */
+export const LEGENDARY_NUMBERS: ReadonlySet<number> = new Set([
+    144, 145, 146, 150,
+    243, 244, 245, 249, 250,
+    377, 378, 379, 380, 381, 382, 383, 384,
+    480, 481, 482, 483, 484, 485, 486, 487, 488,
+    638, 639, 640, 641, 642, 643, 644, 645, 646,
+    716, 717, 718,
+    772, 773, 785, 786, 787, 788, 789, 790, 791, 792, 800,
+    793, 794, 795, 796, 797, 798, 799, 803, 804, 805, 806,   // Ultra Beasts
+    888, 889, 890, 891, 892, 894, 895, 896, 897, 898, 905,
+    1001, 1002, 1003, 1004, 1007, 1008, 1014, 1015, 1016, 1017, 1024,
+]);
+
+/** The Mythicals: the event-only ones, Mew to Pecharunt. */
+export const MYTHICAL_NUMBERS: ReadonlySet<number> = new Set([
+    151, 251, 385, 386, 489, 490, 491, 492, 493, 494, 647, 648, 649,
+    719, 720, 721, 801, 802, 807, 808, 809, 893, 1025,
+]);
+
+export function isLegendary(p: PokedexEntry): boolean {
+    return LEGENDARY_NUMBERS.has(p.Number);
+}
+
+export function isMythical(p: PokedexEntry): boolean {
+    return MYTHICAL_NUMBERS.has(p.Number);
+}
+
+/** The Paradox Pokémon, which the dex files under their own category.
     Koraidon and Miraidon are among them and Legendary besides, so they need
     both boxes ticked. */
 export function isParadox(p: PokedexEntry): boolean {
@@ -190,22 +231,27 @@ export function evolvesFurther(p: PokedexEntry): boolean {
     return (p.Evolutions || []).some((e) => e.To && isStageStep(e));
 }
 
-/** Does the species answer to the stage setting? A species that never
+export const STAGE_KEYS = ['first', 'second', 'final'] as const;
+
+/** Does the species stand at any of these stages? A species that never
     evolves is both a first stage and a final one; 'second' is the second
-    stage of its line whether or not there is a third after it. */
-export function inStage(data: AppData, p: PokedexEntry, stage: string): boolean {
-    if (stage === 'first') return evoStage(data, p) === 1;
-    if (stage === 'second') return evoStage(data, p) === 2;
-    if (stage === 'final') return !evolvesFurther(p);
-    return true;
+    stage of its line whether or not there is a third after it. No stage
+    asked for — or all three, which is the same question — is a yes. */
+export function inStage(data: AppData, p: PokedexEntry, stages: readonly string[]): boolean {
+    const asked = STAGE_KEYS.filter((k) => stages.includes(k));
+    if (!asked.length || asked.length === STAGE_KEYS.length) return true;
+    return asked.some((stage) =>
+        stage === 'first' ? evoStage(data, p) === 1
+        : stage === 'second' ? evoStage(data, p) === 2
+        : !evolvesFurther(p));
 }
 
 /** Everything a wild could be: no egg, no Mega or battle-only form (a state
-    of a creature, not a creature), Legendaries and Paradox Pokémon only on
-    request, and whatever the habitat, type and stage settings leave. */
+    of a creature, not a creature), Legendaries, Mythicals and Paradox Pokémon
+    only on request, and whatever the habitat, type and stage settings leave. */
 export function speciesPool(
     data: AppData,
-    opts: Pick<GmGenOpts, 'legendaries' | 'paradox' | 'habitat' | 'type' | 'type2' | 'typeMode' | 'stage'>,
+    opts: Pick<GmGenOpts, 'legendaries' | 'mythicals' | 'paradox' | 'habitat' | 'type' | 'type2' | 'typeMode' | 'stages'>,
 ): PokedexEntry[] {
     /* Either slot answers to either asked-for type: "Fire + Flying" is
        Charizard whichever way round the dex lists them. */
@@ -215,10 +261,11 @@ export function speciesPool(
         p.Number > 0
         && !isMegaForm(p)
         && !isBattleForm(p)
-        && (opts.legendaries || !p.Legendary)
+        && (opts.legendaries || !isLegendary(p))
+        && (opts.mythicals || !isMythical(p))
         && (opts.paradox || !isParadox(p))
         && (!opts.habitat || inHabitat(p, opts.habitat))
-        && (!opts.stage || inStage(data, p, opts.stage))
+        && inStage(data, p, opts.stages)
         && asked.every((t) => hasType(p, t))
         && (opts.typeMode === 'single' ? !p.Type2 : opts.typeMode === 'dual' ? !!p.Type2 : true));
 }

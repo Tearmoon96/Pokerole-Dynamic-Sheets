@@ -397,10 +397,13 @@ html[data-device="phone"] .dice-config {
 
     .gen-actions > button,
     .gen-type-mode > button,
-    .gen-stage > button {
+    .gen-stage > button,
+    .gen-type-btn {
         min-width: 30px;
         min-height: 30px;
     }
+
+    .gen-type-menu .folder-menu-item { min-height: 36px; }
 
     .gen-twist {
         min-width: 30px;

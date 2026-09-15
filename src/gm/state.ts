@@ -77,9 +77,15 @@ function normalizeGenOpts(raw: unknown): GmGenOpts {
     o.bias = pct(r.bias, DEFAULT_GEN_OPTS.bias);
     o.attackShare = pct(r.attackShare, DEFAULT_GEN_OPTS.attackShare);
     (['species', 'rank', 'rankFrom', 'rankTo', 'habitat', 'type', 'type2', 'typeMode', 'ability', 'gender', 'nature',
-        'item', 'moveMix', 'stage'] as const)
+        'item', 'moveMix'] as const)
         .forEach((k) => { if (typeof o[k] !== 'string') o[k] = DEFAULT_GEN_OPTS[k]; });
+    /* `stages` was a single `stage` string for a while. */
+    const legacyStage = (r as { stage?: unknown }).stage;
+    o.stages = strings(r.stages).length ? strings(r.stages)
+        : (typeof legacyStage === 'string' && legacyStage) ? [legacyStage] : [];
+    delete (o as { stage?: unknown }).stage;
     o.legendaries = !!o.legendaries;
+    o.mythicals = !!o.mythicals;
     o.paradox = !!o.paradox;
     o.biasMoves = !!o.biasMoves;
     return o;

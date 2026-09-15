@@ -60,7 +60,52 @@
 
 .gen-settings[hidden] { display: none; }
 
-/* The type rows: two selects sharing the first, the Any / Single / Dual
+/* The random entries of the rank and item selects sit in their own group
+   and in the accent, so they never read as one more rank or one more item.
+   A native popup honours an option's colour and its group's label, and
+   nothing else. The select itself takes the colour while a random entry is
+   the one chosen. */
+.gen-settings select .gen-opt-random { color: var(--ghost-color); font-style: italic; }
+.gen-settings select optgroup { color: var(--text-secondary); font-style: normal; }
+.gen-settings select option { color: var(--text-primary); font-style: normal; }
+.gen-settings select option.gen-opt-random { color: var(--ghost-color); font-style: italic; }
+.gen-settings select.gen-random-on { color: var(--ghost-color); font-style: italic; }
+
+/* ---- The type pickers ----
+   Buttons that open a menu drawn by the page, because a native <select>
+   cannot put a type chip beside a name. Two share the row. */
+.gen-type-btn {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-family: inherit;
+    font-size: 0.78rem;
+    color: var(--text-primary);
+    background: var(--panel-solid);
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    padding: 0.2rem 0.4rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.gen-type-btn .fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gen-type-btn.random .fname { color: var(--ghost-color); font-style: italic; }
+.gen-type-btn:hover, .gen-type-btn.on, .gen-type-btn:focus-visible { border-color: var(--ghost-color); outline: none; }
+.gen-type-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.gen-type-caret { flex: 0 0 auto; font-size: 0.65rem; color: var(--text-secondary); }
+
+.gen-type-menu { max-height: min(22rem, 70vh); }
+.gen-type-menu .folder-menu-item { padding: 0.28rem 0.45rem; }
+.gen-type-menu .type-chip, .gen-type-btn .type-chip { flex: 0 0 auto; }
+.gen-type-menu .folder-menu-item > i.tick { margin-left: auto; }
+
+/* The "random" row's die, in the same box a chip takes so the names line up. */
+.gen-type-dice { color: var(--ghost-color); border-color: var(--ghost-color); background: var(--primary-faint); }
+
+/* The type rows: two pickers sharing the first, the Any / Single / Dual
    segment on the second under the label column. The stage row is the same
    shape with four buttons. */
 .gen-type-mode,

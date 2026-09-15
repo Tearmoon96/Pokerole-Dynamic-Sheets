@@ -3,12 +3,14 @@ import { createPortal } from 'react-dom';
 import { Panel } from './Panel';
 import { GmSprite } from './GmSprite';
 import { TypeChips } from './RosterBits';
+import { TYPE_ICONS } from '../../lib/themeTables';
+import { mixHex } from '../../lib/color';
 import { useGm } from '../../gm/GmContext';
 import { useAppData } from '../../data/AppDataContext';
 import { useToast } from '../common/Toast';
 import { uid } from '../../gm/state';
 import {
-    ATTRIBUTE_KEYS, RECENT_ROLLS, SOCIAL_KEYS, SPECIALTY_KEYS, generatePokemon, heldItemsIn,
+    ATTRIBUTE_KEYS, RECENT_ROLLS, SOCIAL_KEYS, SPECIALTY_KEYS, STAGE_KEYS, generatePokemon, heldItemsIn,
     learnset, speciesAbilities,
 } from '../../gm/generator';
 import { HABITATS, habitatsOf } from '../../gm/habitats';
@@ -51,12 +53,20 @@ const TYPE_MODES: { key: string; label: string; title: string }[] = [
     { key: 'dual', label: 'Dual', title: 'Two types' },
 ];
 
-const STAGES: { key: string; label: string; title: string }[] = [
-    { key: '', label: 'Random', title: 'Any stage of its line' },
+/* The three stages are toggles that can be combined — "first or second"
+   for a low-rank route — and Random is what having none, or all three,
+   ticked means. */
+const STAGES: { key: typeof STAGE_KEYS[number]; label: string; title: string }[] = [
     { key: 'first', label: 'First', title: 'Nothing before it in its line — including a species that never evolves' },
     { key: 'second', label: 'Second', title: 'The second stage of its line, whether or not there is a third' },
     { key: 'final', label: 'Final', title: 'Evolves no further — including a species that never evolves' },
 ];
+
+/** The stages actually asked for: none, or all three, is "any". */
+function askedStages(stages: string[]): string[] {
+    const on = STAGE_KEYS.filter((k) => stages.includes(k));
+    return on.length === STAGE_KEYS.length ? [] : on;
+}
 
 const GENDERS: { key: string; icon: string; label: string }[] = [
     { key: 'random', icon: 'fa-dice', label: 'Random' },
@@ -74,6 +84,7 @@ export function GeneratorPanel({ onReorder }: { onReorder: (from: string, to: st
     const [notes, setNotes] = useState<string[]>([]);
 
     const o = state.genOpts;
+    const stagesOn = askedStages(o.stages);
     const dexById = (id: string): PokedexEntry | null => data.pokemon.find((p) => p._id === id) || null;
     const chosen = o.species ? dexById(o.species) : null;
 
@@ -216,10 +227,17 @@ export function GeneratorPanel({ onReorder }: { onReorder: (from: string, to: st
                         random rank from a range. */}
                     <div className="set-row">
                         <label htmlFor="gen-rank">Rank</label>
-                        <select id="gen-rank" value={o.rank} onChange={(e) => setOpt({ rank: e.currentTarget.value })}>
-                            <option value="">Random, any rank</option>
-                            <option value="range">Random, within a range…</option>
-                            {RANKS.map((r) => <option value={r} key={r}>{r}</option>)}
+                        {/* Two groups, so the two random entries do not read as
+                            ranks called "Random": a native popup takes group
+                            labels and an option's colour, and nothing else. */}
+                        <select id="gen-rank" value={o.rank} className={o.rank === '' || o.rank === 'range' ? 'gen-random-on' : ''} onChange={(e) => setOpt({ rank: e.currentTarget.value })}>
+                            <optgroup label="Random">
+                                <option value="" className="gen-opt-random">🎲 Any rank</option>
+                                <option value="range" className="gen-opt-random">🎲 Within a range…</option>
+                            </optgroup>
+                            <optgroup label="Fixed rank">
+                                {RANKS.map((r) => <option value={r} key={r}>{r}</option>)}
+                            </optgroup>
                         </select>
                     </div>
                     {o.rank === 'range' && (
@@ -252,27 +270,22 @@ export function GeneratorPanel({ onReorder }: { onReorder: (from: string, to: st
                         there is no second type to ask for. */}
                     <div className="set-row">
                         <label htmlFor="gen-type">Type</label>
-                        <select
+                        <TypeSelect
                             id="gen-type"
                             value={o.type}
+                            types={TYPES}
                             disabled={!!chosen}
-                            title={chosen ? 'Only used when the species is random' : undefined}
-                            onChange={(e) => setOpt({ type: e.currentTarget.value })}
-                        >
-                            <option value="">Random</option>
-                            {TYPES.map((t) => <option value={t} key={t}>{t}</option>)}
-                        </select>
-                        <select
+                            title={chosen ? 'Only used when the species is random' : 'Type'}
+                            onPick={(t) => setOpt({ type: t })}
+                        />
+                        <TypeSelect
                             id="gen-type2"
-                            aria-label="Second type"
                             value={o.typeMode === 'single' ? '' : o.type2}
+                            types={TYPES.filter((t) => t !== o.type)}
                             disabled={!!chosen || o.typeMode === 'single'}
                             title={o.typeMode === 'single' ? 'A single-typed Pokémon has no second type' : 'Second type'}
-                            onChange={(e) => setOpt({ type2: e.currentTarget.value })}
-                        >
-                            <option value="">Random</option>
-                            {TYPES.filter((t) => t !== o.type).map((t) => <option value={t} key={t}>{t}</option>)}
-                        </select>
+                            onPick={(t) => setOpt({ type2: t })}
+                        />
                     </div>
                     <div className="set-row">
                         <label></label>
@@ -290,17 +303,30 @@ export function GeneratorPanel({ onReorder }: { onReorder: (from: string, to: st
                             ))}
                         </div>
                     </div>
-                    {/* Where in its line the species stands. A seg rather than a
-                        select so the four read at a glance, like the type mode. */}
+                    {/* Where in its line the species stands: toggles, so two can
+                        be on together. Random is the state of none — ticking the
+                        third clears the lot, since all three IS random. */}
                     <div className="set-row">
                         <label>Stage</label>
                         <div className="seg gen-stage" id="gen-stage">
+                            <button
+                                className={stagesOn.length ? '' : 'on'}
+                                disabled={!!chosen}
+                                onClick={() => setOpt({ stages: [] })}
+                                title={chosen ? 'Only used when the species is random' : 'Any stage of its line'}
+                            >
+                                Random
+                            </button>
                             {STAGES.map((m) => (
                                 <button
-                                    key={m.key || 'any'}
-                                    className={o.stage === m.key ? 'on' : ''}
+                                    key={m.key}
+                                    className={stagesOn.includes(m.key) ? 'on' : ''}
                                     disabled={!!chosen}
-                                    onClick={() => setOpt({ stage: m.key })}
+                                    onClick={() => setOpt({
+                                        stages: askedStages(stagesOn.includes(m.key)
+                                            ? stagesOn.filter((k) => k !== m.key)
+                                            : [...stagesOn, m.key]),
+                                    })}
                                     title={chosen ? 'Only used when the species is random' : m.title}
                                 >
                                     {m.label}
@@ -309,7 +335,7 @@ export function GeneratorPanel({ onReorder }: { onReorder: (from: string, to: st
                         </div>
                     </div>
                     <div className="gen-checks">
-                        <label className="set-check">
+                        <label className="set-check" title="The Legendary Pokémon of every generation, and the Ultra Beasts with them.">
                             <input
                                 type="checkbox" id="gen-legendaries"
                                 checked={!!o.legendaries}
@@ -317,6 +343,15 @@ export function GeneratorPanel({ onReorder }: { onReorder: (from: string, to: st
                                 onChange={(e) => setOpt({ legendaries: e.currentTarget.checked })}
                             />
                             Legendaries may appear
+                        </label>
+                        <label className="set-check" title="The event-only Pokémon: Mew, Celebi, Jirachi, Arceus and the rest, Meltan to Pecharunt.">
+                            <input
+                                type="checkbox" id="gen-mythicals"
+                                checked={!!o.mythicals}
+                                disabled={!!chosen}
+                                onChange={(e) => setOpt({ mythicals: e.currentTarget.checked })}
+                            />
+                            Mythicals may appear
                         </label>
                         <label className="set-check" title="The past and future Pokémon out of Area Zero. Koraidon and Miraidon are Legendary as well and need both boxes.">
                             <input
@@ -372,9 +407,13 @@ export function GeneratorPanel({ onReorder }: { onReorder: (from: string, to: st
                     </div>
                     <div className="set-row">
                         <label htmlFor="gen-item"></label>
-                        <select id="gen-item" value={o.item} onChange={(e) => setOpt({ item: e.currentTarget.value })}>
-                            <option value="">Matches its type (Charcoal for Fire…)</option>
-                            {heldItems.map((it) => <option value={it.Name} key={it.Name}>{it.Name}</option>)}
+                        <select id="gen-item" value={o.item} className={o.item ? '' : 'gen-random-on'} onChange={(e) => setOpt({ item: e.currentTarget.value })}>
+                            <optgroup label="Automatic">
+                                <option value="" className="gen-opt-random">🎲 Matches its type (Charcoal for Fire…)</option>
+                            </optgroup>
+                            <optgroup label="One item">
+                                {heldItems.map((it) => <option value={it.Name} key={it.Name}>{it.Name}</option>)}
+                            </optgroup>
                         </select>
                     </div>
 
@@ -505,7 +544,8 @@ function summarize(o: GmGenOpts, chosen: PokedexEntry | null): string {
             bits.push([o.type, o.typeMode !== 'single' ? o.type2 : ''].filter(Boolean).join(' + '));
         }
         if (o.typeMode !== 'any') bits.push(o.typeMode === 'single' ? 'single type' : 'dual type');
-        if (o.stage) bits.push(o.stage + ' stage');
+        const st = askedStages(o.stages);
+        if (st.length) bits.push(st.join(' or ') + ' stage');
     }
     if (o.rank === 'range') bits.push(o.rankFrom + '–' + o.rankTo);
     else if (o.rank) bits.push(o.rank);
@@ -744,6 +784,150 @@ function SpeciesField({ value, onPick }: { value: string; onPick: (id: string) =
                 document.body,
             )}
         </div>
+    );
+}
+
+/* A type picker drawn by the page: a native <select> cannot put an icon
+   beside an option, and the type chips are what the roster and the species
+   list already use to say "Fire" at a glance. Same box as the folder menu,
+   in a portal, under the button. */
+function TypeSelect({ id, value, types, disabled, title, onPick }: {
+    id: string;
+    value: string;
+    types: string[];
+    disabled?: boolean;
+    title?: string;
+    onPick: (t: string) => void;
+}) {
+    const choices = ['', ...types];
+    const chosen = Math.max(0, choices.indexOf(value));
+    const [open, setOpen] = useState(false);
+    const [active, setActive] = useState(chosen);
+    const btnRef = useRef<HTMLButtonElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    const close = (refocus = true) => {
+        setOpen(false);
+        if (refocus) btnRef.current?.focus();
+    };
+    const pick = (t: string) => { onPick(t); close(); };
+
+    useLayoutEffect(() => {
+        if (!open) return;
+        const el = menuRef.current;
+        const btn = btnRef.current;
+        if (!el || !btn) return;
+        const place = () => {
+            const r = btn.getBoundingClientRect();
+            const w = Math.max(el.offsetWidth, r.width);
+            const h = el.offsetHeight;
+            const left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - w - 8));
+            let top = r.bottom + 4;
+            if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4);
+            el.style.left = left + 'px';
+            el.style.top = top + 'px';
+            el.style.minWidth = r.width + 'px';
+        };
+        place();
+        window.addEventListener('scroll', place, true);
+        window.addEventListener('resize', place);
+        return () => {
+            window.removeEventListener('scroll', place, true);
+            window.removeEventListener('resize', place);
+        };
+    }, [open]);
+
+    useEffect(() => {
+        if (!open) return;
+        setActive(chosen);
+        menuRef.current?.focus();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
+
+    useEffect(() => {
+        if (!open) return;
+        const onDown = (e: MouseEvent) => {
+            const t = e.target as HTMLElement | null;
+            if (t && t.closest && (t.closest('.gen-type-menu') || t === btnRef.current || btnRef.current?.contains(t))) return;
+            setOpen(false);
+        };
+        document.addEventListener('mousedown', onDown);
+        return () => document.removeEventListener('mousedown', onDown);
+    }, [open]);
+
+    const onKey = (e: React.KeyboardEvent) => {
+        const n = choices.length;
+        if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+        if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => (i + 1) % n); return; }
+        if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => (i + n - 1) % n); return; }
+        if (e.key === 'Home') { e.preventDefault(); setActive(0); return; }
+        if (e.key === 'End') { e.preventDefault(); setActive(n - 1); return; }
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(choices[active]); }
+    };
+
+    return (
+        <>
+            <button
+                ref={btnRef}
+                type="button"
+                id={id}
+                className={'gen-type-btn' + (open ? ' on' : '') + (value ? '' : ' random')}
+                aria-haspopup="listbox"
+                aria-expanded={open}
+                disabled={disabled}
+                title={title}
+                onClick={() => setOpen((v) => !v)}
+            >
+                <TypeGlyph type={value} />
+                <span className="fname">{value || 'Random'}</span>
+                <i className="fa-solid fa-caret-down gen-type-caret"></i>
+            </button>
+            {open && createPortal(
+                <div
+                    ref={menuRef}
+                    className="folder-menu gen-type-menu"
+                    role="listbox"
+                    tabIndex={-1}
+                    aria-label={title || 'Type'}
+                    onKeyDown={onKey}
+                >
+                    {choices.map((t, i) => (
+                        <button
+                            key={t || '__random'}
+                            type="button"
+                            role="option"
+                            aria-selected={i === chosen}
+                            className={'folder-menu-item'
+                                + (i === active ? ' active' : '')
+                                + (i === chosen ? ' on' : '')
+                                + (t ? '' : ' folder-menu-none')}
+                            onMouseEnter={() => setActive(i)}
+                            onClick={() => pick(t)}
+                        >
+                            <TypeGlyph type={t} />
+                            <span className="fname">{t || 'Random'}</span>
+                            {i === chosen && <i className="fa-solid fa-check tick"></i>}
+                        </button>
+                    ))}
+                </div>,
+                document.body,
+            )}
+        </>
+    );
+}
+
+/** One type's chip — the roster's, for a type named rather than read off a
+    species — or a die for "random". */
+function TypeGlyph({ type }: { type: string }) {
+    if (!type) return <span className="type-chip gen-type-dice"><i className="fa-solid fa-dice"></i></span>;
+    const c = typeColors[type] || '#e5e7eb';
+    return (
+        <span
+            className="type-chip"
+            style={{ background: c + '33', borderColor: c, color: mixHex(c, '#ffffff', 0.55) }}
+        >
+            <i className={'fa-solid ' + (TYPE_ICONS[type] || 'fa-circle-question')}></i>
+        </span>
     );
 }
 
