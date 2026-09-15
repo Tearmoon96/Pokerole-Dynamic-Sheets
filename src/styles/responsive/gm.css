@@ -398,6 +398,7 @@ html[data-device="phone"] .dice-config {
     .gen-actions > button,
     .gen-type-mode > button,
     .gen-stage > button,
+    .gen-gens > button,
     .gen-type-btn {
         min-width: 30px;
         min-height: 30px;

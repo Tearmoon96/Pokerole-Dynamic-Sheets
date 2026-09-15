@@ -122,14 +122,21 @@
    segment on the second under the label column. The stage row is the same
    shape with four buttons. */
 .gen-type-mode,
-.gen-stage { flex: 0 0 auto; }
+.gen-stage,
+.gen-gens { flex: 0 0 auto; }
 
 .gen-type-mode button,
-.gen-stage button { flex: 0 0 auto; padding: 0.25rem 0.5rem; }
+.gen-stage button,
+.gen-gens button { flex: 0 0 auto; padding: 0.25rem 0.5rem; }
+
+/* Ten buttons; they wrap on a narrow panel rather than shrinking. */
+.gen-gens { flex: 1; min-width: 0; flex-wrap: wrap; }
+.gen-gens button { min-width: 1.9rem; padding-inline: 0.35rem; }
 
 .set-row select:disabled + .gen-type-mode button,
 .gen-type-mode button:disabled,
-.gen-stage button:disabled { opacity: 0.45; cursor: not-allowed; }
+.gen-stage button:disabled,
+.gen-gens button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .gen-settings select:disabled { opacity: 0.45; cursor: not-allowed; }
 

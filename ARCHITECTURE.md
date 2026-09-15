@@ -96,7 +96,7 @@ than imported, so Vite never parses or bundles them. One line in each page shell
 | `src/components/common/` | Shared widgets — toast, modal, pickers, sprites |
 | `src/state/` | Trainer sheet store, working set, trainer file I/O, PC boxes, IndexedDB |
 | `src/card/` | Card logic: pools, moves, evolution, type chart, weather, ailments, wild import |
-| `src/gm/` | GM logic: entities and tokens, combat, ailments, dice, names, the random Pokémon generator and its habitat table, session files, folders |
+| `src/gm/` | GM logic: entities and tokens, combat, ailments, dice, names, the random Pokémon generator with its habitat and generation tables, session files, folders |
 | `src/table/` | Rolling table: crypto, identity, protocol, validation, transport, session |
 | `src/data/` | Loading `app-data/`, and the context that serves it to components |
 | `src/lib/` | Cross-page helpers: themes, sprites, colour, gear, file system, manuals, update check, device class, touch reordering, the rank table |

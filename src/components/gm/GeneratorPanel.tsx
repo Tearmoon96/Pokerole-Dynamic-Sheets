@@ -14,6 +14,7 @@ import {
     learnset, speciesAbilities,
 } from '../../gm/generator';
 import { HABITATS, habitatsOf } from '../../gm/habitats';
+import { GENERATIONS } from '../../gm/generations';
 import { monPoolMax, monStat } from '../../gm/pools';
 import { isMegaForm } from '../../card/evolution';
 import { RANKS, rankIndex } from '../../lib/ranks';
@@ -62,6 +63,12 @@ const STAGES: { key: typeof STAGE_KEYS[number]; label: string; title: string }[]
     { key: 'final', label: 'Final', title: 'Evolves no further — including a species that never evolves' },
 ];
 
+/** The generations actually asked for: none, or all nine, is "any". */
+function askedGenerations(gens: number[]): number[] {
+    const on = GENERATIONS.filter((g) => gens.includes(g));
+    return on.length === GENERATIONS.length ? [] : on;
+}
+
 /** The stages actually asked for: none, or all three, is "any". */
 function askedStages(stages: string[]): string[] {
     const on = STAGE_KEYS.filter((k) => stages.includes(k));
@@ -94,6 +101,7 @@ export function GeneratorPanel({ onReorder }: { onReorder: (from: string, to: st
 
     const o = state.genOpts;
     const stagesOn = askedStages(o.stages);
+    const gensOn = askedGenerations(o.generations);
     const dexById = (id: string): PokedexEntry | null => data.pokemon.find((p) => p._id === id) || null;
     const chosen = o.species ? dexById(o.species) : null;
 
@@ -308,6 +316,36 @@ export function GeneratorPanel({ onReorder }: { onReorder: (from: string, to: st
                                     title={m.title}
                                 >
                                     {m.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    {/* The generations it may come from: toggles like the stages,
+                        and All is the state of none — or of all nine. */}
+                    <div className="set-row">
+                        <label>Generation</label>
+                        <div className="seg gen-gens" id="gen-gens">
+                            <button
+                                className={gensOn.length ? '' : 'on'}
+                                disabled={!!chosen}
+                                onClick={() => setOpt({ generations: [] })}
+                                title={chosen ? 'Only used when the species is random' : 'Every generation'}
+                            >
+                                All
+                            </button>
+                            {GENERATIONS.map((g) => (
+                                <button
+                                    key={g}
+                                    className={gensOn.includes(g) ? 'on' : ''}
+                                    disabled={!!chosen}
+                                    onClick={() => setOpt({
+                                        generations: askedGenerations(gensOn.includes(g)
+                                            ? gensOn.filter((x) => x !== g)
+                                            : [...gensOn, g]),
+                                    })}
+                                    title={chosen ? 'Only used when the species is random' : 'Generation ' + g + (g === 6 ? ' — and every Mega' : g === 7 ? ' — and the Alolan forms' : g === 8 ? ' — and the Galarian and Hisuian forms' : g === 9 ? ' — and the Paldean forms' : '')}
+                                >
+                                    {g}
                                 </button>
                             ))}
                         </div>
@@ -544,6 +582,8 @@ function summarize(o: GmGenOpts, chosen: PokedexEntry | null): string {
             bits.push([o.type, o.typeMode !== 'single' ? o.type2 : ''].filter(Boolean).join(' + '));
         }
         if (o.typeMode !== 'any') bits.push(o.typeMode === 'single' ? 'single type' : 'dual type');
+        const gs = askedGenerations(o.generations);
+        if (gs.length) bits.push('Gen ' + gs.join(', '));
         const st = askedStages(o.stages);
         if (st.length) bits.push(st.join(' or ') + ' stage');
     }

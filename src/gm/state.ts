@@ -84,6 +84,8 @@ function normalizeGenOpts(raw: unknown): GmGenOpts {
     o.stages = strings(r.stages).length ? strings(r.stages)
         : (typeof legacyStage === 'string' && legacyStage) ? [legacyStage] : [];
     delete (o as { stage?: unknown }).stage;
+    o.generations = (Array.isArray(r.generations) ? r.generations : []).map(Number)
+        .filter((g, i, a) => g >= 1 && g <= 9 && Number.isInteger(g) && a.indexOf(g) === i);
     o.legendaries = !!o.legendaries;
     o.ultraBeasts = !!o.ultraBeasts;
     o.mythicals = !!o.mythicals;

@@ -2,6 +2,7 @@ import { defaultCardSheet } from '../card/defaults';
 import { isMegaForm } from '../card/evolution';
 import { RANKS, RANK_BUDGET, asRank, rankIndex } from '../lib/ranks';
 import { inHabitat } from './habitats';
+import { inGeneration } from './generations';
 import { monPoolMax } from './pools';
 import type { AppData, ItemEntry, MoveEntry, PokedexEntry, PokemonEvolution } from '../data/types';
 import type { CardSheet, CardSkills, Gender } from '../card/types';
@@ -50,6 +51,10 @@ export interface GmGenOpts {
     /** Whether the Paradox Pokémon — the past and future ones out of Area
         Zero — are in the random pool. Off, a time paradox never walks in. */
     paradox: boolean;
+    /** The generations a random species may come from, 1..9. Empty, or all
+        nine, means any. A form counts where the form appeared: an Alolan
+        Raichu is Gen 7 (see generations.ts). */
+    generations: number[];
     /** The stages of its line a random species may be at: any of 'first'
         (nothing before it), 'second' (the second stage of its line) and
         'final' (evolves no further). Empty, or all three, means any. */
@@ -85,7 +90,7 @@ export interface GmGenOpts {
 
 export const DEFAULT_GEN_OPTS: GmGenOpts = {
     species: '', rank: '', rankFrom: 'Rookie', rankTo: 'Advanced', habitat: '', type: '', type2: '',
-    typeMode: 'any', legendaries: false, ultraBeasts: false, mythicals: false, paradox: false, stages: [],
+    typeMode: 'any', legendaries: false, ultraBeasts: false, mythicals: false, paradox: false, generations: [], stages: [],
     ability: '', gender: 'random', nature: '', itemChance: 25, item: '', moves: [],
     moveMix: 'random', attackShare: 60, biasMoves: true, favour: [], bias: 60,
 };
@@ -263,11 +268,11 @@ export function inStage(data: AppData, p: PokedexEntry, stages: readonly string[
 
 /** Everything a wild could be: no egg, no Mega or battle-only form (a state
     of a creature, not a creature), Legendaries, Ultra Beasts, Mythicals and
-    Paradox Pokémon only on request, and whatever the habitat, type and stage
-    settings leave. */
+    Paradox Pokémon only on request, and whatever the habitat, generation,
+    type and stage settings leave. */
 export function speciesPool(
     data: AppData,
-    opts: Pick<GmGenOpts, 'legendaries' | 'ultraBeasts' | 'mythicals' | 'paradox' | 'habitat' | 'type' | 'type2' | 'typeMode' | 'stages'>,
+    opts: Pick<GmGenOpts, 'legendaries' | 'ultraBeasts' | 'mythicals' | 'paradox' | 'habitat' | 'type' | 'type2' | 'typeMode' | 'generations' | 'stages'>,
 ): PokedexEntry[] {
     /* Either slot answers to either asked-for type: "Fire + Flying" is
        Charizard whichever way round the dex lists them. */
@@ -282,6 +287,7 @@ export function speciesPool(
         && (opts.mythicals || !isMythical(p))
         && (opts.paradox || !isParadox(p))
         && (!opts.habitat || inHabitat(p, opts.habitat))
+        && inGeneration(p, opts.generations)
         && inStage(data, p, opts.stages)
         && asked.every((t) => hasType(p, t))
         && (opts.typeMode === 'single' ? !p.Type2 : opts.typeMode === 'dual' ? !!p.Type2 : true));
