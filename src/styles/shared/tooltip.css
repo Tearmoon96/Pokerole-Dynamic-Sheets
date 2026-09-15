@@ -1,9 +1,14 @@
 /* ---------------- Themed tooltip ----------------
    Replaces the browser's native grey `title` square everywhere on the
-   page. The engine at the bottom of the script moves the text out of
+   page. `installTooltips` in src/lib/tooltip.ts moves the text out of
    the title attribute at hover time and renders it here, so the bubble
    follows the palette like every other panel. Sits above the modals
-   (z 300) but under the missing-data warning bar (z 100000). */
+   (z 300) but under the missing-data warning bar (z 100000).
+
+   Shared by all four pages: they all install the engine, and a page that
+   installs it without these rules gets the bubble as an unstyled div at
+   the very end of <body> — a bar of text in the bottom-left corner, which
+   is how the GM screen and the rolling table shipped. */
 #app-tooltip {
     position: fixed;
     top: 0;

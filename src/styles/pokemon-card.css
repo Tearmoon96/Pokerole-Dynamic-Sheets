@@ -21,7 +21,7 @@
 @import './card/moves-ui.css';
 @import './card/move-cards.css';
 @import './card/notepad.css';
-@import './card/tooltip.css';
+@import './shared/tooltip.css';
 @import './card/light-theme.css';
 @import './app-root.css';
 

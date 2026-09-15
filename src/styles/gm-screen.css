@@ -22,6 +22,7 @@
 @import './gm/generator.css';
 @import './gm/confirm-dialog.css';
 @import './gm/toast.css';
+@import './shared/tooltip.css';
 @import './app-root.css';
 
 /* The mobile / tablet wrapper, last so it settles ties against the desktop

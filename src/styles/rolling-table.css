@@ -10,6 +10,7 @@
 @import './table/layout.css';
 @import './table/join.css';
 @import './table/feed.css';
+@import './shared/tooltip.css';
 
 /* The mobile / tablet wrapper, last so it settles ties against the desktop
    rules above rather than needing to out-specify them. Every rule in it is

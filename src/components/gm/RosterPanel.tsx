@@ -154,9 +154,18 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                                 <button
                                     className="icon-btn danger"
                                     style={{ marginLeft: '0.4rem' }}
-                                    onClick={() => store.update((s) => {
-                                        s.trainerIds = s.trainerIds.filter((x) => x !== id);
-                                    })}
+                                    title="Remove from GM screen"
+                                    onClick={async () => {
+                                        const go = await confirm({
+                                            icon: 'fa-user-minus', danger: true, confirmLabel: 'Remove',
+                                            title: 'Remove trainer ' + id + '?',
+                                            text: 'Only from this screen. Loading its .json again brings it back.',
+                                        });
+                                        if (!go) return;
+                                        store.update((s) => {
+                                            s.trainerIds = s.trainerIds.filter((x) => x !== id);
+                                        });
+                                    }}
                                 >
                                     <i className="fa-solid fa-xmark"></i>
                                 </button>
@@ -399,9 +408,19 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                                     <button
                                         className="icon-btn danger"
                                         title="Remove"
-                                        onClick={() => store.update((s) => {
-                                            s.wilds = s.wilds.filter((x) => x.gid !== w.gid);
-                                        })}
+                                        onClick={async () => {
+                                            /* A wild lives only here: closing it is losing it
+                                               unless it was downloaded first. */
+                                            const go = await confirm({
+                                                icon: 'fa-trash-can', danger: true, confirmLabel: 'Remove',
+                                                title: 'Remove ' + monShownName(dexById, w.dexId, sheet) + '?',
+                                                text: 'A wild Pokémon is kept nowhere else. Download it first if you want it back later.',
+                                            });
+                                            if (!go) return;
+                                            store.update((s) => {
+                                                s.wilds = s.wilds.filter((x) => x.gid !== w.gid);
+                                            });
+                                        }}
                                     >
                                         <i className="fa-solid fa-xmark"></i>
                                     </button>

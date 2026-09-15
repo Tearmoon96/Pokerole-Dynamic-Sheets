@@ -41,15 +41,14 @@ export function NotesPanel({ onReorder }: { onReorder: (from: string, to: string
 
     const remove = async (n: GmNoteSheet) => {
         const label = (n.title || '').trim() || 'this note';
-        /* Only ask when there is something to lose */
-        if ((n.body || '').trim()) {
-            const go = await confirm({
-                icon: 'fa-trash-can', danger: true, confirmLabel: 'Delete',
-                title: 'Delete ' + label + '?',
-                text: 'Its text goes with it. This cannot be undone.',
-            });
-            if (!go) return;
-        }
+        /* Always ask — the X sits beside the note's head, where a stray click
+           lands easily, and even an empty note may be one the GM just made. */
+        const go = await confirm({
+            icon: 'fa-trash-can', danger: true, confirmLabel: 'Delete',
+            title: 'Delete ' + label + '?',
+            text: (n.body || '').trim() ? 'Its text goes with it. This cannot be undone.' : 'The note is empty.',
+        });
+        if (!go) return;
         store.update((s) => { s.noteSheets = s.noteSheets.filter((x) => x.gid !== n.gid); });
     };
 

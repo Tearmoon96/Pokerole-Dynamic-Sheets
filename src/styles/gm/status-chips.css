@@ -151,7 +151,15 @@
     margin-left: auto;
 }
 
+/* A flex item beside the row's buttons: centred on their line rather than
+   stretched to their height with the word stuck at its top, and the padding
+   is uneven to swallow the trailing letter-spacing after the last letter,
+   which otherwise reads as the word sitting left of centre. */
 .wild-tag {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    line-height: 1;
     font-size: 0.6rem;
     font-weight: 800;
     letter-spacing: 0.1em;
@@ -159,7 +167,7 @@
     color: var(--ok);
     border: 1px solid var(--ok);
     border-radius: 5px;
-    padding: 0.05rem 0.3rem;
+    padding: 0.2rem 0.25rem 0.2rem 0.35rem;
     margin-left: 0.4rem;
 }
 
