@@ -68,6 +68,15 @@ function askedStages(stages: string[]): string[] {
     return on.length === STAGE_KEYS.length ? [] : on;
 }
 
+/* Legendaries, Ultra Beasts, Mythicals and the time paradoxes, each behind
+   its own box. Initials on the row; the full name is the hint. */
+const TIERS: { key: 'legendaries' | 'ultraBeasts' | 'mythicals' | 'paradox'; id: string; label: string; title: string }[] = [
+    { key: 'legendaries', id: 'gen-legendaries', label: 'L', title: 'Legendaries may appear\nThe Legendary Pokémon of every generation.' },
+    { key: 'ultraBeasts', id: 'gen-ultra-beasts', label: 'UB', title: 'Ultra Beasts may appear\nThe eleven from Ultra Space, Nihilego to Blacephalon.' },
+    { key: 'mythicals', id: 'gen-mythicals', label: 'M', title: 'Mythicals may appear\nThe event-only Pokémon: Mew, Celebi, Jirachi, Arceus and the rest, Meltan to Pecharunt.' },
+    { key: 'paradox', id: 'gen-paradox', label: 'TP', title: 'Time paradoxes may appear\nThe past and future Pokémon out of Area Zero. Koraidon and Miraidon are Legendary as well and need both boxes.' },
+];
+
 const GENDERS: { key: string; icon: string; label: string }[] = [
     { key: 'random', icon: 'fa-dice', label: 'Random' },
     { key: 'M', icon: 'fa-mars', label: 'Male' },
@@ -232,8 +241,8 @@ export function GeneratorPanel({ onReorder }: { onReorder: (from: string, to: st
                             labels and an option's colour, and nothing else. */}
                         <select id="gen-rank" value={o.rank} className={o.rank === '' || o.rank === 'range' ? 'gen-random-on' : ''} onChange={(e) => setOpt({ rank: e.currentTarget.value })}>
                             <optgroup label="Random">
-                                <option value="" className="gen-opt-random">Any rank</option>
-                                <option value="range" className="gen-opt-random">Within a range…</option>
+                                <option value="" className="gen-opt-random">🎲 Any rank</option>
+                                <option value="range" className="gen-opt-random">🎲 Within a range…</option>
                             </optgroup>
                             <optgroup label="Fixed rank">
                                 {RANKS.map((r) => <option value={r} key={r}>{r}</option>)}
@@ -334,43 +343,25 @@ export function GeneratorPanel({ onReorder }: { onReorder: (from: string, to: st
                             ))}
                         </div>
                     </div>
-                    <div className="gen-checks">
-                        <label className="set-check" title="The Legendary Pokémon of every generation.">
-                            <input
-                                type="checkbox" id="gen-legendaries"
-                                checked={!!o.legendaries}
-                                disabled={!!chosen}
-                                onChange={(e) => setOpt({ legendaries: e.currentTarget.checked })}
-                            />
-                            Legendaries may appear
-                        </label>
-                        <label className="set-check" title="The eleven from Ultra Space: Nihilego to Blacephalon, Poipole and Naganadel among them.">
-                            <input
-                                type="checkbox" id="gen-ultra-beasts"
-                                checked={!!o.ultraBeasts}
-                                disabled={!!chosen}
-                                onChange={(e) => setOpt({ ultraBeasts: e.currentTarget.checked })}
-                            />
-                            Ultra Beasts may appear
-                        </label>
-                        <label className="set-check" title="The event-only Pokémon: Mew, Celebi, Jirachi, Arceus and the rest, Meltan to Pecharunt.">
-                            <input
-                                type="checkbox" id="gen-mythicals"
-                                checked={!!o.mythicals}
-                                disabled={!!chosen}
-                                onChange={(e) => setOpt({ mythicals: e.currentTarget.checked })}
-                            />
-                            Mythicals may appear
-                        </label>
-                        <label className="set-check" title="The past and future Pokémon out of Area Zero. Koraidon and Miraidon are Legendary as well and need both boxes.">
-                            <input
-                                type="checkbox" id="gen-paradox"
-                                checked={!!o.paradox}
-                                disabled={!!chosen}
-                                onChange={(e) => setOpt({ paradox: e.currentTarget.checked })}
-                            />
-                            Time paradoxes may appear
-                        </label>
+                    {/* The four tiers of "not an ordinary wild", one line, by
+                        their initials; the hint carries the full name. */}
+                    <div className="set-row">
+                        <label></label>
+                        <div className="gen-tiers" id="gen-tiers">
+                            {TIERS.map((t) => (
+                                <label className="set-check gen-tier" key={t.key} title={t.title}>
+                                    <input
+                                        type="checkbox"
+                                        id={t.id}
+                                        checked={!!o[t.key]}
+                                        disabled={!!chosen}
+                                        aria-label={t.title}
+                                        onChange={(e) => setOpt({ [t.key]: e.currentTarget.checked })}
+                                    />
+                                    {t.label}
+                                </label>
+                            ))}
+                        </div>
                     </div>
 
                     <div className="set-row">
@@ -418,7 +409,7 @@ export function GeneratorPanel({ onReorder }: { onReorder: (from: string, to: st
                         <label htmlFor="gen-item"></label>
                         <select id="gen-item" value={o.item} className={o.item ? '' : 'gen-random-on'} onChange={(e) => setOpt({ item: e.currentTarget.value })}>
                             <optgroup label="Automatic">
-                                <option value="" className="gen-opt-random">Matches its type (Charcoal for Fire…)</option>
+                                <option value="" className="gen-opt-random">🎲 Matches its type (Charcoal for Fire…)</option>
                             </optgroup>
                             <optgroup label="One item">
                                 {heldItems.map((it) => <option value={it.Name} key={it.Name}>{it.Name}</option>)}

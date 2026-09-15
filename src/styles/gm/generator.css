@@ -60,17 +60,29 @@
 
 .gen-settings[hidden] { display: none; }
 
-/* The random entries of the rank and item selects sit in their own group
-   and in the accent, so they never read as one more rank or one more item.
-   A native popup honours an option's colour and its group's label, and
-   nothing else. The select itself takes the colour while a random entry is
-   the one chosen. No glyph in front of them: an emoji in an italic option is
-   drawn by the popup skewed and shoved to the right. */
-.gen-settings select .gen-opt-random { color: var(--ghost-color); font-style: italic; }
+/* The random entries of the rank and item selects sit in their own group,
+   in the accent and with a die in front, so they never read as one more rank
+   or one more item. A native popup honours an option's colour and its
+   group's label, and nothing else — not italic, which it applied to the die
+   too and drew it skewed and shoved right. Upright it is fine. The select
+   itself takes the colour while a random entry is the one chosen. */
+.gen-settings select .gen-opt-random { color: var(--ghost-color); }
 .gen-settings select optgroup { color: var(--text-secondary); font-style: normal; }
-.gen-settings select option { color: var(--text-primary); font-style: normal; }
-.gen-settings select option.gen-opt-random { color: var(--ghost-color); font-style: italic; }
-.gen-settings select.gen-random-on { color: var(--ghost-color); font-style: italic; }
+.gen-settings select option { color: var(--text-primary); }
+.gen-settings select option.gen-opt-random { color: var(--ghost-color); }
+.gen-settings select.gen-random-on { color: var(--ghost-color); }
+
+/* The four tier boxes on one line by their initials, under the label column
+   like the stage buttons above them. */
+.gen-tiers {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.2rem 0.9rem;
+}
+
+.gen-tier { flex: 0 0 auto; font-weight: 700; letter-spacing: 0.06em; }
 
 /* ---- The type pickers ----
    Buttons that open a menu drawn by the page, because a native <select>
@@ -120,14 +132,6 @@
 .gen-stage button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .gen-settings select:disabled { opacity: 0.45; cursor: not-allowed; }
-
-.gen-checks {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem 1rem;
-    /* Under the label column, in line with the fields above it. */
-    padding-left: calc(5.2rem + 0.45rem);
-}
 
 .set-check input:disabled { opacity: 0.45; }
 .set-check:has(input:disabled) { opacity: 0.6; cursor: not-allowed; }
