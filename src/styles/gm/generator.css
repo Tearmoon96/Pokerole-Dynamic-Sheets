@@ -64,7 +64,8 @@
    and in the accent, so they never read as one more rank or one more item.
    A native popup honours an option's colour and its group's label, and
    nothing else. The select itself takes the colour while a random entry is
-   the one chosen. */
+   the one chosen. No glyph in front of them: an emoji in an italic option is
+   drawn by the popup skewed and shoved to the right. */
 .gen-settings select .gen-opt-random { color: var(--ghost-color); font-style: italic; }
 .gen-settings select optgroup { color: var(--text-secondary); font-style: normal; }
 .gen-settings select option { color: var(--text-primary); font-style: normal; }

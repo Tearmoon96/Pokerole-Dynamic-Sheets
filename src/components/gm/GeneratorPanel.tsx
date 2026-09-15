@@ -232,8 +232,8 @@ export function GeneratorPanel({ onReorder }: { onReorder: (from: string, to: st
                             labels and an option's colour, and nothing else. */}
                         <select id="gen-rank" value={o.rank} className={o.rank === '' || o.rank === 'range' ? 'gen-random-on' : ''} onChange={(e) => setOpt({ rank: e.currentTarget.value })}>
                             <optgroup label="Random">
-                                <option value="" className="gen-opt-random">🎲 Any rank</option>
-                                <option value="range" className="gen-opt-random">🎲 Within a range…</option>
+                                <option value="" className="gen-opt-random">Any rank</option>
+                                <option value="range" className="gen-opt-random">Within a range…</option>
                             </optgroup>
                             <optgroup label="Fixed rank">
                                 {RANKS.map((r) => <option value={r} key={r}>{r}</option>)}
@@ -335,7 +335,7 @@ export function GeneratorPanel({ onReorder }: { onReorder: (from: string, to: st
                         </div>
                     </div>
                     <div className="gen-checks">
-                        <label className="set-check" title="The Legendary Pokémon of every generation, and the Ultra Beasts with them.">
+                        <label className="set-check" title="The Legendary Pokémon of every generation.">
                             <input
                                 type="checkbox" id="gen-legendaries"
                                 checked={!!o.legendaries}
@@ -343,6 +343,15 @@ export function GeneratorPanel({ onReorder }: { onReorder: (from: string, to: st
                                 onChange={(e) => setOpt({ legendaries: e.currentTarget.checked })}
                             />
                             Legendaries may appear
+                        </label>
+                        <label className="set-check" title="The eleven from Ultra Space: Nihilego to Blacephalon, Poipole and Naganadel among them.">
+                            <input
+                                type="checkbox" id="gen-ultra-beasts"
+                                checked={!!o.ultraBeasts}
+                                disabled={!!chosen}
+                                onChange={(e) => setOpt({ ultraBeasts: e.currentTarget.checked })}
+                            />
+                            Ultra Beasts may appear
                         </label>
                         <label className="set-check" title="The event-only Pokémon: Mew, Celebi, Jirachi, Arceus and the rest, Meltan to Pecharunt.">
                             <input
@@ -409,7 +418,7 @@ export function GeneratorPanel({ onReorder }: { onReorder: (from: string, to: st
                         <label htmlFor="gen-item"></label>
                         <select id="gen-item" value={o.item} className={o.item ? '' : 'gen-random-on'} onChange={(e) => setOpt({ item: e.currentTarget.value })}>
                             <optgroup label="Automatic">
-                                <option value="" className="gen-opt-random">🎲 Matches its type (Charcoal for Fire…)</option>
+                                <option value="" className="gen-opt-random">Matches its type (Charcoal for Fire…)</option>
                             </optgroup>
                             <optgroup label="One item">
                                 {heldItems.map((it) => <option value={it.Name} key={it.Name}>{it.Name}</option>)}

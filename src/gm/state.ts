@@ -85,6 +85,7 @@ function normalizeGenOpts(raw: unknown): GmGenOpts {
         : (typeof legacyStage === 'string' && legacyStage) ? [legacyStage] : [];
     delete (o as { stage?: unknown }).stage;
     o.legendaries = !!o.legendaries;
+    o.ultraBeasts = !!o.ultraBeasts;
     o.mythicals = !!o.mythicals;
     o.paradox = !!o.paradox;
     o.biasMoves = !!o.biasMoves;

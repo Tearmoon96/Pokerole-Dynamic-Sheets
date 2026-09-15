@@ -40,9 +40,10 @@ export interface GmGenOpts {
     type2: string;
     /** 'any', or 'single' for one type only, 'dual' for two. Random species only. */
     typeMode: string;
-    /** Whether the Legendary species (and the Ultra Beasts) are in the
-        random pool at all. */
+    /** Whether the Legendary species are in the random pool at all. */
     legendaries: boolean;
+    /** Whether the Ultra Beasts — Nihilego to Blacephalon — are. */
+    ultraBeasts: boolean;
     /** Whether the Mythical species — Mew, Celebi, Jirachi and the rest of
         the event-only ones — are in the random pool. */
     mythicals: boolean;
@@ -84,7 +85,7 @@ export interface GmGenOpts {
 
 export const DEFAULT_GEN_OPTS: GmGenOpts = {
     species: '', rank: '', rankFrom: 'Rookie', rankTo: 'Advanced', habitat: '', type: '', type2: '',
-    typeMode: 'any', legendaries: false, mythicals: false, paradox: false, stages: [],
+    typeMode: 'any', legendaries: false, ultraBeasts: false, mythicals: false, paradox: false, stages: [],
     ability: '', gender: 'random', nature: '', itemChance: 25, item: '', moves: [],
     moveMix: 'random', attackShare: 60, biasMoves: true, favour: [], bias: 60,
 };
@@ -158,16 +159,21 @@ export function isBattleForm(p: PokedexEntry): boolean {
     return BATTLE_FORM.test(p._id) || p.Name === 'Minior Core';
 }
 
-/* The three tiers of "not an ordinary wild", by dex number — a form shares
+/* The four tiers of "not an ordinary wild", by dex number — a form shares
    its base's number. They are listed here rather than read off the dex's
-   `Legendary` flag because that flag is one bit for all three and has gaps:
-   it is unset on Type: Null, Silvally, Cosmog, Kubfu and Terapagos, and on
-   Phione, Meltan, Melmetal and Poipole. The card and the pickers still show
-   the flag; only the generator's boxes go by these. */
+   `Legendary` flag because that flag is one bit for all of them and has
+   gaps: it is unset on Type: Null, Silvally, Cosmog, Kubfu and Terapagos,
+   on Phione, Meltan and Melmetal, and on Poipole. The card and the pickers
+   still show the flag; only the generator's boxes go by these. */
 
-/** The Legendaries proper, every generation's, plus the Ultra Beasts, which
-    are not Legendary in name but are met the same way and are under the same
-    box here. */
+/** The Legendaries, every generation's: the birds and Mewtwo; the beasts,
+    Lugia and Ho-Oh; the Regis, the Eon duo and the weather trio; the lake
+    trio, the creation trio, Heatran, Regigigas and Cresselia; the swords of
+    justice, the forces of nature, the Tao trio; the aura trio; Type: Null and
+    Silvally, the Tapus, the Cosmog line and Necrozma; the Galar heroes,
+    Eternatus, the Kubfu line, the new Regis, the Calyrex steeds, Enamorus;
+    the treasures of ruin, Koraidon and Miraidon, the loyal three, Ogerpon
+    and Terapagos. */
 export const LEGENDARY_NUMBERS: ReadonlySet<number> = new Set([
     144, 145, 146, 150,
     243, 244, 245, 249, 250,
@@ -176,9 +182,14 @@ export const LEGENDARY_NUMBERS: ReadonlySet<number> = new Set([
     638, 639, 640, 641, 642, 643, 644, 645, 646,
     716, 717, 718,
     772, 773, 785, 786, 787, 788, 789, 790, 791, 792, 800,
-    793, 794, 795, 796, 797, 798, 799, 803, 804, 805, 806,   // Ultra Beasts
     888, 889, 890, 891, 892, 894, 895, 896, 897, 898, 905,
     1001, 1002, 1003, 1004, 1007, 1008, 1014, 1015, 1016, 1017, 1024,
+]);
+
+/** The eleven Ultra Beasts: the seven of Sun and Moon, Poipole and
+    Naganadel, Stakataka and Blacephalon. */
+export const ULTRA_BEAST_NUMBERS: ReadonlySet<number> = new Set([
+    793, 794, 795, 796, 797, 798, 799, 803, 804, 805, 806,
 ]);
 
 /** The Mythicals: the event-only ones, Mew to Pecharunt. */
@@ -193,6 +204,10 @@ export function isLegendary(p: PokedexEntry): boolean {
 
 export function isMythical(p: PokedexEntry): boolean {
     return MYTHICAL_NUMBERS.has(p.Number);
+}
+
+export function isUltraBeast(p: PokedexEntry): boolean {
+    return ULTRA_BEAST_NUMBERS.has(p.Number);
 }
 
 /** The Paradox Pokémon, which the dex files under their own category.
@@ -247,11 +262,12 @@ export function inStage(data: AppData, p: PokedexEntry, stages: readonly string[
 }
 
 /** Everything a wild could be: no egg, no Mega or battle-only form (a state
-    of a creature, not a creature), Legendaries, Mythicals and Paradox Pokémon
-    only on request, and whatever the habitat, type and stage settings leave. */
+    of a creature, not a creature), Legendaries, Ultra Beasts, Mythicals and
+    Paradox Pokémon only on request, and whatever the habitat, type and stage
+    settings leave. */
 export function speciesPool(
     data: AppData,
-    opts: Pick<GmGenOpts, 'legendaries' | 'mythicals' | 'paradox' | 'habitat' | 'type' | 'type2' | 'typeMode' | 'stages'>,
+    opts: Pick<GmGenOpts, 'legendaries' | 'ultraBeasts' | 'mythicals' | 'paradox' | 'habitat' | 'type' | 'type2' | 'typeMode' | 'stages'>,
 ): PokedexEntry[] {
     /* Either slot answers to either asked-for type: "Fire + Flying" is
        Charizard whichever way round the dex lists them. */
@@ -262,6 +278,7 @@ export function speciesPool(
         && !isMegaForm(p)
         && !isBattleForm(p)
         && (opts.legendaries || !isLegendary(p))
+        && (opts.ultraBeasts || !isUltraBeast(p))
         && (opts.mythicals || !isMythical(p))
         && (opts.paradox || !isParadox(p))
         && (!opts.habitat || inHabitat(p, opts.habitat))
