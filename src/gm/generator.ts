@@ -172,8 +172,9 @@ export function isBattleForm(p: PokedexEntry): boolean {
     justice, the forces of nature, the Tao trio; the aura trio; Type: Null and
     Silvally, the Tapus, the Cosmog line and Necrozma; the Galar heroes,
     Eternatus, the Kubfu line, the new Regis, the Calyrex steeds, Enamorus;
-    the treasures of ruin, Koraidon and Miraidon, the loyal three, Ogerpon
-    and Terapagos. */
+    the treasures of ruin, the loyal three, Ogerpon and Terapagos. Koraidon
+    and Miraidon are Legendary too, but they are Paradox Pokémon first and
+    are behind that box alone, so one tick brings them. */
 export const LEGENDARY_NUMBERS: ReadonlySet<number> = new Set([
     144, 145, 146, 150,
     243, 244, 245, 249, 250,
@@ -183,7 +184,7 @@ export const LEGENDARY_NUMBERS: ReadonlySet<number> = new Set([
     716, 717, 718,
     772, 773, 785, 786, 787, 788, 789, 790, 791, 792, 800,
     888, 889, 890, 891, 892, 894, 895, 896, 897, 898, 905,
-    1001, 1002, 1003, 1004, 1007, 1008, 1014, 1015, 1016, 1017, 1024,
+    1001, 1002, 1003, 1004, 1014, 1015, 1016, 1017, 1024,
 ]);
 
 /** The eleven Ultra Beasts: the seven of Sun and Moon, Poipole and
@@ -210,9 +211,8 @@ export function isUltraBeast(p: PokedexEntry): boolean {
     return ULTRA_BEAST_NUMBERS.has(p.Number);
 }
 
-/** The Paradox Pokémon, which the dex files under their own category.
-    Koraidon and Miraidon are among them and Legendary besides, so they need
-    both boxes ticked. */
+/** The Paradox Pokémon, which the dex files under their own category —
+    Koraidon and Miraidon included. */
 export function isParadox(p: PokedexEntry): boolean {
     return p.DexCategory === 'Paradox Pokémon';
 }

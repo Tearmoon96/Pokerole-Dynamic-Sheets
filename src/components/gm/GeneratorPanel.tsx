@@ -71,10 +71,10 @@ function askedStages(stages: string[]): string[] {
 /* Legendaries, Ultra Beasts, Mythicals and the time paradoxes, each behind
    its own box. Initials on the row; the full name is the hint. */
 const TIERS: { key: 'legendaries' | 'ultraBeasts' | 'mythicals' | 'paradox'; id: string; label: string; title: string }[] = [
-    { key: 'legendaries', id: 'gen-legendaries', label: 'L', title: 'Legendaries may appear\nThe Legendary Pokémon of every generation.' },
-    { key: 'ultraBeasts', id: 'gen-ultra-beasts', label: 'UB', title: 'Ultra Beasts may appear\nThe eleven from Ultra Space, Nihilego to Blacephalon.' },
-    { key: 'mythicals', id: 'gen-mythicals', label: 'M', title: 'Mythicals may appear\nThe event-only Pokémon: Mew, Celebi, Jirachi, Arceus and the rest, Meltan to Pecharunt.' },
-    { key: 'paradox', id: 'gen-paradox', label: 'TP', title: 'Time paradoxes may appear\nThe past and future Pokémon out of Area Zero. Koraidon and Miraidon are Legendary as well and need both boxes.' },
+    { key: 'legendaries', id: 'gen-legendaries', label: 'L', title: 'Legendaries may appear' },
+    { key: 'mythicals', id: 'gen-mythicals', label: 'M', title: 'Mythicals may appear' },
+    { key: 'paradox', id: 'gen-paradox', label: 'TP', title: 'Time paradoxes may appear, including Koraidon and Miraidon' },
+    { key: 'ultraBeasts', id: 'gen-ultra-beasts', label: 'UB', title: 'Ultra Beasts may appear' },
 ];
 
 const GENDERS: { key: string; icon: string; label: string }[] = [
