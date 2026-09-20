@@ -5,8 +5,7 @@
 #
 #   scripts/compare-ui.sh            # landing screen + populated sheet
 #
-# Needs google-chrome-stable and ImageMagick on the host. Inside the VS Code
-# Flatpak, run it through host-spawn.
+# Needs google-chrome-stable and ImageMagick.
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 OUT="$ROOT/.verify"
@@ -34,6 +33,24 @@ shoot() {
     google-chrome-stable --headless=new --disable-gpu --no-sandbox --hide-scrollbars \
         --window-size=1400,2400 --virtual-time-budget=18000 \
         --screenshot="$2" "$1" 2>/dev/null
+}
+
+# ImageMagick 7's HDRI builds report -metric AE scaled by QuantumRange (65535 on
+# Q16-HDRI) and in scientific notation; IM6 printed a plain count. Both broke the
+# old parser -- `cut -d'.' -f1` turned "1.24625e+09" into "1", so every view read
+# as one pixel and the run passed no matter what had changed. Calibrate against a
+# pair that differs by exactly one pixel instead of hardcoding the scale.
+magick -size 2x1 xc:black "$OUT/ae-cal-a.png"
+magick "$OUT/ae-cal-a.png" -fill white -draw "point 0,0" "$OUT/ae-cal-b.png"
+AESCALE=$(magick compare -metric AE "$OUT/ae-cal-a.png" "$OUT/ae-cal-b.png" null: 2>&1 \
+    | tail -1 | awk '{ printf "%.0f", $1 }')
+rm -f "$OUT/ae-cal-a.png" "$OUT/ae-cal-b.png"
+[ "${AESCALE:-0}" -lt 1 ] && AESCALE=1
+
+# Differing pixels between two shots, as a plain integer.
+ae() {
+    magick compare -metric AE "$1" "$2" null: 2>&1 | tail -1 \
+        | awk -v s="$AESCALE" '{ printf "%.0f", $1 / s }'
 }
 
 # Each entry is "<label>|<page>|<query string>": the closed sheet, then one per
@@ -66,8 +83,7 @@ echo "$VIEWS" | while IFS='|' read -r label lpage rpage view; do
     [ -z "$label" ] && continue
     shoot "http://localhost:$PORT/$lpage.html$view" "$OUT/shots/$label-legacy.png"
     shoot "http://localhost:$PORT/$rpage.html$view"  "$OUT/shots/$label-react.png"
-    diff=$(magick compare -metric AE "$OUT/shots/$label-legacy.png" "$OUT/shots/$label-react.png" null: 2>&1 | tail -1)
-    px=$(echo "$diff" | cut -d' ' -f1 | cut -d'.' -f1)
+    px=$(ae "$OUT/shots/$label-legacy.png" "$OUT/shots/$label-react.png")
 
     # A handful of pixels is subpixel antialiasing. Above that, measure this
     # view's own noise floor rather than guessing a threshold: Chrome resamples a
@@ -86,7 +102,7 @@ echo "$VIEWS" | while IFS='|' read -r label lpage rpage view; do
         npx=0
         for n in 1 2; do
             shoot "http://localhost:$PORT/$lpage.html$view" "$OUT/shots/$label-legacy-n$n.png"
-            this=$(magick compare -metric AE "$OUT/shots/$label-legacy.png" "$OUT/shots/$label-legacy-n$n.png" null: 2>&1 | tail -1 | cut -d' ' -f1 | cut -d'.' -f1)
+            this=$(ae "$OUT/shots/$label-legacy.png" "$OUT/shots/$label-legacy-n$n.png")
             [ "${this:-0}" -gt "$npx" ] && npx=${this:-0}
         done
         floor=$(( npx * 2 + 500 ))
@@ -97,7 +113,7 @@ echo "$VIEWS" | while IFS='|' read -r label lpage rpage view; do
             echo "$label: $px pixels differ, within this view's noise (self-noise ${npx:-0}, floor $floor)"
         fi
     else
-        echo "$label: $diff pixels differ"
+        echo "$label: $px pixels differ"
     fi
 done
 
