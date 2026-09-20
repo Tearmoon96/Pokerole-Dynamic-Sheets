@@ -1,4 +1,5 @@
 import { defaultCardSheet } from '../card/defaults';
+import { lockedGender } from '../card/gender';
 import { isMegaForm } from '../card/evolution';
 import { RANKS, RANK_BUDGET, asRank, rankIndex } from '../lib/ranks';
 import { inHabitat } from './habitats';
@@ -461,10 +462,8 @@ function spend(
 
 function rollGender(p: PokedexEntry, opts: GmGenOpts, rnd: Rng): Gender {
     if (opts.gender !== 'random') return (opts.gender === 'M' || opts.gender === 'F') ? opts.gender : '';
-    const t = String(p.GenderType || '').toUpperCase();
-    if (t === 'M') return 'M';
-    if (t === 'F') return 'F';
-    if (t === 'N') return '';
+    const locked = lockedGender(p);
+    if (locked !== null) return locked;
     return rnd() < 0.5 ? 'M' : 'F';
 }
 

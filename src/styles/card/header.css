@@ -71,6 +71,12 @@
     color: #f472b6;
 }
 
+/* The dex fixed it — genderless, or a one-gender species. Still a glyph,
+   just not a control. */
+.gender-toggle:disabled {
+    cursor: default;
+}
+
 .pokemon-name {
     font-size: 2.5rem;
     font-weight: 800;

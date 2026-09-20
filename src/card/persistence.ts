@@ -1,6 +1,7 @@
 import { WORKING_KEY, cardStorageKey } from './cardContext';
 import type { CardContext } from './cardContext';
 import { defaultCardSheet } from './defaults';
+import { lockedGender } from './gender';
 import { derivedPoolMax } from './pools';
 import type { CardSheet, Specialty } from './types';
 import type { PokedexEntry } from '../data/types';
@@ -107,6 +108,11 @@ export function normalizeCardSheet(p: PokedexEntry, parsed: Partial<CardSheet> |
         sheet.willMaxBonus = parsed.willMax - derivedPoolMax(src, 'will');
         sheet.willMax = null;
     }
+    /* A genderless or single-gender species carries the dex's answer, whatever
+       the sheet said: the toggle used to let any species cycle ♂/♀, and a wild
+       rolled by hand or an evolution into a single-gender line can disagree. */
+    const locked = lockedGender(p);
+    if (locked !== null) sheet.gender = locked;
     return sheet;
 }
 

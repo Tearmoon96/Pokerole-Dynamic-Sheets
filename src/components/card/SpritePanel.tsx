@@ -6,6 +6,7 @@ import { GITHUB_RAW, IMG_BASE } from '../../data/paths';
 import { SPRITE_SET_BLOCKED } from '../../state/constants';
 import { readCustomImage } from '../../lib/fileSystem';
 import { MegaStoneIcon, megaStoneOf } from '../common/MonName';
+import { speciesGender } from '../../card/gender';
 import type { SpriteFrames } from '../../data/types';
 
 /* The sprite box: the art itself, the set tabs under it, and the framing
@@ -236,15 +237,26 @@ const GENDER_META: Record<string, { cls: string; icon: string; title: string }> 
     'F': { cls: 'female', icon: 'fa-venus', title: 'Female — click to clear' },
 };
 
+/* A species the dex fixes: the glyph is shown but the button is inert. The
+   sheet already carries the right value — normalizeCardSheet writes it on
+   load — so this only has to stop the click. */
+const LOCKED_META: Record<string, { cls: string; icon: string; title: string }> = {
+    'N': { cls: 'unset', icon: 'fa-genderless', title: 'Genderless species' },
+    'M': { cls: 'male', icon: 'fa-mars', title: 'Male-only species' },
+    'F': { cls: 'female', icon: 'fa-venus', title: 'Female-only species' },
+};
+
 function GenderToggle() {
-    const { sheet, store } = useCard();
-    const meta = GENDER_META[sheet.gender] || GENDER_META[''];
+    const { pokemon, sheet, store } = useCard();
+    const locked = LOCKED_META[speciesGender(pokemon)];
+    const meta = locked || GENDER_META[sheet.gender] || GENDER_META[''];
     const next: Record<string, '' | 'M' | 'F'> = { '': 'M', 'M': 'F', 'F': '' };
     return (
         <button
             className={'gender-toggle ' + meta.cls}
             id="gender-toggle"
             title={meta.title}
+            disabled={!!locked}
             onClick={() => store.update((s) => { s.gender = next[s.gender] ?? 'M'; })}
         >
             <i className={'fa-solid ' + meta.icon}></i>
