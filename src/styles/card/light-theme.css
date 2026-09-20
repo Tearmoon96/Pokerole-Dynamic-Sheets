@@ -300,8 +300,7 @@
     text-shadow: 0 1px 3px #ffffffcc;
 }
 
-:where(:root.light-theme) .shiny-toggle.on,
-:where(:root.light-theme) .sprite-panel.shiny .sprite-stage::after {
+:where(:root.light-theme) .shiny-toggle.on {
     color: #d97706;
     text-shadow: 0 1px 3px #ffffffcc;
 }
