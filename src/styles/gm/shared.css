@@ -24,6 +24,26 @@ button.danger:hover { border-color: var(--danger); background: #ef444422; color:
 button.accent { border-color: var(--accent-border); }
 button.accent:hover { background: var(--accent-faint); border-color: var(--accent); }
 
+/* A latched icon button reads as HELD DOWN, not merely as a slightly
+   brighter border. `accent` alone tinted the edge and nothing else, so
+   the combat panel's crosshair — the one that says which fight the
+   roster joins — gave no sign that the press had done anything.
+
+   Keyed off aria-pressed rather than a class: a button that declares
+   itself a toggle to a screen reader is exactly the one that should
+   look like a toggle, and the two can never fall out of step. */
+button.icon-btn[aria-pressed="true"] {
+    background: var(--accent-faint);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: inset 0 1px 4px #00000066, 0 0 7px var(--accent-glow);
+}
+
+button.icon-btn[aria-pressed="true"]:hover {
+    background: var(--accent-faint);
+    border-color: var(--accent);
+}
+
 input[type="text"], input[type="number"], textarea {
     font-family: inherit;
     color: var(--text-primary);

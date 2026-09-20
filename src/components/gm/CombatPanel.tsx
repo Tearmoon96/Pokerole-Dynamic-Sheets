@@ -7,7 +7,8 @@ import { useGmConfirm } from './ConfirmDialog';
 import { useAppData } from '../../data/AppDataContext';
 import { useToast } from '../common/Toast';
 import { newCombat, uid } from '../../gm/state';
-import { combatPanelKey } from '../../gm/constants';
+import { CRIT_MARGIN, combatPanelKey } from '../../gm/constants';
+import { HISTORY_LIMIT, roll } from '../../gm/dice';
 import { useFlash } from '../../gm/useFlash';
 import { defaultStatus, ailmentByKey } from '../../gm/ailments';
 import {
@@ -100,6 +101,27 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
         e.stopPropagation();
         adjustPool(state, dexById, token, key, e.shiftKey ? delta * 5 : delta, () => store.save());
         store.refresh();
+    };
+
+    /* Initiative is 1d6 plus Dexterity + Alert, and the tracker used to make
+       the GM roll it in the move panel and copy the total across by hand. The
+       roll goes to the dice history as well as into the field, so it can be
+       read back — and shown to the table — like every other roll on this
+       screen. */
+    const rollInitiative = (token: string, pid: string) => {
+        const ref = entityRef(state, dexById, token);
+        if (!ref || ref.kind === 'custom') return;
+        const bonus = ref.value('Dexterity') + ref.value('Alert');
+        store.update((s) => {
+            const entry = roll(1, 6, { who: ref.name, what: 'Initiative', bonus }, CRIT_MARGIN);
+            s.dice = { ...s.dice, history: [entry, ...s.dice.history].slice(0, HISTORY_LIMIT) };
+            s.combats = s.combats.map((c) => (c.gid === gid ? {
+                ...c,
+                participants: c.participants.map((p) =>
+                    ((p as unknown as Record<string, string>).pid === pid
+                        ? { ...p, init: entry.total } : p)),
+            } : c));
+        });
     };
 
     const applyRoundDamage = (token: string, ailKey: string, dmg: number, e: React.MouseEvent) => {
@@ -270,7 +292,7 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
                         between — with one, every addition can only go here. */}
                     {many && (
                         <button
-                            className={'icon-btn' + (focused ? ' accent' : '')}
+                            className="icon-btn"
                             aria-pressed={focused}
                             title={focused
                                 ? 'The roster adds to this fight'
@@ -329,6 +351,9 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
                             })}
                             onUsed={(key) => patch((p as unknown as Record<string, string>).pid,
                                 (x) => ({ ...x, [key]: !x[key] }))}
+                            onRollInit={() => rollInitiative(
+                                resolveToken(state, participantToken(p)) || participantToken(p),
+                                (p as unknown as Record<string, string>).pid)}
                             onMove={(dir) => {
                                 flash((p as unknown as Record<string, string>).pid);
                                 mutate((c) => {
@@ -397,7 +422,7 @@ const USED_MARKS: { key: 'usedClash' | 'usedEva'; label: string; icon: string; t
     },
 ];
 
-function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit, onUsed, onMove, onRemove, onOpenTip, cycleStatus, onDeal, onPool }: {
+function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit, onUsed, onRollInit, onMove, onRemove, onOpenTip, cycleStatus, onDeal, onPool }: {
     p: GmCombatant;
     /** True for the moment after an up/down press landed on this row. */
     moved: boolean;
@@ -409,6 +434,7 @@ function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit,
     onPip: (i: number) => void;
     onInit: (v: string) => void;
     onUsed: (key: 'usedClash' | 'usedEva') => void;
+    onRollInit: () => void;
     onMove: (dir: number) => void;
     onRemove: () => void;
     onOpenTip: (token: string) => void;
@@ -433,6 +459,10 @@ function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit,
     const shifted = !!mod && init != null;
     const [editing, setEditing] = useState(false);
     const shown = init == null ? '' : String(editing ? init : init + mod);
+    /* A hand-typed combatant has no sheet behind it, so there is nothing to
+       roll off — the GM types that one in, as they always did. */
+    const initBonus = ref && ref.kind !== 'custom' ? ref.value('Dexterity') + ref.value('Alert') : 0;
+    const canRollInit = init == null && !!ref && ref.kind !== 'custom';
     const flags = ref ? roundFlags(ref, p, round) : [];
     const kindIcon = rec.kind === 'trainer' ? 'fa-user'
         : rec.kind === 'custom' ? 'fa-masks-theater' : null;
@@ -469,6 +499,20 @@ function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit,
                             onChange={(e) => onInit(e.currentTarget.value)}
                         />
                     </label>
+                    {/* Only while the field is empty, and only where there is a
+                        sheet to read Dexterity + Alert off: a number already in
+                        the box is the GM's answer, and a button that would
+                        overwrite it sitting next to it is a button waiting to
+                        be hit by mistake. Clearing the field brings it back. */}
+                    {canRollInit && (
+                        <button
+                            className="icon-btn c-init-roll"
+                            title={'Roll initiative: 1d6 + ' + initBonus + ' (Dexterity + Alert)'}
+                            onClick={onRollInit}
+                        >
+                            <i className="fa-solid fa-dice-d6"></i>
+                        </button>
+                    )}
                 </div>
                 {/* Absent for a hand-typed combatant, which has no sheet behind
                     it to hold a pool. */}

@@ -127,6 +127,21 @@
     flex: 0 0 auto;
 }
 
+/* The quick roll beside the field, shown only while it is empty. Sized
+   to the field rather than to the head's other buttons, so the pair reads
+   as one control; it sits under the "INIT" caption's line, which is why
+   the wrapper and the button are aligned on their ends rather than
+   centred. */
+.combat-row .c-init-roll {
+    flex: 0 0 auto;
+    align-self: flex-end;
+    padding: 0.3rem 0.35rem;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+.combat-row .c-init-roll:hover { color: var(--accent); border-color: var(--accent); }
+
 /* A status is shifting this Initiative (paralysis is −2). The field shows
    the shifted number, which is the one the order is read from, in the
    same amber the dice roller uses for a stand-out result. Focusing it
