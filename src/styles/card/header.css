@@ -77,6 +77,29 @@
     cursor: default;
 }
 
+/* Shiny mark, beside the gender toggle: the same bare glyph, gold when on.
+   A marker only — no shiny art ships in any sprite pack, so the sprite
+   itself is dressed in sprite-viewer.css rather than swapped. */
+.shiny-toggle {
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    text-shadow: 0 1px 3px #000000cc;
+}
+
+.shiny-toggle.on {
+    color: #fbbf24;
+    text-shadow: 0 1px 3px #000000cc, 0 0 8px #fbbf2480;
+}
+
 .pokemon-name {
     font-size: 2.5rem;
     font-weight: 800;

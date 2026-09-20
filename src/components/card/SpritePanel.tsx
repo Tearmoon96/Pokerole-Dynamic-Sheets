@@ -109,13 +109,17 @@ export function SpritePanel({ onUpload }: { onUpload: () => void }) {
     const stone = megaStoneOf(pokemon);
 
     return (
-        <div className={'sprite-panel' + (showingCustom ? ' showing-custom' : '')} id="sprite-panel">
+        <div
+            className={'sprite-panel' + (showingCustom ? ' showing-custom' : '') + (sheet.shiny ? ' shiny' : '')}
+            id="sprite-panel"
+        >
             {/* Top-right: the mega stone (empty for anything that is not a Mega
-                form) and the gender toggle */}
+                form), the shiny mark and the gender toggle */}
             <div className="sprite-top-right">
                 <span className="mega-stone-slot" id="mega-stone-slot">
                     {stone && <MegaStoneIcon stone={stone} />}
                 </span>
+                <ShinyToggle />
                 <GenderToggle />
             </div>
 
@@ -260,6 +264,20 @@ function GenderToggle() {
             onClick={() => store.update((s) => { s.gender = next[s.gender] ?? 'M'; })}
         >
             <i className={'fa-solid ' + meta.icon}></i>
+        </button>
+    );
+}
+
+function ShinyToggle() {
+    const { sheet, store } = useCard();
+    return (
+        <button
+            className={'shiny-toggle' + (sheet.shiny ? ' on' : '')}
+            id="shiny-toggle"
+            title={sheet.shiny ? 'Shiny \u2014 click to clear' : 'Mark as shiny'}
+            onClick={() => store.update((s) => { s.shiny = !s.shiny; })}
+        >
+            <i className="fa-solid fa-star"></i>
         </button>
     );
 }

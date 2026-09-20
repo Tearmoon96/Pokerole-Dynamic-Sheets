@@ -41,6 +41,7 @@ export function defaultCardSheet(p: PokedexEntry): CardSheet {
         heldItem: '',
         nature: '',
         gender: '',
+        shiny: false,
         nickname: '',
         customImage: '',
         spriteType: 'Home',

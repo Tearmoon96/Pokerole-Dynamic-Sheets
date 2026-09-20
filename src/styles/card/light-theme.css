@@ -295,6 +295,17 @@
     color: #db2777;
 }
 
+/* Amber, not gold: #fbbf24 on a light body is ~1.5:1 */
+:where(:root.light-theme) .shiny-toggle {
+    text-shadow: 0 1px 3px #ffffffcc;
+}
+
+:where(:root.light-theme) .shiny-toggle.on,
+:where(:root.light-theme) .sprite-panel.shiny .sprite-stage::after {
+    color: #d97706;
+    text-shadow: 0 1px 3px #ffffffcc;
+}
+
 /* The fills are themed by --hp-color / --will-color; all the light page
    changes is the glow, which smears on a pale panel instead of reading
    as a halo. */

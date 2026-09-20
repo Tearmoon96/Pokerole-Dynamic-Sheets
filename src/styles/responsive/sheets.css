@@ -380,3 +380,14 @@ html[data-device="phone"] .card-container::before,
 html[data-device="tablet"] .card-container::before {
     display: none;
 }
+
+/* ------------------------------------------------------------
+   The sprite box's corner: shiny mark and gender glyph side by side.
+   Each gets a 36px touch overlay from base.css, and at the desktop's
+   6px gap the two overlays meet in the middle, so a tap on the star's
+   right edge went to the gender toggle instead (3 of 4 probes). Room
+   between them is all it takes; the corner has it to spare.
+   ------------------------------------------------------------ */
+html[data-pointer="coarse"] .sprite-top-right {
+    gap: 18px;
+}

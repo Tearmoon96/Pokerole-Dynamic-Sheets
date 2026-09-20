@@ -71,6 +71,9 @@ export interface CardSheet {
     nature: string;
     /** '' = unset, 'M' = male, 'F' = female (not every species has one). */
     gender: Gender;
+    /** A marker only: no sprite pack carries shiny art, so the card dresses
+        the ordinary sprite in gold rather than swapping it. */
+    shiny: boolean;
     /** Optional custom name; the trainer sheet can show it instead of the species. */
     nickname: string;
     /** User-uploaded art, shown by the "Custom" sprite tab; a downscaled PNG
