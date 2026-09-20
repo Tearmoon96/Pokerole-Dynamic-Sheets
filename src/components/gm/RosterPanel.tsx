@@ -16,7 +16,8 @@ import { trainerPoolMax } from '../../gm/pools';
 import { adjustPool, monShownName, wildKey, wildLiveSheet } from '../../gm/entities';
 import { readWorking, upsertWorkingTrainer, workingTrainerData } from '../../gm/workingSet';
 import { TRAINER_MARKER } from '../../state/constants';
-import { WILD_MARKER } from '../../card/cardContext';
+import { WILD_MARKER, wildSheetKey } from '../../card/cardContext';
+import { wildUrl } from '../../card/wild';
 import type { GmCombatant } from '../../gm/types';
 import type { PokedexEntry } from '../../data/types';
 import type { ReactNode } from 'react';
@@ -400,18 +401,24 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                                         className="icon-btn"
                                         title="Open the Pokémon card (wild mode)"
                                         onClick={() => {
-                                            if (!w.pushed || !localStorage.getItem(wildKey(w.dexId))) {
+                                            /* A push mints the sheet its own id, so two wilds of
+                                               one species open as two cards. A wild already on
+                                               the card keeps whatever id it is there under — for
+                                               one pushed before ids existed that is the bare
+                                               species id, which wildUrl leaves out of the URL. */
+                                            const live = !!w.pushed && !!localStorage.getItem(wildKey(w));
+                                            const wid = live ? (w.wid || w.dexId) : (w.wid || w.dexId + '.' + w.gid);
+                                            if (!live) {
                                                 try {
-                                                    localStorage.setItem(wildKey(w.dexId),
+                                                    localStorage.setItem(wildSheetKey(wid),
                                                         JSON.stringify(w.sheet || {}));
                                                 } catch { /* quota: the card will open on defaults */ }
                                                 store.update((s) => {
                                                     s.wilds = s.wilds.map((x) =>
-                                                        x.gid === w.gid ? { ...x, pushed: true } : x);
+                                                        x.gid === w.gid ? { ...x, pushed: true, wid } : x);
                                                 });
                                             }
-                                            window.open('pokemon-card.html?pokemon='
-                                                + encodeURIComponent(w.dexId) + '&wild=1', '_blank');
+                                            window.open('pokemon-card.html' + wildUrl(w.dexId, wid), '_blank');
                                         }}
                                     >
                                         <i className="fa-solid fa-arrow-up-right-from-square"></i>

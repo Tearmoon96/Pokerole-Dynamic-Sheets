@@ -1,5 +1,6 @@
 import type { PokedexEntry } from '../data/types';
 import type { CardSheet } from '../card/types';
+import { wildSheetKey } from '../card/cardContext';
 import type { TrainerState } from '../state/types';
 import type { GmCombatant, GmState, GmWild } from './types';
 import { STATUS_ICONS, normalizeStatus } from './ailments';
@@ -29,8 +30,11 @@ import { mutateWorkingTrainer, workingTrainerData } from './workingSet';
        t:<i>  m:<i>:<slot>      live, built for this render
        T:<id> M:<id>:<slot>     stored, survives the roster moving */
 
-export function wildKey(dexId: string): string {
-    return 'pokerole_wild_' + dexId + '_sheet';
+/** The card's storage key for this wild once it has been pushed there. A wild
+    pushed since ids existed carries its own `wid`; one pushed before that lives
+    under the bare species key, which the card still answers to. */
+export function wildKey(w: GmWild): string {
+    return wildSheetKey(w.wid || w.dexId);
 }
 
 /** A wild that has been pushed to a card tab is edited there, so the live copy
@@ -38,7 +42,7 @@ export function wildKey(dexId: string): string {
 export function wildLiveSheet(w: GmWild): Partial<CardSheet> {
     if (w.pushed) {
         try {
-            const live = JSON.parse(localStorage.getItem(wildKey(w.dexId)) || 'null');
+            const live = JSON.parse(localStorage.getItem(wildKey(w)) || 'null');
             if (live) return live;
         } catch { /* fall through to the loaded copy */ }
     }
@@ -243,8 +247,8 @@ export function writeStatus(
         const sheet = wildLiveSheet(w) as Record<string, unknown>;
         sheet.status = normalizeStatus(sheet.status);
         mutate(sheet.status as GmStatus);
-        if (w.pushed && localStorage.getItem(wildKey(w.dexId))) {
-            try { localStorage.setItem(wildKey(w.dexId), JSON.stringify(sheet)); }
+        if (w.pushed && localStorage.getItem(wildKey(w))) {
+            try { localStorage.setItem(wildKey(w), JSON.stringify(sheet)); }
             catch { /* quota */ }
         } else {
             w.sheet = sheet as unknown as CardSheet;
@@ -330,8 +334,8 @@ export function adjustPool(
         sheet[key] = clamp((sheet[key] || 0) + delta, max);
         /* Write back wherever that sheet came from: the card's own key once the
            wild has been opened, otherwise our loaded copy */
-        if (w.pushed && localStorage.getItem(wildKey(w.dexId))) {
-            try { localStorage.setItem(wildKey(w.dexId), JSON.stringify(sheet)); }
+        if (w.pushed && localStorage.getItem(wildKey(w))) {
+            try { localStorage.setItem(wildKey(w), JSON.stringify(sheet)); }
             catch { /* quota: the bar below still shows the attempt */ }
         } else {
             w.sheet = sheet as unknown as CardSheet;

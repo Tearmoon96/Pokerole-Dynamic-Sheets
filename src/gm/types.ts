@@ -13,8 +13,13 @@ export interface GmWild {
     gid: string;
     dexId: string;
     sheet: CardSheet;
-    /** Whether this wild has been pushed to a card tab under its species key. */
+    /** Whether this wild has been pushed to a card tab. */
     pushed?: boolean;
+    /** The card's id for the pushed sheet (`<dexId>.<gid>`), minted on the first
+        push. Absent on a wild pushed before ids existed, which the card still
+        finds under its species id — see wildKey(). Two wilds of one species
+        used to share that key and overwrite each other. */
+    wid?: string;
 }
 
 export interface GmNoteSheet {

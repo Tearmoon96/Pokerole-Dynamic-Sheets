@@ -56,9 +56,10 @@ export function readCardContext(dexId: string, search = location.search): CardCo
         /* The FIRST wild of a species keeps the plain species id, which makes
            the storage key byte-for-byte the one this page has always used. That
            matters twice over: a sheet saved before this change is still found,
-           and the GM Screen — which pushes a wild under the species key and
-           opens the card with no ?wid at all — still lands on it. Only a second
-           sheet of the same species gets a suffixed id.
+           and a wild the GM Screen pushed before it passed ?wid — under the
+           species key, opened with no id at all — still lands on it. Only a
+           second sheet of the same species gets a suffixed id; the GM now mints
+           one per push (`<dexId>.<gid>`) for exactly that reason.
 
            The id also stops following the species, so evolving a wild keeps the
            same sheet instead of moving it to the new species' key. */
