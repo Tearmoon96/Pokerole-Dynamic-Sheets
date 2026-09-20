@@ -1,4 +1,5 @@
 import type { MoveEntry } from '../data/types';
+import { RANKS } from '../lib/ranks';
 import { formatPoolTotal, painPenalty, resolvePoolString } from './pools';
 import type { StatSource } from './pools';
 import type { CardSheet, MoveOverride } from './types';
@@ -109,9 +110,13 @@ export function signed(n: number): string {
     return (n > 0 ? '+' : '\u2212') + Math.abs(n);
 }
 
-export const RANK_ORDER: Record<string, number> = {
-    Custom: 0, Starter: 1, Rookie: 2, Standard: 3, Advanced: 4, Expert: 5, Ace: 6,
-};
+/* Custom moves on top, then the eight ranks in RANKS order. Derived from the
+   one list rather than spelt out: the old hand-written copy stopped at Ace, so
+   Master and Champion moves — over a thousand learnset entries — sorted to the
+   end tied and could not be filtered on. */
+export const RANK_ORDER: Record<string, number> = Object.fromEntries(
+    [['Custom', 0], ...RANKS.map((r, i) => [r, i + 1])],
+);
 
 export const ATTR_ICONS: Record<string, string> = {
     SoundMove: 'fa-volume-high',

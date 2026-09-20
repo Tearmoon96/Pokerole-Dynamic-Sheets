@@ -10,11 +10,12 @@ import {
 import type { CardMove } from '../../card/moves';
 import { painPenalty, resolvePoolValue } from '../../card/pools';
 import { reorderHandle, reorderItem } from '../../lib/touchDrag';
+import { RANKS } from '../../lib/ranks';
 
 /* The move learnset: the filter controls, the three universal rolls, and the
    list itself. */
 
-const FILTER_RANKS = ['Starter', 'Rookie', 'Standard', 'Advanced', 'Expert', 'Ace', 'Custom'];
+const FILTER_RANKS = [...RANKS, 'Custom'];
 const MOVE_SUGGESTION_CAP = 40;
 
 export function MovesPanel({ speciesMoves, onEditMove, onDeleteMove }: {
