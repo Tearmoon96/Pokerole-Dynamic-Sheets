@@ -176,6 +176,28 @@
     z-index: 2;
 }
 
+/* The stone is an inline <img>, and .mega-stone-icon gives it
+   `vertical-align: middle` for the one place it sits inline: after a mega
+   form's name in the License's team slot. In this flex row that alignment
+   is what dropped it ~1.5px below the star and the gender glyph — the
+   slot's own box is centred, the image inside it was not. As a flex item
+   it needs none of it. The 25px size is the PNG's doing: it carries an
+   11px transparent margin on each side of an 80px canvas, so only 59/80
+   of the box is ink and 25px of box draws ~18.5px of stone, between the
+   star's 17.8 and the gender glyph's 19.4. At the 28px the title once
+   wanted it was visibly the biggest thing in the corner. */
+.sprite-top-right .mega-stone-slot {
+    line-height: 0;
+}
+
+.sprite-top-right .mega-stone-icon {
+    height: 25px;
+    width: 25px;
+    object-fit: contain;
+    vertical-align: baseline;
+    display: block;
+}
+
 /* Top-left of the sprite box, stacked downwards: resize, then the two
    custom-image controls under it. */
 .sprite-top-left {
