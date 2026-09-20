@@ -88,6 +88,22 @@
     border-style: dashed;
 }
 
+/* The flat part of a sum roll — Initiative's Dexterity + Alert. Dashed
+   and unboxed against the faces beside it, because it is the one number
+   in that row that was not rolled. */
+.die-bonus {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+    min-width: 1.8rem;
+    text-align: center;
+    padding: 0.2rem 0.25rem;
+    border-radius: 7px;
+    border: 1px dashed var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+}
+
 .roll-totals {
     display: flex;
     gap: 0.8rem;

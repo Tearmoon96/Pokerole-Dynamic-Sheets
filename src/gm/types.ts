@@ -42,10 +42,21 @@ export interface GmCombatant {
     name?: string;
     initiative?: number;
     actions?: number;
+    /** Clash and Evasion are once per Round each, whichever of the two Clash
+        pools was used, so the tracker carries a mark for each rather than a
+        count. Cleared when the Round advances, exactly as the action pips are. */
+    usedClash?: boolean;
+    usedEva?: boolean;
     [key: string]: unknown;
 }
 
+/** One fight. A session holds a list of them, because a party that splits up
+    is running two initiative orders at once and one round counter cannot
+    describe both. */
 export interface GmCombat {
+    gid: string;
+    /** What the panel's head is titled; the GM renames it. */
+    name: string;
     round: number;
     participants: GmCombatant[];
 }
@@ -90,7 +101,12 @@ export interface GmState {
     /** entry key -> folder gid */
     rosterFolderOf: Record<string, string>;
     noteFolders: GmFolder[];
-    combat: GmCombat;
+    /** The fights running at once, one board panel each. Never empty: the
+        board always offers a tracker, and an empty list would leave the GM
+        with no way to make one. */
+    combats: GmCombat[];
+    /** Which of them the roster's "add to combat" buttons drop into. */
+    combatFocus: string;
     /** legacy single note; migrated into noteSheets */
     notes: string;
     noteSheets: GmNoteSheet[];

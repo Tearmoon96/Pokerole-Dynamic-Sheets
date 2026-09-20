@@ -50,13 +50,24 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
         store.refresh();
     };
 
+    /* The board can be running two fights at once, so a join button has to
+       name one. It drops into the FOCUSED fight — the one whose panel has its
+       crosshair lit — which with a single fight on the board is simply the
+       only one there is. */
+    const focusedCombat = state.combats.find((c) => c.gid === state.combatFocus) || state.combats[0];
+    /* Named in the toast only when there is a choice to have got wrong. */
+    const intoWhere = state.combats.length > 1 && focusedCombat
+        ? ' joins ' + escapeHtml(focusedCombat.name) + '.' : ' joins the fight.';
+
     const addParticipant = (part: Partial<GmCombatant>) => store.update((s) => {
-        s.combat = {
-            ...s.combat,
-            participants: [...s.combat.participants, Object.assign({
+        const gid = s.combats.some((c) => c.gid === s.combatFocus)
+            ? s.combatFocus : s.combats[0].gid;
+        s.combats = s.combats.map((c) => (c.gid === gid ? {
+            ...c,
+            participants: [...c.participants, Object.assign({
                 pid: uid(), label: '?', kind: 'custom', dexId: null, src: null, init: null, acted: 0,
             }, part) as GmCombatant],
-        };
+        } : c));
     });
 
     const loadFiles = async (files: File[]) => {
@@ -232,12 +243,12 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                                 </button>
                                 <button
                                     className="icon-btn"
-                                    title="Add trainer to combat"
+                                    title={'Add trainer to ' + (focusedCombat ? focusedCombat.name : 'combat')}
                                     onClick={() => {
                                         /* By id, not by index: this outlives the render that made it */
                                         addParticipant({ label: t.name || 'Trainer', kind: 'trainer', src: 'T:' + id } as never);
                                         toast('<i class="fa-solid fa-khanda"></i> '
-                                            + escapeHtml(t.name || 'Trainer') + ' joins the fight.');
+                                            + escapeHtml(t.name || 'Trainer') + intoWhere);
                                     }}
                                 >
                                     <i className="fa-solid fa-khanda"></i>
@@ -312,7 +323,7 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                                                 <>
                                                     <button
                                                         className="icon-btn"
-                                                        title="Add to combat"
+                                                        title={'Add to ' + (focusedCombat ? focusedCombat.name : 'combat')}
                                                         onClick={() => {
                                                             /* Trainer first, then the Pokémon: in a turn
                                                                order read aloud, the name that tells the
@@ -324,7 +335,7 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                                                                 src: 'M:' + id + ':' + x.idx,
                                                             } as never);
                                                             toast('<i class="fa-solid fa-khanda"></i> '
-                                                                + escapeHtml(label) + ' joins the fight.');
+                                                                + escapeHtml(label) + intoWhere);
                                                         }}
                                                     >
                                                         <i className="fa-solid fa-khanda"></i>
@@ -373,14 +384,14 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                                     <span className="wild-tag">wild</span>
                                     <button
                                         className="icon-btn"
-                                        title="Add to combat"
+                                        title={'Add to ' + (focusedCombat ? focusedCombat.name : 'combat')}
                                         onClick={() => {
                                             const label = monShownName(dexById, w.dexId, sheet) + ' (wild)';
                                             addParticipant({
                                                 label, kind: 'wild', dexId: w.dexId, src: 'w:' + w.gid,
                                             } as never);
                                             toast('<i class="fa-solid fa-khanda"></i> '
-                                                + escapeHtml(label) + ' joins the fight.');
+                                                + escapeHtml(label) + intoWhere);
                                         }}
                                     >
                                         <i className="fa-solid fa-khanda"></i>

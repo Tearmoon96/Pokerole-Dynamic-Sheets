@@ -104,7 +104,10 @@ export function DicePanel({ onReorder, onRollDamage }: {
                     {(history.slice(1) as RollEntry[]).map((e, i) => (
                         <div className="roll-history-entry" key={e.t + '-' + i}>
                             <span className="h-label">{e.label}</span>
-                            <span className="h-vals">{e.vals.join(' ')}</span>
+                            <span className="h-vals">
+                                {e.vals.join(' ')}
+                                {e.bonus != null && (e.bonus < 0 ? ' − ' + Math.abs(e.bonus) : ' + ' + e.bonus)}
+                            </span>
                             <span className="h-total">
                                 = {e.total}
                                 {e.succ != null && (
@@ -147,6 +150,9 @@ function RollOutput({ entry, onRollDamage }: {
                 </div>
             )}
             <div className="die-faces">
+                {/* A sum roll's flat part sits in the row of faces as a chip of
+                    its own, so what was rolled and what was added read as one
+                    sentence rather than the total appearing from nowhere. */}
                 {entry.vals.map((val, i) => {
                     const cls = entry.succ != null && val >= 4 ? 'success'
                         : val === sides ? 'max' : val === 1 ? 'one' : '';
@@ -161,6 +167,11 @@ function RollOutput({ entry, onRollDamage }: {
                         </span>
                     );
                 })}
+                {entry.bonus != null && (
+                    <span className="die-bonus" title="Added to the dice, not rolled">
+                        {entry.bonus < 0 ? '−' : '+'}{Math.abs(entry.bonus)}
+                    </span>
+                )}
             </div>
             <div className="roll-totals">
                 <span>Total <strong>{entry.total}</strong></span>

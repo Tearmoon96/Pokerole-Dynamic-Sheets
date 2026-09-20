@@ -16,6 +16,11 @@ export interface RollEntry {
     what?: string;
     /** The target number an accuracy roll was made against. */
     need?: number | null;
+    /** A flat number added to the faces. Present only on a SUM roll — one
+        where the dice are added up rather than counted for successes, which in
+        Pokerole is Initiative and nothing else: 1d6 + Dexterity + Alert. Its
+        presence is what says so, and it leaves `succ` null. */
+    bonus?: number | null;
     pain?: number;
     verdict?: string;
     /** Carried so a hit can roll the damage in one more click. */
@@ -40,10 +45,18 @@ export function accuracyVerdict(succ: number, need: number, critMargin: number):
 /** Roll `count` dice of `sides`, and work out what it means. */
 export function roll(count: number, sides: number, meta: RollMeta, critMargin: number): RollEntry {
     const vals = Array.from({ length: count }, () => 1 + Math.floor(Math.random() * sides));
-    const total = vals.reduce((a, b) => a + b, 0);
-    const succ = sides === 6 ? vals.filter((v) => v >= 4).length : null;
+    /* A sum roll adds a flat number to the faces and is NOT a pool: Initiative
+       is 1d6 + Dexterity + Alert, one die however big the pools behind it are,
+       and counting 4-6 on that one die would say nothing. `succ` stays null,
+       which is also what keeps the pain penalty and the accuracy verdict —
+       both of which act on successes — off it. */
+    const bonus = meta.bonus == null ? null : Math.round(meta.bonus);
+    const total = vals.reduce((a, b) => a + b, 0) + (bonus || 0);
+    const succ = (sides === 6 && bonus == null) ? vals.filter((v) => v >= 4).length : null;
+    const label = count + 'd' + sides
+        + (bonus == null ? '' : (bonus < 0 ? ' − ' + Math.abs(bonus) : ' + ' + bonus));
     const entry: RollEntry = Object.assign(
-        { label: count + 'd' + sides, vals, total, succ, net: null as number | null, t: Date.now() },
+        { label, vals, total, succ, net: null as number | null, t: Date.now() },
         meta);
     /* Pain comes off the successes, not the pool: the dice are all rolled, then
        the weakest of the ones that landed are struck out. `succ` stays the raw

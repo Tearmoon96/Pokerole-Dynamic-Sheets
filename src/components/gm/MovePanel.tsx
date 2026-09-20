@@ -43,6 +43,12 @@ function QuickRolls({ who, value, pain, doRoll }: {
     doRoll: (dice: number, meta: RollMeta) => void;
 }) {
     const clash = value('Clash');
+    /* Initiative is the one roll on this panel that is not a pool. It is a
+       SINGLE d6 plus Dexterity + Alert, added up — not that many dice counted
+       for successes, which is what this chip used to roll and what made a fast
+       Pokemon roll eight dice for a number it then read off as a total. The
+       pain penalty comes off successes, so it has nothing to take here. */
+    const initBonus = value('Dexterity') + value('Alert');
 
     const chip = (key: string, label: string, dice: number, tip: string, what: string) => {
         const body = <>{label} <strong>{dice}</strong></>;
@@ -63,8 +69,14 @@ function QuickRolls({ who, value, pain, doRoll }: {
 
     return (
         <>
-            {chip('init', 'INIT', value('Dexterity') + value('Alert'),
-                'Dexterity + Alert', 'Initiative')}
+            <button
+                key="init"
+                className="tip-roll"
+                title={'Dexterity + Alert — click to roll 1d6 + ' + initBonus}
+                onClick={() => doRoll(1, { who, what: 'Initiative', bonus: initBonus })}
+            >
+                INIT <strong>1d6+{initBonus}</strong>
+            </button>
             {chip('eva', 'EVA', value('Dexterity') + value('Evasion'),
                 'Dexterity + Evasion', 'Evasion')}
             {chip('clash-s', 'CLASH-S', value('Strength') + clash,

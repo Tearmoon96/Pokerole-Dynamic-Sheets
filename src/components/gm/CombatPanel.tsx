@@ -6,7 +6,8 @@ import { useGm } from '../../gm/GmContext';
 import { useGmConfirm } from './ConfirmDialog';
 import { useAppData } from '../../data/AppDataContext';
 import { useToast } from '../common/Toast';
-import { uid } from '../../gm/state';
+import { newCombat, uid } from '../../gm/state';
+import { combatPanelKey } from '../../gm/constants';
 import { useFlash } from '../../gm/useFlash';
 import { defaultStatus, ailmentByKey } from '../../gm/ailments';
 import {
@@ -16,13 +17,20 @@ import {
     adjustPool, entityPool, entityRef, participantToken as sharedParticipantToken, resolveToken, writeStatus,
 } from '../../gm/entities';
 import { PoolBar } from './RosterBits';
-import type { GmCombatant } from '../../gm/types';
+import type { GmCombat, GmCombatant } from '../../gm/types';
 import type { PokedexEntry } from '../../data/types';
 
 /* The combat tracker: initiative, five actions each, the status strip and the
-   round-start flags that say what an ailment is about to cost. */
+   round-start flags that say what an ailment is about to cost.
 
-export function CombatPanel({ onReorder, onOpenTip, cycleStatus }: {
+   One of these per fight. A party that splits up is running two initiative
+   orders and two round counters at once, so each gets its own board panel with
+   its own head and its own name, rather than one tracker the GM has to empty
+   and refill on every cut between the two. `combat` is the fight this panel
+   shows; every write goes through `mutate`, which finds it again by gid. */
+
+export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
+    combat: GmCombat;
     onReorder: (from: string, to: string) => void;
     onOpenTip: (token: string) => void;
     cycleStatus: (token: string, key: string, e: React.MouseEvent) => void;
@@ -41,8 +49,19 @@ export function CombatPanel({ onReorder, onOpenTip, cycleStatus }: {
     const dexById = (id: string): PokedexEntry | null =>
         data.pokemon.find((p) => p._id === id) || null;
 
-    const parts = state.combat.participants;
-    const round = state.combat.round;
+    const gid = combat.gid;
+    const parts = combat.participants;
+    const round = combat.round;
+    const many = state.combats.length > 1;
+    const focused = state.combatFocus === gid;
+
+    /* Every write this panel makes lands on ITS fight and no other. The gid is
+       looked up again inside the update rather than closed over as an index,
+       so a fight removed from another panel in between cannot make this one
+       write to its neighbour. */
+    const mutate = (fn: (c: GmCombat) => GmCombat) => store.update((s) => {
+        s.combats = s.combats.map((c) => (c.gid === gid ? fn(c) : c));
+    });
 
     const participantToken = (p: GmCombatant): string => sharedParticipantToken(state, dexById, p);
 
@@ -58,25 +77,21 @@ export function CombatPanel({ onReorder, onOpenTip, cycleStatus }: {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [parts, round]);
 
-    const addParticipant = (part: Partial<GmCombatant>) => store.update((s) => {
-        s.combat = {
-            ...s.combat,
-            participants: [...s.combat.participants, Object.assign({
-                /* `src` points back at the roster entry this came from, so the
-                   move tooltip works on a combat row too; it is a plain token
-                   and goes stale harmlessly if the roster is rearranged. */
-                pid: uid(), label: '?', kind: 'custom', dexId: null, src: null, init: null, acted: 0,
-            }, part) as GmCombatant],
-        };
-    });
+    const addParticipant = (part: Partial<GmCombatant>) => mutate((c) => ({
+        ...c,
+        participants: [...c.participants, Object.assign({
+            /* `src` points back at the roster entry this came from, so the
+               move tooltip works on a combat row too; it is a plain token
+               and goes stale harmlessly if the roster is rearranged. */
+            pid: uid(), label: '?', kind: 'custom', dexId: null, src: null, init: null, acted: 0,
+        }, part) as GmCombatant],
+    }));
 
-    const patch = (pid: string, fn: (p: GmCombatant) => GmCombatant) => store.update((s) => {
-        s.combat = {
-            ...s.combat,
-            participants: s.combat.participants.map((p) =>
-                (p as unknown as Record<string, string>).pid === pid ? fn(p) : p),
-        };
-    });
+    const patch = (pid: string, fn: (p: GmCombatant) => GmCombatant) => mutate((c) => ({
+        ...c,
+        participants: c.participants.map((p) =>
+            (p as unknown as Record<string, string>).pid === pid ? fn(p) : p),
+    }));
 
     /* Same gesture as the roster's bars, writing to the same sheets: a combat
        row and a roster row for one Pokemon are two views of one pool, and
@@ -108,11 +123,63 @@ export function CombatPanel({ onReorder, onOpenTip, cycleStatus }: {
             + ' takes <strong>' + dmg + '</strong> from ' + escapeHtml(a ? a.name : 'the ailment'));
     };
 
+    /* A second fight lands directly after this one on the board rather than
+       past the notes at the far right: two simultaneous fights read as a pair,
+       and the GM who just asked for one is looking here. */
+    const addCombat = () => store.update((s) => {
+        const made = newCombat('Combat ' + (s.combats.length + 1));
+        s.combats = [...s.combats, made];
+        s.combatFocus = made.gid;
+        const order = s.layout.order.slice();
+        const at = order.indexOf(combatPanelKey(gid));
+        order.splice(at < 0 ? order.length : at + 1, 0, combatPanelKey(made.gid));
+        s.layout = { ...s.layout, order };
+    });
+
+    const removeCombat = async () => {
+        const go = await confirm({
+            icon: 'fa-trash', danger: true, confirmLabel: 'Remove',
+            title: 'Remove ' + (combat.name || 'this combat') + '?',
+            text: parts.length
+                ? 'Its ' + parts.length + (parts.length === 1 ? ' combatant goes' : ' combatants go')
+                  + ' with it. The roster and their sheets are untouched.'
+                : 'The panel goes off the board.',
+        });
+        if (!go) return;
+        store.update((s) => {
+            /* The board always offers a tracker: the last one is emptied by
+               the flag button, never removed, and its Remove is not rendered. */
+            if (s.combats.length < 2) return;
+            const key = combatPanelKey(gid);
+            s.combats = s.combats.filter((c) => c.gid !== gid);
+            if (!s.combats.some((c) => c.gid === s.combatFocus)) s.combatFocus = s.combats[0].gid;
+            const widths = { ...s.layout.widths };
+            delete widths[key];
+            s.layout = {
+                order: s.layout.order.filter((k) => k !== key),
+                hidden: s.layout.hidden.filter((k) => k !== key),
+                widths,
+            };
+        });
+    };
+
     return (
         <Panel
-            panelKey="combat"
+            panelKey={combatPanelKey(gid)}
+            kind="combat"
             icon="fa-khanda"
-            title="Combat"
+            title={
+                <input
+                    className="panel-title-edit"
+                    value={combat.name}
+                    title="Rename this combat"
+                    aria-label="Combat name"
+                    onChange={(e) => {
+                        const name = e.currentTarget.value;
+                        mutate((c) => ({ ...c, name }));
+                    }}
+                />
+            }
             onReorder={onReorder}
             actions={
                 <>
@@ -134,9 +201,12 @@ export function CombatPanel({ onReorder, onOpenTip, cycleStatus }: {
                                 const ref = entityRef(s, dexById, participantToken(p));
                                 return init + initOffset(ref ? ref.status : null);
                             };
-                            const keyed = s.combat.participants.map((p, i) => ({ p, i }));
-                            keyed.sort((a, b) => eff(b.p) - eff(a.p) || a.i - b.i);
-                            s.combat = { ...s.combat, participants: keyed.map((k) => k.p) };
+                            s.combats = s.combats.map((c) => {
+                                if (c.gid !== gid) return c;
+                                const keyed = c.participants.map((p, i) => ({ p, i }));
+                                keyed.sort((a, b) => eff(b.p) - eff(a.p) || a.i - b.i);
+                                return { ...c, participants: keyed.map((k) => k.p) };
+                            });
                         })}
                     >
                         <i className="fa-solid fa-arrow-down-wide-short"></i>
@@ -149,7 +219,8 @@ export function CombatPanel({ onReorder, onOpenTip, cycleStatus }: {
                             const go = await confirm({
                                 icon: 'fa-forward-step', confirmLabel: 'Advance',
                                 title: 'Advance to round ' + next + '?',
-                                text: "Everyone's actions reset to 0 / " + MAX_ACTIONS + '.',
+                                text: "Everyone's actions reset to 0 / " + MAX_ACTIONS
+                                    + ', and the clash and evasion marks are cleared.',
                             });
                             if (!go) return;
                             /* Flinch lasts "until the end of the subject's next
@@ -163,12 +234,17 @@ export function CombatPanel({ onReorder, onOpenTip, cycleStatus }: {
                                     writeStatus(state, token, (st) => { st.flinch = false; }, () => store.save());
                                 }
                             });
-                            store.update((s) => {
-                                s.combat = {
-                                    round: next,
-                                    participants: s.combat.participants.map((p) => ({ ...p, acted: 0 })),
-                                };
-                            });
+                            /* Clash and Evasion are once per Round each, so the
+                               Round boundary is what clears their marks — the
+                               same boundary and the same gesture as the action
+                               pips going back to zero. */
+                            mutate((c) => ({
+                                ...c,
+                                round: next,
+                                participants: c.participants.map((p) => ({
+                                    ...p, acted: 0, usedClash: false, usedEva: false,
+                                })),
+                            }));
                         }}
                     >
                         <i className="fa-solid fa-forward-step"></i>
@@ -184,11 +260,42 @@ export function CombatPanel({ onReorder, onOpenTip, cycleStatus }: {
                                 text: 'Every combatant is cleared and the round counter goes back to 1.',
                             });
                             if (!go) return;
-                            store.update((s) => { s.combat = { round: 1, participants: [] }; });
+                            mutate((c) => ({ ...c, round: 1, participants: [] }));
                         }}
                     >
                         <i className="fa-solid fa-flag-checkered"></i>
                     </button>
+                    {/* Which fight the roster's join buttons drop into. Only
+                        worth a control once there are two of them to choose
+                        between — with one, every addition can only go here. */}
+                    {many && (
+                        <button
+                            className={'icon-btn' + (focused ? ' accent' : '')}
+                            aria-pressed={focused}
+                            title={focused
+                                ? 'The roster adds to this fight'
+                                : 'Send the roster\u2019s join buttons to this fight'}
+                            onClick={() => store.update((s) => { s.combatFocus = gid; })}
+                        >
+                            <i className="fa-solid fa-crosshairs"></i>
+                        </button>
+                    )}
+                    <button
+                        className="icon-btn"
+                        title="Add a second fight: another tracker beside this one, with its own round"
+                        onClick={addCombat}
+                    >
+                        <i className="fa-solid fa-plus"></i>
+                    </button>
+                    {many && (
+                        <button
+                            className="icon-btn danger"
+                            title="Remove this fight from the board"
+                            onClick={() => { void removeCombat(); }}
+                        >
+                            <i className="fa-solid fa-trash"></i>
+                        </button>
+                    )}
                 </>
             }
         >
@@ -220,24 +327,24 @@ export function CombatPanel({ onReorder, onOpenTip, cycleStatus }: {
                                 const n = parseInt(v, 10);
                                 return { ...x, init: isNaN(n) ? undefined : n };
                             })}
+                            onUsed={(key) => patch((p as unknown as Record<string, string>).pid,
+                                (x) => ({ ...x, [key]: !x[key] }))}
                             onMove={(dir) => {
                                 flash((p as unknown as Record<string, string>).pid);
-                                store.update((s) => {
-                                    const list = s.combat.participants.slice();
+                                mutate((c) => {
+                                    const list = c.participants.slice();
                                     const j = idx + dir;
-                                    if (j < 0 || j >= list.length) return;
+                                    if (j < 0 || j >= list.length) return c;
                                     [list[idx], list[j]] = [list[j], list[idx]];
-                                    s.combat = { ...s.combat, participants: list };
+                                    return { ...c, participants: list };
                                 });
                             }}
-                            onRemove={() => store.update((s) => {
-                                s.combat = {
-                                    ...s.combat,
-                                    participants: s.combat.participants.filter(
-                                        (x) => (x as unknown as Record<string, string>).pid
-                                            !== (p as unknown as Record<string, string>).pid),
-                                };
-                            })}
+                            onRemove={() => mutate((c) => ({
+                                ...c,
+                                participants: c.participants.filter(
+                                    (x) => (x as unknown as Record<string, string>).pid
+                                        !== (p as unknown as Record<string, string>).pid),
+                            }))}
                             onOpenTip={onOpenTip}
                             cycleStatus={cycleStatus}
                             onDeal={applyRoundDamage}
@@ -274,7 +381,23 @@ export function CombatPanel({ onReorder, onOpenTip, cycleStatus }: {
     );
 }
 
-function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit, onMove, onRemove, onOpenTip, cycleStatus, onDeal, onPool }: {
+/* Clash and Evasion are once per Round each — and one Clash, whether it was
+   rolled off Strength or off Special — so what the row needs is a mark, not a
+   counter. Kept here beside the component that draws them so a third one is
+   added in one place. */
+const USED_MARKS: { key: 'usedClash' | 'usedEva'; label: string; icon: string; tip: string }[] = [
+    {
+        key: 'usedClash', label: 'CLASH', icon: 'fa-hand-fist',
+        tip: 'Clash — once per Round, whichever of the two pools it was rolled off. '
+            + 'Click when it is used; advancing the Round clears it.',
+    },
+    {
+        key: 'usedEva', label: 'EVA', icon: 'fa-person-running',
+        tip: 'Evasion — once per Round. Click when it is used; advancing the Round clears it.',
+    },
+];
+
+function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit, onUsed, onMove, onRemove, onOpenTip, cycleStatus, onDeal, onPool }: {
     p: GmCombatant;
     /** True for the moment after an up/down press landed on this row. */
     moved: boolean;
@@ -285,6 +408,7 @@ function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit,
     dexById: (id: string) => PokedexEntry | null;
     onPip: (i: number) => void;
     onInit: (v: string) => void;
+    onUsed: (key: 'usedClash' | 'usedEva') => void;
     onMove: (dir: number) => void;
     onRemove: () => void;
     onOpenTip: (token: string) => void;
@@ -373,6 +497,27 @@ function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit,
                                 onClick={() => onPip(i)}
                             />
                         ))}
+                    </div>
+                    {/* Not pips: an action is one of five and reads as a
+                        count, while these two are each a yes or a no and a
+                        row of one pip would say nothing. A hand-typed
+                        combatant gets them as well — an NPC with no sheet
+                        behind it still clashes once a Round. */}
+                    <div className="c-used">
+                        {USED_MARKS.map((m) => {
+                            const on = !!p[m.key];
+                            return (
+                                <button
+                                    key={m.key}
+                                    className={'used-mark' + (on ? ' on' : '')}
+                                    aria-pressed={on}
+                                    title={m.tip + (on ? ' — used this Round.' : '')}
+                                    onClick={() => onUsed(m.key)}
+                                >
+                                    <i className={'fa-solid ' + m.icon}></i>{m.label}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
                 {/* A grid area of its own, so the stylesheet can put it beside

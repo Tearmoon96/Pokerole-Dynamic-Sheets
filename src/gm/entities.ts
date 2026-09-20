@@ -125,8 +125,7 @@ export function entityRef(
         };
     }
     if (p[0] === 'c') {
-        const part = state.combat.participants.find(
-            (x) => (x as unknown as Record<string, unknown>).pid === p[1]);
+        const part = participantByPid(state, p[1]);
         if (!part) return null;
         return {
             kind: 'custom', token: token!,
@@ -165,6 +164,19 @@ export function entityPool(
     return null;
 }
 
+/* Every combatant on the board, whichever fight they are standing in. The
+   board carries one combat panel per fight, so anything that answers a
+   question about "the" combat — what a `c:` token names, whose action count a
+   move panel shows — has to look across all of them. */
+export function allParticipants(state: GmState): GmCombatant[] {
+    return state.combats.reduce<GmCombatant[]>((acc, c) => acc.concat(c.participants), []);
+}
+
+export function participantByPid(state: GmState, pid: string): GmCombatant | null {
+    return allParticipants(state).find(
+        (x) => (x as unknown as Record<string, unknown>).pid === pid) || null;
+}
+
 /* The address a combat row should be drawn and clicked through. Falls back to
    the participant itself when its source has gone — a row whose trainer was
    removed keeps a working status strip of its own instead of rendering none. */
@@ -189,7 +201,12 @@ export function participantForToken(
 ): GmCombatant | null {
     const want = resolveToken(state, token);
     if (!want) return null;
-    return state.combat.participants.find(
+    /* Across every fight on the board, not just one: a subject can only be in
+       the order of the fight it is actually in, and which that is has no
+       bearing on what its move panel should say. The first match wins — the
+       same Pokemon standing in two simultaneous fights is a mistake the GM
+       will see in front of them, not something to resolve here. */
+    return allParticipants(state).find(
         (p) => resolveToken(state, participantToken(state, dexById, p)) === want) || null;
 }
 
@@ -234,8 +251,7 @@ export function writeStatus(
             onWildChanged();
         }
     } else if (p[0] === 'c') {
-        const part = state.combat.participants.find(
-            (x) => (x as unknown as Record<string, unknown>).pid === p[1]);
+        const part = participantByPid(state, p[1]);
         if (!part) return;
         const rec = part as unknown as Record<string, unknown>;
         rec.status = normalizeStatus(rec.status);

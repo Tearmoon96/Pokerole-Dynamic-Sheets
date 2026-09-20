@@ -157,7 +157,10 @@ body.touch-reordering {
     .icon-btn,
     .c-remove,
     .c-tip,
-    .tip-btn {
+    .tip-btn,
+    /* The combat row's clash and evasion latches, for the same reason: they
+       sit as a pair, so an overlay on each would meet in the middle. */
+    .used-mark {
         min-width: 30px;
         min-height: 30px;
     }

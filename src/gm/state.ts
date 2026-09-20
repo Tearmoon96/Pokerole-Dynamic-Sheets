@@ -1,18 +1,28 @@
-import { DEFAULT_NAME_OPTS, GM_KEY, PANEL_KEYS, PANEL_MAX_W, PANEL_MIN_W } from './constants';
+import {
+    COMBAT_KEY, DEFAULT_NAME_OPTS, GM_KEY, PANEL_MAX_W, PANEL_MIN_W,
+    combatPanelKey, expandPanelKeys,
+} from './constants';
 import { normalizeFolders } from './folders';
 import { DEFAULT_GEN_OPTS, RECENT_ROLLS } from './generator';
 import type { GmGenOpts } from './generator';
-import type { GmLayout, GmState } from './types';
+import type { GmCombat, GmCombatant, GmLayout, GmState } from './types';
 
 export function uid(): string {
     return 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
+/** A fresh, empty fight. The name is what the panel's head is titled. */
+export function newCombat(name: string): GmCombat {
+    return { gid: uid(), name, round: 1, participants: [] };
+}
+
 export function defaultGmState(): GmState {
+    const first = newCombat('Combat');
     return {
         trainerIds: [],
         wilds: [],
-        combat: { round: 1, participants: [] },
+        combats: [first],
+        combatFocus: first.gid,
         notes: '',
         noteSheets: [],
         noteFolders: [],
@@ -26,27 +36,39 @@ export function defaultGmState(): GmState {
         genOpts: { ...DEFAULT_GEN_OPTS, moves: [], favour: [] },
         generated: [],
         genRecent: [],
-        layout: { order: PANEL_KEYS.slice(), widths: {}, hidden: [] },
+        layout: { order: expandPanelKeys([combatPanelKey(first.gid)]), widths: {}, hidden: [] },
     };
 }
 
-/* A stored order must come back as a permutation of PANEL_KEYS whatever it
-   actually held: an older file predating a panel, a hand-edit that duplicated or
-   misspelt one. Anything unrecognised is dropped and anything missing is
-   appended, so a panel can never go missing from the board with no way to get it
-   back. */
-export function normalizeLayout(raw: unknown): GmLayout {
+/* A stored order must come back as a permutation of the board's real keys
+   whatever it actually held: an older file predating a panel, a hand-edit that
+   duplicated or misspelt one. Anything unrecognised is dropped and anything
+   missing is appended, so a panel can never go missing from the board with no
+   way to get it back.
+
+   `combatKeys` is what the session's fights expand the 'combat' placeholder
+   into. A file written before the board carried more than one fight names the
+   panel plainly, `combat`, so that spelling is read as the FIRST of them —
+   otherwise every such board would open with its tracker appended at the far
+   right, past the notes. */
+export function normalizeLayout(raw: unknown, combatKeys: string[]): GmLayout {
     const r = (raw && typeof raw === 'object') ? raw as Partial<GmLayout> : {};
+    const all = expandPanelKeys(combatKeys);
+    const legacy = (k: string) => (k === COMBAT_KEY && combatKeys.length ? combatKeys[0] : k);
+
     const order: string[] = [];
-    (Array.isArray(r.order) ? r.order : []).forEach((k) => {
-        if (PANEL_KEYS.includes(k) && !order.includes(k)) order.push(k);
+    (Array.isArray(r.order) ? r.order : []).forEach((raw0) => {
+        const k = legacy(raw0);
+        if (all.includes(k) && !order.includes(k)) order.push(k);
     });
-    PANEL_KEYS.forEach((k) => { if (!order.includes(k)) order.push(k); });
+    all.forEach((k) => { if (!order.includes(k)) order.push(k); });
 
     const widths: Record<string, number> = {};
-    const w = (r.widths && typeof r.widths === 'object') ? r.widths : {};
-    PANEL_KEYS.forEach((k) => {
-        const n = Number((w as Record<string, unknown>)[k]);
+    const w = (r.widths && typeof r.widths === 'object') ? r.widths as Record<string, unknown> : {};
+    Object.keys(w).forEach((raw0) => {
+        const k = legacy(raw0);
+        if (!all.includes(k) || widths[k] != null) return;
+        const n = Number(w[raw0]);
         if (isFinite(n) && n > 0) {
             widths[k] = Math.round(Math.max(PANEL_MIN_W, Math.min(PANEL_MAX_W, n)));
         }
@@ -55,9 +77,43 @@ export function normalizeLayout(raw: unknown): GmLayout {
        hand-edited file cannot hide something that no longer exists — or, worse,
        leave a key in here that no toggle can reach to switch back on. */
     const hidden = (Array.isArray(r.hidden) ? r.hidden : [])
-        .filter((k, i, a) => PANEL_KEYS.includes(k) && a.indexOf(k) === i);
+        .map(legacy)
+        .filter((k, i, a) => all.includes(k) && a.indexOf(k) === i);
 
     return { order, widths, hidden };
+}
+
+/* One fight, every field back to its own type. Same contract as the rest of
+   this file: a hand-edited or older file arrives renderable rather than
+   crashing a row. */
+function normalizeCombat(raw: unknown, fallbackName: string): GmCombat {
+    const r = (raw && typeof raw === 'object') ? raw as Partial<GmCombat> : {};
+    const round = Number(r.round);
+    return {
+        gid: typeof r.gid === 'string' && r.gid ? r.gid : uid(),
+        name: typeof r.name === 'string' && r.name.trim() ? r.name : fallbackName,
+        round: round > 0 ? Math.floor(round) : 1,
+        participants: (Array.isArray(r.participants) ? r.participants : []) as GmCombatant[],
+    };
+}
+
+/* The fights a stored blob carries. `combats` is the current shape; `combat`,
+   a single object, is what every file written before the board could hold two
+   at once has, and it becomes the first of the list. */
+function normalizeCombats(raw: Partial<GmState> & { combat?: unknown }): GmCombat[] {
+    const list = Array.isArray(raw.combats) ? raw.combats
+        : (raw.combat && typeof raw.combat === 'object') ? [raw.combat]
+            : [];
+    const seen = new Set<string>();
+    const out = list.map((c, i) => normalizeCombat(c, i ? 'Combat ' + (i + 1) : 'Combat'))
+        .map((c) => {
+            /* Two fights sharing a gid would share a board panel and a set of
+               layout entries, so the duplicate is given a new one. */
+            if (seen.has(c.gid)) c.gid = uid();
+            seen.add(c.gid);
+            return c;
+        });
+    return out.length ? out : [newCombat('Combat')];
 }
 
 /* The generator's settings, each field back to its own type. The two lists
@@ -101,7 +157,10 @@ function normalizeGenOpts(raw: unknown): GmGenOpts {
 export function normalizeGmState(raw: unknown): GmState {
     const r = (raw && typeof raw === 'object') ? raw as Partial<GmState> : {};
     const s: GmState = Object.assign(defaultGmState(), r);
-    s.combat = Object.assign({ round: 1, participants: [] }, r.combat);
+    s.combats = normalizeCombats(r);
+    delete (s as unknown as Record<string, unknown>).combat;
+    s.combatFocus = s.combats.some((c) => c.gid === r.combatFocus)
+        ? r.combatFocus! : s.combats[0].gid;
     s.dice = Object.assign({ count: 2, sides: 6, history: [] }, r.dice);
     s.nameOpts = Object.assign({}, DEFAULT_NAME_OPTS, r.nameOpts);
     s.genOpts = normalizeGenOpts(r.genOpts);
@@ -119,7 +178,6 @@ export function normalizeGmState(raw: unknown): GmState {
     (['trainerIds', 'wilds', 'npcs', 'noteSheets', 'generated'] as const).forEach((k) => {
         if (!Array.isArray(s[k])) (s as unknown as Record<string, unknown>)[k] = [];
     });
-    if (!Array.isArray(s.combat.participants)) s.combat.participants = [];
     if (!Array.isArray(s.dice.history)) s.dice.history = [];
     if (!s.expanded || typeof s.expanded !== 'object') s.expanded = {};
 
@@ -153,8 +211,7 @@ export function normalizeGmState(raw: unknown): GmState {
         if (known.has(k) && folderIds.has(v)) filed[k] = v;
     });
     s.rosterFolderOf = filed;
-    if (!(s.combat.round > 0)) s.combat.round = 1;
-    s.layout = normalizeLayout(r.layout);
+    s.layout = normalizeLayout(r.layout, s.combats.map((c) => combatPanelKey(c.gid)));
     return s;
 }
 

@@ -181,11 +181,10 @@ export function pinnedMoveObjects(
    SP.DEF are what an attacker rolls AGAINST — there is no roll to make with
    them — so they stay plain text.
 
-   `init` is new against the legacy page, which showed Dexterity + Alert and
-   left the GM to count it out: the combat tracker asks for an initiative roll
-   by hand, and the number it wants was already on screen next to a button that
-   would not roll it. */
-export const ROLLABLE_QUICK = ['init', 'eva', 'clash-s', 'clash-sp'];
+   Initiative is NOT in here, and is not a pool at all: it is 1d6 plus
+   Dexterity + Alert as a flat number. The panel draws and rolls it itself for
+   that reason — see QuickRolls. */
+export const ROLLABLE_QUICK = ['eva', 'clash-s', 'clash-sp'];
 
 export function ordSuffix(n: number): string {
     if (n % 100 >= 11 && n % 100 <= 13) return 'th';

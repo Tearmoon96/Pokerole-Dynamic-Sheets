@@ -13,7 +13,8 @@ import { AilmentPopover } from './AilmentPopover';
 import { STATUS_ICONS } from '../../gm/ailments';
 import { entityRef, writeStatus } from '../../gm/entities';
 import { WORKING_KEY } from '../../state/constants';
-import { ActivePanelCtx, PANEL_TABS } from '../../gm/phoneBoard';
+import { ActivePanelCtx, panelTabs } from '../../gm/phoneBoard';
+import { combatGidOf, isCombatPanelKey } from '../../gm/constants';
 import { useDeviceClass } from '../../lib/device';
 import type { PokedexEntry } from '../../data/types';
 import type { GmStatus } from '../../gm/ailments';
@@ -109,9 +110,6 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
         roster: (
             <RosterPanel key="roster" onReorder={reorder} onOpenTip={setTipToken} cycleStatus={cycleStatus} />
         ),
-        combat: (
-            <CombatPanel key="combat" onReorder={reorder} onOpenTip={setTipToken} cycleStatus={cycleStatus} />
-        ),
         dice: (
             <DicePanel
                 key="dice"
@@ -132,9 +130,29 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
        out among the rest with no extra rule. */
     const shown = state.layout.order.filter((k) => !state.layout.hidden.includes(k));
 
+    /* The combat trackers are not in PANELS: there is one per fight and the
+       list is the session's, so they are built here from the key. A key naming
+       a fight that is no longer there renders nothing, exactly as an unknown
+       key in the order does — normalizeLayout drops both on the next load. */
+    const panelFor = (k: string): React.ReactNode => {
+        if (!isCombatPanelKey(k)) return PANELS[k];
+        const c = state.combats.find((x) => x.gid === combatGidOf(k));
+        if (!c) return null;
+        return (
+            <CombatPanel
+                key={k}
+                combat={c}
+                onReorder={reorder}
+                onOpenTip={setTipToken}
+                cycleStatus={cycleStatus}
+            />
+        );
+    };
+
+    const allTabs = panelTabs(state.combats);
     const tabs = shown
-        .map((k) => PANEL_TABS.find((t) => t.key === k))
-        .filter((t): t is typeof PANEL_TABS[number] => Boolean(t));
+        .map((k) => allTabs.find((t) => t.key === k))
+        .filter((t): t is typeof allTabs[number] => Boolean(t));
 
     /* Falls back to the first tab if the selected panel is not in the current
        order — otherwise a board saved without, say, the dice panel would open
@@ -171,7 +189,7 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
                 in it every time the GM glanced at another tab. */}
             <ActivePanelCtx.Provider value={onPhone ? active : null}>
                 <main className="board" id="board">
-                    {shown.map((k) => PANELS[k]).filter(Boolean)}
+                    {shown.map(panelFor).filter(Boolean)}
                     {!shown.length && (
                         <div className="board-empty">
                             Every section is hidden. Switch one back on with the

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGm } from '../../gm/GmContext';
-import { PANEL_TABS } from '../../gm/phoneBoard';
+import { panelTabs } from '../../gm/phoneBoard';
 import { HomeButton } from '../common/HomeButton';
 import { useGmConfirm } from './ConfirmDialog';
 import { useToast } from '../common/Toast';
@@ -111,7 +111,7 @@ export function TopBar() {
                     than collapsing it, so the panels left over share its width
                     — .panel is `flex: 1 1 390px`, which does that by itself. */}
                 <div className="section-toggles" role="group" aria-label="Show or hide board sections">
-                    {PANEL_TABS.map((t) => {
+                    {panelTabs(state.combats).map((t) => {
                         const on = !state.layout.hidden.includes(t.key);
                         return (
                             <button

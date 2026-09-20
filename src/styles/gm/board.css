@@ -89,7 +89,13 @@ body.resizing .panel-body { pointer-events: none; }
     flex: 0 0 auto;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    /* A combat panel's head carries the most of any: a round pill, sort,
+       advance, end, the crosshair that says where the roster adds, new and
+       remove, plus the grip and the lock. At 260px — a panel's floor — that
+       is more than one line, and wrapping is what a too-narrow row of fixed
+       controls has instead of painting them over each other. */
+    flex-wrap: wrap;
+    gap: 0.35rem 0.5rem;
     padding: 0.55rem 0.8rem;
     border-bottom: 1px solid var(--border-color);
     background: var(--primary-faint);
@@ -110,6 +116,44 @@ body.resizing .panel-body { pointer-events: none; }
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* A panel whose title is its own, renameable, rather than a fixed word: the
+   combat trackers, one per fight. Drawn as the title it replaces — the field
+   is the heading, so it carries no border until it is hovered or focused and
+   there is nothing extra on the head's one line. */
+.panel-title-edit {
+    width: 100%;
+    min-width: 0;
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 0.1rem 0.25rem;
+    margin: -0.1rem -0.25rem;
+}
+
+/* The other five heads let their title give way to the controls, because
+   the title is a fixed word that can be read back off the icon beside it.
+   A combat panel's is the fight's NAME and a field to type it in, so it
+   claims a floor instead and the head wraps around it — at a phone's width
+   the row of controls is wider than the panel on its own, and a title
+   squeezed to 17px is a rename nobody can aim at. */
+.panel[data-panel-kind="combat"] .panel-head h2 {
+    flex: 1 1 7.5rem;
+    min-width: 7.5rem;
+    overflow: visible;
+}
+
+.panel-title-edit:hover { border-color: var(--border-color); }
+
+.panel-title-edit:focus {
+    outline: none;
+    border-color: var(--ghost-color);
+    background: var(--panel-solid);
 }
 
 .panel-body {

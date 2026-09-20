@@ -35,7 +35,7 @@ html[data-device="tablet"] .panel {
    in two and the name is trimmed to about four characters. 400px is what it
    takes for the strip to sit on one line, and three panels still fit across
    a 10.5" tablet with it. */
-html[data-device="tablet"] #panel-combat {
+html[data-device="tablet"] .panel[data-panel-kind="combat"] {
     flex: 1 1 400px;
     min-width: 400px;
 }
@@ -269,6 +269,14 @@ html[data-device="phone"] .dice-config {
        between the two groups. */
     .pips {
         gap: 3px;
+    }
+
+    /* Finger-sized, and with the label legible beside a 26px pip. The strip
+       wraps them onto a line of their own when the panel has no room, which
+       is what the strip is for. */
+    .used-mark {
+        font-size: 0.66rem;
+        padding: 0.25rem 0.45rem;
     }
 
     .pip {

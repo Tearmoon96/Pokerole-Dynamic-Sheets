@@ -12,10 +12,14 @@ import { reorderHandle, reorderItem } from '../../lib/touchDrag';
    an explicit width and "does not follow the window" are the same state, so
    setting one is what turns the lock on. */
 
-export function Panel({ panelKey, icon, title, actions, children, onReorder }: {
+export function Panel({ panelKey, kind, icon, title, actions, children, onReorder }: {
     panelKey: string;
+    /* Which FAMILY of panel this is, for rules that want every one of a kind.
+       The board can hold several combat trackers, each with a key of its own,
+       so `#panel-combat` stopped being a thing a stylesheet could name. */
+    kind?: string;
     icon: string;
-    title: string;
+    title: ReactNode;
     actions?: ReactNode;
     children: ReactNode;
     onReorder: (from: string, to: string) => void;
@@ -89,6 +93,7 @@ export function Panel({ panelKey, icon, title, actions, children, onReorder }: {
             className={'panel' + (fixed ? ' fixed-w' : '')
                 + (activePanel === panelKey ? ' phone-active' : '')}
             id={'panel-' + panelKey}
+            data-panel-kind={kind || panelKey}
             /* Marks this panel as both a thing that can be picked up and a
                place another can land, for the touch path — the native drag
                below never fires from a finger. The grab itself is on the

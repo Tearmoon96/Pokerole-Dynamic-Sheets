@@ -172,6 +172,49 @@
     box-shadow: 0 0 5px var(--ghost-color-glow);
 }
 
+/* Clash and Evasion, once per Round each. A pair of latches on the action
+   strip rather than pips: an action is one of five and reads as a count,
+   while each of these is a yes or a no.
+
+   Lit in the danger red when used, which is the answer the GM is scanning
+   for — "has this one already clashed this Round" — and dim otherwise, so a
+   row of eight status glyphs and five pips does not gain two more things
+   shouting at it. */
+.c-used {
+    display: flex;
+    gap: 0.2rem;
+    flex: 0 0 auto;
+}
+
+.used-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.58rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    padding: 0.25rem 0.3rem;
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.used-mark i { font-size: 0.6rem; }
+
+.used-mark:hover { color: var(--text-secondary); border-color: var(--ghost-color); }
+
+.used-mark.on {
+    color: #fca5a5;
+    border-color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 16%, transparent);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+}
+
 /* Sits in the action strip, which does its own spacing */
 .combat-row .status-chips { margin-top: 0; }
 
