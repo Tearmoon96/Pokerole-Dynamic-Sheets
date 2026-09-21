@@ -180,24 +180,41 @@
     display: block;
 }
 
-/* Optical centring. The row centres each mark's BOX, and the three boxes
-   are centred to within 0.3px — but the shapes inside are not symmetric.
-   Measured on the rendered ink at 8x: a five-pointed star has two legs
-   below and one spike above, so its centroid sits 0.8px under its box
-   centre; the ♀♂ glyph's circle-and-arrow put its centroid 1.5px above;
-   the stone is a circle and the two coincide. Side by side that reads as
-   the star low and the stone high, though the boxes say otherwise. Each
-   glyph is nudged so its centroid, not its box, lands on the row's
-   centre. A transform on the <i>, not `top`: a relative offset is
-   snapped to whole pixels, a transform is rendered at the fraction
-   asked for — and the buttons, the flex row and the touch overlays do
-   not move either way. */
+/* The three marks share a BOTTOM edge — the owner's call, after the
+   centred version still read as staggered: a five-pointed star, a circle
+   and a ♀♂ glyph have very different ink, and what the eye lines up on a
+   row of small marks is where they stand, not where their middles are.
+
+   The row centres each mark's box, so the ink bottoms fall where each
+   shape's own metrics put them: measured at 8x, relative to the row's
+   centre, the stone's ink ends at +8.9px, the star's at +8.75, and the
+   gender glyphs anywhere from +6.9 (⚲) to +10.0 (⚥) — the ♀ and ⚥ carry a
+   cross below their circle, the ⚲ nothing. Each glyph is shifted by the
+   difference so its ink ends level with the stone's; one offset per
+   glyph, because the gender mark is four different shapes.
+
+   A transform on the <i>, not `top`: a relative offset is snapped to
+   whole pixels, a transform is rendered at the fraction asked for — and
+   the buttons, the flex row and the touch overlays do not move either
+   way. */
 .sprite-top-right .shiny-toggle i {
-    transform: translateY(-0.5px);
+    transform: translateY(0.15px);
 }
 
-.sprite-top-right .gender-toggle i {
-    transform: translateY(1.4px);
+.sprite-top-right .gender-toggle .fa-venus-mars {
+    transform: translateY(-1.1px);
+}
+
+.sprite-top-right .gender-toggle .fa-mars {
+    transform: translateY(0.15px);
+}
+
+.sprite-top-right .gender-toggle .fa-venus {
+    transform: translateY(-1px);
+}
+
+.sprite-top-right .gender-toggle .fa-genderless {
+    transform: translateY(2px);
 }
 
 /* Top-left of the sprite box, stacked downwards: resize, then the two
