@@ -1076,3 +1076,10 @@ select.move-edit-input optgroup {
     }
 }
 
+
+/* Rank list: the same narrow box as the nature's; the rank already on the
+   sheet is marked, because the list opens with all eight rather than filtered */
+.move-suggestion .rank-current {
+    color: var(--accent);
+    font-weight: 700;
+}

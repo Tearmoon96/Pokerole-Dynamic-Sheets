@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSheetStore } from '../../state/SheetContext';
 import { useAppData } from '../../data/AppDataContext';
 import { Suggestions } from '../common/Suggestions';
+import { RankInput } from '../common/RankInput';
 
 /* Nature search: a dropdown over the 25 book natures. The input stays a plain
    text field, so a homebrew nature can just be typed in and saved — the list is
@@ -51,16 +52,12 @@ export function NatureRank() {
                     }))}
                 />
             </div>
-            <div className="pill-field">
+            <div className="pill-field rank-field">
                 <label htmlFor="rank-input">Rank:</label>
-                <input
-                    type="text"
-                    id="rank-input"
+                <RankInput
                     value={sheet.rank}
-                    onChange={(e) => {
-                        const rank = e.currentTarget.value;
-                        store.update((s) => { s.rank = rank; });
-                    }}
+                    onCommit={(rank) => store.update((s) => { s.rank = rank; })}
+                    suggestionsClassName="nature-suggestions rank-suggestions"
                 />
             </div>
         </div>

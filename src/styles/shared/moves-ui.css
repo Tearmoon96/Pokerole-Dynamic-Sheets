@@ -533,3 +533,22 @@ select.move-edit-input optgroup {
     font-size: 0.9rem;
 }
 
+
+/* Rank list: the same upward-opening box as the nature's, since this pill
+   is the very last thing in the panel. It rises over the Nature pill, so it
+   must stack above .nature-field's 5. The rank already on the sheet is
+   marked, because the list opens with all eight rather than filtered. */
+.rank-field {
+    position: relative;
+    z-index: 6;
+}
+
+/* Eight rows, so it need never scroll: the nature's 220px cut Champion off */
+.rank-suggestions {
+    max-height: 280px;
+}
+
+.move-suggestion .rank-current {
+    color: var(--accent);
+    font-weight: 700;
+}

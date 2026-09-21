@@ -1,6 +1,7 @@
 import { useCard } from '../../card/CardContext';
 import { PoolBar } from '../common/PoolBar';
 import { StatusTracker } from './StatusTracker';
+import { RankInput } from '../common/RankInput';
 import {
     DEFENCE_BONUS_CAP, defenceValue, derivedPoolMax, getPoolMax,
 } from '../../card/pools';
@@ -113,16 +114,14 @@ export function PoolsPanel() {
                 <span className="tracker-label">
                     <i className="fa-solid fa-ranking-star" style={{ color: '#f59e0b' }}></i> Rank
                 </span>
-                <input
-                    type="text"
-                    id="rank-input"
-                    className="pool-text-input"
-                    value={sheet.rank}
-                    onChange={(e) => {
-                        const rank = e.currentTarget.value;
-                        store.update((s) => { s.rank = rank; });
-                    }}
-                />
+                <div className="item-search-wrap">
+                    <RankInput
+                        value={sheet.rank}
+                        onCommit={(rank) => store.update((s) => { s.rank = rank; })}
+                        inputClassName="pool-text-input"
+                        suggestionsClassName="nature-suggestions rank-suggestions"
+                    />
+                </div>
             </div>
 
             <div className="tracker-row">
