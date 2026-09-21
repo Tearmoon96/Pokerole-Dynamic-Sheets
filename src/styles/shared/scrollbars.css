@@ -1,0 +1,65 @@
+/* Scrollbars, all four pages. One copy, imported by every page's entry file
+   after the page's own sheets, so nothing below it paints a track of its own.
+
+   Two kinds of scroller. The PAGE's own bar keeps the dark strip down the
+   right edge it always had. Every scroller INSIDE the page — a dropdown
+   list, a textarea, a picker, a GM panel body — gets no track at all, and a
+   thumb that stops 6px short of either end. A track painted edge to edge
+   was a dark rectangle laid over a 12px-radius panel: it ran straight
+   through the panel's padding and into its rounded corners, and on the
+   light theme it was a black bar down the side of a white list.
+
+   Chrome only, and deliberately no `scrollbar-color`: the moment that
+   property is set Chrome ignores every ::-webkit-scrollbar rule below. */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+    /* Keeps the thumb clear of a rounded panel's corners; matches the 6px
+       padding the dropdown lists give their rows */
+    margin: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--ghost-color);
+}
+
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* The page's own bar. body's overflow-x is propagated to the viewport on
+   the sheets, and Chrome reads the viewport's scrollbar rules off whichever
+   of the two propagated, so both are named. */
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+    background: #0d0914cc;
+    margin: 0;
+}
+
+/* Light themes. --border-color is the theme colour at ~25%, tuned to read
+   over a near-black track; over a white panel it is a pink so pale it is
+   barely there, and the page's dark strip becomes a black bar down a light
+   page. The card and the License both flip .light-theme on <html>. */
+:root.light-theme::-webkit-scrollbar-track,
+:root.light-theme body::-webkit-scrollbar-track {
+    background: #00000012;
+}
+
+:root.light-theme::-webkit-scrollbar-thumb,
+:root.light-theme ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--ghost-color) 40%, transparent);
+}
+
+:root.light-theme::-webkit-scrollbar-thumb:hover,
+:root.light-theme ::-webkit-scrollbar-thumb:hover {
+    background: var(--ghost-color);
+}

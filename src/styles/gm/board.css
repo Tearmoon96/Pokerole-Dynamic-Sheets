@@ -180,9 +180,5 @@ body.resizing .panel-body { pointer-events: none; }
    Applies to every panel, so all five scroll the same way. */
 .panel-body > * { flex: 0 0 auto; }
 
-/* Slim scrollbars, same feel as the sheets */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--primary-soft); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--ghost-color); }
+/* Scrollbars: shared/scrollbars.css */
 

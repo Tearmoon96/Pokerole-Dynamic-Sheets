@@ -59,23 +59,7 @@ body {
     overflow-x: hidden;
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar {
-    width: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: #0d0914cc;
-}
-
-::-webkit-scrollbar-thumb {
-    background: var(--border-color);
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: var(--ghost-color);
-}
+/* Scrollbars: shared/scrollbars.css */
 
 .card-container {
     width: 100%;

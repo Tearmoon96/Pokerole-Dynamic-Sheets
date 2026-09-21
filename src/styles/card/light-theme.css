@@ -61,11 +61,6 @@
     --will-glow: #3c6cf866;
 }
 
-:where(:root.light-theme) ::-webkit-scrollbar-track,
-:where(:root.light-theme) .moves-grid::-webkit-scrollbar-track {
-    background: #00000012;
-}
-
 /* Hairlines: panel frames, dividers, inputs and buttons were all drawn
    as white-alpha borders */
 :where(:root.light-theme) .sprite-selectors,

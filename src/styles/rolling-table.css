@@ -20,3 +20,4 @@
 
 /* The "new version is ready" bar, on every page that registers a worker. */
 @import './shared/update-prompt.css';
+@import './shared/scrollbars.css';

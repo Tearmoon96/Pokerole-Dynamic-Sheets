@@ -1035,13 +1035,6 @@ select.move-edit-input optgroup {
     overflow: hidden;
 }
 
-/* The page-wide track is #0d0914cc — the same ink as the box but at 80%
-   against the box's 50%, which drew a darker strip down this edge. Match
-   the box instead, and let the glow layer below show through it. */
-.moves-grid::-webkit-scrollbar-track {
-    background: #0d091480;
-}
-
 .moves-grid {
     position: absolute;
     inset: 0;
