@@ -180,6 +180,26 @@
     display: block;
 }
 
+/* Optical centring. The row centres each mark's BOX, and the three boxes
+   are centred to within 0.3px — but the shapes inside are not symmetric.
+   Measured on the rendered ink at 8x: a five-pointed star has two legs
+   below and one spike above, so its centroid sits 0.8px under its box
+   centre; the ♀♂ glyph's circle-and-arrow put its centroid 1.5px above;
+   the stone is a circle and the two coincide. Side by side that reads as
+   the star low and the stone high, though the boxes say otherwise. Each
+   glyph is nudged so its centroid, not its box, lands on the row's
+   centre. A transform on the <i>, not `top`: a relative offset is
+   snapped to whole pixels, a transform is rendered at the fraction
+   asked for — and the buttons, the flex row and the touch overlays do
+   not move either way. */
+.sprite-top-right .shiny-toggle i {
+    transform: translateY(-0.5px);
+}
+
+.sprite-top-right .gender-toggle i {
+    transform: translateY(1.4px);
+}
+
 /* Top-left of the sprite box, stacked downwards: resize, then the two
    custom-image controls under it. */
 .sprite-top-left {
