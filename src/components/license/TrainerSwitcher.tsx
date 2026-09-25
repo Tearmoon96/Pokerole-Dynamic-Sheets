@@ -1,6 +1,7 @@
 import { Modal, ModalClose, ModalTitle } from '../common/Modal';
 import { useSheetStore } from '../../state/SheetContext';
 import { useSession } from '../../state/SessionContext';
+import { PickReorder, useDragReorder } from '../common/PickReorder';
 
 /* Edge arrows, the indicator, and the picker behind it. All three only exist
    while more than one trainer is loaded from a folder. */
@@ -58,14 +59,17 @@ export function TrainerPicker() {
     const session = useSession();
     const n = store.trainers.length;
     const close = () => session.setTrainerPickerOpen(false);
+    const move = (from: number, to: number) => store.moveTrainer(from, to);
+    const { rowProps, rowClass } = useDragReorder(move);
 
     return (
         <Modal open={session.trainerPickerOpen} onClose={close} id="trainer-picker-modal">
             <ModalClose onClick={close} />
             <ModalTitle icon="fa-users" centered={false}>Choose a Trainer</ModalTitle>
             <p className="modal-text" id="trainer-picker-text">
-                {n} trainer{n === 1 ? '' : 's'} loaded. Click one to open it, or use ✕ to close
-                (unload) it — its .json file on disk is never touched.
+                {n} trainer{n === 1 ? '' : 's'} loaded. Click one to open it, drag it or use the
+                arrows to reorder, or use ✕ to close (unload) it — its .json file on disk is never
+                touched.
             </p>
             <div className="trainer-picker-list" id="trainer-picker-list">
                 {store.trainers.map((t, i) => {
@@ -74,14 +78,16 @@ export function TrainerPicker() {
                     return (
                         <div
                             key={t.id || i}
-                            className={'trainer-pick-row' + (i === store.active ? ' current' : '')}
+                            className={'trainer-pick-row' + (i === store.active ? ' current' : '') + rowClass(i)}
                             onClick={() => { close(); store.setActive(i); }}
+                            {...rowProps(i)}
                         >
                             <i className="fa-solid fa-id-card"></i>
                             <span className="trainer-pick-name">{nm}</span>
                             <span className="trainer-pick-sub">
                                 {sub}{store.isDirty(t) ? ' • unsaved' : ''}
                             </span>
+                            <PickReorder index={i} count={n} label="this trainer" onMove={move} />
                             <button
                                 className="trainer-pick-close"
                                 title="Close this trainer (unload it; the file stays on disk)"

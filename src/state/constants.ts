@@ -6,6 +6,8 @@
 export const STORAGE_KEY = 'pokerole_trainer_license';
 /** Shared working set (this page + Pokémon cards). */
 export const WORKING_KEY = 'pokerole_working';
+/** Trainer ids in the order the user arranged them in the picker. */
+export const TRAINER_ORDER_KEY = 'pokerole_trainer_order';
 
 /** Marker written into exported trainer JSON; the folder loader keys off it. */
 export const TRAINER_MARKER = '_pokeroleTrainer';

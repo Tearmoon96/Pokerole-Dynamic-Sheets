@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import { Modal, ModalClose } from '../common/Modal';
+import { PickReorder, useDragReorder } from '../common/PickReorder';
 import { TileSprite } from '../common/TileSprite';
 import { useCard } from '../../card/CardContext';
 import { useAppData } from '../../data/AppDataContext';
 import { speciesDisplayName } from './CardHeader';
 import { megaStoneOf } from '../common/MonName';
-import { readWildOpen, wildUrl } from '../../card/wild';
+import { moveWildOpen, readWildOpen, wildUrl } from '../../card/wild';
 import { wildSheetKey } from '../../card/cardContext';
 import type { WildOpenEntry } from '../../card/wild';
 
@@ -115,7 +117,11 @@ export function WildSwitcherModal({ open, onClose, onNewWild, onImportFolder, on
     const { store } = useCard();
     const { data } = useAppData();
     const { name, species } = useWildNames();
+    /* The list is read from storage on every render, so a move only needs one */
+    const [, setMoves] = useState(0);
     const list = readWildOpen();
+    const move = (from: number, to: number) => { moveWildOpen(from, to); setMoves((n) => n + 1); };
+    const { rowProps, rowClass } = useDragReorder(move);
 
     return (
         <Modal open={open} onClose={onClose} boxClassName="wild-switch-box" id="wild-switch-modal">
@@ -125,7 +131,8 @@ export function WildSwitcherModal({ open, onClose, onNewWild, onImportFolder, on
             </div>
             <p className="modal-text" id="wild-switch-text">
                 {list.length > 1
-                    ? list.length + ' wild Pokémon open. Click one to edit it, or ✕ to close it. '
+                    ? list.length + ' wild Pokémon open. Click one to edit it, drag it or use the arrows '
+                      + 'to reorder, or ✕ to close it. '
                       + 'They all stay in this browser until you save or export them.'
                     : 'One wild Pokémon open. Add another and the two sit side by side — '
                       + 'arrows at the edges of the page switch between them.'}
@@ -155,20 +162,22 @@ export function WildSwitcherModal({ open, onClose, onNewWild, onImportFolder, on
                 </button>
             </div>
             <div className="wild-pick-list" id="wild-pick-list">
-                {list.map((e) => {
+                {list.map((e, i) => {
                     const dex = data.pokemon.find((x) => x._id === e.dexId);
                     const current = e.wid === store.ctx.wildId;
                     return (
                         <div
                             key={e.wid}
-                            className={'wild-pick-row' + (current ? ' current' : '')}
+                            className={'wild-pick-row' + (current ? ' current' : '') + rowClass(i)}
                             title={(current ? 'This is the sheet on screen' : 'Open this one')
                                 + (e.file ? ' — imported from ' + e.file : '')}
                             onClick={() => { onClose(); switchWild(list, e.wid, store.ctx.wildId); }}
+                            {...rowProps(i)}
                         >
                             <TileSprite image={dex ? dex.Image : ''} />
                             <span className="wild-pick-name">{name(e)}</span>
                             <span className="wild-pick-sub">{current ? 'on screen' : species(e)}</span>
+                            <PickReorder index={i} count={list.length} label="this Pokémon" onMove={move} />
                             <button
                                 className="wild-pick-close"
                                 title="Close this wild Pokémon"

@@ -1,9 +1,10 @@
 import { defaultState } from './defaults';
 import { normalizeState } from './normalize';
 import { STORAGE_KEY } from './constants';
+import { moveItem } from '../lib/reorder';
 import {
-    anyDirty, isDirty, markSaved, mergeFromStorage, readWorkingSet, trainerJson,
-    writeWorkingSet, WorkingSetQuotaError,
+    anyDirty, isDirty, markSaved, mergeFromStorage, readWorkingSet, rememberTrainerOrder,
+    trainerJson, writeWorkingSet, WorkingSetQuotaError,
 } from './workingSet';
 import type { WorkingTrainer } from './workingSet';
 import type { StoredSession } from './restore';
@@ -125,6 +126,19 @@ export class SheetStore {
         if (!next.length) { this.startBlank(); this.save(); return; }
         this.trainers = next;
         this.active = Math.min(this.active > index ? this.active - 1 : this.active, next.length - 1);
+        this.save();
+        this.notify();
+    }
+
+    /** Move a trainer to another place in the picker. The one on screen stays
+        on screen; only its position in the list changes. */
+    moveTrainer(from: number, to: number): void {
+        const next = moveItem(this.trainers, from, to);
+        if (next === this.trainers) return;
+        const current = this.entry;
+        this.trainers = next;
+        this.active = Math.max(0, next.indexOf(current));
+        rememberTrainerOrder(next.map((t) => t.id));
         this.save();
         this.notify();
     }

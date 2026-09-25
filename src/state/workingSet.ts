@@ -1,4 +1,4 @@
-import { TRAINER_MARKER, WORKING_KEY } from './constants';
+import { TRAINER_MARKER, TRAINER_ORDER_KEY, WORKING_KEY } from './constants';
 import { defaultState } from './defaults';
 import { normalizeState } from './normalize';
 import type { TrainerEntry, TrainerState } from './types';
@@ -87,4 +87,26 @@ export function mergeFromStorage(current: WorkingTrainer[]): WorkingTrainer[] | 
         return { ...t, data: normalizeState(wt.data) };
     });
     return changed ? next : null;
+}
+
+/* The order trainers were arranged in, kept apart from the working set.
+
+   The working set already carries its trainers in order, so a restored session
+   needs nothing more. This is for opening the folder again: files come back in
+   whatever order the directory lists them, and without it the arrangement would
+   be lost every time. It holds ids, never data, and only once the user has
+   actually moved something — a folder nobody rearranged loads as it always did.
+   Trainers not loaded right now keep their places at the end, so arranging one
+   folder never forgets another's. */
+export function readTrainerOrder(): string[] {
+    try {
+        const raw = JSON.parse(localStorage.getItem(TRAINER_ORDER_KEY) || 'null');
+        return Array.isArray(raw) ? raw.filter((x) => typeof x === 'string') : [];
+    } catch { return []; }
+}
+
+export function rememberTrainerOrder(ids: string[]): void {
+    const rest = readTrainerOrder().filter((id) => !ids.includes(id));
+    try { localStorage.setItem(TRAINER_ORDER_KEY, JSON.stringify([...ids, ...rest])); }
+    catch { /* quota: the working set still holds this session's order */ }
 }

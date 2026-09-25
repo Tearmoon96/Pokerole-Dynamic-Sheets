@@ -1,0 +1,65 @@
+/* Reordering the trainer and wild-Pokémon pickers: the arrows at the end of a
+   row, and the marks a dragged row leaves. Shared by the License and the card. */
+.pick-reorder {
+    display: inline-flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    gap: 1px;
+}
+
+.pick-reorder button {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.62rem;
+    line-height: 1;
+    padding: 2px 5px;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: all 0.15s;
+}
+
+.pick-reorder button i {
+    /* .trainer-pick-row i paints every glyph in the row the theme colour */
+    color: inherit;
+}
+
+.pick-reorder button:hover:not(:disabled) {
+    opacity: 1;
+    color: var(--text-primary);
+    background: var(--primary-soft);
+}
+
+.pick-reorder button:disabled {
+    opacity: 0.2;
+    cursor: default;
+}
+
+/* The row being dragged fades; the one under it shows where it will land */
+.trainer-pick-row.dragging,
+.wild-pick-row.dragging {
+    opacity: 0.4;
+}
+
+.trainer-pick-row.drop-before,
+.wild-pick-row.drop-before {
+    box-shadow: inset 0 3px 0 -1px var(--ghost-color);
+}
+
+.trainer-pick-row.drop-after,
+.wild-pick-row.drop-after {
+    box-shadow: inset 0 -3px 0 -1px var(--ghost-color);
+}
+
+/* A finger gets the arrows at a size it can hit, side by side */
+html[data-pointer="coarse"] .pick-reorder {
+    flex-direction: row;
+    gap: 4px;
+}
+
+html[data-pointer="coarse"] .pick-reorder button {
+    font-size: 0.8rem;
+    min-width: 36px;
+    min-height: 36px;
+}

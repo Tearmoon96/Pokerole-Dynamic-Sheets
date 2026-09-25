@@ -1,7 +1,8 @@
 import { TRAINER_MARKER } from './constants';
 import { genId } from './defaults';
 import { normalizeState } from './normalize';
-import { markSaved, trainerFileName, trainerJson } from './workingSet';
+import { markSaved, readTrainerOrder, trainerFileName, trainerJson } from './workingSet';
+import { sortByOrder } from '../lib/reorder';
 import type { WorkingTrainer } from './workingSet';
 import { dirEntries, ensureWorkingFolderScaffold, getDirHandle, rememberDirHandle } from '../lib/fileSystem';
 
@@ -92,7 +93,7 @@ export function adoptLoadedTrainers(loaded: WorkingTrainer[]): WorkingTrainer[] 
         seen.add(t.id);
         markSaved(t);   // freshly loaded == in sync with disk
     });
-    return loaded;
+    return sortByOrder(loaded, (t) => t.id, readTrainerOrder());
 }
 
 function download(json: string, fileName: string): void {

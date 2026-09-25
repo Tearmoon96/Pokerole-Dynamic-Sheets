@@ -1,5 +1,6 @@
 import { idbDel, idbGet, idbSet } from '../state/idb';
 import { dirEntries } from '../lib/fileSystem';
+import { moveItem } from '../lib/reorder';
 import { WILD_MARKER, WILD_OPEN_KEY, wildSheetKey } from './cardContext';
 import type { CardSheet } from './types';
 import type { PokedexEntry } from '../data/types';
@@ -49,6 +50,14 @@ export function readWildOpen(): WildOpenEntry[] {
 export function writeWildOpen(list: WildOpenEntry[]): void {
     try { localStorage.setItem(WILD_OPEN_KEY, JSON.stringify(list)); }
     catch { /* quota / private mode: the switcher simply forgets */ }
+}
+
+/** Move an open sheet to another place in the switcher. */
+export function moveWildOpen(from: number, to: number): WildOpenEntry[] {
+    const list = readWildOpen();
+    const next = moveItem(list, from, to);
+    if (next !== list) writeWildOpen(next);
+    return next;
 }
 
 /** `file` is left alone when the caller has none — a reload must not forget
