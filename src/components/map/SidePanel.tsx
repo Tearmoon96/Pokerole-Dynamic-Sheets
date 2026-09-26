@@ -1,0 +1,484 @@
+import { useEffect, useRef, useState } from 'react';
+import type { ReactElement } from 'react';
+import { useMap } from '../../map/MapContext';
+import { LABEL_ROLES, PATH_KINDS, styleOf } from '../../map/styles';
+import type { MapStyle } from '../../map/styles';
+import { TERRAINS } from '../../map/terrain';
+import { LANDMARK_GROUPS, LANDMARKS, landmarkOf } from '../../map/landmarks';
+import type { LandmarkGroup } from '../../map/landmarks';
+import { landmarkChain, markerChain, onImageArrived, pokemonTokenChain, probeImage, terrainTextureUrl } from '../../map/sprites';
+import { patternDataUrl } from '../../map/render/patterns';
+import { uid } from '../../map/doc';
+import { typeColors } from '../../lib/themeTables';
+import { MapSprite } from './MapSprite';
+import { TokenPicker } from './TokenPicker';
+import type { MapDoc, MapLabel, MapPath, MapStamp, MapToken, Selection } from '../../map/types';
+import type { MapStore } from '../../map/store';
+
+/* The right-hand panel: what the current tool lays down, and — once something
+   is selected — the inspector for it. Every field is controlled (`value=`) and
+   keyed by the object's id, never by what is typed into it (§5E). */
+
+export const TOKEN_COLORS = ['#e0645c', '#3c6cf8', '#3aa593', '#f0b429', '#a855f7', '#ec4899', '#f8f8f8', '#333333'];
+
+const TYPES = Object.keys(typeColors);
+
+/* ------------------------------------------------------------- terrain */
+
+function swatchBackground(style: MapStyle, slug: string): string {
+    const look = style.terrain[slug];
+    const fill = look?.fill ?? '#888';
+    const tex = probeImage(terrainTextureUrl(style, slug));
+    if (tex) return `url("${tex.src}") center / 50% repeat, ${fill}`;
+    const tile = look?.pattern ? patternDataUrl(look.pattern, look.ink ?? '#0003') : null;
+    return tile ? `url("${tile}") 0 0 / 100% repeat, ${fill}` : fill;
+}
+
+function TerrainPalette({ style }: { style: MapStyle }) {
+    const { store, ui } = useMap();
+    const [, setTick] = useState(0);
+    useEffect(() => onImageArrived(() => setTick((n) => n + 1)), []);
+    const backgrounds = new Map(TERRAINS.map((t) => [t.slug, swatchBackground(style, t.slug)]));
+    return (
+        <section className="map-section">
+            <h3>Terrain</h3>
+            <div className="map-swatches">
+                {TERRAINS.map((t) => (
+                    <button
+                        key={t.code}
+                        className={'map-swatch' + (ui.terrain === t.code ? ' on' : '')}
+                        aria-pressed={ui.terrain === t.code}
+                        title={t.name}
+                        onClick={() => store.setUi({ terrain: t.code, tool: ui.tool === 'fill' ? 'fill' : 'paint' })}
+                    >
+                        <span className={'map-swatch-chip' + (style.pixelated ? ' pixelated' : '')} style={{ background: backgrounds.get(t.slug) }}></span>
+                        <span className="map-swatch-name">{t.name}</span>
+                    </button>
+                ))}
+            </div>
+            {ui.tool !== 'fill' && (
+                <div className="map-row">
+                    <label htmlFor="map-brush">Brush</label>
+                    <input
+                        id="map-brush" type="range" min={1} max={12} step={1} value={ui.brush}
+                        onChange={(e) => store.setUi({ brush: Number(e.currentTarget.value) })}
+                    />
+                    <span className="map-num">{ui.brush}</span>
+                    <button
+                        className="icon-btn"
+                        aria-pressed={ui.brushSquare}
+                        title={ui.brushSquare ? 'Square brush — click for round' : 'Round brush — click for square'}
+                        onClick={() => store.setUi({ brushSquare: !ui.brushSquare })}
+                    >
+                        <i className={'fa-regular ' + (ui.brushSquare ? 'fa-square' : 'fa-circle')}></i>
+                    </button>
+                </div>
+            )}
+            <p className="map-hint">
+                {ui.tool === 'fill'
+                    ? 'Click to fill every connected cell of the same terrain.'
+                    : 'Drag to paint. [ and ] change the brush. Hold Space to pan.'}
+            </p>
+        </section>
+    );
+}
+
+/* ------------------------------------------------------------- landmarks */
+
+function LandmarkPalette({ style }: { style: MapStyle }) {
+    const { store, ui } = useMap();
+    const [group, setGroup] = useState<LandmarkGroup | 'all'>('all');
+    const [query, setQuery] = useState('');
+    const q = query.trim().toLowerCase();
+    const list = LANDMARKS.filter((l) => (group === 'all' || l.group === group) && (!q || l.name.toLowerCase().includes(q)));
+    return (
+        <section className="map-section">
+            <h3>Landmarks</h3>
+            <div className="map-chips">
+                <button className="map-chip" aria-pressed={group === 'all'} onClick={() => setGroup('all')}>All</button>
+                {LANDMARK_GROUPS.map((g) => (
+                    <button key={g.key} className="map-chip" aria-pressed={group === g.key} onClick={() => setGroup(g.key)}>{g.label}</button>
+                ))}
+            </div>
+            <input
+                type="text" className="map-search" placeholder="Search landmarks…" value={query}
+                onChange={(e) => setQuery(e.currentTarget.value)}
+            />
+            <div className="map-tiles">
+                {list.map((l) => (
+                    <button
+                        key={l.slug}
+                        className={'map-tile' + (ui.landmark === l.slug ? ' on' : '')}
+                        aria-pressed={ui.landmark === l.slug}
+                        title={l.name + ' — ' + l.slug + '.png'}
+                        onClick={() => store.setUi({ landmark: l.slug, tool: 'stamp' })}
+                    >
+                        <MapSprite
+                            candidates={landmarkChain(style, l.slug)} icon={l.icon} color={l.color}
+                            className={'map-tile-art' + (style.pixelated ? ' pixelated' : '')}
+                        />
+                        <span className="map-tile-name">{l.name}</span>
+                    </button>
+                ))}
+                {!list.length && <p className="map-hint">No landmark matches.</p>}
+            </div>
+            <p className="map-hint">Click the map to place. Hold Space to pan.</p>
+        </section>
+    );
+}
+
+/* ------------------------------------------------------------- paths */
+
+function PathPreview({ style, kind }: { style: MapStyle; kind: MapPath['kind'] }) {
+    const look = style.paths[kind];
+    const w = Math.max(2, 10 * look.widthScale);
+    const d = 'M6 20 C 22 4, 38 36, 58 14';
+    return (
+        <svg className="map-path-preview" viewBox="0 0 64 32" width={64} height={32} style={{ background: style.terrain.grassland.fill }}>
+            {look.casing && <path d={d} fill="none" stroke={look.casing} strokeWidth={w + 4} strokeLinecap={look.cap} />}
+            <path d={d} fill="none" stroke={look.color} strokeWidth={w} strokeLinecap={look.cap}
+                strokeDasharray={look.dash?.map((x) => x * w).join(' ')} />
+        </svg>
+    );
+}
+
+function PathPalette({ style }: { style: MapStyle }) {
+    const { store, ui } = useMap();
+    return (
+        <section className="map-section">
+            <h3>Paths</h3>
+            <div className="map-kinds">
+                {PATH_KINDS.map((k) => (
+                    <button
+                        key={k.kind}
+                        className={'map-kind' + (ui.pathKind === k.kind ? ' on' : '')}
+                        aria-pressed={ui.pathKind === k.kind}
+                        onClick={() => store.setUi({ pathKind: k.kind, tool: 'path' })}
+                    >
+                        <PathPreview style={style} kind={k.kind} />
+                        <span>{k.name}</span>
+                    </button>
+                ))}
+            </div>
+            <p className="map-hint">Drag to draw; the line is smoothed when you let go. Select a path to name it, number a Route or drag its points.</p>
+        </section>
+    );
+}
+
+/* ------------------------------------------------------------- tokens */
+
+function TokenPalette({ style }: { style: MapStyle }) {
+    const { store, ui } = useMap();
+    const [picking, setPicking] = useState(false);
+    const tok = ui.token;
+    const set = (patch: Partial<NonNullable<typeof tok>>) => {
+        if (tok) store.setUi({ token: { ...tok, ...patch }, tool: 'token' });
+    };
+    return (
+        <section className="map-section">
+            <h3>Tokens</h3>
+            <div className="map-token-kinds">
+                <button className="map-kind" aria-pressed={tok?.kind === 'pokemon'} onClick={() => setPicking(true)}>
+                    <i className="fa-solid fa-dragon"></i><span>Pokémon…</span>
+                </button>
+                <button
+                    className="map-kind" aria-pressed={tok?.kind === 'trainer'}
+                    onClick={() => store.setUi({ tool: 'token', token: { kind: 'trainer', name: 'Trainer', color: tok?.color ?? TOKEN_COLORS[0] } })}
+                >
+                    <i className="fa-solid fa-user"></i><span>Trainer</span>
+                </button>
+                <button
+                    className="map-kind" aria-pressed={tok?.kind === 'wild'}
+                    onClick={() => store.setUi({ tool: 'token', token: { kind: 'wild', name: '', color: tok?.color ?? TOKEN_COLORS[3] } })}
+                >
+                    <i className="fa-solid fa-circle-question"></i><span>Wild</span>
+                </button>
+            </div>
+            {tok ? (
+                <div className="map-token-pending">
+                    <span className="map-token-preview" style={{ borderColor: tok.color }}>
+                        <MapSprite
+                            candidates={tok.kind === 'pokemon' && tok.image ? pokemonTokenChain(tok.image) : markerChain(style, tok.kind === 'trainer' ? 'trainer' : 'wild')}
+                            icon={tok.kind === 'trainer' ? 'fa-user' : 'fa-question'} color={tok.color}
+                            className="map-token-art"
+                        />
+                    </span>
+                    <div className="map-token-fields">
+                        <input type="text" value={tok.name} placeholder="Name (optional)" onChange={(e) => set({ name: e.currentTarget.value })} />
+                        <ColorRow value={tok.color} onPick={(color) => set({ color })} />
+                    </div>
+                </div>
+            ) : (
+                <p className="map-hint">Pick a Pokémon, a trainer or a wild marker, then click the map to place it.</p>
+            )}
+            <TokenPicker
+                open={picking}
+                onClose={() => setPicking(false)}
+                onPick={(p) => {
+                    setPicking(false);
+                    store.setUi({ tool: 'token', token: { kind: 'pokemon', image: p.Image, name: p.Name, color: tok?.color ?? TOKEN_COLORS[1] } });
+                }}
+            />
+        </section>
+    );
+}
+
+function ColorRow({ value, onPick }: { value: string; onPick: (c: string) => void }) {
+    return (
+        <div className="map-colors">
+            {TOKEN_COLORS.map((c) => (
+                <button key={c} className="map-color" aria-pressed={value === c} style={{ background: c }} title={c} onClick={() => onPick(c)}></button>
+            ))}
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------- labels */
+
+function LabelPalette() {
+    const { store, ui } = useMap();
+    return (
+        <section className="map-section">
+            <h3>Labels</h3>
+            <div className="map-chips">
+                {LABEL_ROLES.map((r) => (
+                    <button key={r.role} className="map-chip" aria-pressed={ui.labelRole === r.role} onClick={() => store.setUi({ labelRole: r.role, tool: 'label' })}>
+                        {r.name}
+                    </button>
+                ))}
+            </div>
+            <p className="map-hint">Click the map to place a label, then type its text below.</p>
+        </section>
+    );
+}
+
+/* ------------------------------------------------------------- inspector */
+
+function NumberField({ label, value, step, min, max, onChange }: {
+    label: string; value: number; step: number; min: number; max: number; onChange: (v: number) => void;
+}) {
+    return (
+        <label className="map-field">
+            <span>{label}</span>
+            <input
+                type="number" value={Number(value.toFixed(2))} step={step} min={min} max={max}
+                onChange={(e) => {
+                    const v = Number(e.currentTarget.value);
+                    if (isFinite(v)) onChange(Math.max(min, Math.min(max, v)));
+                }}
+            />
+        </label>
+    );
+}
+
+function patchObject(store: MapStore, sel: Selection, patch: Record<string, unknown>): void {
+    store.edit((d) => {
+        if (sel.kind === 'stamp') d.stamps = d.stamps.map((o) => (o.id === sel.id ? { ...o, ...patch } as MapStamp : o));
+        if (sel.kind === 'token') d.tokens = d.tokens.map((o) => (o.id === sel.id ? { ...o, ...patch } as MapToken : o));
+        if (sel.kind === 'label') d.labels = d.labels.map((o) => (o.id === sel.id ? { ...o, ...patch } as MapLabel : o));
+        if (sel.kind === 'path') d.paths = d.paths.map((o) => (o.id === sel.id ? { ...o, ...patch } as MapPath : o));
+    }, sel.id + ':' + Object.keys(patch).join(','));
+}
+
+export function deleteSelection(store: MapStore): void {
+    const sel = store.ui.selection;
+    if (!sel) return;
+    store.edit((d) => {
+        if (sel.kind === 'stamp') d.stamps = d.stamps.filter((o) => o.id !== sel.id);
+        if (sel.kind === 'token') d.tokens = d.tokens.filter((o) => o.id !== sel.id);
+        if (sel.kind === 'label') d.labels = d.labels.filter((o) => o.id !== sel.id);
+        if (sel.kind === 'path') d.paths = d.paths.filter((o) => o.id !== sel.id);
+    });
+    store.setUi({ selection: null });
+}
+
+export function duplicateSelection(store: MapStore): void {
+    const sel = store.ui.selection;
+    if (!sel) return;
+    const id = uid();
+    const off = store.doc.grid.snap ? 1 : 0.6;
+    store.edit((d) => {
+        if (sel.kind === 'stamp') { const o = d.stamps.find((x) => x.id === sel.id); if (o) d.stamps = [...d.stamps, { ...o, id, x: o.x + off, y: o.y + off }]; }
+        if (sel.kind === 'token') { const o = d.tokens.find((x) => x.id === sel.id); if (o) d.tokens = [...d.tokens, { ...o, id, x: o.x + off, y: o.y + off }]; }
+        if (sel.kind === 'label') { const o = d.labels.find((x) => x.id === sel.id); if (o) d.labels = [...d.labels, { ...o, id, x: o.x + off, y: o.y + off }]; }
+        if (sel.kind === 'path') {
+            const o = d.paths.find((x) => x.id === sel.id);
+            if (o) d.paths = [...d.paths, { ...o, id, points: o.points.map(([x, y]) => [x + off, y + off] as [number, number]) }];
+        }
+    });
+    store.setUi({ selection: { kind: sel.kind, id } });
+}
+
+/** Move the selection to the top (or bottom) of its own layer. */
+function restack(store: MapStore, sel: Selection, top: boolean): void {
+    const move = <T extends { id: string }>(list: T[]): T[] => {
+        const o = list.find((x) => x.id === sel.id);
+        if (!o) return list;
+        const rest = list.filter((x) => x.id !== sel.id);
+        return top ? [...rest, o] : [o, ...rest];
+    };
+    store.edit((d) => {
+        if (sel.kind === 'stamp') d.stamps = move(d.stamps);
+        if (sel.kind === 'token') d.tokens = move(d.tokens);
+        if (sel.kind === 'label') d.labels = move(d.labels);
+        if (sel.kind === 'path') d.paths = move(d.paths);
+    });
+}
+
+function Inspector({ doc, sel }: { doc: MapDoc; sel: Selection }) {
+    const { store } = useMap();
+    const labelRef = useRef<HTMLTextAreaElement>(null);
+    const set = (patch: Record<string, unknown>) => patchObject(store, sel, patch);
+
+    /* A label just placed from the map: put the caret in its text straight
+       away so it can be typed over. A frame later, so the press that placed
+       it has finished moving focus first. */
+    useEffect(() => {
+        if (sel.kind !== 'label' || store.ui.focusLabel !== sel.id) return;
+        const frame = requestAnimationFrame(() => {
+            labelRef.current?.focus();
+            labelRef.current?.select();
+            store.setUi({ focusLabel: undefined });
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [store, sel]);
+
+    let body: ReactElement | null = null;
+    let title = '';
+    if (sel.kind === 'stamp') {
+        const s = doc.stamps.find((o) => o.id === sel.id);
+        if (!s) return null;
+        const def = landmarkOf(s.landmark);
+        title = def.name;
+        body = (
+            <>
+                <label className="map-field">
+                    <span>Landmark</span>
+                    <select value={s.landmark} onChange={(e) => set({ landmark: e.currentTarget.value })}>
+                        {LANDMARK_GROUPS.map((g) => (
+                            <optgroup key={g.key} label={g.label}>
+                                {LANDMARKS.filter((l) => l.group === g.key).map((l) => <option key={l.slug} value={l.slug}>{l.name}</option>)}
+                            </optgroup>
+                        ))}
+                    </select>
+                </label>
+                <label className="map-field">
+                    <span>Label</span>
+                    <input type="text" value={s.label ?? ''} placeholder="Shown under it" onChange={(e) => set({ label: e.currentTarget.value })} />
+                </label>
+                {def.typed && (
+                    <label className="map-field">
+                        <span>Type</span>
+                        <select value={s.type ?? ''} onChange={(e) => set({ type: e.currentTarget.value || undefined })}>
+                            <option value="">None</option>
+                            {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                    </label>
+                )}
+                <div className="map-field-row">
+                    <NumberField label="Size" value={s.size} step={0.5} min={0.3} max={40} onChange={(v) => set({ size: v })} />
+                    <NumberField label="Turn°" value={s.rotation} step={15} min={-360} max={360} onChange={(v) => set({ rotation: v })} />
+                </div>
+                <label className="map-check">
+                    <input type="checkbox" checked={s.flip} onChange={(e) => set({ flip: e.currentTarget.checked })} /> Mirror
+                </label>
+            </>
+        );
+    } else if (sel.kind === 'token') {
+        const t = doc.tokens.find((o) => o.id === sel.id);
+        if (!t) return null;
+        title = t.kind === 'pokemon' ? 'Pokémon token' : t.kind === 'trainer' ? 'Trainer token' : 'Wild Pokémon';
+        body = (
+            <>
+                <label className="map-field">
+                    <span>Name</span>
+                    <input type="text" value={t.name} onChange={(e) => set({ name: e.currentTarget.value })} />
+                </label>
+                <NumberField label="Size" value={t.size} step={0.5} min={0.5} max={10} onChange={(v) => set({ size: v })} />
+                <ColorRow value={t.color} onPick={(color) => set({ color })} />
+            </>
+        );
+    } else if (sel.kind === 'label') {
+        const l = doc.labels.find((o) => o.id === sel.id);
+        if (!l) return null;
+        title = 'Label';
+        body = (
+            <>
+                <label className="map-field">
+                    <span>Text</span>
+                    <textarea ref={labelRef} rows={2} value={l.text} onChange={(e) => set({ text: e.currentTarget.value })} />
+                </label>
+                <div className="map-chips">
+                    {LABEL_ROLES.map((r) => (
+                        <button key={r.role} className="map-chip" aria-pressed={l.role === r.role} onClick={() => set({ role: r.role })}>{r.name}</button>
+                    ))}
+                </div>
+                <div className="map-field-row">
+                    <NumberField label="Scale" value={l.scale} step={0.1} min={0.2} max={8} onChange={(v) => set({ scale: v })} />
+                    <NumberField label="Turn°" value={l.rotation} step={5} min={-360} max={360} onChange={(v) => set({ rotation: v })} />
+                </div>
+            </>
+        );
+    } else {
+        const p = doc.paths.find((o) => o.id === sel.id);
+        if (!p) return null;
+        title = PATH_KINDS.find((k) => k.kind === p.kind)?.name ?? 'Path';
+        body = (
+            <>
+                <label className="map-field">
+                    <span>Kind</span>
+                    <select value={p.kind} onChange={(e) => set({ kind: e.currentTarget.value })}>
+                        {PATH_KINDS.map((k) => <option key={k.kind} value={k.kind}>{k.name}</option>)}
+                    </select>
+                </label>
+                <label className="map-field">
+                    <span>Name</span>
+                    <input type="text" value={p.label ?? ''} placeholder="Written along it" onChange={(e) => set({ label: e.currentTarget.value })} />
+                </label>
+                {p.kind === 'route' && (
+                    <label className="map-field">
+                        <span>Route no.</span>
+                        <input type="text" value={p.routeNo ?? ''} placeholder="e.g. 12" onChange={(e) => set({ routeNo: e.currentTarget.value })} />
+                    </label>
+                )}
+                <NumberField label="Width" value={p.width} step={0.1} min={0.1} max={6} onChange={(v) => set({ width: v })} />
+            </>
+        );
+    }
+
+    return (
+        <section className="map-section map-inspector">
+            <h3>{title}</h3>
+            {body}
+            <div className="map-inspector-actions">
+                <button className="icon-btn" title="Duplicate (Ctrl+D)" onClick={() => duplicateSelection(store)}><i className="fa-solid fa-clone"></i></button>
+                <button className="icon-btn" title="Bring to front" onClick={() => restack(store, sel, true)}><i className="fa-solid fa-arrow-up-wide-short"></i></button>
+                <button className="icon-btn" title="Send to back" onClick={() => restack(store, sel, false)}><i className="fa-solid fa-arrow-down-short-wide"></i></button>
+                <span className="spacer"></span>
+                <button className="icon-btn danger" title="Delete (Del)" onClick={() => deleteSelection(store)}><i className="fa-solid fa-trash"></i></button>
+            </div>
+        </section>
+    );
+}
+
+export function SidePanel() {
+    const { doc, ui } = useMap();
+    const style = styleOf(doc.styleId);
+    let palette: ReactElement | null = null;
+    switch (ui.tool) {
+        case 'paint': case 'fill': palette = <TerrainPalette style={style} />; break;
+        case 'stamp': palette = <LandmarkPalette style={style} />; break;
+        case 'path': palette = <PathPalette style={style} />; break;
+        case 'token': palette = <TokenPalette style={style} />; break;
+        case 'label': palette = <LabelPalette />; break;
+        case 'select': palette = !ui.selection ? <p className="map-hint map-section">Click something on the map to select it. Drag to move; drag a landmark's corner to resize it or its knob to turn it.</p> : null; break;
+        case 'erase': palette = <p className="map-hint map-section">Click or drag across landmarks, tokens, labels and paths to remove them. Terrain is changed by painting over it.</p>; break;
+        case 'pan': palette = <p className="map-hint map-section">Drag to move around the map; the wheel or a pinch zooms.</p>; break;
+    }
+    return (
+        <aside className="map-side">
+            {palette}
+            {ui.selection && <Inspector key={ui.selection.kind + ':' + ui.selection.id} doc={doc} sel={ui.selection} />}
+        </aside>
+    );
+}

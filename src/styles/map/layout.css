@@ -1,0 +1,99 @@
+/* ---------------- Page layout ---------------- */
+
+.map-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+}
+
+.map-topbar { gap: 0.6rem; flex-wrap: nowrap; }
+
+.map-topbar .logo { flex: 0 0 auto; }
+
+/* Which map is open; opens the list. Shrinks before anything else does. */
+.map-name-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    max-width: 18rem;
+    flex: 0 1 auto;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.map-name-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.map-styles {
+    display: flex;
+    gap: 0.25rem;
+    padding-left: 0.6rem;
+    border-left: 1px solid var(--border-color);
+    flex: 0 0 auto;
+}
+
+.map-scale {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The words on the bar's buttons go first when the window narrows; the
+   glyphs stay, and each button keeps its hint. */
+@media (max-width: 1320px) {
+    .map-btn-text { display: none; }
+}
+
+/* ---------------- Tool rail ---------------- */
+
+.map-rail {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.5rem 0.35rem;
+    border-right: 1px solid var(--border-color);
+    background: var(--panel-strong);
+    overflow-y: auto;
+}
+
+.map-tool {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+}
+
+.map-tool:disabled { opacity: 0.35; cursor: default; }
+
+.map-rail-sep {
+    width: 70%;
+    height: 1px;
+    background: var(--border-color);
+    margin: 0.2rem 0;
+    flex: 0 0 auto;
+}
+
+/* ---------------- Side panel ---------------- */
+
+.map-side {
+    flex: 0 0 290px;
+    width: 290px;
+    border-left: 1px solid var(--border-color);
+    background: var(--panel-strong);
+    overflow-y: auto;
+    padding: 0.4rem 0.7rem 1rem;
+}

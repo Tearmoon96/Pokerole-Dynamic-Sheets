@@ -1,0 +1,24 @@
+/* The Map Maker.
+
+   It borrows the GM screen's materials — the palette, the top bar, buttons and
+   inputs, the confirm dialog and the toast — and adds its own layout: a tool
+   rail, the map stage, and a side panel. */
+@import './gm/base.css';
+@import './gm/topbar.css';
+@import './gm/shared.css';
+@import './gm/confirm-dialog.css';
+@import './gm/toast.css';
+@import './shared/tooltip.css';
+@import './app-root.css';
+@import './map/layout.css';
+@import './map/stage.css';
+@import './map/panel.css';
+@import './map/dialogs.css';
+
+/* The mobile / tablet wrapper, last so it settles ties against the desktop
+   rules above. Every rule in it is behind data-device or data-pointer. */
+@import './responsive/base.css';
+@import './responsive/map.css';
+
+@import './shared/update-prompt.css';
+@import './shared/scrollbars.css';

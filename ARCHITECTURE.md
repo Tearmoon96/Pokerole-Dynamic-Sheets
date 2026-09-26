@@ -43,7 +43,7 @@ dependencies are React and React DOM, and nothing else.
 
 ## How it runs
 
-Four independent pages, not a single-page app. Each is its own entry, its own
+Five independent pages, not a single-page app. Each is its own entry, its own
 bundle, and its own browser tab:
 
 | Page | What it is |
@@ -52,6 +52,7 @@ bundle, and its own browser tab:
 | `pokemon-card.html` | One Pokémon's card — a team member, a boxed one, or a wild |
 | `gm-screen.html` | The GM board: roster, combat tracker, dice, NPC names, notes |
 | `rolling-table.html` | A shared dice table. The only page that needs the network — see [The rolling table](#the-rolling-table) |
+| `map-maker.html` | A map editor for regions, towns and battle maps — see [The Map Maker](#the-map-maker) |
 
 They are linked by a shared working set in `localStorage` under
 `pokerole_working`. The license writes it; the card reads the Pokémon it was
@@ -87,17 +88,19 @@ than imported, so Vite never parses or bundles them. One line in each page shell
 
 | Path | What is in it |
 |---|---|
-| `src/pages/` | The three HTML shells. ~1.2 KB each: a `<div id="root">`, a script tag, and the `DATA_BASE` line |
+| `src/pages/` | The HTML shells, one per page. ~1.2 KB each: a `<div id="root">`, a script tag, and the `DATA_BASE` line |
 | `src/main/` | One entry per page — mounts React and wires the providers |
 | `src/components/license/` | Trainer sheet UI (30 files) |
 | `src/components/card/` | Pokémon card UI (21 files) |
 | `src/components/gm/` | GM screen UI (15 files) |
 | `src/components/table/` | Rolling table UI |
+| `src/components/map/` | Map Maker UI: the stage, tool rail, side panel, dialogs |
 | `src/components/common/` | Shared widgets — toast, modal, pickers, sprites |
 | `src/state/` | Trainer sheet store, working set, trainer file I/O, PC boxes, IndexedDB |
 | `src/card/` | Card logic: pools, moves, evolution, type chart, weather, ailments, wild import |
 | `src/gm/` | GM logic: entities and tokens, combat, ailments, dice, names, the random Pokémon generator with its habitat and generation tables, session files, folders |
 | `src/table/` | Rolling table: crypto, identity, protocol, validation, transport, session |
+| `src/map/` | Map Maker logic: the map document, terrain and landmark catalogues, styles, contours, rendering, the store, map files |
 | `src/data/` | Loading `app-data/`, and the context that serves it to components |
 | `src/lib/` | Cross-page helpers: themes, sprites, colour, gear, file system, manuals, update check, device class, touch reordering, the rank table |
 | `src/hooks/` | Small React hooks — theme, document title, drag ghosts, name fitting |
@@ -108,7 +111,7 @@ than imported, so Vite never parses or bundles them. One line in each page shell
 
 | Path | What it is |
 |---|---|
-| `*.html` + `assets/` | The three built pages and their bundles |
+| `*.html` + `assets/` | The built pages and their bundles |
 | `app-data/` | Game database and sprites |
 | `Trainers and Pokemons/` | The working folder — trainer `.json`, wild exports, custom images |
 | `Pokerole Core Book/` | Where the rulebook PDFs go; the sheet's manual button opens them |
@@ -130,6 +133,29 @@ than imported, so Vite never parses or bundles them. One line in each page shell
 it drives each page at four viewport sizes and reports horizontal overflow,
 content clipped away by `overflow: hidden`, controls too small to hit, and
 fields that would trigger the iOS zoom.
+
+## The Map Maker
+
+`map-maker.html` edits maps of any scale on one square grid: a cell means
+whatever the map's scale label says. A map is one `MapDoc`
+([`src/map/types.ts`](src/map/types.ts)): the terrain as one character per cell,
+plus lists of paths, landmark stamps, tokens and labels, all positioned in
+cell units so no style, zoom or grid setting ever moves anything.
+
+- **Styles** ([`src/map/styles.ts`](src/map/styles.ts)) are data: terrain
+  colours and textures, edge treatment, path looks, label fonts. Hand-drawn and
+  Anime draw terrain as smooth contours (marching squares in
+  [`src/map/geometry.ts`](src/map/geometry.ts), rounded and bent by noise);
+  Town Map and Overworld draw it as cells.
+- **Rendering** is two layers: a viewport-sized canvas for the ground
+  ([`src/map/render/`](src/map/render/)), and a world layer of real elements
+  for everything placed on it, moved and scaled by one CSS transform.
+- **Art** is linked by file name: `app-data/images/MapSprites/<Style>/<slug>.png`,
+  then `Common/`, then a drawn placeholder. [`MAP-SPRITES.md`](MAP-SPRITES.md)
+  lists every name.
+- **Storage**: each map under its own `localStorage` key, `pokerole_map_<id>`,
+  with the list in `pokerole_maps`, so two tabs on two maps never overwrite
+  each other. Save and Open write one map per `.json` file.
 
 ## The rolling table
 

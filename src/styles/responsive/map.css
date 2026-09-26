@@ -1,0 +1,90 @@
+/* ============================================================
+   The mobile / tablet wrapper, part 3: the Map Maker.
+
+   Every rule is behind data-device or data-pointer (see base.css).
+
+   On a tablet the side panel narrows. On a phone the layout turns into a
+   column: the map takes the room, the tool rail runs along the bottom as a
+   strip, and the side panel sits under the map as a scrolling drawer. The map
+   itself needs no change — pan and pinch-zoom are what a phone wants anyway.
+   ============================================================ */
+
+html[data-device="tablet"] .map-side {
+    flex-basis: 240px;
+    width: 240px;
+}
+
+html[data-device="tablet"] .map-styles .map-btn-text,
+html[data-device="tablet"] .map-topbar .map-btn-text { display: none; }
+
+html[data-device="phone"] body { height: 100dvh; }
+
+html[data-device="phone"] .map-topbar {
+    flex-wrap: wrap;
+    row-gap: 0.35rem;
+    padding: 0.4rem 0.6rem;
+    padding-top: calc(0.4rem + var(--safe-top));
+}
+
+html[data-device="phone"] .map-topbar .map-logo-text,
+html[data-device="phone"] .map-topbar .version,
+html[data-device="phone"] .map-topbar .map-btn-text,
+html[data-device="phone"] .map-topbar .map-scale { display: none; }
+
+html[data-device="phone"] .map-topbar .spacer { display: none; }
+
+html[data-device="phone"] .map-name-btn { flex: 1 1 8rem; max-width: none; }
+
+html[data-device="phone"] .map-styles { border-left: 0; padding-left: 0; }
+
+html[data-device="phone"] .map-topbar .session-status { order: 10; flex-basis: 100%; max-width: none; }
+html[data-device="phone"] .map-topbar .session-status:empty { display: none; }
+
+html[data-device="phone"] .map-body {
+    flex-direction: column;
+}
+
+html[data-device="phone"] .map-stage { flex: 1 1 55%; min-height: 0; }
+
+html[data-device="phone"] .map-rail {
+    order: 2;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-top: 1px solid var(--border-color);
+    padding: 0.35rem 0.5rem;
+}
+
+html[data-device="phone"] .map-rail-sep { width: 1px; height: 24px; margin: 0 0.15rem; }
+
+html[data-device="phone"] .map-tool { flex: 0 0 auto; }
+
+html[data-device="phone"] .map-side {
+    order: 3;
+    flex: 0 1 38%;
+    width: auto;
+    min-height: 0;
+    border-left: 0;
+    border-top: 1px solid var(--border-color);
+    padding-bottom: calc(1rem + var(--safe-bottom));
+}
+
+html[data-device="phone"] .map-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* Finger-sized controls on any touch screen, whatever its width. */
+html[data-pointer="coarse"] .map-tool { width: 44px; height: 44px; font-size: 1.1rem; }
+
+html[data-pointer="coarse"] .map-handle { width: 26px; height: 26px; }
+html[data-pointer="coarse"] .map-handle-resize { right: -16px; bottom: -16px; }
+html[data-pointer="coarse"] .map-handle-rotate { top: -40px; margin-left: -13px; }
+html[data-pointer="coarse"] .map-handle-rotate::after { left: 11px; top: 24px; height: 16px; }
+
+html[data-pointer="coarse"] .map-color { width: 30px; height: 30px; }
+html[data-pointer="coarse"] .map-chip { min-height: 32px; }
+
+html[data-pointer="coarse"] .map-field input,
+html[data-pointer="coarse"] .map-field select,
+html[data-pointer="coarse"] .map-field textarea,
+html[data-pointer="coarse"] .map-token-fields input,
+html[data-pointer="coarse"] .map-search { font-size: 16px; }

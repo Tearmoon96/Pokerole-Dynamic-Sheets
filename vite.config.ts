@@ -77,7 +77,7 @@ function devPageAliases(pages: string[]) {
 }
 
 
-export const PAGES = ['trainer-license', 'pokemon-card', 'gm-screen', 'rolling-table'];
+export const PAGES = ['trainer-license', 'pokemon-card', 'gm-screen', 'rolling-table', 'map-maker'];
 const FIRST_PAGE = PAGES[0];
 
 export default defineConfig(({ command }) => {

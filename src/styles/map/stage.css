@@ -1,0 +1,243 @@
+/* ---------------- The map stage ----------------
+   The ground is a canvas the size of the stage; everything placed on the map
+   lives in .map-world, which is the size of the MAP and is moved and scaled
+   by one CSS transform. */
+
+.map-stage {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: crosshair;
+}
+
+.map-stage[data-tool="select"] { cursor: default; }
+.map-stage[data-tool="pan"] { cursor: grab; }
+.map-stage.panning { cursor: grabbing; }
+.map-stage[data-tool="erase"] { cursor: cell; }
+.map-stage[data-tool="label"] { cursor: text; }
+
+.map-canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+}
+
+.map-world {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+}
+
+.map-svg {
+    position: absolute;
+    left: 0;
+    top: 0;
+    overflow: visible;
+    pointer-events: none;
+}
+
+/* Only Select and Erase reach the objects; every other tool paints or draws
+   straight over them. */
+.map-obj,
+.map-hit { pointer-events: none; }
+
+.map-stage[data-tool="select"] .map-obj,
+.map-stage[data-tool="erase"] .map-obj { pointer-events: auto; }
+.map-stage[data-tool="select"] .map-hit,
+.map-stage[data-tool="erase"] .map-hit { pointer-events: stroke; }
+.map-stage[data-tool="select"] .map-label,
+.map-stage[data-tool="erase"] .map-label { pointer-events: bounding-box; }
+
+.map-stage[data-tool="select"] .map-obj,
+.map-stage[data-tool="select"] .map-hit { cursor: move; }
+
+.pixelated img,
+img.pixelated { image-rendering: pixelated; }
+
+/* ---------------- Stamps ---------------- */
+
+.map-stamp {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.map-stamp-art {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    -webkit-user-drag: none;
+}
+
+/* The placeholder: until the art exists, a disc with the landmark's glyph. */
+.map-ph {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: #fff;
+    border: 2px solid #0006;
+    box-shadow: 0 2px 6px #0005;
+    box-sizing: border-box;
+}
+
+.map-stamp .map-ph { width: 78%; height: 78%; }
+
+.map-type-badge {
+    position: absolute;
+    right: 4%;
+    top: 4%;
+    width: 30%;
+    height: 30%;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px #0006;
+}
+
+.map-stamp-label {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    line-height: 1.1;
+    pointer-events: none;
+}
+
+.map-stamp.selected,
+.map-token.selected {
+    outline: 2px dashed var(--accent);
+    outline-offset: 3px;
+}
+
+.map-handle {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px #0008;
+    cursor: nwse-resize;
+}
+
+.map-handle-resize { right: -10px; bottom: -10px; }
+
+.map-handle-rotate {
+    left: 50%;
+    top: -28px;
+    margin-left: -7px;
+    cursor: grab;
+}
+
+.map-handle-rotate::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 12px;
+    width: 1px;
+    height: 12px;
+    background: var(--accent);
+}
+
+/* ---------------- Tokens ---------------- */
+
+.map-token {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border-style: solid;
+    background: #ffffffd9;
+    box-shadow: 0 2px 6px #0007;
+    box-sizing: border-box;
+}
+
+.map-token-art {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+    border-radius: 50%;
+    -webkit-user-drag: none;
+}
+
+/* A Box sprite is a whole body in a square; the token is a head in a circle.
+   Zoom in on the upper middle so it reads as the same kind of thing. */
+.map-token-art.tok-box {
+    object-fit: cover;
+    object-position: 50% 30%;
+    transform: scale(1.25);
+}
+
+.map-token .map-ph { width: 100%; height: 100%; border: 0; }
+
+.map-token-name {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translate(-50%, 2px);
+    padding: 0 0.35em;
+    border-radius: 0.5em;
+    color: #fff;
+    font-weight: 600;
+    white-space: nowrap;
+    line-height: 1.35;
+    text-shadow: 0 1px 2px #000a;
+    pointer-events: none;
+}
+
+/* ---------------- Paths and labels ---------------- */
+
+.map-path-sel { stroke: var(--accent); stroke-dasharray: 6 5; }
+.map-path-draft { stroke: var(--accent); stroke-dasharray: 4 4; opacity: 0.9; }
+
+.map-vertex {
+    fill: var(--accent);
+    stroke: #fff;
+    stroke-width: 2;
+    pointer-events: auto;
+    cursor: move;
+}
+
+.map-path-label, .map-route-no { pointer-events: none; user-select: none; }
+
+.map-label { user-select: none; }
+.map-label.selected { text-decoration: underline dashed; text-decoration-color: var(--accent); }
+
+/* ---------------- Brush and readout ---------------- */
+
+.map-brush {
+    position: absolute;
+    border: 2px solid #fff;
+    outline: 1px solid #000a;
+    border-radius: 50%;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+.map-brush.square { border-radius: 0; }
+
+.map-zoom-readout {
+    position: absolute;
+    right: 0.6rem;
+    bottom: 0.5rem;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    background: var(--panel-strong);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.1rem 0.4rem;
+    pointer-events: none;
+}
