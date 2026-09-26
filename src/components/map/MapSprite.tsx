@@ -28,9 +28,13 @@ export function MapSprite({ candidates, icon, color, className, style, title }: 
     const list = candidates.map((c) => (typeof c === 'string' ? { url: c } : c));
     const current = list.find((c) => !missing.has(c.url));
 
+    /* The placeholder does NOT take `className`: that is the image's class,
+       and `display: block` on it (`.map-token-art`) overrode the disc's own
+       flex centring, so the glyph slid out of the middle. Whatever holds a
+       sprite sizes `.map-ph` itself. */
     if (!current) {
         return (
-            <span className={'map-ph' + (className ? ' ' + className : '')} style={{ ...style, background: color }} title={title}>
+            <span className="map-ph" style={{ ...style, background: color }} title={title}>
                 <i className={'fa-solid ' + icon}></i>
             </span>
         );

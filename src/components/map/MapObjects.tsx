@@ -21,7 +21,7 @@ export type Grab = 'move' | 'resize' | 'rotate' | { vertex: number };
 
 export type ObjectDown = (e: ReactPointerEvent, sel: Selection, grab: Grab) => void;
 
-const isSel = (sel: Selection | null, kind: Selection['kind'], id: string) => !!sel && sel.kind === kind && sel.id === id;
+const isSel = (sel: Selection[], kind: Selection['kind'], id: string) => sel.some((x) => x.kind === kind && x.id === id);
 
 /* ------------------------------------------------------------------ paths */
 
@@ -55,7 +55,7 @@ function PathShape({ path, style }: { path: MapPath; style: MapStyle }) {
 }
 
 export function PathsLayer({ doc, style, selection, draft, onDown }: {
-    doc: MapDoc; style: MapStyle; selection: Selection | null; draft: Pt[] | null; onDown: ObjectDown;
+    doc: MapDoc; style: MapStyle; selection: Selection[]; draft: Pt[] | null; onDown: ObjectDown;
 }) {
     const W = doc.cols * CELL, H = doc.rows * CELL;
     const town = style.label.route;
@@ -65,6 +65,8 @@ export function PathsLayer({ doc, style, selection, draft, onDown }: {
                 const d = smoothPathD(p.points as Pt[], CELL);
                 const hitW = Math.max(p.width, 0.7) * CELL;
                 const selected = isSel(selection, 'path', p.id);
+                /* Points are editable only on a path selected on its own. */
+                const alone = selected && selection.length === 1;
                 const mid = midpoint(p.points as Pt[]);
                 const fontSize = town.size * CELL * 0.8;
                 return (
@@ -97,7 +99,7 @@ export function PathsLayer({ doc, style, selection, draft, onDown }: {
                         {selected && (
                             <>
                                 <path className="map-path-sel" d={d} fill="none" strokeWidth={3} />
-                                {p.points.map(([x, y], i) => (
+                                {alone && p.points.map(([x, y], i) => (
                                     <circle key={i} className="map-vertex" cx={x * CELL} cy={y * CELL} r={6}
                                         onPointerDown={(e) => onDown(e, { kind: 'path', id: p.id }, { vertex: i })} />
                                 ))}
@@ -115,8 +117,11 @@ export function PathsLayer({ doc, style, selection, draft, onDown }: {
 
 /* ----------------------------------------------------------------- stamps */
 
-function StampView({ stamp, style, selected, onDown }: {
-    stamp: MapStamp; style: MapStyle; selected: boolean; onDown: ObjectDown;
+function StampView({ stamp, style, selected, alone, onDown }: {
+    stamp: MapStamp; style: MapStyle; selected: boolean;
+    /** Selected on its own: only then does it get resize and turn handles. */
+    alone: boolean;
+    onDown: ObjectDown;
 }) {
     const def = landmarkOf(stamp.landmark);
     const px = stamp.size * CELL;
@@ -153,7 +158,7 @@ function StampView({ stamp, style, selected, onDown }: {
                     fontStyle: lab.italic ? 'italic' : undefined,
                 }}>{stamp.label}</span>
             )}
-            {selected && (
+            {selected && alone && (
                 <>
                     <span className="map-handle map-handle-resize" onPointerDown={(e) => onDown(e, sel, 'resize')} title="Drag to resize"></span>
                     <span className="map-handle map-handle-rotate" onPointerDown={(e) => onDown(e, sel, 'rotate')} title="Drag to rotate"></span>
@@ -164,12 +169,15 @@ function StampView({ stamp, style, selected, onDown }: {
 }
 
 export function StampsLayer({ doc, style, selection, onDown }: {
-    doc: MapDoc; style: MapStyle; selection: Selection | null; onDown: ObjectDown;
+    doc: MapDoc; style: MapStyle; selection: Selection[]; onDown: ObjectDown;
 }) {
     return (
         <>
             {doc.stamps.map((s) => (
-                <StampView key={s.id} stamp={s} style={style} selected={isSel(selection, 'stamp', s.id)} onDown={onDown} />
+                <StampView
+                    key={s.id} stamp={s} style={style} selected={isSel(selection, 'stamp', s.id)}
+                    alone={selection.length === 1} onDown={onDown}
+                />
             ))}
         </>
     );
@@ -212,7 +220,7 @@ function LabelText({ label, style, selected, onDown }: {
 }
 
 export function LabelsLayer({ doc, style, selection, onDown }: {
-    doc: MapDoc; style: MapStyle; selection: Selection | null; onDown: ObjectDown;
+    doc: MapDoc; style: MapStyle; selection: Selection[]; onDown: ObjectDown;
 }) {
     const W = doc.cols * CELL, H = doc.rows * CELL;
     return (
@@ -256,7 +264,7 @@ function TokenView({ token, style, selected, onDown }: {
 }
 
 export function TokensLayer({ doc, style, selection, onDown }: {
-    doc: MapDoc; style: MapStyle; selection: Selection | null; onDown: ObjectDown;
+    doc: MapDoc; style: MapStyle; selection: Selection[]; onDown: ObjectDown;
 }) {
     return (
         <>

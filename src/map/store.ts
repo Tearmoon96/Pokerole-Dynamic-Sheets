@@ -43,7 +43,10 @@ export interface MapUi {
     /** The role a newly placed label takes. */
     labelRole: LabelRole;
     token: PendingToken | null;
-    selection: Selection | null;
+    /** Everything selected, in the order it was picked. Several only with
+        Ctrl/Cmd-click or a drag box; the inspector edits one at a time and
+        offers the group actions for more. */
+    selection: Selection[];
     /** A label just placed from the map, whose text field should take the
         caret as soon as its inspector mounts. */
     focusLabel?: string;
@@ -74,7 +77,7 @@ export class MapStore {
 
     ui: MapUi = {
         tool: 'paint', terrain: 'g', brush: 2, brushSquare: false,
-        landmark: 'mountain', pathKind: 'road', labelRole: 'town', token: null, selection: null,
+        landmark: 'mountain', pathKind: 'road', labelRole: 'town', token: null, selection: [],
     };
 
     onToast: ((html: string) => void) | null = null;
@@ -197,8 +200,8 @@ export class MapStore {
     }
 
     private dropStaleSelection(): void {
-        const sel = this.ui.selection;
-        if (sel && !findObject(this.doc, sel)) this.ui = { ...this.ui, selection: null };
+        const kept = this.ui.selection.filter((sel) => findObject(this.doc, sel));
+        if (kept.length !== this.ui.selection.length) this.ui = { ...this.ui, selection: kept };
     }
 
     setUi(patch: Partial<MapUi>): void {
@@ -213,7 +216,7 @@ export class MapStore {
         this.activeId = id;
         this.undoStack = [];
         this.redoStack = [];
-        this.ui = { ...this.ui, selection: null };
+        this.ui = { ...this.ui, selection: [] };
         this.indexDirty = true;
         this.save();
         this.notify();
@@ -236,7 +239,7 @@ export class MapStore {
             this.activeId = doc.id;
             this.dirty.add(doc.id);
             this.indexDirty = true;
-            this.ui = { ...this.ui, selection: null };
+            this.ui = { ...this.ui, selection: [] };
             this.save();
             this.notify();
             return;
@@ -254,7 +257,7 @@ export class MapStore {
             this.activeId = this.maps[0].id;
             this.undoStack = [];
             this.redoStack = [];
-            this.ui = { ...this.ui, selection: null };
+            this.ui = { ...this.ui, selection: [] };
         }
         this.save();
         this.notify();
@@ -331,6 +334,8 @@ export class MapStore {
         if (doc) { this.maps = this.maps.map((m) => (m.id === id ? doc : m)); this.notify(); }
     }
 }
+
+export const sameSel = (a: Selection, b: Selection): boolean => a.kind === b.kind && a.id === b.id;
 
 export function findObject(doc: MapDoc, sel: Selection): { id: string } | undefined {
     switch (sel.kind) {

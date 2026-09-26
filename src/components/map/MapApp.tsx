@@ -53,9 +53,24 @@ export function MapApp({ dataOk }: { dataOk: boolean }) {
             if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) store.redo(); else store.undo(); return; }
             if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); store.redo(); return; }
             if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelection(store); return; }
+            if (mod && e.key.toLowerCase() === 'a') {
+                /* Everything on the map, under the Select tool so it can be dragged at once. */
+                e.preventDefault();
+                const d = store.doc;
+                store.setUi({
+                    tool: 'select',
+                    selection: [
+                        ...d.paths.map((o) => ({ kind: 'path' as const, id: o.id })),
+                        ...d.stamps.map((o) => ({ kind: 'stamp' as const, id: o.id })),
+                        ...d.labels.map((o) => ({ kind: 'label' as const, id: o.id })),
+                        ...d.tokens.map((o) => ({ kind: 'token' as const, id: o.id })),
+                    ],
+                });
+                return;
+            }
             if (mod) return;
             if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelection(store); return; }
-            if (e.key === 'Escape') { store.setUi({ selection: null }); return; }
+            if (e.key === 'Escape') { store.setUi({ selection: [] }); return; }
             if (e.key === '[') { store.setUi({ brush: Math.max(1, store.ui.brush - 1) }); return; }
             if (e.key === ']') { store.setUi({ brush: Math.min(12, store.ui.brush + 1) }); return; }
             if (e.key === '+' || e.key === '=') { window.dispatchEvent(new CustomEvent('map-zoom', { detail: 1.25 })); return; }

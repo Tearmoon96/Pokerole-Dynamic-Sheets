@@ -14,6 +14,7 @@ import { LabelsLayer, PathsLayer, StampsLayer, TokensLayer } from './MapObjects'
 import type { Grab, ObjectDown } from './MapObjects';
 import { useToast } from '../common/Toast';
 import type { MapDoc, Selection } from '../../map/types';
+import { sameSel } from '../../map/store';
 
 /* The map itself: a canvas for the ground, and the world layer on top of it
    holding paths, stamps, labels and tokens as real elements.
@@ -38,7 +39,10 @@ type Gesture =
     | { kind: 'paint'; last: Pt }
     | { kind: 'path'; pts: Pt[] }
     | { kind: 'erase' }
-    | { kind: 'move'; sel: Selection; start: Pt; orig: Pt[]; moved: boolean }
+    /* Everything selected moves together; `anchor` is the one under the
+       pointer, the one whose snapping decides the step for all of them. */
+    | { kind: 'move'; items: { sel: Selection; orig: Pt[] }[]; anchor: number; start: Pt; moved: boolean }
+    | { kind: 'box'; start: Pt; add: boolean; base: Selection[] }
     | { kind: 'resize'; sel: Selection; centre: Pt }
     | { kind: 'rotate'; sel: Selection; centre: Pt }
     | { kind: 'vertex'; sel: Selection; index: number }
@@ -51,6 +55,11 @@ const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
    (a pen lifted mid-event, a synthetic event), and a drag without capture
    still works while the pointer stays over the stage — so never let that
    failure end the gesture. */
+/** Two selections merged, without repeats. */
+function union(a: Selection[], b: Selection[]): Selection[] {
+    return [...a, ...b.filter((x) => !a.some((y) => sameSel(x, y)))];
+}
+
 function capture(el: HTMLElement, pointerId: number): void {
     try { el.setPointerCapture(pointerId); } catch { /* not capturable: carry on without */ }
 }
@@ -64,6 +73,20 @@ function removeObject(d: MapDoc, tag: string): boolean {
     if (kind === 'label') d.labels = d.labels.filter((o) => o.id !== id);
     if (kind === 'path') d.paths = d.paths.filter((o) => o.id !== id);
     return d.stamps.length + d.tokens.length + d.labels.length + d.paths.length !== before;
+}
+
+/** Everything whose position (or, for a path, any of whose points) lies in
+    the box between two corners, in cell units. */
+function objectsInBox(d: MapDoc, a: Pt, b: Pt): Selection[] {
+    const x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]);
+    const y0 = Math.min(a[1], b[1]), y1 = Math.max(a[1], b[1]);
+    const inBox = (x: number, y: number) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+    return [
+        ...d.paths.filter((p) => p.points.some(([x, y]) => inBox(x, y))).map((p) => ({ kind: 'path' as const, id: p.id })),
+        ...d.stamps.filter((o) => inBox(o.x, o.y)).map((o) => ({ kind: 'stamp' as const, id: o.id })),
+        ...d.labels.filter((o) => inBox(o.x, o.y)).map((o) => ({ kind: 'label' as const, id: o.id })),
+        ...d.tokens.filter((o) => inBox(o.x, o.y)).map((o) => ({ kind: 'token' as const, id: o.id })),
+    ];
 }
 
 /** The position (or, for a path, all the points) of a selected object. */
@@ -88,6 +111,8 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     const [texTick, setTexTick] = useState(0);
     const [hover, setHover] = useState<Pt | null>(null);
     const [draft, setDraft] = useState<Pt[] | null>(null);
+    /* The drag box of a Select drag on empty ground, corners in cell units. */
+    const [box, setBox] = useState<[Pt, Pt] | null>(null);
     const gesture = useRef<Gesture | null>(null);
     const pointers = useRef(new Map<number, Pt>());
     const fitted = useRef('');
@@ -271,7 +296,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 store.edit((d) => {
                     d.stamps = [...d.stamps, { id, landmark: def.slug, x, y, size: def.size, rotation: 0, flip: false }];
                 });
-                store.setUi({ selection: { kind: 'stamp', id } });
+                store.setUi({ selection: [{ kind: 'stamp', id }] });
                 return;
             }
             case 'token': {
@@ -281,7 +306,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 const [x, y] = place(at, 1);
                 const id = uid();
                 store.edit((d) => { d.tokens = [...d.tokens, { id, ...tok, x, y, size: 1 }]; });
-                store.setUi({ selection: { kind: 'token', id } });
+                store.setUi({ selection: [{ kind: 'token', id }] });
                 return;
             }
             case 'label': {
@@ -290,7 +315,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 store.edit((d) => {
                     d.labels = [...d.labels, { id, text: 'New label', x: at[0], y: at[1], role: store.ui.labelRole, scale: 1, rotation: 0 }];
                 });
-                store.setUi({ selection: { kind: 'label', id }, focusLabel: id });
+                store.setUi({ selection: [{ kind: 'label', id }], focusLabel: id });
                 return;
             }
             case 'select': {
@@ -299,7 +324,11 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 const hitTol = 0.5;
                 const hit = [...store.doc.paths].reverse().find((p) => distToPolyline(at, p.points as Pt[]) < Math.max(hitTol, p.width / 2));
                 if (hit) { startObjectGesture(e, { kind: 'path', id: hit.id }, 'move'); return; }
-                store.setUi({ selection: null });
+                /* Empty ground: a drag box. With Ctrl or Cmd it adds to what is
+                   already selected; without, a click that never becomes a
+                   drag just clears the selection. */
+                const add = e.ctrlKey || e.metaKey;
+                gesture.current = { kind: 'box', start: at, add, base: add ? store.ui.selection : [] };
                 return;
             }
         }
@@ -307,12 +336,33 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
 
     const startObjectGesture = (e: ReactPointerEvent, sel: Selection, grab: Grab) => {
         const d = store.doc;
-        store.setUi({ selection: sel });
+        const current = store.ui.selection;
+        const picked = current.some((x) => sameSel(x, sel));
+
+        /* Ctrl or Cmd: add it to the selection, or take it out. No drag. */
+        if (grab === 'move' && (e.ctrlKey || e.metaKey)) {
+            store.setUi({ selection: picked ? current.filter((x) => !sameSel(x, sel)) : [...current, sel] });
+            return;
+        }
+
         store.checkpoint();
-        const pos = positionsOf(d, sel);
         if (grab === 'move') {
-            gesture.current = { kind: 'move', sel, start: toCell(e), orig: pos, moved: false };
-        } else if (grab === 'resize' || grab === 'rotate') {
+            /* Pressing one of several selected things drags them all; pressing
+               anything else selects just that. */
+            const group = picked ? current : [sel];
+            if (!picked) store.setUi({ selection: group });
+            gesture.current = {
+                kind: 'move',
+                items: group.map((x) => ({ sel: x, orig: positionsOf(d, x) })).filter((x) => x.orig.length),
+                anchor: Math.max(0, group.findIndex((x) => sameSel(x, sel))),
+                start: toCell(e),
+                moved: false,
+            };
+            return;
+        }
+        store.setUi({ selection: [sel] });
+        const pos = positionsOf(d, sel);
+        if (grab === 'resize' || grab === 'rotate') {
             gesture.current = { kind: grab, sel, centre: pos[0] };
         } else {
             gesture.current = { kind: 'vertex', sel, index: grab.vertex };
@@ -371,9 +421,13 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 const dx = at[0] - g.start[0], dy = at[1] - g.start[1];
                 if (!g.moved && Math.hypot(dx, dy) < 0.05) return;
                 g.moved = true;
-                moveSelection(g.sel, g.orig, dx, dy);
+                moveItems(g.items, g.anchor, dx, dy);
                 return;
             }
+            case 'box':
+                setBox([g.start, at]);
+                store.setUi({ selection: union(g.base, objectsInBox(store.doc, g.start, at)) });
+                return;
             case 'resize': {
                 const s = store.doc.stamps.find((o) => o.id === g.sel.id);
                 if (!s) return;
@@ -404,26 +458,34 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         }
     };
 
-    const moveSelection = (sel: Selection, orig: Pt[], dx: number, dy: number) => {
+    /* One step for the whole group. With snapping on, the object under the
+       pointer snaps and the rest take the same step, so the group keeps its
+       shape rather than each piece jumping to its own nearest cell. */
+    const moveItems = (items: { sel: Selection; orig: Pt[] }[], anchor: number, dx: number, dy: number) => {
+        const d0 = store.doc;
+        const lead = items[anchor];
+        if (lead && d0.grid.snap && (lead.sel.kind === 'stamp' || lead.sel.kind === 'token')) {
+            const list = lead.sel.kind === 'stamp' ? d0.stamps : d0.tokens;
+            const o = (list as { id: string; size: number }[]).find((x) => x.id === lead.sel.id);
+            if (o) {
+                const [sx, sy] = snapPoint(lead.orig[0][0] + dx, lead.orig[0][1] + dy, o.size);
+                dx = sx - lead.orig[0][0];
+                dy = sy - lead.orig[0][1];
+            }
+        }
+        const at = new Map(items.map((it) => [it.sel.kind + ':' + it.sel.id, it.orig]));
+        const shift = (kind: string, id: string): Pt[] | undefined =>
+            at.get(kind + ':' + id)?.map(([x, y]) => [x + dx, y + dy] as Pt);
         store.live((d) => {
-            if (sel.kind === 'path') {
-                d.paths = d.paths.map((p) => (p.id === sel.id
-                    ? { ...p, points: orig.map(([x, y]) => [x + dx, y + dy] as [number, number]) }
-                    : p));
-                return;
-            }
-            let [x, y] = [orig[0][0] + dx, orig[0][1] + dy];
-            if (sel.kind === 'stamp') {
-                const s = d.stamps.find((o) => o.id === sel.id);
-                if (s && d.grid.snap) [x, y] = snapPoint(x, y, s.size);
-                d.stamps = d.stamps.map((o) => (o.id === sel.id ? { ...o, x, y } : o));
-            } else if (sel.kind === 'token') {
-                const t = d.tokens.find((o) => o.id === sel.id);
-                if (t && d.grid.snap) [x, y] = snapPoint(x, y, t.size);
-                d.tokens = d.tokens.map((o) => (o.id === sel.id ? { ...o, x, y } : o));
-            } else {
-                d.labels = d.labels.map((o) => (o.id === sel.id ? { ...o, x, y } : o));
-            }
+            const place = <T extends { id: string; x: number; y: number }>(list: T[], kind: string): T[] =>
+                list.map((o) => { const p = shift(kind, o.id); return p ? { ...o, x: p[0][0], y: p[0][1] } : o; });
+            d.stamps = place(d.stamps, 'stamp');
+            d.tokens = place(d.tokens, 'token');
+            d.labels = place(d.labels, 'label');
+            d.paths = d.paths.map((p) => {
+                const pts = shift('path', p.id);
+                return pts ? { ...p, points: pts.map(([x, y]) => [x, y] as [number, number]) } : p;
+            });
         });
     };
 
@@ -437,6 +499,12 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         }
         gesture.current = null;
         if (!g) return;
+        if (g.kind === 'box') {
+            setBox(null);
+            /* A press that never became a drag: an ordinary click on nothing. */
+            if (!box && !g.add) store.setUi({ selection: [] });
+            return;
+        }
         if (g.kind === 'path') {
             setDraft(null);
             const pts = simplify(g.pts, 0.15);
@@ -447,7 +515,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             store.edit((d) => {
                 d.paths = [...d.paths, { id, kind, points: pts.map(([x, y]) => [+x.toFixed(2), +y.toFixed(2)] as [number, number]), width: PATH_KINDS.find((k) => k.kind === kind)?.width ?? 0.6 }];
             });
-            store.setUi({ selection: { kind: 'path', id } });
+            store.setUi({ selection: [{ kind: 'path', id }] });
             return;
         }
         if (g.kind !== 'pan') store.settle();
@@ -483,6 +551,16 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 <StampsLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} />
                 <LabelsLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} />
                 <TokensLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} />
+                {box && (
+                    <div
+                        className="map-marquee"
+                        style={{
+                            left: Math.min(box[0][0], box[1][0]) * CELL, top: Math.min(box[0][1], box[1][1]) * CELL,
+                            width: Math.abs(box[1][0] - box[0][0]) * CELL, height: Math.abs(box[1][1] - box[0][1]) * CELL,
+                            borderWidth: 1.5 / view.zoom,
+                        }}
+                    />
+                )}
                 {showBrush && hover && (
                     ui.tool === 'fill'
                         ? <div className="map-brush square" style={{ left: Math.floor(hover[0]) * CELL, top: Math.floor(hover[1]) * CELL, width: CELL, height: CELL }} />

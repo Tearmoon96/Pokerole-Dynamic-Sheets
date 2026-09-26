@@ -241,3 +241,12 @@ img.pixelated { image-rendering: pixelated; }
     padding: 0.1rem 0.4rem;
     pointer-events: none;
 }
+
+/* The Select tool's drag box. Its border is divided by the zoom inline, so it
+   stays a hairline however far in or out the map is. */
+.map-marquee {
+    position: absolute;
+    border: 1.5px dashed var(--accent);
+    background: var(--accent-faint);
+    pointer-events: none;
+}

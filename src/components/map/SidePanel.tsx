@@ -280,49 +280,104 @@ function patchObject(store: MapStore, sel: Selection, patch: Record<string, unkn
     }, sel.id + ':' + Object.keys(patch).join(','));
 }
 
+/** The ids of the selection, by kind — what every group action filters on. */
+function selectedIds(store: MapStore): Record<Selection['kind'], Set<string>> {
+    const out = { stamp: new Set<string>(), token: new Set<string>(), label: new Set<string>(), path: new Set<string>() };
+    for (const sel of store.ui.selection) out[sel.kind].add(sel.id);
+    return out;
+}
+
 export function deleteSelection(store: MapStore): void {
-    const sel = store.ui.selection;
-    if (!sel) return;
+    if (!store.ui.selection.length) return;
+    const ids = selectedIds(store);
     store.edit((d) => {
-        if (sel.kind === 'stamp') d.stamps = d.stamps.filter((o) => o.id !== sel.id);
-        if (sel.kind === 'token') d.tokens = d.tokens.filter((o) => o.id !== sel.id);
-        if (sel.kind === 'label') d.labels = d.labels.filter((o) => o.id !== sel.id);
-        if (sel.kind === 'path') d.paths = d.paths.filter((o) => o.id !== sel.id);
+        d.stamps = d.stamps.filter((o) => !ids.stamp.has(o.id));
+        d.tokens = d.tokens.filter((o) => !ids.token.has(o.id));
+        d.labels = d.labels.filter((o) => !ids.label.has(o.id));
+        d.paths = d.paths.filter((o) => !ids.path.has(o.id));
     });
-    store.setUi({ selection: null });
+    store.setUi({ selection: [] });
 }
 
+/** Copies of everything selected, offset a step, and the copies selected. */
 export function duplicateSelection(store: MapStore): void {
-    const sel = store.ui.selection;
-    if (!sel) return;
-    const id = uid();
+    if (!store.ui.selection.length) return;
+    const ids = selectedIds(store);
     const off = store.doc.grid.snap ? 1 : 0.6;
+    const made: Selection[] = [];
+    const copy = <T extends { id: string; x: number; y: number }>(list: T[], kind: Selection['kind']): T[] => [
+        ...list,
+        ...list.filter((o) => ids[kind].has(o.id)).map((o) => {
+            const id = uid();
+            made.push({ kind, id });
+            return { ...o, id, x: o.x + off, y: o.y + off };
+        }),
+    ];
     store.edit((d) => {
-        if (sel.kind === 'stamp') { const o = d.stamps.find((x) => x.id === sel.id); if (o) d.stamps = [...d.stamps, { ...o, id, x: o.x + off, y: o.y + off }]; }
-        if (sel.kind === 'token') { const o = d.tokens.find((x) => x.id === sel.id); if (o) d.tokens = [...d.tokens, { ...o, id, x: o.x + off, y: o.y + off }]; }
-        if (sel.kind === 'label') { const o = d.labels.find((x) => x.id === sel.id); if (o) d.labels = [...d.labels, { ...o, id, x: o.x + off, y: o.y + off }]; }
-        if (sel.kind === 'path') {
-            const o = d.paths.find((x) => x.id === sel.id);
-            if (o) d.paths = [...d.paths, { ...o, id, points: o.points.map(([x, y]) => [x + off, y + off] as [number, number]) }];
-        }
+        d.stamps = copy(d.stamps, 'stamp');
+        d.tokens = copy(d.tokens, 'token');
+        d.labels = copy(d.labels, 'label');
+        d.paths = [
+            ...d.paths,
+            ...d.paths.filter((o) => ids.path.has(o.id)).map((o) => {
+                const id = uid();
+                made.push({ kind: 'path', id });
+                return { ...o, id, points: o.points.map(([x, y]) => [x + off, y + off] as [number, number]) };
+            }),
+        ];
     });
-    store.setUi({ selection: { kind: sel.kind, id } });
+    store.setUi({ selection: made });
 }
 
-/** Move the selection to the top (or bottom) of its own layer. */
-function restack(store: MapStore, sel: Selection, top: boolean): void {
-    const move = <T extends { id: string }>(list: T[]): T[] => {
-        const o = list.find((x) => x.id === sel.id);
-        if (!o) return list;
-        const rest = list.filter((x) => x.id !== sel.id);
-        return top ? [...rest, o] : [o, ...rest];
+/** Move the selection to the top (or bottom) of each of its layers, keeping
+    the selected objects' order among themselves. */
+function restack(store: MapStore, top: boolean): void {
+    const ids = selectedIds(store);
+    const move = <T extends { id: string }>(list: T[], set: Set<string>): T[] => {
+        const picked = list.filter((x) => set.has(x.id));
+        if (!picked.length) return list;
+        const rest = list.filter((x) => !set.has(x.id));
+        return top ? [...rest, ...picked] : [...picked, ...rest];
     };
     store.edit((d) => {
-        if (sel.kind === 'stamp') d.stamps = move(d.stamps);
-        if (sel.kind === 'token') d.tokens = move(d.tokens);
-        if (sel.kind === 'label') d.labels = move(d.labels);
-        if (sel.kind === 'path') d.paths = move(d.paths);
+        d.stamps = move(d.stamps, ids.stamp);
+        d.tokens = move(d.tokens, ids.token);
+        d.labels = move(d.labels, ids.label);
+        d.paths = move(d.paths, ids.path);
     });
+}
+
+function GroupActions() {
+    const { store } = useMap();
+    return (
+        <div className="map-inspector-actions">
+            <button className="icon-btn" title="Duplicate (Ctrl+D)" onClick={() => duplicateSelection(store)}><i className="fa-solid fa-clone"></i></button>
+            <button className="icon-btn" title="Bring to front" onClick={() => restack(store, true)}><i className="fa-solid fa-arrow-up-wide-short"></i></button>
+            <button className="icon-btn" title="Send to back" onClick={() => restack(store, false)}><i className="fa-solid fa-arrow-down-short-wide"></i></button>
+            <span className="spacer"></span>
+            <button className="icon-btn danger" title="Delete (Del)" onClick={() => deleteSelection(store)}><i className="fa-solid fa-trash"></i></button>
+        </div>
+    );
+}
+
+const KIND_NAMES: Record<Selection['kind'], [string, string]> = {
+    stamp: ['landmark', 'landmarks'], token: ['token', 'tokens'], label: ['label', 'labels'], path: ['path', 'paths'],
+};
+
+/** Several things selected: what they are, and what can be done to all of them. */
+function GroupInspector({ selection }: { selection: Selection[] }) {
+    const counts = new Map<Selection['kind'], number>();
+    for (const s of selection) counts.set(s.kind, (counts.get(s.kind) ?? 0) + 1);
+    return (
+        <section className="map-section map-inspector">
+            <h3>{selection.length} selected</h3>
+            <p className="map-hint">
+                {[...counts].map(([k, n]) => n + ' ' + KIND_NAMES[k][n === 1 ? 0 : 1]).join(', ')}.
+                {' '}Drag any of them to move them together. Ctrl-click to add or remove one.
+            </p>
+            <GroupActions />
+        </section>
+    );
 }
 
 function Inspector({ doc, sel }: { doc: MapDoc; sel: Selection }) {
@@ -450,13 +505,7 @@ function Inspector({ doc, sel }: { doc: MapDoc; sel: Selection }) {
         <section className="map-section map-inspector">
             <h3>{title}</h3>
             {body}
-            <div className="map-inspector-actions">
-                <button className="icon-btn" title="Duplicate (Ctrl+D)" onClick={() => duplicateSelection(store)}><i className="fa-solid fa-clone"></i></button>
-                <button className="icon-btn" title="Bring to front" onClick={() => restack(store, sel, true)}><i className="fa-solid fa-arrow-up-wide-short"></i></button>
-                <button className="icon-btn" title="Send to back" onClick={() => restack(store, sel, false)}><i className="fa-solid fa-arrow-down-short-wide"></i></button>
-                <span className="spacer"></span>
-                <button className="icon-btn danger" title="Delete (Del)" onClick={() => deleteSelection(store)}><i className="fa-solid fa-trash"></i></button>
-            </div>
+            <GroupActions />
         </section>
     );
 }
@@ -471,14 +520,15 @@ export function SidePanel() {
         case 'path': palette = <PathPalette style={style} />; break;
         case 'token': palette = <TokenPalette style={style} />; break;
         case 'label': palette = <LabelPalette />; break;
-        case 'select': palette = !ui.selection ? <p className="map-hint map-section">Click something on the map to select it. Drag to move; drag a landmark's corner to resize it or its knob to turn it.</p> : null; break;
+        case 'select': palette = !ui.selection.length ? <p className="map-hint map-section">Click something on the map to select it. Drag to move; drag a landmark's corner to resize it or its knob to turn it. Ctrl-click to select several, or drag a box round them.</p> : null; break;
         case 'erase': palette = <p className="map-hint map-section">Click or drag across landmarks, tokens, labels and paths to remove them. Terrain is changed by painting over it.</p>; break;
         case 'pan': palette = <p className="map-hint map-section">Drag to move around the map; the wheel or a pinch zooms.</p>; break;
     }
     return (
         <aside className="map-side">
             {palette}
-            {ui.selection && <Inspector key={ui.selection.kind + ':' + ui.selection.id} doc={doc} sel={ui.selection} />}
+            {ui.selection.length === 1 && <Inspector key={ui.selection[0].kind + ':' + ui.selection[0].id} doc={doc} sel={ui.selection[0]} />}
+            {ui.selection.length > 1 && <GroupInspector selection={ui.selection} />}
         </aside>
     );
 }
