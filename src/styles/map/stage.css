@@ -217,16 +217,8 @@ img.pixelated { image-rendering: pixelated; }
 
 /* ---------------- Brush and readout ---------------- */
 
-.map-brush {
-    position: absolute;
-    border: 2px solid #fff;
-    outline: 1px solid #000a;
-    border-radius: 50%;
-    pointer-events: none;
-    box-sizing: border-box;
-}
-
-.map-brush.square { border-radius: 0; }
+/* Drawn as an SVG of the brush's own shape (MapCanvas BrushOutline). */
+.map-brush-outline { pointer-events: none; }
 
 .map-zoom-readout {
     position: absolute;

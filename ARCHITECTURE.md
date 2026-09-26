@@ -138,18 +138,28 @@ fields that would trigger the iOS zoom.
 
 `map-maker.html` edits maps of any scale on one square grid: a cell means
 whatever the map's scale label says. A map is one `MapDoc`
-([`src/map/types.ts`](src/map/types.ts)): the terrain as one character per cell,
-plus lists of paths, landmark stamps, tokens and labels, all positioned in
-cell units so no style, zoom or grid setting ever moves anything.
+([`src/map/types.ts`](src/map/types.ts)): the terrain, plus lists of paths,
+landmark stamps, tokens and labels, all positioned in cell units so no style,
+zoom or grid setting ever moves anything.
 
+- **Terrain** is a grid of samples finer than the cells — up to 16 a side,
+  fewer on the largest maps ([`src/map/raster.ts`](src/map/raster.ts)) — stored
+  run-length encoded. Brushes ([`src/map/brushes.ts`](src/map/brushes.ts))
+  paint their exact shape into it at any size, and the renderer draws what is
+  there without bending it. Maps from before the samples are converted on load,
+  keeping their look.
 - **Styles** ([`src/map/styles.ts`](src/map/styles.ts)) are data: terrain
   colours and textures, edge treatment, path looks, label fonts. Hand-drawn and
-  Anime draw terrain as smooth contours (marching squares in
-  [`src/map/geometry.ts`](src/map/geometry.ts), rounded and bent by noise);
-  Town Map and Overworld draw it as cells.
+  Anime trace the samples into smooth outlines (marching squares in
+  [`src/map/geometry.ts`](src/map/geometry.ts), all layers in one pass); Town
+  Map and Overworld draw them as blocks.
 - **Rendering** is two layers: a viewport-sized canvas for the ground
   ([`src/map/render/`](src/map/render/)), and a world layer of real elements
   for everything placed on it, moved and scaled by one CSS transform.
+  **Export** redraws both onto one canvas as a PNG
+  ([`exportPng.ts`](src/map/render/exportPng.ts)); opened from the disk, its
+  pictures are read from a folder the user picks, because a `file://` page may
+  not read its own images back ([`exportImages.ts`](src/map/render/exportImages.ts)).
 - **Art** is linked by file name: `app-data/images/MapSprites/<Style>/<slug>.png`,
   then `Common/`, then a drawn placeholder. [`MAP-SPRITES.md`](MAP-SPRITES.md)
   lists every name.

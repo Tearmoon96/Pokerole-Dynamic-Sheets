@@ -35,6 +35,9 @@ export interface MapStamp {
     label?: string;
     /** A Gym's type, drawn as a badge in its corner. */
     type?: string;
+    /** Snap to the grid: true or false overrides the map's own setting,
+        absent follows it. */
+    snap?: boolean;
 }
 
 export type TokenKind = 'pokemon' | 'trainer' | 'wild';
@@ -50,6 +53,9 @@ export interface MapToken {
     size: number;
     /** The ring around the token — whose side it is on, at a glance. */
     color: string;
+    /** Snap to the grid: true or false overrides the map's own setting,
+        absent follows it. */
+    snap?: boolean;
 }
 
 export type LabelRole = 'region' | 'town' | 'route' | 'small';
@@ -67,7 +73,8 @@ export interface MapLabel {
 
 export interface MapGrid {
     show: boolean;
-    /** Snap placed and dragged objects to the cells. */
+    /** Snap placed and dragged objects to the cells — the default each
+        landmark and token follows unless it has its own setting. */
     snap: boolean;
     /** 0..1 */
     opacity: number;
@@ -79,12 +86,14 @@ export interface MapDoc {
     styleId: StyleId;
     cols: number;
     rows: number;
+    /** Terrain samples per cell on each side — see raster.ts. */
+    res: number;
     /** What a cell means, in the GM's words: "1 cell = 5 km". Shown, never computed with. */
     scaleLabel: string;
     grid: MapGrid;
-    /** One terrain code per cell, row by row — see terrain.ts. A string rather
-        than an array because it is by far the biggest thing in the file, and one
-        character a cell keeps a 200x200 map to 40 KB. */
+    /** The terrain samples, run-length encoded — see raster.ts. A string
+        rather than an array because it is by far the biggest thing in the
+        file, and an immutable string is what lets undo snapshots share it. */
     terrain: string;
     paths: MapPath[];
     stamps: MapStamp[];

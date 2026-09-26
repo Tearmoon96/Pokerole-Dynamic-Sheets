@@ -4,7 +4,7 @@ import { useAppData } from '../../data/AppDataContext';
 import { useToast } from '../common/Toast';
 import { useGmConfirm } from '../gm/ConfirmDialog';
 import { HomeButton } from '../common/HomeButton';
-import { MAP_STYLES } from '../../map/styles';
+import { ExportControl, GridControl, ScaleControl, SizeControl, SnapToggle, StyleControl } from './TopBarControls';
 import {
     downloadMap, ensureWritable, forgetMapHandle, mapFileName, mapJson, parseMapFile,
     readMapHandle, rememberMapHandle, writeMapFile,
@@ -17,9 +17,7 @@ function escapeHtml(s: string): string {
     return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 }
 
-export function MapTopBar({ onMaps, onSettings, onSprites }: {
-    onMaps: () => void; onSettings: () => void; onSprites: () => void;
-}) {
+export function MapTopBar({ onMaps, onSprites }: { onMaps: () => void; onSprites: () => void }) {
     const { store, doc } = useMap();
     const { data } = useAppData();
     const toast = useToast();
@@ -124,39 +122,24 @@ export function MapTopBar({ onMaps, onSettings, onSprites }: {
                 <i className="fa-solid fa-caret-down"></i>
             </button>
 
-            <div className="map-styles" role="group" aria-label="Map style">
-                {MAP_STYLES.map((s) => (
-                    <button
-                        key={s.id}
-                        className="icon-btn"
-                        aria-pressed={doc.styleId === s.id}
-                        title={s.name + ' style'}
-                        onClick={() => { if (doc.styleId !== s.id) store.edit((d) => { d.styleId = s.id; }); }}
-                    >
-                        <i className={'fa-solid ' + s.icon}></i><span className="map-btn-text"> {s.name}</span>
-                    </button>
-                ))}
+            <div className="map-styles">
+                <StyleControl />
             </div>
 
-            <button
-                className="icon-btn"
-                aria-pressed={doc.grid.show}
-                title={doc.grid.show ? 'Hide the grid (#)' : 'Show the grid (#)'}
-                onClick={() => store.edit((d) => { d.grid = { ...d.grid, show: !d.grid.show }; })}
-            >
-                <i className="fa-solid fa-border-all"></i><span className="map-btn-text"> Grid</span>
-            </button>
-            {doc.scaleLabel && <span className="map-scale" title="What one cell means on this map">{doc.scaleLabel}</span>}
+            <div className="map-settings" role="group" aria-label="Map settings">
+                <GridControl />
+                <SnapToggle />
+                <SizeControl />
+                <ScaleControl />
+            </div>
 
             <span className="spacer"></span>
             <span className={'session-status' + (status.warn ? ' warn' : '')}>{status.text}</span>
             <div className="session-actions">
-                <button className="icon-btn" onClick={onSettings} title="Map settings: size, scale, grid">
-                    <i className="fa-solid fa-sliders"></i>
-                </button>
                 <button className="icon-btn" onClick={onSprites} title="Sprite checklist: which art the page has found">
                     <i className="fa-solid fa-images"></i>
                 </button>
+                <ExportControl />
                 <button className="icon-btn" onClick={() => { void saveAs(); }} title="Save this map to a .json file, choosing where">
                     <i className="fa-solid fa-floppy-disk"></i><span className="map-btn-text"> Save</span>
                 </button>

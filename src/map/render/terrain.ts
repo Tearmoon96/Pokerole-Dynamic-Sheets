@@ -1,31 +1,35 @@
-import { chaikinClosed, traceContours } from '../geometry';
+import { chaikinClosed, dropCollinear, traceLevels } from '../geometry';
 import type { Pt } from '../geometry';
-import { TERRAINS, terrainOf } from '../terrain';
+import { TERRAINS } from '../terrain';
 import type { TerrainDef } from '../terrain';
 import type { MapStyle, TerrainLook } from '../styles';
 import type { MapDoc } from '../types';
+import { rasterOf } from '../raster';
 import { probeImage, terrainTextureUrl } from '../sprites';
 import { CELL, patternTile, tileScale } from './patterns';
 
 /* The ground, drawn into a canvas.
 
-   The shapes are built once per change of the terrain string (buildGeometry) as
+   The shapes are built once per change of the terrain (buildGeometry) as
    Path2D objects in world px; every frame after that — a pan, a zoom — only
    fills and strokes them under the view transform, which is cheap. The canvas
    is the size of the VIEWPORT, not of the map: a 200x200 map at 32px a cell is
    6400px square, which at a 2x pixel ratio is a canvas no browser will give you.
 
+   The shapes come from the terrain samples (raster.ts) as they are. Nothing
+   here bends an edge: a square brush's square stays square, and an Organic
+   stroke wanders because the brush painted it wandering.
+
    Two ways to build:
 
-   - smooth: one layer per terrain in z order, each covering every cell AT OR
+   - smooth: one layer per terrain in z order, each covering every sample AT OR
      ABOVE its z. So a layer's outline is exactly where that terrain and
      everything stacked on it end, the next layer paints over its own part, and
-     two neighbouring smooth edges can never leave a sliver of nothing between
-     them. The outlines are marching squares round the cell centres, rounded off
-     with two passes of Chaikin — and in a style with `wobble`, jittered first,
-     at points keyed by position so the ink line does not crawl on redraw;
-   - blocky: one region per terrain, the union of its own cells, and the
-     optional 1px border wherever two different terrains meet. */
+     two neighbouring edges can never leave a sliver of nothing between them.
+     The outlines are marching squares round the sample centres, with two
+     passes of Chaikin to take the stair-steps off a diagonal;
+   - blocky: one region per terrain, the union of its own samples, and the
+     optional border wherever two different terrains meet. */
 
 export interface TerrainLayer {
     terrain: TerrainDef;
@@ -46,86 +50,47 @@ export interface TerrainGeometry {
     borders: Path2D | null;
 }
 
-/* A stable pseudo-random value for a lattice point. */
-function hash(x: number, y: number, k: number): number {
-    const s = Math.sin(x * 127.1 + y * 311.7 + k * 74.7) * 43758.5453;
-    return s - Math.floor(s);
-}
-
-/* Smooth value noise, -1..1: hashed lattice values blended with smoothstep.
-   Sampled at the outline's points it bends a coastline gently over a few
-   cells instead of shaking it point by point, and — being a function of
-   position alone — two terrains sharing an edge bend it identically. */
-function noise(x: number, y: number, k: number): number {
-    const x0 = Math.floor(x), y0 = Math.floor(y);
-    const fx = x - x0, fy = y - y0;
-    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
-    const a = hash(x0, y0, k), b = hash(x0 + 1, y0, k), c = hash(x0, y0 + 1, k), d = hash(x0 + 1, y0 + 1, k);
-    return (a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy) * 2 - 1;
-}
-
-/** Wavelength of the wobble, in cells. */
-const WOBBLE_SCALE = 2.3;
-
-function loopsToPath(loops: Pt[][], wobble: number): Path2D {
+function loopsToPath(loops: Pt[][], scale: number): Path2D {
     const path = new Path2D();
     for (let loop of loops) {
-        if (wobble > 0) {
-            loop = loop.map(([x, y]) => {
-                const u = x / WOBBLE_SCALE, v = y / WOBBLE_SCALE;
-                /* Two octaves: the broad bend, and a little grain on top. */
-                const dx = noise(u, v, 1) + 0.35 * noise(u * 3.1, v * 3.1, 3);
-                const dy = noise(u, v, 2) + 0.35 * noise(u * 3.1, v * 3.1, 4);
-                return [x + dx * wobble, y + dy * wobble] as Pt;
-            });
-        }
-        loop = chaikinClosed(chaikinClosed(loop));
-        path.moveTo(loop[0][0] * CELL, loop[0][1] * CELL);
-        for (let i = 1; i < loop.length; i++) path.lineTo(loop[i][0] * CELL, loop[i][1] * CELL);
+        /* Chaikin on the dense outline first, so it only rounds off a
+           sample's worth of corner; THEN drop the collinear points. The other
+           way round turns a square into an octagon. */
+        loop = dropCollinear(chaikinClosed(chaikinClosed(loop)));
+        path.moveTo(loop[0][0] * scale, loop[0][1] * scale);
+        for (let i = 1; i < loop.length; i++) path.lineTo(loop[i][0] * scale, loop[i][1] * scale);
         path.closePath();
     }
     return path;
 }
 
 export function geometryKey(doc: MapDoc, style: MapStyle): string {
-    return doc.cols + 'x' + doc.rows + ':' + style.edgeMode + ':' + style.wobble + ':' + (style.cellBorder ? 1 : 0) + ':' + doc.terrain;
+    return doc.cols + 'x' + doc.rows + '@' + doc.res + ':' + style.edgeMode + ':' + (style.cellBorder ? 1 : 0) + ':' + doc.terrain;
 }
 
 export function buildGeometry(doc: MapDoc, style: MapStyle): TerrainGeometry {
-    const { cols, rows, terrain } = doc;
     const key = geometryKey(doc, style);
-    const n = cols * rows;
-    const present = new Set<string>();
-    for (let i = 0; i < n; i++) present.add(terrain[i]);
-    const order = TERRAINS.filter((t) => present.has(t.code));
-    /* Unknown codes read as the fallback terrain, which may not be in `order`. */
-    for (const code of present) {
-        const t = terrainOf(code);
-        if (!order.includes(t)) order.push(t);
-    }
-    order.sort((a, b) => a.z - b.z);
+    const r = rasterOf(doc);
+    /* A raster holds indices into TERRAINS, which is in z order — so the
+       index IS the level the contours are traced at. */
+    const present = new Uint8Array(TERRAINS.length);
+    for (let i = 0; i < r.data.length; i++) present[r.data[i]] = 1;
+    const order = TERRAINS.map((t, i) => ({ t, i })).filter((x) => present[x.i]);
 
     if (style.edgeMode === 'blocky') return buildBlocky(doc, style, order, key);
 
-    const z = new Int8Array(n);
-    for (let i = 0; i < n; i++) z[i] = terrainOf(terrain[i]).z;
-    const mask = new Uint8Array(n);
-    const layers: TerrainLayer[] = [];
+    const scale = CELL / r.res;
     const full = new Path2D();
-    full.rect(0, 0, cols * CELL, rows * CELL);
+    full.rect(0, 0, doc.cols * CELL, doc.rows * CELL);
+    const traced = traceLevels(r.data, r.w, r.h, order.slice(1).map((x) => x.i));
 
+    const layers: TerrainLayer[] = [];
     let coast: Path2D | null = null;
     let waterLayers = 0;
-    order.forEach((t, idx) => {
-        let area: Path2D;
-        if (idx === 0) {
-            area = full;
-        } else {
-            for (let i = 0; i < n; i++) mask[i] = z[i] >= t.z ? 1 : 0;
-            area = loopsToPath(traceContours(mask, cols, rows), style.wobble);
-        }
+    order.forEach(({ t }, idx) => {
+        const area = idx === 0 ? full : loopsToPath(traced[idx - 1], scale);
         if (t.water) waterLayers = idx + 1;
-        else if (!coast && idx > 0 && order[idx - 1].water) coast = area;
+        else if (!coast && idx > 0 && order[idx - 1].t.water) coast = area;
         const look = style.terrain[t.slug];
         layers.push({ terrain: t, area, outline: look?.edge && idx > 0 ? area : null });
     });
@@ -133,45 +98,55 @@ export function buildGeometry(doc: MapDoc, style: MapStyle): TerrainGeometry {
     return { key, layers, coast, waterLayers, borders: null };
 }
 
-function buildBlocky(doc: MapDoc, style: MapStyle, order: TerrainDef[], key: string): TerrainGeometry {
-    const { cols, rows, terrain } = doc;
-    const paths = new Map<string, Path2D>();
-    for (const t of order) paths.set(t.code, new Path2D());
+function buildBlocky(doc: MapDoc, style: MapStyle, order: { t: TerrainDef; i: number }[], key: string): TerrainGeometry {
+    const { w, h, res, data } = rasterOf(doc);
+    const px = CELL / res;
+    const paths = new Map<number, Path2D>();
+    for (const { i } of order) paths.set(i, new Path2D());
     /* Horizontal runs of one terrain as one rect each — far fewer subpaths
-       than a rect per cell on a map painted in broad strokes. */
-    for (let y = 0; y < rows; y++) {
+       than a rect per sample on a map painted in broad strokes. */
+    for (let y = 0; y < h; y++) {
         let x = 0;
-        while (x < cols) {
-            const code = terrain[y * cols + x];
+        const row = y * w;
+        while (x < w) {
+            const v = data[row + x];
             let end = x + 1;
-            while (end < cols && terrain[y * cols + end] === code) end++;
-            const p = paths.get(terrainOf(code).code) ?? paths.get(code);
-            p?.rect(x * CELL, y * CELL, (end - x) * CELL, CELL);
+            while (end < w && data[row + end] === v) end++;
+            paths.get(v)?.rect(x * px, y * px, (end - x) * px, px);
             x = end;
         }
     }
     let borders: Path2D | null = null;
     if (style.cellBorder) {
         borders = new Path2D();
-        const at = (x: number, y: number) => terrain[y * cols + x];
-        for (let y = 0; y < rows; y++) {
-            for (let x = 0; x < cols; x++) {
-                if (x < cols - 1 && at(x, y) !== at(x + 1, y)) {
-                    borders.moveTo((x + 1) * CELL, y * CELL); borders.lineTo((x + 1) * CELL, (y + 1) * CELL);
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                const v = data[y * w + x];
+                if (x < w - 1 && v !== data[y * w + x + 1]) {
+                    borders.moveTo((x + 1) * px, y * px); borders.lineTo((x + 1) * px, (y + 1) * px);
                 }
-                if (y < rows - 1 && at(x, y) !== at(x, y + 1)) {
-                    borders.moveTo(x * CELL, (y + 1) * CELL); borders.lineTo((x + 1) * CELL, (y + 1) * CELL);
+                if (y < h - 1 && v !== data[(y + 1) * w + x]) {
+                    borders.moveTo(x * px, (y + 1) * px); borders.lineTo((x + 1) * px, (y + 1) * px);
                 }
             }
         }
     }
-    const layers = order.map((t) => ({ terrain: t, area: paths.get(t.code)!, outline: null }));
+    const layers = order.map(({ t, i }) => ({ terrain: t, area: paths.get(i)!, outline: null }));
     return { key, layers, coast: null, waterLayers: 0, borders };
 }
 
 /* ------------------------------------------------------------------ drawing */
 
-function fillLayer(ctx: CanvasRenderingContext2D, style: MapStyle, t: TerrainDef, area: Path2D): void {
+/** Where a terrain's texture comes from: the page's own probe normally, a
+    set loaded beforehand for a PNG export (see exportPng.ts). */
+export type TextureSource = (style: MapStyle, slug: string) => { img: CanvasImageSource; w: number; h: number } | null;
+
+const probeTexture: TextureSource = (style, slug) => {
+    const img = probeImage(terrainTextureUrl(style, slug));
+    return img && img.naturalWidth > 0 ? { img, w: img.naturalWidth, h: img.naturalHeight } : null;
+};
+
+function fillLayer(ctx: CanvasRenderingContext2D, style: MapStyle, t: TerrainDef, area: Path2D, textures: TextureSource): void {
     const look: TerrainLook | undefined = style.terrain[t.slug];
     /* The terrain's own colour first, always: a texture with transparent
        parts would otherwise show whatever lies underneath — the sea. */
@@ -179,11 +154,11 @@ function fillLayer(ctx: CanvasRenderingContext2D, style: MapStyle, t: TerrainDef
     ctx.fill(area, 'evenodd');
     /* The owner's own tile for this terrain, one cell per repeat, replaces
        the procedural pattern. */
-    const tex = probeImage(terrainTextureUrl(style, t.slug));
-    if (tex && tex.naturalWidth > 0) {
-        const pat = ctx.createPattern(tex, 'repeat');
+    const tex = textures(style, t.slug);
+    if (tex) {
+        const pat = ctx.createPattern(tex.img, 'repeat');
         if (pat) {
-            pat.setTransform(new DOMMatrix([CELL / tex.naturalWidth, 0, 0, CELL / tex.naturalHeight, 0, 0]));
+            pat.setTransform(new DOMMatrix([CELL / tex.w, 0, 0, CELL / tex.h, 0, 0]));
             ctx.fillStyle = pat;
             ctx.fill(area, 'evenodd');
             return;
@@ -202,7 +177,8 @@ function fillLayer(ctx: CanvasRenderingContext2D, style: MapStyle, t: TerrainDef
 }
 
 /** Draw the map's ground under the transform already set on `ctx` (world px). */
-export function drawTerrain(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapDoc, style: MapStyle): void {
+export function drawTerrain(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapDoc, style: MapStyle,
+    textures: TextureSource = probeTexture): void {
     const W = doc.cols * CELL, H = doc.rows * CELL;
     ctx.save();
     const clip = new Path2D();
@@ -219,7 +195,7 @@ export function drawTerrain(ctx: CanvasRenderingContext2D, geo: TerrainGeometry,
                 ctx.stroke(geo.coast);
             }
         }
-        fillLayer(ctx, style, layer.terrain, layer.area);
+        fillLayer(ctx, style, layer.terrain, layer.area, textures);
     });
 
     for (const layer of geo.layers) {
@@ -233,7 +209,7 @@ export function drawTerrain(ctx: CanvasRenderingContext2D, geo: TerrainGeometry,
 
     if (geo.borders && style.cellBorder) {
         ctx.strokeStyle = style.cellBorder;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = Math.min(2, CELL / doc.res);
         ctx.stroke(geo.borders);
     }
     ctx.restore();

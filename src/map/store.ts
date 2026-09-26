@@ -1,4 +1,5 @@
 import { createDoc, normalizeDoc } from './doc';
+import type { BrushId } from './brushes';
 import type { LabelRole, MapDoc, PathKind, Selection, Tool } from './types';
 
 /* One mutable store behind the Map Maker, in the same shape as the GM screen's
@@ -36,8 +37,9 @@ export interface MapUi {
     tool: Tool;
     /** Terrain code the brush and the bucket lay down. */
     terrain: string;
+    /** Brush size in cells, to three decimals. */
     brush: number;
-    brushSquare: boolean;
+    brushShape: BrushId;
     landmark: string;
     pathKind: PathKind;
     /** The role a newly placed label takes. */
@@ -76,7 +78,7 @@ export class MapStore {
     private pending: MapDoc | null = null;
 
     ui: MapUi = {
-        tool: 'paint', terrain: 'g', brush: 2, brushSquare: false,
+        tool: 'paint', terrain: 'g', brush: 2, brushShape: 'circle',
         landmark: 'mountain', pathKind: 'road', labelRole: 'town', token: null, selection: [],
     };
 

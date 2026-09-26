@@ -111,89 +111,119 @@ export function chaikinClosed(loop: Pt[]): Pt[] {
 
 /* ------------------------------------------------------------------ contours
 
-   Marching squares over a boolean mask, one sample per cell centre. The result
-   is closed loops in cell units, ready to fill with the even-odd rule, which is
+   Marching squares over a grid of levels, one sample per grid point. For each
+   threshold asked for it traces the outline of "every sample at or above the
+   threshold", as closed loops ready to fill with the even-odd rule — which is
    what makes a lake inside an island inside a sea come out right with no
    bookkeeping about which loop is a hole.
 
-   The mask is padded by two rings before tracing: the first repeats the edge
-   cells, the second is empty. So a region touching the map's border closes
-   OUTSIDE the map rather than curling back in along the edge, and the renderer
-   clips it to the map — land runs straight off the edge of the page, as on a
-   real map. */
+   All thresholds in ONE pass: a 2x2 square whose four samples agree — nearly
+   all of them on a painted map — is skipped at once, and only squares on a
+   boundary do any work. A 1600x1600 raster is millions of squares, and one
+   pass per terrain was too slow to redraw under a brush.
 
-export function traceContours(mask: Uint8Array, cols: number, rows: number): Pt[][] {
-    const W = cols + 4, H = rows + 4;
+   The grid is padded by two rings: the first repeats the edge samples, the
+   second is below every threshold. So a region touching the map's border
+   closes OUTSIDE the map rather than curling back in along the edge, and the
+   renderer clips it — land runs straight off the edge of the page. Loops come
+   back in sample units, where sample i's centre is i + 0.5. */
+
+export function traceLevels(levels: Uint8Array, w: number, h: number, thresholds: number[]): Pt[][][] {
+    const W = w + 4, H = h + 4;
     const g = new Uint8Array(W * H);
     for (let y = 1; y < H - 1; y++) {
-        const sy = Math.max(0, Math.min(rows - 1, y - 2));
+        const sy = Math.max(0, Math.min(h - 1, y - 2));
+        const row = sy * w;
         for (let x = 1; x < W - 1; x++) {
-            const sx = Math.max(0, Math.min(cols - 1, x - 2));
-            g[y * W + x] = mask[sy * cols + sx];
+            g[y * W + x] = levels[row + Math.max(0, Math.min(w - 1, x - 2))] + 1;
         }
     }
+    /* +1 above so the empty outer ring (0) is below every threshold. */
+    const ts = thresholds.map((t) => t + 1);
+    const nexts = ts.map(() => new Map<number, number>());
 
     /* Edge points are keyed by which grid edge they sit on:
        horizontal edge (x,y)-(x+1,y) -> 2*(y*W+x); vertical (x,y)-(x,y+1) -> 2*(y*W+x)+1. */
-    const next = new Map<number, number>();
-    const link = (a: number, b: number) => { next.set(a, b); };
-    const hE = (x: number, y: number) => 2 * (y * W + x);
-    const vE = (x: number, y: number) => 2 * (y * W + x) + 1;
-
     for (let y = 0; y < H - 1; y++) {
         for (let x = 0; x < W - 1; x++) {
-            const tl = g[y * W + x], tr = g[y * W + x + 1];
-            const br = g[(y + 1) * W + x + 1], bl = g[(y + 1) * W + x];
-            const c = (tl << 3) | (tr << 2) | (br << 1) | bl;
-            if (c === 0 || c === 15) continue;
-            const top = hE(x, y), bottom = hE(x, y + 1), left = vE(x, y), right = vE(x + 1, y);
-            /* Every segment is oriented with the filled side on its right, so
-               following `next` walks each loop in one direction. The two
-               saddles join their filled corners diagonally. */
-            switch (c) {
-                case 1: link(bottom, left); break;
-                case 2: link(right, bottom); break;
-                case 3: link(right, left); break;
-                case 4: link(top, right); break;
-                case 5: link(top, left); link(bottom, right); break;
-                case 6: link(top, bottom); break;
-                case 7: link(top, left); break;
-                case 8: link(left, top); break;
-                case 9: link(bottom, top); break;
-                case 10: link(left, bottom); link(right, top); break;
-                case 11: link(right, top); break;
-                case 12: link(left, right); break;
-                case 13: link(bottom, right); break;
-                case 14: link(left, bottom); break;
+            const i = y * W + x;
+            const a = g[i], b = g[i + 1], c = g[i + W + 1], d = g[i + W];
+            if (a === b && b === c && c === d) continue;
+            const lo = Math.min(a, b, c, d), hi = Math.max(a, b, c, d);
+            const top = 2 * i, bottom = 2 * (i + W), left = 2 * i + 1, right = 2 * (i + 1) + 1;
+            for (let k = 0; k < ts.length; k++) {
+                const t = ts[k];
+                if (t <= lo || t > hi) continue;
+                const next = nexts[k];
+                const code = ((a >= t ? 1 : 0) << 3) | ((b >= t ? 1 : 0) << 2) | ((c >= t ? 1 : 0) << 1) | (d >= t ? 1 : 0);
+                /* Every segment keeps the filled side on the same hand, so
+                   following `next` walks each loop one way round. The two
+                   saddles join their filled corners diagonally. */
+                switch (code) {
+                    case 1: next.set(bottom, left); break;
+                    case 2: next.set(right, bottom); break;
+                    case 3: next.set(right, left); break;
+                    case 4: next.set(top, right); break;
+                    case 5: next.set(top, left); next.set(bottom, right); break;
+                    case 6: next.set(top, bottom); break;
+                    case 7: next.set(top, left); break;
+                    case 8: next.set(left, top); break;
+                    case 9: next.set(bottom, top); break;
+                    case 10: next.set(left, bottom); next.set(right, top); break;
+                    case 11: next.set(right, top); break;
+                    case 12: next.set(left, right); break;
+                    case 13: next.set(bottom, right); break;
+                    case 14: next.set(left, bottom); break;
+                }
             }
         }
     }
 
-    /* An edge key back to its position, in cell units of the UNPADDED map:
-       sample (x, y) of the padded grid is the centre of cell (x-2, y-2). */
+    /* An edge key back to its position, in sample units of the UNPADDED
+       grid: padded point (x, y) is the centre of sample (x-2, y-2). */
     const pos = (k: number): Pt => {
         const vert = k & 1;
         const i = k >> 1;
         const x = i % W, y = (i - x) / W;
-        const px = vert ? x : x + 0.5;
-        const py = vert ? y + 0.5 : y;
-        return [px - 2 + 0.5, py - 2 + 0.5];
+        return [(vert ? x : x + 0.5) - 1.5, (vert ? y + 0.5 : y) - 1.5];
     };
 
-    const loops: Pt[][] = [];
-    const seen = new Set<number>();
-    for (const start of next.keys()) {
-        if (seen.has(start)) continue;
-        const loop: Pt[] = [];
-        let k: number | undefined = start;
-        while (k !== undefined && !seen.has(k)) {
-            seen.add(k);
-            loop.push(pos(k));
-            k = next.get(k);
+    return nexts.map((next) => {
+        const loops: Pt[][] = [];
+        const seen = new Set<number>();
+        for (const start of next.keys()) {
+            if (seen.has(start)) continue;
+            const loop: Pt[] = [];
+            let k: number | undefined = start;
+            while (k !== undefined && !seen.has(k)) {
+                seen.add(k);
+                loop.push(pos(k));
+                k = next.get(k);
+            }
+            if (loop.length >= 3) loops.push(loop);
         }
-        if (loop.length >= 3) loops.push(loop);
+        return loops;
+    });
+}
+
+/** One boolean mask's outline, in cell units of a one-sample-a-cell grid. */
+export function traceContours(mask: Uint8Array, cols: number, rows: number): Pt[][] {
+    return traceLevels(mask, cols, rows, [1])[0];
+}
+
+/** Collapse runs of points that lie on one straight line. A square brush's
+    edge comes back from marching squares as a point every sample; this keeps
+    its four corners, and makes a big map's outlines a fraction the size. */
+export function dropCollinear(loop: Pt[]): Pt[] {
+    const n = loop.length;
+    if (n < 4) return loop;
+    const out: Pt[] = [];
+    for (let i = 0; i < n; i++) {
+        const a = loop[(i + n - 1) % n], b = loop[i], c = loop[(i + 1) % n];
+        const cross = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+        if (Math.abs(cross) > 1e-9) out.push(b);
     }
-    return loops;
+    return out.length >= 3 ? out : loop;
 }
 
 /** Dense points along the Catmull-Rom curve through `pts`. */

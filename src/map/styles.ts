@@ -44,9 +44,6 @@ export interface MapStyle {
     folder: string;
     icon: string;
     edgeMode: 'smooth' | 'blocky';
-    /** How far a smooth edge wanders off the cells, in cells: 0 keeps it on
-        the cell outline (rounded), more makes a coastline organic. */
-    wobble: number;
     /** Everything past the map's edge. */
     backdrop: string;
     /** A frame drawn around the map itself. */
@@ -75,7 +72,7 @@ const HAND_INK = '#3b2f24';
 
 const handdrawn: MapStyle = {
     id: 'handdrawn', name: 'Hand-drawn', folder: 'HandDrawn', icon: 'fa-feather-pointed',
-    edgeMode: 'smooth', wobble: 0.38,
+    edgeMode: 'smooth',
     backdrop: '#2a241d', frame: { color: HAND_INK, width: 3 },
     coast: { color: '#3f5e5a1c', widths: [1.8, 1.3, 0.85, 0.45] },
     pixelated: false,
@@ -122,7 +119,7 @@ const ANIME_LINE = '#24324d';
 
 const anime: MapStyle = {
     id: 'anime', name: 'Anime', folder: 'Anime', icon: 'fa-wand-magic-sparkles',
-    edgeMode: 'smooth', wobble: 0.24,
+    edgeMode: 'smooth',
     backdrop: '#1c2335', frame: { color: ANIME_LINE, width: 4 },
     coast: { color: '#ffffff2e', widths: [1.1, 0.7, 0.4] },
     pixelated: false,
@@ -167,7 +164,7 @@ const anime: MapStyle = {
 
 const townmap: MapStyle = {
     id: 'townmap', name: 'Town Map', folder: 'TownMap', icon: 'fa-map-location-dot',
-    edgeMode: 'blocky', wobble: 0,
+    edgeMode: 'blocky',
     backdrop: '#101820', frame: { color: '#f8f8f8', width: 4 },
     pixelated: true,
     cellBorder: '#20402888',
@@ -212,7 +209,7 @@ const townmap: MapStyle = {
 
 const overworld: MapStyle = {
     id: 'overworld', name: 'Overworld', folder: 'Overworld', icon: 'fa-gamepad',
-    edgeMode: 'blocky', wobble: 0,
+    edgeMode: 'blocky',
     backdrop: '#101010', frame: { color: '#000000', width: 2 },
     pixelated: true,
     grid: '#00000030',

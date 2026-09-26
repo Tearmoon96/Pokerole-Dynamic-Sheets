@@ -230,3 +230,135 @@
 }
 
 .map-inspector-actions .spacer { flex: 1; }
+
+/* ---------------- Brush controls ---------------- */
+
+.map-brush-controls .map-row { margin-top: 0.5rem; }
+
+.map-brush-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.8rem;
+}
+
+.map-brush-btn span { flex: 1 1 auto; text-align: left; }
+.map-brush-btn .map-brush-glyph { color: var(--accent); }
+
+.map-brush-size {
+    width: 5.2rem;
+    flex: 0 0 auto;
+    font-size: 0.8rem;
+}
+
+.map-unit { font-size: 0.7rem; color: var(--text-secondary); }
+
+.map-brush-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 74px);
+    gap: 0.35rem;
+}
+
+.map-brush-choice {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.5rem 0.2rem 0.4rem;
+    font-size: 0.7rem;
+    white-space: normal;
+    line-height: 1.15;
+}
+
+.map-brush-choice .map-brush-glyph { color: var(--text-secondary); }
+
+.map-brush-choice[aria-pressed="true"] {
+    border-color: var(--accent);
+    background: var(--accent-faint);
+    box-shadow: 0 0 6px var(--accent-glow);
+}
+
+.map-brush-choice[aria-pressed="true"] .map-brush-glyph { color: var(--accent); }
+
+/* ---------------- Size slider (as the Pokémon card sizes a sprite) ---------------- */
+
+.map-size-editor {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0.55rem;
+}
+
+.map-size-row {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.map-size-row > span:first-child {
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+.map-size-range {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--ghost-color);
+    cursor: pointer;
+}
+
+.map-size-val {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    width: 42px;
+    flex-shrink: 0;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.map-size-reset {
+    background: #ffffff0d;
+    border: 1px solid #ffffff26;
+    color: var(--text-secondary);
+    font-size: 0.68rem;
+    padding: 0.2rem 0.5rem;
+    flex: 0 0 auto;
+}
+
+.map-size-reset:disabled { opacity: 0.4; cursor: default; }
+
+/* ---------------- Segmented choice (snap override) ---------------- */
+
+.map-segmented {
+    display: flex;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.map-segmented button {
+    flex: 1 1 0;
+    min-width: 0;
+    border: 0;
+    border-radius: 0;
+    border-right: 1px solid var(--border-color);
+    background: transparent;
+    padding: 0.3rem 0.3rem;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+.map-segmented button:last-child { border-right: 0; }
+
+.map-segmented button[aria-pressed="true"] {
+    background: var(--accent-faint);
+    color: var(--accent);
+    font-weight: 600;
+}

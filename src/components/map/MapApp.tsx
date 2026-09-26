@@ -5,7 +5,8 @@ import { MapTopBar } from './MapTopBar';
 import { ToolRail, TOOLS } from './ToolRail';
 import { SidePanel, deleteSelection, duplicateSelection } from './SidePanel';
 import { MapCanvas } from './MapCanvas';
-import { MapListDialog, MapSettingsDialog, SpriteChecklist } from './MapDialogs';
+import { cleanSize } from '../../map/brushes';
+import { MapListDialog, SpriteChecklist } from './MapDialogs';
 
 /* The Map Maker: top bar, tool rail, the map, and the side panel. */
 
@@ -19,7 +20,7 @@ function typing(target: EventTarget | null): boolean {
 export function MapApp({ dataOk }: { dataOk: boolean }) {
     const { store, doc } = useMap();
     const toast = useToast();
-    const [dialog, setDialog] = useState<'maps' | 'settings' | 'sprites' | null>(null);
+    const [dialog, setDialog] = useState<'maps' | 'sprites' | null>(null);
     const [spaceHeld, setSpaceHeld] = useState(false);
 
     useEffect(() => {
@@ -71,8 +72,8 @@ export function MapApp({ dataOk }: { dataOk: boolean }) {
             if (mod) return;
             if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelection(store); return; }
             if (e.key === 'Escape') { store.setUi({ selection: [] }); return; }
-            if (e.key === '[') { store.setUi({ brush: Math.max(1, store.ui.brush - 1) }); return; }
-            if (e.key === ']') { store.setUi({ brush: Math.min(12, store.ui.brush + 1) }); return; }
+            if (e.key === '[') { store.setUi({ brush: cleanSize(store.ui.brush / 1.25) }); return; }
+            if (e.key === ']') { store.setUi({ brush: cleanSize(store.ui.brush * 1.25) }); return; }
             if (e.key === '+' || e.key === '=') { window.dispatchEvent(new CustomEvent('map-zoom', { detail: 1.25 })); return; }
             if (e.key === '-') { window.dispatchEvent(new CustomEvent('map-zoom', { detail: 0.8 })); return; }
             if (e.key === '0') { window.dispatchEvent(new CustomEvent('map-fit')); return; }
@@ -96,7 +97,6 @@ export function MapApp({ dataOk }: { dataOk: boolean }) {
         <>
             <MapTopBar
                 onMaps={() => setDialog('maps')}
-                onSettings={() => setDialog('settings')}
                 onSprites={() => setDialog('sprites')}
             />
             {!dataOk && (
@@ -111,7 +111,6 @@ export function MapApp({ dataOk }: { dataOk: boolean }) {
                 <SidePanel />
             </div>
             <MapListDialog open={dialog === 'maps'} onClose={() => setDialog(null)} />
-            <MapSettingsDialog open={dialog === 'settings'} onClose={() => setDialog(null)} />
             <SpriteChecklist open={dialog === 'sprites'} onClose={() => setDialog(null)} />
         </>
     );

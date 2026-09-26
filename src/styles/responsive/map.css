@@ -29,7 +29,10 @@ html[data-device="phone"] .map-topbar {
 html[data-device="phone"] .map-topbar .map-logo-text,
 html[data-device="phone"] .map-topbar .version,
 html[data-device="phone"] .map-topbar .map-btn-text,
-html[data-device="phone"] .map-topbar .map-scale { display: none; }
+html[data-device="phone"] .map-topbar .map-scale-text { display: none; }
+
+html[data-device="phone"] .map-settings { border-left: 0; padding-left: 0; flex-wrap: wrap; }
+html[data-device="phone"] .map-style-name { display: none; }
 
 html[data-device="phone"] .map-topbar .spacer { display: none; }
 
@@ -81,10 +84,16 @@ html[data-pointer="coarse"] .map-handle-rotate { top: -40px; margin-left: -13px;
 html[data-pointer="coarse"] .map-handle-rotate::after { left: 11px; top: 24px; height: 16px; }
 
 html[data-pointer="coarse"] .map-color { width: 30px; height: 30px; }
+html[data-pointer="coarse"] .map-split-caret { min-width: 30px; }
+html[data-pointer="coarse"] .map-segmented button { min-height: 34px; }
+html[data-pointer="coarse"] .map-brush-choice { min-height: 64px; }
 html[data-pointer="coarse"] .map-chip { min-height: 32px; }
 
 html[data-pointer="coarse"] .map-field input,
 html[data-pointer="coarse"] .map-field select,
 html[data-pointer="coarse"] .map-field textarea,
 html[data-pointer="coarse"] .map-token-fields input,
+html[data-pointer="coarse"] .map-brush-size,
+html[data-pointer="coarse"] .map-popover input,
+html[data-pointer="coarse"] .map-popover select,
 html[data-pointer="coarse"] .map-search { font-size: 16px; }

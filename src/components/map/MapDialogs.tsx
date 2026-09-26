@@ -3,10 +3,10 @@ import { useMap } from '../../map/MapContext';
 import { Modal, ModalClose } from '../common/Modal';
 import { useGmConfirm } from '../gm/ConfirmDialog';
 import { MAP_STYLES } from '../../map/styles';
-import { TERRAINS, TERRAIN_BY_SLUG } from '../../map/terrain';
+import { TERRAINS } from '../../map/terrain';
 import { LANDMARKS } from '../../map/landmarks';
 import { COMMON_FOLDER, MAP_SPRITE_BASE, imageExists, terrainTextureUrl } from '../../map/sprites';
-import { MAX_CELLS, MIN_CELLS, clampCells, createDoc, resizeDoc, uid } from '../../map/doc';
+import { MAX_CELLS, MIN_CELLS, clampCells, createDoc, uid } from '../../map/doc';
 import type { MapDoc, StyleId } from '../../map/types';
 
 /* ------------------------------------------------------------- new map */
@@ -145,89 +145,6 @@ export function MapListDialog({ open, onClose }: { open: boolean; onClose: () =>
                     </li>
                 ))}
             </ul>
-        </Modal>
-    );
-}
-
-/* ------------------------------------------------------------- settings */
-
-export function MapSettingsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-    const { store, doc } = useMap();
-    const [cols, setCols] = useState(doc.cols);
-    const [rows, setRows] = useState(doc.rows);
-    const [fill, setFill] = useState('sea');
-
-    useEffect(() => { if (open) { setCols(doc.cols); setRows(doc.rows); } }, [open, doc.cols, doc.rows]);
-
-    const sized = clampCells(cols) !== doc.cols || clampCells(rows) !== doc.rows;
-
-    return (
-        <Modal open={open} onClose={onClose} boxClassName="map-dialog">
-            <ModalClose onClick={onClose} />
-            <div className="map-dialog-title"><i className="fa-solid fa-sliders"></i> Map settings</div>
-            <label className="map-field">
-                <span>Name</span>
-                <input type="text" value={doc.name} onChange={(e) => { const v = e.currentTarget.value; store.edit((d) => { d.name = v; }, 'name'); }} />
-            </label>
-            <label className="map-field">
-                <span>Scale</span>
-                <input
-                    type="text" value={doc.scaleLabel} placeholder="e.g. 1 cell = 5 km"
-                    onChange={(e) => { const v = e.currentTarget.value; store.edit((d) => { d.scaleLabel = v; }, 'scale'); }}
-                />
-            </label>
-            <label className="map-field">
-                <span>Style</span>
-                <select value={doc.styleId} onChange={(e) => { const v = e.currentTarget.value as StyleId; store.edit((d) => { d.styleId = v; }); }}>
-                    {MAP_STYLES.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-            </label>
-
-            <h4 className="map-dialog-sub">Grid</h4>
-            <div className="map-field-row">
-                <label className="map-check">
-                    <input type="checkbox" checked={doc.grid.show} onChange={(e) => { const v = e.currentTarget.checked; store.edit((d) => { d.grid = { ...d.grid, show: v }; }); }} /> Show lines
-                </label>
-                <label className="map-check">
-                    <input type="checkbox" checked={doc.grid.snap} onChange={(e) => { const v = e.currentTarget.checked; store.edit((d) => { d.grid = { ...d.grid, snap: v }; }); }} /> Snap to cells
-                </label>
-            </div>
-            <label className="map-field">
-                <span>Line opacity</span>
-                <input
-                    type="range" min={0.05} max={1} step={0.05} value={doc.grid.opacity}
-                    onChange={(e) => { const v = Number(e.currentTarget.value); store.edit((d) => { d.grid = { ...d.grid, opacity: v }; }, 'grid-opacity'); }}
-                />
-            </label>
-
-            <h4 className="map-dialog-sub">Size</h4>
-            <div className="map-field-row">
-                <label className="map-field">
-                    <span>Columns</span>
-                    <input type="number" min={MIN_CELLS} max={MAX_CELLS} value={cols} onChange={(e) => setCols(Number(e.currentTarget.value))} />
-                </label>
-                <label className="map-field">
-                    <span>Rows</span>
-                    <input type="number" min={MIN_CELLS} max={MAX_CELLS} value={rows} onChange={(e) => setRows(Number(e.currentTarget.value))} />
-                </label>
-                <label className="map-field">
-                    <span>New cells</span>
-                    <select value={fill} onChange={(e) => setFill(e.currentTarget.value)}>
-                        {TERRAINS.map((t) => <option key={t.slug} value={t.slug}>{t.name}</option>)}
-                    </select>
-                </label>
-            </div>
-            <p className="map-hint">Grows or trims from the right and bottom edges; everything painted stays where it is.</p>
-            <button
-                disabled={!sized}
-                onClick={() => {
-                    const code = TERRAIN_BY_SLUG.get(fill)?.code ?? 'S';
-                    store.edit((d) => resizeDoc(d, cols, rows, code));
-                    window.dispatchEvent(new CustomEvent('map-fit'));
-                }}
-            >
-                <i className="fa-solid fa-up-right-and-down-left-from-center"></i> Resize to {clampCells(cols)}×{clampCells(rows)}
-            </button>
         </Modal>
     );
 }

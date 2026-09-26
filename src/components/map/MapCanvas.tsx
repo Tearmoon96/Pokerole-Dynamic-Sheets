@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react';
 import { useMap } from '../../map/MapContext';
 import { PATH_KINDS, styleOf } from '../../map/styles';
-import { brushCells, floodFill, paintCells, snapPoint, uid } from '../../map/doc';
+import { snapPoint, snapsFor, uid } from '../../map/doc';
+import { codeIndex, encode, floodFill, rasterOf, remember } from '../../map/raster';
+import type { Raster } from '../../map/raster';
+import { BRUSH_BY_ID, strokeSegment } from '../../map/brushes';
 import { distToPolyline, simplify } from '../../map/geometry';
 import type { Pt } from '../../map/geometry';
 import { landmarkOf } from '../../map/landmarks';
@@ -36,7 +39,10 @@ const MAX_ZOOM = 8;
 
 type Gesture =
     | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
-    | { kind: 'paint'; last: Pt }
+    /* A stroke paints into its own copy of the samples and publishes it at
+       most once a frame: encoding a big map is milliseconds, and a pointer
+       reports far more often than the screen redraws. */
+    | { kind: 'paint'; last: Pt; work: Raster; frame: number | null }
     | { kind: 'path'; pts: Pt[] }
     | { kind: 'erase' }
     /* Everything selected moves together; `anchor` is the one under the
@@ -217,18 +223,19 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     };
     const inside = ([x, y]: Pt) => x >= 0 && y >= 0 && x <= store.doc.cols && y <= store.doc.rows;
 
-    const paintAlong = (from: Pt, to: Pt) => {
-        const d = store.doc;
-        const code = store.ui.terrain;
-        const steps = Math.max(1, Math.ceil(Math.hypot(to[0] - from[0], to[1] - from[1]) / 0.5));
-        const cells: number[] = [];
-        for (let i = 0; i <= steps; i++) {
-            const t = i / steps;
-            cells.push(...brushCells(from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t,
-                store.ui.brush, store.ui.brushSquare, d.cols, d.rows));
-        }
-        const terrain = paintCells(d.terrain, cells, code);
-        if (terrain !== d.terrain) store.live((m) => { m.terrain = terrain; });
+    const publish = (g: { work: Raster; frame: number | null }) => {
+        if (g.frame != null) { cancelAnimationFrame(g.frame); g.frame = null; }
+        const terrain = encode(g.work.data);
+        if (terrain === store.doc.terrain) return;
+        /* A copy for the cache: the stroke goes on painting into `work`. */
+        remember(terrain, g.work.data.slice());
+        store.live((m) => { m.terrain = terrain; });
+    };
+
+    const paintAlong = (g: { work: Raster; frame: number | null }, from: Pt, to: Pt) => {
+        const value = codeIndex(store.ui.terrain);
+        if (!strokeSegment(g.work, store.ui.brushShape, from, to, store.ui.brush, value)) return;
+        if (g.frame == null) g.frame = requestAnimationFrame(() => { g.frame = null; publish(g); });
     };
 
     const eraseAt = (e: { clientX: number; clientY: number }) => {
@@ -243,7 +250,9 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         const [a, b] = [...pointers.current.values()];
         /* Two fingers down mid-stroke: that was the start of a pinch, not a
            stroke, so whatever the first finger did is put back. */
-        if (gesture.current && gesture.current.kind !== 'pan' && gesture.current.kind !== 'pinch') store.cancel();
+        const was = gesture.current;
+        if (was?.kind === 'paint' && was.frame != null) cancelAnimationFrame(was.frame);
+        if (was && was.kind !== 'pan' && was.kind !== 'pinch') store.cancel();
         setDraft(null);
         gesture.current = {
             kind: 'pinch', dist: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1,
@@ -272,12 +281,24 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             case 'paint':
                 if (!inside(at)) return;
                 store.checkpoint();
-                paintAlong(at, at);
-                gesture.current = { kind: 'paint', last: at };
+                {
+                    const r = rasterOf(store.doc);
+                    const g = { kind: 'paint' as const, last: at, work: { ...r, data: r.data.slice() }, frame: null };
+                    gesture.current = g;
+                    paintAlong(g, at, at);
+                }
                 return;
             case 'fill':
                 if (!inside(at)) return;
-                store.edit((d) => { d.terrain = floodFill(d, Math.floor(at[0]), Math.floor(at[1]), store.ui.terrain); });
+                {
+                    const r = rasterOf(store.doc);
+                    const work = { ...r, data: r.data.slice() };
+                    if (floodFill(work, Math.floor(at[0] * r.res), Math.floor(at[1] * r.res), codeIndex(store.ui.terrain))) {
+                        const terrain = encode(work.data);
+                        remember(terrain, work.data);
+                        store.edit((d) => { d.terrain = terrain; });
+                    }
+                }
                 return;
             case 'path':
                 gesture.current = { kind: 'path', pts: [at] };
@@ -404,7 +425,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             }
             case 'paint':
                 setHover(at);
-                paintAlong(g.last, at);
+                paintAlong(g, g.last, at);
                 g.last = at;
                 return;
             case 'path': {
@@ -437,7 +458,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 const dx = at[0] - g.centre[0], dy = at[1] - g.centre[1];
                 const lx = dx * Math.cos(r) - dy * Math.sin(r), ly = dx * Math.sin(r) + dy * Math.cos(r);
                 let size = Math.max(0.3, 2 * Math.max(Math.abs(lx), Math.abs(ly)));
-                if (store.doc.grid.snap) size = Math.max(0.5, Math.round(size * 2) / 2);
+                if (snapsFor(store.doc, s)) size = Math.max(0.5, Math.round(size * 2) / 2);
                 store.live((d) => { d.stamps = d.stamps.map((o) => (o.id === s.id ? { ...o, size } : o)); });
                 return;
             }
@@ -464,10 +485,10 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     const moveItems = (items: { sel: Selection; orig: Pt[] }[], anchor: number, dx: number, dy: number) => {
         const d0 = store.doc;
         const lead = items[anchor];
-        if (lead && d0.grid.snap && (lead.sel.kind === 'stamp' || lead.sel.kind === 'token')) {
+        if (lead && (lead.sel.kind === 'stamp' || lead.sel.kind === 'token')) {
             const list = lead.sel.kind === 'stamp' ? d0.stamps : d0.tokens;
-            const o = (list as { id: string; size: number }[]).find((x) => x.id === lead.sel.id);
-            if (o) {
+            const o = (list as { id: string; size: number; snap?: boolean }[]).find((x) => x.id === lead.sel.id);
+            if (o && snapsFor(d0, o)) {
                 const [sx, sy] = snapPoint(lead.orig[0][0] + dx, lead.orig[0][1] + dy, o.size);
                 dx = sx - lead.orig[0][0];
                 dy = sy - lead.orig[0][1];
@@ -518,6 +539,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             store.setUi({ selection: [{ kind: 'path', id }] });
             return;
         }
+        if (g.kind === 'paint') publish(g);
         if (g.kind !== 'pan') store.settle();
     };
 
@@ -526,7 +548,6 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     /* ---------------------------------------------------------------- render */
 
     const W = doc.cols * CELL, H = doc.rows * CELL;
-    const brushPx = ui.brush * CELL;
     const showBrush = hover && (ui.tool === 'paint' || ui.tool === 'fill') && !spaceHeld;
     const cursorTool = spaceHeld ? 'pan' : ui.tool;
 
@@ -562,15 +583,52 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                     />
                 )}
                 {showBrush && hover && (
-                    ui.tool === 'fill'
-                        ? <div className="map-brush square" style={{ left: Math.floor(hover[0]) * CELL, top: Math.floor(hover[1]) * CELL, width: CELL, height: CELL }} />
-                        : <div
-                            className={'map-brush' + (ui.brushSquare || ui.brush <= 2 ? ' square' : '')}
-                            style={{ left: hover[0] * CELL - brushPx / 2, top: hover[1] * CELL - brushPx / 2, width: brushPx, height: brushPx }}
-                        />
+                    <BrushOutline
+                        at={hover}
+                        shape={ui.tool === 'fill' ? 'fill' : BRUSH_BY_ID.get(ui.brushShape)?.outline ?? 'circle'}
+                        size={ui.brush}
+                        res={doc.res}
+                        zoom={view.zoom}
+                    />
                 )}
             </div>
             <div className="map-zoom-readout">{Math.round(view.zoom * 100)}%</div>
         </div>
+    );
+}
+
+/* Where the brush will land, drawn in world px. Its shape is the brush's own:
+   a circle, a square, a diamond, a hexagon, the whole cells the Grid-cells
+   brush will take — or, for the noisy brushes, a dashed circle, since their
+   edge is decided by the noise under it. The fill tool shows the sample. */
+function BrushOutline({ at, shape, size, res, zoom }: {
+    at: Pt; shape: string; size: number; res: number; zoom: number;
+}) {
+    const r = (size / 2) * CELL;
+    const [x, y] = [at[0] * CELL, at[1] * CELL];
+    const sw = 1.5 / zoom;
+    let body: ReactElement;
+    if (shape === 'fill') {
+        const s = CELL / res;
+        body = <rect x={Math.floor(at[0] * res) * s} y={Math.floor(at[1] * res) * s} width={s} height={s} />;
+    } else if (shape === 'cells') {
+        const n = Math.max(1, Math.round(size));
+        const x0 = Math.floor(at[0] - n / 2 + 0.5), y0 = Math.floor(at[1] - n / 2 + 0.5);
+        body = <rect x={x0 * CELL} y={y0 * CELL} width={n * CELL} height={n * CELL} />;
+    } else if (shape === 'square') {
+        body = <rect x={x - r} y={y - r} width={r * 2} height={r * 2} />;
+    } else if (shape === 'diamond') {
+        body = <polygon points={`${x},${y - r} ${x + r},${y} ${x},${y + r} ${x - r},${y}`} />;
+    } else if (shape === 'hexagon') {
+        const h = r * Math.sqrt(3) / 2;
+        body = <polygon points={`${x - r},${y} ${x - r / 2},${y - h} ${x + r / 2},${y - h} ${x + r},${y} ${x + r / 2},${y + h} ${x - r / 2},${y + h}`} />;
+    } else {
+        body = <circle cx={x} cy={y} r={r} strokeDasharray={shape === 'blob' ? `${4 / zoom} ${3 / zoom}` : undefined} />;
+    }
+    return (
+        <svg className="map-svg map-brush-outline" style={{ overflow: 'visible' }} width={1} height={1}>
+            <g fill="none" stroke="#000a" strokeWidth={sw * 2.2}>{body}</g>
+            <g fill="none" stroke="#fff" strokeWidth={sw}>{body}</g>
+        </svg>
     );
 }

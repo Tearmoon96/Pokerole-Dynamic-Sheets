@@ -8,10 +8,11 @@ import { LANDMARK_GROUPS, LANDMARKS, landmarkOf } from '../../map/landmarks';
 import type { LandmarkGroup } from '../../map/landmarks';
 import { landmarkChain, markerChain, onImageArrived, pokemonTokenChain, probeImage, terrainTextureUrl } from '../../map/sprites';
 import { patternDataUrl } from '../../map/render/patterns';
-import { uid } from '../../map/doc';
+import { snapPoint, uid } from '../../map/doc';
 import { typeColors } from '../../lib/themeTables';
 import { MapSprite } from './MapSprite';
 import { TokenPicker } from './TokenPicker';
+import { BrushControls } from './BrushControls';
 import type { MapDoc, MapLabel, MapPath, MapStamp, MapToken, Selection } from '../../map/types';
 import type { MapStore } from '../../map/store';
 
@@ -56,28 +57,11 @@ function TerrainPalette({ style }: { style: MapStyle }) {
                     </button>
                 ))}
             </div>
-            {ui.tool !== 'fill' && (
-                <div className="map-row">
-                    <label htmlFor="map-brush">Brush</label>
-                    <input
-                        id="map-brush" type="range" min={1} max={12} step={1} value={ui.brush}
-                        onChange={(e) => store.setUi({ brush: Number(e.currentTarget.value) })}
-                    />
-                    <span className="map-num">{ui.brush}</span>
-                    <button
-                        className="icon-btn"
-                        aria-pressed={ui.brushSquare}
-                        title={ui.brushSquare ? 'Square brush — click for round' : 'Round brush — click for square'}
-                        onClick={() => store.setUi({ brushSquare: !ui.brushSquare })}
-                    >
-                        <i className={'fa-regular ' + (ui.brushSquare ? 'fa-square' : 'fa-circle')}></i>
-                    </button>
-                </div>
-            )}
+            {ui.tool !== 'fill' && <BrushControls />}
             <p className="map-hint">
                 {ui.tool === 'fill'
-                    ? 'Click to fill every connected cell of the same terrain.'
-                    : 'Drag to paint. [ and ] change the brush. Hold Space to pan.'}
+                    ? 'Click to fill the whole connected patch of the terrain under the pointer.'
+                    : 'Drag to paint. [ and ] change the size. Hold Space to pan.'}
             </p>
         </section>
     );
@@ -271,6 +255,59 @@ function NumberField({ label, value, step, min, max, onChange }: {
     );
 }
 
+/** Size as the Pokémon card sizes a sprite: a slider, the value as a
+    multiple, and Reset. `base` is what 1.00× means — a token's one cell, a
+    landmark's own default size. */
+function SizeSlider({ size, base, onChange }: { size: number; base: number; onChange: (v: number) => void }) {
+    const scale = size / base;
+    return (
+        <div className="map-size-editor">
+            <label className="map-size-row">
+                <span>Size</span>
+                <input
+                    type="range" min="0.25" max="4" step="0.01"
+                    className="map-size-range"
+                    value={Math.min(4, Math.max(0.25, scale))}
+                    onChange={(e) => onChange(Math.round(parseFloat(e.currentTarget.value) * base * 1000) / 1000)}
+                />
+                <span className="map-size-val">{scale.toFixed(2)}×</span>
+            </label>
+            <button className="map-size-reset" onClick={() => onChange(base)} disabled={Math.abs(scale - 1) < 0.001}>Reset</button>
+        </div>
+    );
+}
+
+/** This object's own snap setting, over the map's. */
+function SnapChoice({ value, mapSnap, onChange }: {
+    value: boolean | undefined; mapSnap: boolean; onChange: (v: boolean | undefined) => void;
+}) {
+    return (
+        <div className="map-field">
+            <span>Snap to grid</span>
+            <div className="map-segmented" role="group" aria-label="Snap to grid">
+                <button aria-pressed={value === undefined} onClick={() => onChange(undefined)}
+                    title="Follow the map's Snap button in the top bar">
+                    Map ({mapSnap ? 'on' : 'off'})
+                </button>
+                <button aria-pressed={value === true} onClick={() => onChange(true)} title="Always snap, whatever the map says">
+                    <i className="fa-solid fa-magnet"></i> Snap
+                </button>
+                <button aria-pressed={value === false} onClick={() => onChange(false)} title="Never snap, whatever the map says">
+                    <i className="fa-solid fa-up-down-left-right"></i> Free
+                </button>
+            </div>
+        </div>
+    );
+}
+
+/** A new snap setting, and — if it now snaps — the position it snaps to,
+    so choosing Snap puts the object on the grid there and then. */
+function snapPatch(doc: MapDoc, o: { x: number; y: number; size: number }, snap: boolean | undefined): Record<string, unknown> {
+    if (!(snap ?? doc.grid.snap)) return { snap };
+    const [x, y] = snapPoint(o.x, o.y, o.size);
+    return { snap, x, y };
+}
+
 function patchObject(store: MapStore, sel: Selection, patch: Record<string, unknown>): void {
     store.edit((d) => {
         if (sel.kind === 'stamp') d.stamps = d.stamps.map((o) => (o.id === sel.id ? { ...o, ...patch } as MapStamp : o));
@@ -430,13 +467,14 @@ function Inspector({ doc, sel }: { doc: MapDoc; sel: Selection }) {
                         </select>
                     </label>
                 )}
+                <SizeSlider size={s.size} base={def.size} onChange={(v) => set({ size: v })} />
                 <div className="map-field-row">
-                    <NumberField label="Size" value={s.size} step={0.5} min={0.3} max={40} onChange={(v) => set({ size: v })} />
                     <NumberField label="Turn°" value={s.rotation} step={15} min={-360} max={360} onChange={(v) => set({ rotation: v })} />
+                    <label className="map-check">
+                        <input type="checkbox" checked={s.flip} onChange={(e) => set({ flip: e.currentTarget.checked })} /> Mirror
+                    </label>
                 </div>
-                <label className="map-check">
-                    <input type="checkbox" checked={s.flip} onChange={(e) => set({ flip: e.currentTarget.checked })} /> Mirror
-                </label>
+                <SnapChoice value={s.snap} mapSnap={doc.grid.snap} onChange={(v) => set(snapPatch(doc, s, v))} />
             </>
         );
     } else if (sel.kind === 'token') {
@@ -449,8 +487,9 @@ function Inspector({ doc, sel }: { doc: MapDoc; sel: Selection }) {
                     <span>Name</span>
                     <input type="text" value={t.name} onChange={(e) => set({ name: e.currentTarget.value })} />
                 </label>
-                <NumberField label="Size" value={t.size} step={0.5} min={0.5} max={10} onChange={(v) => set({ size: v })} />
+                <SizeSlider size={t.size} base={1} onChange={(v) => set({ size: v })} />
                 <ColorRow value={t.color} onPick={(color) => set({ color })} />
+                <SnapChoice value={t.snap} mapSnap={doc.grid.snap} onChange={(v) => set(snapPatch(doc, t, v))} />
             </>
         );
     } else if (sel.kind === 'label') {
