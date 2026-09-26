@@ -4,7 +4,7 @@ import { useAppData } from '../../data/AppDataContext';
 import { useToast } from '../common/Toast';
 import { useGmConfirm } from '../gm/ConfirmDialog';
 import { HomeButton } from '../common/HomeButton';
-import { ExportControl, GridControl, ScaleControl, SizeControl, SnapToggle, StyleControl } from './TopBarControls';
+import { BackgroundControl, BordersControl, ExportControl, GridControl, ScaleControl, SizeControl, SnapToggle, StyleControl } from './TopBarControls';
 import {
     downloadMap, ensureWritable, forgetMapHandle, mapFileName, mapJson, parseMapFile,
     readMapHandle, rememberMapHandle, writeMapFile,
@@ -124,6 +124,8 @@ export function MapTopBar({ onMaps, onSprites }: { onMaps: () => void; onSprites
 
             <div className="map-styles">
                 <StyleControl />
+                <BackgroundControl />
+                <BordersControl />
             </div>
 
             <div className="map-settings" role="group" aria-label="Map settings">

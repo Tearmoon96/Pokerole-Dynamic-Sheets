@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMap } from '../../map/MapContext';
 import { BRUSHES, BRUSH_BY_ID, MAX_BRUSH, MIN_BRUSH, cleanSize } from '../../map/brushes';
 import type { BrushId } from '../../map/brushes';
+import type { BrushSlot } from '../../map/store';
 import { Popover } from './Popover';
 
 /* The brush: which one, and how big.
@@ -20,6 +21,7 @@ export function BrushGlyph({ id, size = 22 }: { id: BrushId; size?: number }) {
         case 'diamond': body = <polygon points="12,3 21,12 12,21 3,12" {...common} />; break;
         case 'hexagon': body = <polygon points="3,12 7.5,4.2 16.5,4.2 21,12 16.5,19.8 7.5,19.8" {...common} />; break;
         case 'cells': body = <g {...common}><rect x="4" y="4" width="7" height="7" /><rect x="13" y="4" width="7" height="7" /><rect x="4" y="13" width="7" height="7" /><rect x="13" y="13" width="7" height="7" /></g>; break;
+        case 'classic': body = <path d="M8 4h5l2 2 3 1 2 3-1 3 2 3-2 3-4 1-2 2H9l-2-2-3-1-1-4 1-3-1-3 2-3z" {...common} />; break;
         case 'organic': body = <path d="M12 3c3 0 4 2 6 3s3 4 2 6-1 4-3 5-4 3-6 2-4-1-5-3-3-4-2-6 2-3 3-5 3-2 5-2z" {...common} />; break;
         case 'rugged': body = <polygon points="12,2 14,6 19,4 18,9 22,12 18,14 20,19 15,18 12,22 10,18 5,20 6,15 2,12 6,10 4,5 9,6" {...common} />; break;
         case 'spray': body = <g {...common}>{[[12, 12, 2], [7, 8, 1.5], [16, 7, 1.3], [18, 13, 1.6], [8, 16, 1.4], [13, 18, 1.5], [5, 12, 1], [11, 5, 1.1], [19, 18, 1]].map(([x, y, r], i) => <circle key={i} cx={x} cy={y} r={r} />)}</g>; break;
@@ -34,7 +36,7 @@ const fromSlider = (v: number) => cleanSize(Math.exp(LOG_MIN + (v / 1000) * (LOG
 /** A number field that can be typed into freely — "1." or "" on the way to
     "1.25" — and commits a clean value as it goes. The draft is local; the
     size shown is the store's whenever the field is not being typed in. */
-function SizeField({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+function SizeField({ value, label, onChange }: { value: number; label: string; onChange: (v: number) => void }) {
     const [draft, setDraft] = useState<string | null>(null);
     const input = useRef<HTMLInputElement>(null);
     /* Changed from elsewhere — the slider, [ and ] — while not being typed
@@ -60,21 +62,26 @@ function SizeField({ value, onChange }: { value: number; onChange: (v: number) =
                 if (isFinite(v) && v > 0) onChange(cleanSize(v));
             }}
             onKeyDown={(e) => { if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur(); }}
-            aria-label="Brush size in cells"
+            aria-label={label}
         />
     );
 }
 
-export function BrushControls() {
+const SIZE_LABEL: Record<BrushSlot, string> = { paint: 'Brush size in cells', erase: 'Eraser size in cells', edge: 'Border brush size in cells' };
+
+/** The brush of one tool — painting, the eraser, the Borders brush each have
+    their own, so a fine eraser does not shrink the paint brush. */
+export function BrushControls({ slot }: { slot: BrushSlot }) {
     const { store, ui } = useMap();
     const [open, setOpen] = useState(false);
     const button = useRef<HTMLButtonElement>(null);
     const close = useCallback(() => setOpen(false), []);
-    const current = BRUSH_BY_ID.get(ui.brushShape) ?? BRUSHES[0];
-    const setSize = (v: number) => store.setUi({ brush: cleanSize(v) });
+    const brush = ui.brushes[slot];
+    const current = BRUSH_BY_ID.get(brush.shape) ?? BRUSHES[0];
+    const setSize = (v: number) => store.setBrush(slot, { size: cleanSize(v) });
 
     /* The picker is for choosing: pick one and it is done. */
-    useEffect(() => { setOpen(false); }, [ui.brushShape]);
+    useEffect(() => { setOpen(false); }, [brush.shape]);
 
     return (
         <div className="map-brush-controls">
@@ -93,13 +100,13 @@ export function BrushControls() {
                 </button>
             </div>
             <div className="map-row">
-                <label htmlFor="map-brush-range">Size</label>
+                <label htmlFor={'map-brush-range-' + slot}>Size</label>
                 <input
-                    id="map-brush-range" type="range" min={0} max={1000} step={1}
-                    value={toSlider(ui.brush)}
+                    id={'map-brush-range-' + slot} type="range" min={0} max={1000} step={1}
+                    value={toSlider(brush.size)}
                     onChange={(e) => setSize(fromSlider(Number(e.currentTarget.value)))}
                 />
-                <SizeField value={ui.brush} onChange={setSize} />
+                <SizeField value={brush.size} label={SIZE_LABEL[slot]} onChange={setSize} />
                 <span className="map-unit">cells</span>
             </div>
             <Popover anchor={button} open={open} onClose={close} className="map-brush-picker">
@@ -109,9 +116,12 @@ export function BrushControls() {
                         <button
                             key={b.id}
                             className="map-brush-choice"
-                            aria-pressed={b.id === ui.brushShape}
+                            aria-pressed={b.id === brush.shape}
                             title={b.hint}
-                            onClick={() => store.setUi({ brushShape: b.id, tool: ui.tool === 'fill' ? 'paint' : ui.tool })}
+                            onClick={() => {
+                                store.setBrush(slot, { shape: b.id });
+                                if (ui.tool === 'fill') store.setUi({ tool: 'paint' });
+                            }}
                         >
                             <BrushGlyph id={b.id} />
                             <span>{b.name}</span>

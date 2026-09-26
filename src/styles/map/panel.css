@@ -257,7 +257,7 @@
 
 .map-brush-grid {
     display: grid;
-    grid-template-columns: repeat(4, 74px);
+    grid-template-columns: repeat(3, 84px);
     gap: 0.35rem;
 }
 
@@ -361,4 +361,17 @@
     background: var(--accent-faint);
     color: var(--accent);
     font-weight: 600;
+}
+
+/* The eraser's two modes, and the edge look a brush lays down. */
+.map-erase-mode { margin-bottom: 0.55rem; }
+.map-edge-choice { margin-top: 0.55rem; }
+.map-edge-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 0.25rem;
+    vertical-align: 1px;
+    box-shadow: 0 0 0 1px #fff4;
 }

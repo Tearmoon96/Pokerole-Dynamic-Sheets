@@ -3,20 +3,24 @@ import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react';
 import { useMap } from '../../map/MapContext';
 import { PATH_KINDS, styleOf } from '../../map/styles';
 import { snapPoint, snapsFor, uid } from '../../map/doc';
-import { codeIndex, encode, floodFill, rasterOf, remember } from '../../map/raster';
-import type { Raster } from '../../map/raster';
-import { BRUSH_BY_ID, strokeSegment } from '../../map/brushes';
+import { EMPTY, codeIndex, encode, floodFill, rasterOf, remember, resolvedOf } from '../../map/raster';
+import type { Canvas } from '../../map/raster';
+import { BRUSH_BY_ID, newStroke, strokeSegment } from '../../map/brushes';
+import type { Stroke } from '../../map/brushes';
+import { PAINT_INHERIT, blankEdges, edgesOf, encodeEdges, paintValue, rememberEdges } from '../../map/edges';
+import { slotOf } from '../../map/store';
+import type { BrushSetting, MapUi } from '../../map/store';
 import { distToPolyline, simplify } from '../../map/geometry';
 import type { Pt } from '../../map/geometry';
 import { landmarkOf } from '../../map/landmarks';
 import { CELL } from '../../map/render/patterns';
-import { buildGeometry, drawGrid, drawTerrain, geometryKey } from '../../map/render/terrain';
+import { buildGeometry, drawEdgeTint, drawGrid, drawTerrain, geometryKey } from '../../map/render/terrain';
 import type { TerrainGeometry } from '../../map/render/terrain';
 import { onImageArrived } from '../../map/sprites';
 import { LabelsLayer, PathsLayer, StampsLayer, TokensLayer } from './MapObjects';
 import type { Grab, ObjectDown } from './MapObjects';
 import { useToast } from '../common/Toast';
-import type { MapDoc, Selection } from '../../map/types';
+import type { MapDoc, Selection, Tool } from '../../map/types';
 import { sameSel } from '../../map/store';
 
 /* The map itself: a canvas for the ground, and the world layer on top of it
@@ -42,7 +46,7 @@ type Gesture =
     /* A stroke paints into its own copy of the samples and publishes it at
        most once a frame: encoding a big map is milliseconds, and a pointer
        reports far more often than the screen redraws. */
-    | { kind: 'paint'; last: Pt; work: Raster; frame: number | null }
+    | ({ kind: 'paint' } & Stroking)
     | { kind: 'path'; pts: Pt[] }
     | { kind: 'erase' }
     /* Everything selected moves together; `anchor` is the one under the
@@ -55,6 +59,47 @@ type Gesture =
     | { kind: 'pinch'; dist: number; mid: Pt; view: View };
 
 const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+
+/** A brush stroke under way: the painting tool, the eraser's terrain mode
+    and the Borders brush all stroke the same way, into their own layers. */
+interface Stroking {
+    last: Pt;
+    canvas: Canvas;
+    /** The copies being painted, whichever of the two this stroke writes. */
+    terrain: Uint8Array | null;
+    edges: Uint8Array | null;
+    brush: BrushSetting;
+    stroke: Stroke;
+    frame: number | null;
+}
+
+/** The layers one press of a painting tool writes, as copies to paint into:
+    terrain and its border look for the brush, bare ground and no border for
+    the eraser, the border look alone for the Borders brush. */
+function strokeLayers(d: MapDoc, tool: Tool, ui: Pick<MapUi, 'terrain' | 'paintEdge' | 'edgeKind'>):
+    { terrain: Uint8Array | null; edges: Uint8Array | null; canvas: Canvas } {
+    const r = rasterOf(d);
+    const had = edgesOf(d);
+    const edgeCopy = () => (had ? had.slice() : blankEdges(d));
+    const layers: Canvas['layers'] = [];
+    let terrain: Uint8Array | null = null, edges: Uint8Array | null = null;
+    if (tool === 'edge') {
+        edges = edgeCopy();
+        layers.push({ data: edges, value: paintValue(ui.edgeKind) });
+    } else {
+        terrain = r.data.slice();
+        const erase = tool === 'erase';
+        layers.push({ data: terrain, value: erase ? EMPTY : codeIndex(ui.terrain) });
+        const edge = erase ? PAINT_INHERIT : paintValue(ui.paintEdge);
+        /* Laying "the map decides" on a map where nothing was ever painted
+           changes nothing: skip the layer. */
+        if (edge !== PAINT_INHERIT || had) {
+            edges = edgeCopy();
+            layers.push({ data: edges, value: edge });
+        }
+    }
+    return { terrain, edges, canvas: { w: r.w, h: r.h, res: r.res, layers } };
+}
 
 /* Capture keeps a drag coming to the stage after it leaves the element it
    started on. It throws for a pointer the browser no longer counts as down
@@ -107,6 +152,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     const { store, doc, ui } = useMap();
     const toast = useToast();
     const style = styleOf(doc.styleId);
+    const tool = ui.tool;
     const stageRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [size, setSize] = useState({ w: 0, h: 0 });
@@ -175,13 +221,14 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             const key = geometryKey(doc, style);
             if (!geoRef.current || geoRef.current.key !== key) geoRef.current = buildGeometry(doc, style);
             drawTerrain(ctx, geoRef.current, doc, style);
+            if (tool === 'edge') drawEdgeTint(ctx, doc);
             drawGrid(ctx, doc, style, view.zoom * dpr, {
                 x0: -view.x / view.zoom / CELL, y0: -view.y / view.zoom / CELL,
                 x1: (size.w - view.x) / view.zoom / CELL, y1: (size.h - view.y) / view.zoom / CELL,
             });
         });
         return () => cancelAnimationFrame(frame);
-    }, [doc, style, view, size, texTick]);
+    }, [doc, style, view, size, texTick, tool]);
 
     /* ------------------------------------------------------------ zoom/wheel */
 
@@ -223,18 +270,19 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     };
     const inside = ([x, y]: Pt) => x >= 0 && y >= 0 && x <= store.doc.cols && y <= store.doc.rows;
 
-    const publish = (g: { work: Raster; frame: number | null }) => {
+    const publish = (g: Stroking) => {
         if (g.frame != null) { cancelAnimationFrame(g.frame); g.frame = null; }
-        const terrain = encode(g.work.data);
-        if (terrain === store.doc.terrain) return;
-        /* A copy for the cache: the stroke goes on painting into `work`. */
-        remember(terrain, g.work.data.slice());
-        store.live((m) => { m.terrain = terrain; });
+        const terrain = g.terrain ? encode(g.terrain) : store.doc.terrain;
+        const edges = g.edges ? encodeEdges(g.edges) : store.doc.edges;
+        if (terrain === store.doc.terrain && edges === store.doc.edges) return;
+        /* Copies for the cache: the stroke goes on painting into its own. */
+        if (g.terrain && terrain !== store.doc.terrain) remember(terrain, g.terrain.slice());
+        if (g.edges && edges !== store.doc.edges) rememberEdges(edges, g.edges.slice());
+        store.live((m) => { m.terrain = terrain; m.edges = edges; });
     };
 
-    const paintAlong = (g: { work: Raster; frame: number | null }, from: Pt, to: Pt) => {
-        const value = codeIndex(store.ui.terrain);
-        if (!strokeSegment(g.work, store.ui.brushShape, from, to, store.ui.brush, value)) return;
+    const paintAlong = (g: Stroking, from: Pt, to: Pt) => {
+        if (!strokeSegment(g.canvas, g.brush.shape, from, to, g.brush.size, g.stroke)) return;
         if (g.frame == null) g.frame = requestAnimationFrame(() => { g.frame = null; publish(g); });
     };
 
@@ -279,35 +327,45 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
 
         switch (tool) {
             case 'paint':
+            case 'edge':
+            case 'erase': {
+                if (tool === 'erase' && store.ui.eraseMode === 'objects') {
+                    store.checkpoint();
+                    gesture.current = { kind: 'erase' };
+                    eraseAt(e);
+                    return;
+                }
                 if (!inside(at)) return;
                 store.checkpoint();
-                {
-                    const r = rasterOf(store.doc);
-                    const g = { kind: 'paint' as const, last: at, work: { ...r, data: r.data.slice() }, frame: null };
-                    gesture.current = g;
-                    paintAlong(g, at, at);
-                }
+                const d = store.doc;
+                const g: { kind: 'paint' } & Stroking = {
+                    kind: 'paint', last: at, frame: null,
+                    ...strokeLayers(d, tool, store.ui),
+                    brush: store.ui.brushes[slotOf(tool)!],
+                    stroke: newStroke(d.cols, d.rows),
+                };
+                gesture.current = g;
+                paintAlong(g, at, at);
                 return;
+            }
             case 'fill':
                 if (!inside(at)) return;
                 {
-                    const r = rasterOf(store.doc);
-                    const work = { ...r, data: r.data.slice() };
-                    if (floodFill(work, Math.floor(at[0] * r.res), Math.floor(at[1] * r.res), codeIndex(store.ui.terrain))) {
-                        const terrain = encode(work.data);
-                        remember(terrain, work.data);
-                        store.edit((d) => { d.terrain = terrain; });
+                    const d = store.doc;
+                    const { terrain, edges, canvas } = strokeLayers(d, 'paint', store.ui);
+                    const looks = resolvedOf(d).data;
+                    if (floodFill(canvas, looks, Math.floor(at[0] * d.res), Math.floor(at[1] * d.res))) {
+                        const t = encode(terrain!);
+                        remember(t, terrain!);
+                        const ed = edges ? encodeEdges(edges) : d.edges;
+                        if (edges) rememberEdges(ed, edges);
+                        store.edit((m) => { m.terrain = t; m.edges = ed; });
                     }
                 }
                 return;
             case 'path':
                 gesture.current = { kind: 'path', pts: [at] };
                 setDraft([at]);
-                return;
-            case 'erase':
-                store.checkpoint();
-                gesture.current = { kind: 'erase' };
-                eraseAt(e);
                 return;
             case 'stamp': {
                 if (!inside(at)) return;
@@ -406,7 +464,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         const at = toCell(e);
         const g = gesture.current;
         if (!g) {
-            if (store.ui.tool === 'paint' || store.ui.tool === 'fill') setHover(at);
+            if (brushTool(store.ui.tool, store.ui.eraseMode) || store.ui.tool === 'fill') setHover(at);
             return;
         }
         switch (g.kind) {
@@ -548,7 +606,8 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     /* ---------------------------------------------------------------- render */
 
     const W = doc.cols * CELL, H = doc.rows * CELL;
-    const showBrush = hover && (ui.tool === 'paint' || ui.tool === 'fill') && !spaceHeld;
+    const slot = brushTool(ui.tool, ui.eraseMode) ? slotOf(ui.tool) : null;
+    const showBrush = hover && (slot || ui.tool === 'fill') && !spaceHeld;
     const cursorTool = spaceHeld ? 'pan' : ui.tool;
 
     return (
@@ -585,8 +644,8 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 {showBrush && hover && (
                     <BrushOutline
                         at={hover}
-                        shape={ui.tool === 'fill' ? 'fill' : BRUSH_BY_ID.get(ui.brushShape)?.outline ?? 'circle'}
-                        size={ui.brush}
+                        shape={!slot ? 'fill' : BRUSH_BY_ID.get(ui.brushes[slot].shape)?.outline ?? 'circle'}
+                        size={slot ? ui.brushes[slot].size : 1}
                         res={doc.res}
                         zoom={view.zoom}
                     />
@@ -595,6 +654,12 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             <div className="map-zoom-readout">{Math.round(view.zoom * 100)}%</div>
         </div>
     );
+}
+
+/** Whether a tool paints with a brush right now — the eraser only when it
+    rubs out terrain. */
+function brushTool(tool: string, eraseMode: string): boolean {
+    return tool === 'paint' || tool === 'edge' || (tool === 'erase' && eraseMode === 'terrain');
 }
 
 /* Where the brush will land, drawn in world px. Its shape is the brush's own:

@@ -148,6 +148,18 @@ zoom or grid setting ever moves anything.
   paint their exact shape into it at any size, and the renderer draws what is
   there without bending it. Maps from before the samples are converted on load,
   keeping their look.
+- **The background** is a layer under the painting: a bare sample (stored as
+  `_`) shows the map's `background` terrain, whatever it is at the time. The
+  eraser paints bare samples, so rubbing out uncovers it, and swapping the
+  background from sea to clouds swaps every bare patch at once.
+- **Borders** ([`src/map/edges.ts`](src/map/edges.ts)): each edge between two
+  terrains is drawn once, in one of four looks — the style's own, a line,
+  none, or a soft blend. A painted border layer (a second sample raster, laid
+  down by the terrain brush or the Borders brush) beats a terrain's own
+  setting, which beats the map's. Soft edges are drawn by painting each
+  terrain's ground through a blurred mask of where it lies; the masks add up
+  to one, so textures cross-fade without smearing. The pixel styles dither the
+  same blend instead of fading it.
 - **Styles** ([`src/map/styles.ts`](src/map/styles.ts)) are data: terrain
   colours and textures, edge treatment, path looks, label fonts. Hand-drawn and
   Anime trace the samples into smooth outlines (marching squares in

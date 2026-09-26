@@ -3,7 +3,7 @@ import type { ReactElement } from 'react';
 import { useMap } from '../../map/MapContext';
 import { LABEL_ROLES, PATH_KINDS, styleOf } from '../../map/styles';
 import type { MapStyle } from '../../map/styles';
-import { TERRAINS } from '../../map/terrain';
+import { TERRAINS, TERRAIN_BY_CODE } from '../../map/terrain';
 import { LANDMARK_GROUPS, LANDMARKS, landmarkOf } from '../../map/landmarks';
 import type { LandmarkGroup } from '../../map/landmarks';
 import { landmarkChain, markerChain, onImageArrived, pokemonTokenChain, probeImage, terrainTextureUrl } from '../../map/sprites';
@@ -13,7 +13,9 @@ import { typeColors } from '../../lib/themeTables';
 import { MapSprite } from './MapSprite';
 import { TokenPicker } from './TokenPicker';
 import { BrushControls } from './BrushControls';
-import type { MapDoc, MapLabel, MapPath, MapStamp, MapToken, Selection } from '../../map/types';
+import { EDGE_KINDS, EDGE_NAME, paintValue } from '../../map/edges';
+import { EDGE_TINT } from '../../map/render/terrain';
+import type { EdgeKind, MapDoc, MapLabel, MapPath, MapStamp, MapToken, Selection } from '../../map/types';
 import type { MapStore } from '../../map/store';
 
 /* The right-hand panel: what the current tool lays down, and — once something
@@ -26,7 +28,7 @@ const TYPES = Object.keys(typeColors);
 
 /* ------------------------------------------------------------- terrain */
 
-function swatchBackground(style: MapStyle, slug: string): string {
+export function swatchBackground(style: MapStyle, slug: string): string {
     const look = style.terrain[slug];
     const fill = look?.fill ?? '#888';
     const tex = probeImage(terrainTextureUrl(style, slug));
@@ -57,11 +59,93 @@ function TerrainPalette({ style }: { style: MapStyle }) {
                     </button>
                 ))}
             </div>
-            {ui.tool !== 'fill' && <BrushControls />}
+            {ui.tool !== 'fill' && <BrushControls slot="paint" />}
+            <EdgeChoice
+                label="Its edges"
+                value={ui.paintEdge}
+                mapHint="Leave the edges to the Borders settings on the top bar"
+                onChange={(v) => store.setUi({ paintEdge: v })}
+            />
             <p className="map-hint">
                 {ui.tool === 'fill'
                     ? 'Click to fill the whole connected patch of the terrain under the pointer.'
                     : 'Drag to paint. [ and ] change the size. Hold Space to pan.'}
+            </p>
+        </section>
+    );
+}
+
+/** How the edges of what is painted are drawn: the map's say, or one of the
+    four looks. */
+export function EdgeChoice({ label, value, mapHint, tints, onChange }: {
+    label: string; value: EdgeKind | 'map'; mapHint: string; tints?: boolean; onChange: (v: EdgeKind | 'map') => void;
+}) {
+    return (
+        <div className="map-field map-edge-choice">
+            <span>{label}</span>
+            <div className="map-segmented" role="group" aria-label={label}>
+                <button aria-pressed={value === 'map'} onClick={() => onChange('map')} title={mapHint}>Map</button>
+                {EDGE_KINDS.map((k) => (
+                    <button key={k.kind} aria-pressed={value === k.kind} onClick={() => onChange(k.kind)} title={k.hint}>
+                        {tints && <span className="map-edge-dot" style={{ background: EDGE_TINT[paintValue(k.kind)] }}></span>}
+                        {k.name}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------- eraser */
+
+function ErasePalette() {
+    const { store, ui, doc } = useMap();
+    const bg = TERRAIN_BY_CODE.get(doc.background);
+    return (
+        <section className="map-section">
+            <h3>Eraser</h3>
+            <div className="map-segmented map-erase-mode" role="group" aria-label="What the eraser removes">
+                <button aria-pressed={ui.eraseMode === 'terrain'} onClick={() => store.setUi({ eraseMode: 'terrain' })}>
+                    <i className="fa-solid fa-layer-group"></i> Terrain
+                </button>
+                <button aria-pressed={ui.eraseMode === 'objects'} onClick={() => store.setUi({ eraseMode: 'objects' })}>
+                    <i className="fa-solid fa-shapes"></i> Objects
+                </button>
+            </div>
+            {ui.eraseMode === 'terrain' ? (
+                <>
+                    <BrushControls slot="erase" />
+                    <p className="map-hint">
+                        Drag to rub terrain out: the map's background{bg ? ' (' + bg.name + ')' : ''} shows through.
+                        Change the background on the top bar. [ and ] change the size.
+                    </p>
+                </>
+            ) : (
+                <p className="map-hint">Click or drag across landmarks, tokens, labels and paths to remove them.</p>
+            )}
+        </section>
+    );
+}
+
+/* ------------------------------------------------------------- borders */
+
+function EdgePalette() {
+    const { store, ui, doc } = useMap();
+    return (
+        <section className="map-section">
+            <h3>Borders</h3>
+            <EdgeChoice
+                label="Paint edges as"
+                tints
+                value={ui.edgeKind}
+                mapHint="Clear what was painted, so the Borders settings on the top bar apply again"
+                onChange={(v) => store.setUi({ edgeKind: v })}
+            />
+            <BrushControls slot="edge" />
+            <p className="map-hint">
+                Paint over the edges between terrains to choose how they look there — a line, none, or a soft
+                blend of one terrain into the next. What you paint is tinted while this tool is out. The rest
+                follow the Borders settings on the top bar (now: {EDGE_NAME[doc.borders.kind]}).
             </p>
         </section>
     );
@@ -560,7 +644,8 @@ export function SidePanel() {
         case 'token': palette = <TokenPalette style={style} />; break;
         case 'label': palette = <LabelPalette />; break;
         case 'select': palette = !ui.selection.length ? <p className="map-hint map-section">Click something on the map to select it. Drag to move; drag a landmark's corner to resize it or its knob to turn it. Ctrl-click to select several, or drag a box round them.</p> : null; break;
-        case 'erase': palette = <p className="map-hint map-section">Click or drag across landmarks, tokens, labels and paths to remove them. Terrain is changed by painting over it.</p>; break;
+        case 'erase': palette = <ErasePalette />; break;
+        case 'edge': palette = <EdgePalette />; break;
         case 'pan': palette = <p className="map-hint map-section">Drag to move around the map; the wheel or a pinch zooms.</p>; break;
     }
     return (

@@ -1,7 +1,11 @@
-import { FALLBACK_TERRAIN, TERRAINS, TERRAIN_BY_CODE, TERRAIN_BY_SLUG } from './terrain';
+import { TERRAINS, TERRAIN_BY_CODE, TERRAIN_BY_SLUG } from './terrain';
 import { STYLE_BY_ID } from './styles';
-import { codeIndex, decode, encode, filled, fromCells, isEncoded, pickRes, rasterOf, remember, resizeRaster } from './raster';
-import type { LabelRole, MapDoc, MapLabel, MapPath, MapStamp, MapToken, StyleId } from './types';
+import {
+    EMPTY, blank, decode, encode, fromCells, isEncoded, pickRes, rasterOf, remember, resizeRaster, runTotal,
+} from './raster';
+import type { Raster } from './raster';
+import { DEFAULT_BORDERS, MAX_SOFT, MIN_SOFT, decodeEdges, edgesOf, encodeEdges, isEdgeKind, rememberEdges } from './edges';
+import type { EdgeKind, LabelRole, MapBorders, MapDoc, MapLabel, MapPath, MapStamp, MapToken, StyleId } from './types';
 
 /* Pure operations on a MapDoc. Nothing here touches the DOM or storage, so the
    harness in .verify/ can drive all of it from Node. */
@@ -17,13 +21,14 @@ export function clampCells(n: number): number {
     return Math.max(MIN_CELLS, Math.min(MAX_CELLS, Math.round(Number(n) || MIN_CELLS)));
 }
 
+/** A new map: nothing painted yet, so all of it is the background. */
 export function createDoc(opts: {
-    name?: string; cols?: number; rows?: number; styleId?: StyleId; fill?: string; scaleLabel?: string;
+    name?: string; cols?: number; rows?: number; styleId?: StyleId; background?: string; scaleLabel?: string;
 } = {}): MapDoc {
     const cols = clampCells(opts.cols ?? 40);
     const rows = clampCells(opts.rows ?? 30);
     const res = pickRes(cols, rows);
-    const code = (TERRAIN_BY_SLUG.get(opts.fill ?? 'sea') ?? FALLBACK_TERRAIN).code;
+    const background = (TERRAIN_BY_SLUG.get(opts.background ?? 'sea') ?? TERRAIN_BY_SLUG.get('sea')!).code;
     return {
         id: uid(),
         name: opts.name?.trim() || 'New map',
@@ -33,7 +38,10 @@ export function createDoc(opts: {
         res,
         scaleLabel: opts.scaleLabel ?? '',
         grid: { show: true, snap: true, opacity: 0.5 },
-        terrain: filled(cols * res, rows * res, code),
+        terrain: blank(cols * res * rows * res),
+        background,
+        edges: '',
+        borders: { ...DEFAULT_BORDERS, terrain: {} },
         paths: [],
         stamps: [],
         tokens: [],
@@ -63,19 +71,35 @@ export function normalizeDoc(raw: unknown): MapDoc | null {
 
     let terrain = str(r.terrain, '');
     let res = num(r.res, 0);
+    let data: Uint8Array | null = null;
     if (!res || !isEncoded(terrain)) {
         /* One character a cell: bake it into samples. */
         res = pickRes(cols, rows);
-        const data = fromCells(terrain, cols, rows, res, LEGACY_WOBBLE[styleId] ?? 0);
-        terrain = encode(data);
-        remember(terrain, data);
+        data = fromCells(terrain, cols, rows, res, LEGACY_WOBBLE[styleId] ?? 0);
     } else {
         res = Math.max(1, Math.min(16, Math.round(res)));
         /* Round-trip only if the runs do not add up to the raster exactly. */
-        const want = cols * res * rows * res;
-        const total = (terrain.match(/\d+/g) ?? []).reduce((s, n) => s + Number(n), 0);
-        if (total !== want) terrain = encode(decode(terrain, want));
+        if (runTotal(terrain) !== cols * res * rows * res) data = decode(terrain, cols * res * rows * res);
     }
+
+    let background = str(r.background, '');
+    if (!TERRAIN_BY_CODE.has(background)) {
+        /* From before maps had a background: every sample was painted. The
+           ground the map is set in becomes the background — so the sea round
+           a region is a layer that can be swapped for clouds, and rubbing
+           out a patch uncovers what it looks like it should. */
+        data ??= decode(terrain, cols * res * rows * res).slice();
+        background = TERRAINS[baseOf(data, cols * res, rows * res)].code;
+        const bg = TERRAINS.findIndex((t) => t.code === background);
+        for (let i = 0; i < data.length; i++) if (data[i] === bg) data[i] = EMPTY;
+    }
+    if (data) {
+        terrain = encode(data);
+        remember(terrain, data);
+    }
+
+    let edges = str(r.edges, '');
+    if (edges && runTotal(edges) !== cols * res * rows * res) edges = encodeEdges(decodeEdges(edges, cols * res * rows * res));
 
     return {
         id: str(r.id, '') || uid(),
@@ -91,6 +115,9 @@ export function normalizeDoc(raw: unknown): MapDoc | null {
             opacity: Math.max(0, Math.min(1, num(grid.opacity, 0.5))),
         },
         terrain,
+        background,
+        edges,
+        borders: normalizeBorders(r.borders),
         paths: arr<MapPath>(r.paths).filter((p) => p && Array.isArray(p.points) && p.points.length >= 2)
             .map((p) => ({ ...p, id: p.id || uid(), width: num(p.width, 0.6) })),
         stamps: arr<MapStamp>(r.stamps).filter((s) => s && typeof s.landmark === 'string')
@@ -113,24 +140,58 @@ export function normalizeDoc(raw: unknown): MapDoc | null {
     };
 }
 
-/** The terrain code at a point, in cells. '' off the map. */
+/** The terrain most of the map's outer edge is painted in: the sea round a
+    region, the grass round a town. */
+function baseOf(data: Uint8Array, w: number, h: number): number {
+    const count = new Map<number, number>();
+    const add = (i: number) => count.set(data[i], (count.get(data[i]) ?? 0) + 1);
+    for (let x = 0; x < w; x++) { add(x); add((h - 1) * w + x); }
+    for (let y = 1; y < h - 1; y++) { add(y * w); add(y * w + w - 1); }
+    let best = data[0], most = -1;
+    for (const [v, n] of count) if (v !== EMPTY && (n > most || (n === most && v < best))) { best = v; most = n; }
+    return best === EMPTY ? TERRAINS.findIndex((t) => t.slug === 'sea') : best;
+}
+
+function normalizeBorders(raw: unknown): MapBorders {
+    const b = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+    const terrain: Partial<Record<string, EdgeKind>> = {};
+    const t = (b.terrain && typeof b.terrain === 'object' ? b.terrain : {}) as Record<string, unknown>;
+    for (const [slug, kind] of Object.entries(t)) if (TERRAIN_BY_SLUG.has(slug) && isEdgeKind(kind)) terrain[slug] = kind;
+    return {
+        kind: isEdgeKind(b.kind) ? b.kind : DEFAULT_BORDERS.kind,
+        soft: Math.max(MIN_SOFT, Math.min(MAX_SOFT, num(b.soft, DEFAULT_BORDERS.soft))),
+        terrain,
+    };
+}
+
+/** The terrain code at a point, in cells — as it looks, so a bare sample
+    reads as the background. '' off the map. */
 export function terrainAt(doc: MapDoc, x: number, y: number): string {
     const r = rasterOf(doc);
     const sx = Math.floor(x * r.res), sy = Math.floor(y * r.res);
     if (sx < 0 || sy < 0 || sx >= r.w || sy >= r.h) return '';
-    return TERRAINS[r.data[sy * r.w + sx]]?.code ?? '';
+    const v = r.data[sy * r.w + sx];
+    return v === EMPTY ? doc.background : TERRAINS[v]?.code ?? '';
 }
 
 /** A new size, anchored top-left: what was painted stays where it was, new
-    cells take `fill`, and objects left outside are pulled back to the edge. */
-export function resizeDoc(doc: MapDoc, cols: number, rows: number, fillCode: string): MapDoc {
+    cells are bare background, and objects left outside are pulled back to
+    the edge. */
+export function resizeDoc(doc: MapDoc, cols: number, rows: number): MapDoc {
     cols = clampCells(cols);
     rows = clampCells(rows);
     if (cols === doc.cols && rows === doc.rows) return doc;
-    const code = TERRAIN_BY_CODE.has(fillCode) ? fillCode : FALLBACK_TERRAIN.code;
-    const next = resizeRaster(rasterOf(doc), cols, rows, codeIndex(code));
+    const next = resizeRaster(rasterOf(doc), cols, rows, EMPTY);
     const terrain = encode(next.data);
     remember(terrain, next.data);
+    let edges = '';
+    const painted = edgesOf(doc);
+    if (painted) {
+        const was: Raster = { w: doc.cols * doc.res, h: doc.rows * doc.res, res: doc.res, data: painted };
+        const moved = resizeRaster(was, cols, rows, 0);
+        edges = encodeEdges(moved.data);
+        rememberEdges(edges, moved.data);
+    }
     const cx = (v: number) => Math.max(0, Math.min(cols, v));
     const cy = (v: number) => Math.max(0, Math.min(rows, v));
     return {
@@ -139,6 +200,7 @@ export function resizeDoc(doc: MapDoc, cols: number, rows: number, fillCode: str
         rows,
         res: next.res,
         terrain,
+        edges,
         stamps: doc.stamps.map((s) => ({ ...s, x: cx(s.x), y: cy(s.y) })),
         tokens: doc.tokens.map((t) => ({ ...t, x: cx(t.x), y: cy(t.y) })),
         labels: doc.labels.map((l) => ({ ...l, x: cx(l.x), y: cy(l.y) })),

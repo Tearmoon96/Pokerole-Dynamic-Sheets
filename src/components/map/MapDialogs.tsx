@@ -13,10 +13,11 @@ import type { MapDoc, StyleId } from '../../map/types';
 
 /* Starting points, not limits: a cell means whatever the map says it does. */
 const PRESETS = [
-    { name: 'Region', cols: 64, rows: 44, fill: 'sea', scale: '1 cell = 2 km' },
-    { name: 'Route or area', cols: 40, rows: 28, fill: 'grassland', scale: '1 cell = 50 m' },
-    { name: 'Town', cols: 32, rows: 24, fill: 'grassland', scale: '1 cell = 10 m' },
-    { name: 'Battle', cols: 20, rows: 14, fill: 'grassland', scale: '1 cell = 1 m' },
+    { name: 'Region', cols: 64, rows: 44, background: 'sea', scale: '1 cell = 2 km' },
+    { name: 'Sky isles', cols: 48, rows: 36, background: 'clouds', scale: '1 cell = 1 km' },
+    { name: 'Route or area', cols: 40, rows: 28, background: 'grassland', scale: '1 cell = 50 m' },
+    { name: 'Town', cols: 32, rows: 24, background: 'grassland', scale: '1 cell = 10 m' },
+    { name: 'Battle', cols: 20, rows: 14, background: 'grassland', scale: '1 cell = 1 m' },
 ];
 
 function NewMapForm({ onCreate }: { onCreate: (d: MapDoc) => void }) {
@@ -24,7 +25,7 @@ function NewMapForm({ onCreate }: { onCreate: (d: MapDoc) => void }) {
     const [name, setName] = useState('');
     const [cols, setCols] = useState(40);
     const [rows, setRows] = useState(28);
-    const [fill, setFill] = useState('sea');
+    const [background, setBackground] = useState('sea');
     const [styleId, setStyleId] = useState<StyleId>(doc.styleId);
     const [scale, setScale] = useState('');
 
@@ -32,7 +33,7 @@ function NewMapForm({ onCreate }: { onCreate: (d: MapDoc) => void }) {
         <div className="map-new">
             <div className="map-chips">
                 {PRESETS.map((p) => (
-                    <button key={p.name} className="map-chip" onClick={() => { setCols(p.cols); setRows(p.rows); setFill(p.fill); setScale(p.scale); }}>
+                    <button key={p.name} className="map-chip" onClick={() => { setCols(p.cols); setRows(p.rows); setBackground(p.background); setScale(p.scale); }}>
                         {p.name} <span className="muted">{p.cols}×{p.rows}</span>
                     </button>
                 ))}
@@ -59,8 +60,8 @@ function NewMapForm({ onCreate }: { onCreate: (d: MapDoc) => void }) {
                     <input type="number" min={MIN_CELLS} max={MAX_CELLS} value={rows} onChange={(e) => setRows(Number(e.currentTarget.value))} />
                 </label>
                 <label className="map-field">
-                    <span>Start as</span>
-                    <select value={fill} onChange={(e) => setFill(e.currentTarget.value)}>
+                    <span>Background</span>
+                    <select value={background} onChange={(e) => setBackground(e.currentTarget.value)}>
                         {TERRAINS.map((t) => <option key={t.slug} value={t.slug}>{t.name}</option>)}
                     </select>
                 </label>
@@ -71,7 +72,7 @@ function NewMapForm({ onCreate }: { onCreate: (d: MapDoc) => void }) {
             </label>
             <button
                 className="accent"
-                onClick={() => onCreate(createDoc({ name, cols: clampCells(cols), rows: clampCells(rows), fill, styleId, scaleLabel: scale }))}
+                onClick={() => onCreate(createDoc({ name, cols: clampCells(cols), rows: clampCells(rows), background, styleId, scaleLabel: scale }))}
             >
                 <i className="fa-solid fa-plus"></i> Create map
             </button>

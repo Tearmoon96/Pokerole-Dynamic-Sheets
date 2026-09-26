@@ -97,3 +97,6 @@ html[data-pointer="coarse"] .map-brush-size,
 html[data-pointer="coarse"] .map-popover input,
 html[data-pointer="coarse"] .map-popover select,
 html[data-pointer="coarse"] .map-search { font-size: 16px; }
+
+html[data-pointer="coarse"] .map-borders-terrains li { min-height: 36px; }
+html[data-pointer="coarse"] .map-borders-terrains summary { min-height: 32px; display: flex; align-items: center; }

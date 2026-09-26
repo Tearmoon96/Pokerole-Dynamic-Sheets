@@ -180,3 +180,39 @@
 .map-style-choice strong { font-size: 0.84rem; }
 .map-style-choice .muted { font-size: 0.72rem; }
 .map-style-choice[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-faint); }
+
+/* The background picker. */
+.map-bg-btn { display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; flex: 0 0 auto; }
+.map-bg-chip { width: 20px; height: 14px; border-radius: 4px; border: 1px solid #0008; flex: 0 0 auto; }
+.map-bg-chip.pixelated { image-rendering: pixelated; }
+.map-bg-pop { width: 20rem; }
+.map-bg-group-name { font-size: 0.68rem; font-weight: 600; color: var(--text-secondary); margin: 0.55rem 0 0.25rem; }
+
+/* Borders: the map's look, the blend width, each terrain's own. */
+.map-borders-btn { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; flex: 0 0 auto; }
+.map-borders-pop { width: 21rem; }
+.map-borders-pop .map-field + .map-field { margin-top: 0.5rem; }
+.map-borders-terrains { margin-top: 0.6rem; }
+.map-borders-terrains summary { cursor: pointer; font-weight: 600; font-size: 0.78rem; padding: 0.2rem 0; }
+.map-borders-terrains ul { list-style: none; margin: 0.35rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.map-borders-terrains li { display: flex; align-items: center; gap: 0.45rem; }
+.map-borders-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.76rem; }
+.map-borders-terrains select {
+    flex: 0 0 7.5rem;
+    width: 7.5rem;
+    font-size: 0.74rem;
+    padding: 0.15rem 0.3rem;
+    font-family: inherit;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    background: var(--panel-solid);
+}
+.map-borders-terrains select option { background: var(--panel-solid); color: var(--text-primary); }
+.map-popover kbd {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.7rem;
+    padding: 0 0.3rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}

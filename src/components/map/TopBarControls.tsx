@@ -2,9 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMap } from '../../map/MapContext';
 import { useToast } from '../common/Toast';
 import { Popover } from './Popover';
-import { TERRAINS, TERRAIN_BY_SLUG } from '../../map/terrain';
+import { TERRAINS, TERRAIN_BY_CODE } from '../../map/terrain';
+import type { TerrainDef } from '../../map/terrain';
 import { MAP_STYLES, styleOf } from '../../map/styles';
 import { MAX_CELLS, MIN_CELLS, clampCells, resizeDoc } from '../../map/doc';
+import { EDGE_KINDS, MAX_SOFT, MIN_SOFT } from '../../map/edges';
+import { swatchBackground } from './SidePanel';
+import type { EdgeKind } from '../../map/types';
 import { exportSize, renderMapPng } from '../../map/render/exportPng';
 import { exportLoader, folderReadable, pickAppFolder, readAppFolder, readsFromDisk } from '../../map/render/exportImages';
 
@@ -57,6 +61,135 @@ export function StyleControl() {
                         </button>
                     ))}
                 </div>
+            </Popover>
+        </>
+    );
+}
+
+/* ------------------------------------------------------------- background */
+
+const BG_GROUPS: { name: string; test: (t: TerrainDef) => boolean }[] = [
+    { name: 'Sky', test: (t) => !!t.sky },
+    { name: 'Water', test: (t) => !!t.water },
+    { name: 'Land', test: (t) => !t.sky && !t.water },
+];
+
+export function BackgroundControl() {
+    const { store, doc } = useMap();
+    const pop = usePopover();
+    const style = styleOf(doc.styleId);
+    const bg = TERRAIN_BY_CODE.get(doc.background) ?? TERRAINS[0];
+    return (
+        <>
+            <button
+                ref={pop.anchor} className="icon-btn map-bg-btn" aria-expanded={pop.open}
+                title={'Background: ' + bg.name + ' — shows wherever nothing is painted'} onClick={() => pop.setOpen((o) => !o)}
+            >
+                <span className={'map-bg-chip' + (style.pixelated ? ' pixelated' : '')} style={{ background: swatchBackground(style, bg.slug) }}></span>
+                <span className="map-btn-text"> {bg.name}</span> <i className="fa-solid fa-caret-down"></i>
+            </button>
+            <Popover anchor={pop.anchor} open={pop.open} onClose={pop.close} className="map-bg-pop">
+                <div className="map-popover-title">Background</div>
+                <p className="map-hint">
+                    The layer under everything painted. It shows wherever nothing is painted, and wherever the
+                    eraser rubs terrain out.
+                </p>
+                {BG_GROUPS.map((g) => (
+                    <div key={g.name} className="map-bg-group">
+                        <div className="map-bg-group-name">{g.name}</div>
+                        <div className="map-swatches">
+                            {TERRAINS.filter(g.test).map((t) => (
+                                <button
+                                    key={t.code}
+                                    className={'map-swatch' + (doc.background === t.code ? ' on' : '')}
+                                    aria-pressed={doc.background === t.code}
+                                    onClick={() => { if (doc.background !== t.code) store.edit((d) => { d.background = t.code; }); }}
+                                >
+                                    <span className={'map-swatch-chip' + (style.pixelated ? ' pixelated' : '')} style={{ background: swatchBackground(style, t.slug) }}></span>
+                                    <span className="map-swatch-name">{t.name}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </Popover>
+        </>
+    );
+}
+
+/* ------------------------------------------------------------- borders */
+
+const SOFT_STEP = 0.25;
+
+export function BordersControl() {
+    const { store, doc } = useMap();
+    const pop = usePopover();
+    const style = styleOf(doc.styleId);
+    const b = doc.borders;
+    const setBorders = (patch: Partial<typeof b>, coalesce?: string) =>
+        store.edit((d) => { d.borders = { ...d.borders, ...patch }; }, coalesce);
+    const setTerrain = (slug: string, kind: EdgeKind | 'map') => {
+        const terrain = { ...b.terrain };
+        if (kind === 'map') delete terrain[slug]; else terrain[slug] = kind;
+        setBorders({ terrain });
+    };
+    const overrides = Object.keys(b.terrain).length;
+    return (
+        <>
+            <button
+                ref={pop.anchor} className="icon-btn map-borders-btn" aria-expanded={pop.open}
+                title="Borders: how the edges between terrains are drawn" onClick={() => pop.setOpen((o) => !o)}
+            >
+                <i className="fa-solid fa-bezier-curve"></i><span className="map-btn-text"> Borders</span> <i className="fa-solid fa-caret-down"></i>
+            </button>
+            <Popover anchor={pop.anchor} open={pop.open} onClose={pop.close} className="map-borders-pop">
+                <div className="map-popover-title">Borders</div>
+                <div className="map-field">
+                    <span>Every edge</span>
+                    <div className="map-segmented" role="group" aria-label="Every edge">
+                        {EDGE_KINDS.map((k) => (
+                            <button key={k.kind} aria-pressed={b.kind === k.kind} title={k.hint} onClick={() => setBorders({ kind: k.kind })}>
+                                {k.name}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <label className="map-field">
+                    <span>Soft blend — {b.soft} cell{b.soft === 1 ? '' : 's'} wide</span>
+                    <input
+                        type="range" min={MIN_SOFT} max={MAX_SOFT} step={SOFT_STEP} value={b.soft}
+                        onChange={(e) => { const v = Number(e.currentTarget.value); setBorders({ soft: v }, 'soft-width'); }}
+                    />
+                </label>
+                <details className="map-borders-terrains" open={overrides > 0}>
+                    <summary>By terrain{overrides ? ' (' + overrides + ')' : ''}</summary>
+                    <p className="map-hint">A terrain's own edges, over the setting above. Where two terrains that both have one meet, the one stacked on top decides.</p>
+                    <ul>
+                        {TERRAINS.map((t) => (
+                            <li key={t.slug}>
+                                <span className={'map-swatch-chip' + (style.pixelated ? ' pixelated' : '')} style={{ background: swatchBackground(style, t.slug) }}></span>
+                                <span className="map-borders-name">{t.name}</span>
+                                <select
+                                    value={b.terrain[t.slug] ?? 'map'}
+                                    aria-label={t.name + ' edges'}
+                                    onChange={(e) => setTerrain(t.slug, e.currentTarget.value as EdgeKind | 'map')}
+                                >
+                                    <option value="map">As above</option>
+                                    {EDGE_KINDS.map((k) => <option key={k.kind} value={k.kind}>{k.name}</option>)}
+                                </select>
+                            </li>
+                        ))}
+                    </ul>
+                </details>
+                <p className="map-hint">
+                    The Borders brush <kbd>O</kbd> paints a look onto single edges, and the terrain brush can lay
+                    one down as it paints. Painted edges win over everything here.
+                </p>
+                {doc.edges && (
+                    <button className="map-popover-go" onClick={() => store.edit((d) => { d.edges = ''; })}>
+                        <i className="fa-solid fa-broom"></i> Clear the painted edges
+                    </button>
+                )}
             </Popover>
         </>
     );
@@ -127,7 +260,6 @@ export function SizeControl() {
     const pop = usePopover();
     const [cols, setCols] = useState(doc.cols);
     const [rows, setRows] = useState(doc.rows);
-    const [fill, setFill] = useState('sea');
 
     useEffect(() => { if (pop.open) { setCols(doc.cols); setRows(doc.rows); } }, [pop.open, doc.cols, doc.rows]);
     const changed = clampCells(cols) !== doc.cols || clampCells(rows) !== doc.rows;
@@ -152,18 +284,14 @@ export function SizeControl() {
                         <input type="number" min={MIN_CELLS} max={MAX_CELLS} value={rows} onChange={(e) => setRows(Number(e.currentTarget.value))} />
                     </label>
                 </div>
-                <label className="map-field">
-                    <span>New cells</span>
-                    <select value={fill} onChange={(e) => setFill(e.currentTarget.value)}>
-                        {TERRAINS.map((t) => <option key={t.slug} value={t.slug}>{t.name}</option>)}
-                    </select>
-                </label>
-                <p className="map-hint">Grows or trims at the right and bottom edges; everything painted stays where it is.</p>
+                <p className="map-hint">
+                    Grows or trims at the right and bottom edges; everything painted stays where it is, and new
+                    cells show the background.
+                </p>
                 <button
                     className="accent map-popover-go" disabled={!changed}
                     onClick={() => {
-                        const code = TERRAIN_BY_SLUG.get(fill)?.code ?? 'S';
-                        store.edit((d) => resizeDoc(d, cols, rows, code));
+                        store.edit((d) => resizeDoc(d, cols, rows));
                         pop.close();
                         window.dispatchEvent(new CustomEvent('map-fit'));
                     }}

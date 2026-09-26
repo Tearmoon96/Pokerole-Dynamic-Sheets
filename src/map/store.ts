@@ -1,6 +1,6 @@
 import { createDoc, normalizeDoc } from './doc';
 import type { BrushId } from './brushes';
-import type { LabelRole, MapDoc, PathKind, Selection, Tool } from './types';
+import type { EdgeKind, LabelRole, MapDoc, PathKind, Selection, Tool } from './types';
 
 /* One mutable store behind the Map Maker, in the same shape as the GM screen's
    (src/gm/store.ts): components read through useSyncExternalStore and every
@@ -33,13 +33,32 @@ export interface PendingToken {
     color: string;
 }
 
+/** The three tools that paint with a brush, each with a brush of its own. */
+export type BrushSlot = 'paint' | 'erase' | 'edge';
+
+export interface BrushSetting {
+    shape: BrushId;
+    /** In cells, to three decimals. */
+    size: number;
+}
+
+/** Which brush a tool paints with, if any. */
+export function slotOf(tool: Tool): BrushSlot | null {
+    return tool === 'paint' ? 'paint' : tool === 'erase' ? 'erase' : tool === 'edge' ? 'edge' : null;
+}
+
 export interface MapUi {
     tool: Tool;
     /** Terrain code the brush and the bucket lay down. */
     terrain: string;
-    /** Brush size in cells, to three decimals. */
-    brush: number;
-    brushShape: BrushId;
+    brushes: Record<BrushSlot, BrushSetting>;
+    /** The border look the terrain brush and the bucket lay down with the
+        terrain — 'map' leaves it to the terrain's and the map's settings. */
+    paintEdge: EdgeKind | 'map';
+    /** What the Borders brush paints. */
+    edgeKind: EdgeKind | 'map';
+    /** The eraser rubs out terrain, or removes whatever object it touches. */
+    eraseMode: 'terrain' | 'objects';
     landmark: string;
     pathKind: PathKind;
     /** The role a newly placed label takes. */
@@ -78,9 +97,20 @@ export class MapStore {
     private pending: MapDoc | null = null;
 
     ui: MapUi = {
-        tool: 'paint', terrain: 'g', brush: 2, brushShape: 'circle',
+        tool: 'paint', terrain: 'g',
+        brushes: {
+            paint: { shape: 'circle', size: 2 },
+            erase: { shape: 'circle', size: 1 },
+            edge: { shape: 'circle', size: 2 },
+        },
+        paintEdge: 'map', edgeKind: 'soft', eraseMode: 'terrain',
         landmark: 'mountain', pathKind: 'road', labelRole: 'town', token: null, selection: [],
     };
+
+    /** Change one brush's shape or size. */
+    setBrush(slot: BrushSlot, patch: Partial<BrushSetting>): void {
+        this.setUi({ brushes: { ...this.ui.brushes, [slot]: { ...this.ui.brushes[slot], ...patch } } });
+    }
 
     onToast: ((html: string) => void) | null = null;
 
@@ -351,7 +381,7 @@ export function findObject(doc: MapDoc, sel: Selection): { id: string } | undefi
 /* Cheap equality for the fields a drag can touch: every array and the terrain
    are replaced, never mutated, so identity is enough. */
 function sameDoc(a: MapDoc, b: MapDoc): boolean {
-    return a.terrain === b.terrain && a.stamps === b.stamps && a.tokens === b.tokens
+    return a.terrain === b.terrain && a.edges === b.edges && a.stamps === b.stamps && a.tokens === b.tokens
         && a.labels === b.labels && a.paths === b.paths;
 }
 

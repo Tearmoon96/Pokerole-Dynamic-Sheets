@@ -49,8 +49,11 @@ export interface MapStyle {
     /** A frame drawn around the map itself. */
     frame: { color: string; width: number };
     terrain: Record<string, TerrainLook>;
-    /** Blocky styles: a 1px line between two different terrains. */
+    /** Blocky styles: a 1px line between two different terrains, where the
+        edge is left to the style. */
     cellBorder?: string;
+    /** An edge set to Line: one clear line, the same on every terrain. */
+    line: { color: string; width: number };
     /** Shading laid along the coast on the water side, one stroke per width
         (in cells), each in `color` — translucent, so they build up towards the
         shore. The old-map coastal wash; nothing is drawn without it. */
@@ -75,9 +78,11 @@ const handdrawn: MapStyle = {
     edgeMode: 'smooth',
     backdrop: '#2a241d', frame: { color: HAND_INK, width: 3 },
     coast: { color: '#3f5e5a1c', widths: [1.8, 1.3, 0.85, 0.45] },
+    line: { color: HAND_INK, width: 1.6 },
     pixelated: false,
     grid: '#3b2f2455',
     terrain: {
+        'clouds': { fill: '#dfe3dc', pattern: 'clouds', ink: '#98a4a3' },
         'deep-sea': { fill: '#9fb4ae', pattern: 'waves', ink: '#5d7a74' },
         'sea': { fill: '#b6c8bd', pattern: 'waves', ink: '#7d968c' },
         'shallows': { fill: '#cbd8c6', pattern: 'ripples', ink: '#8fa89a' },
@@ -122,9 +127,11 @@ const anime: MapStyle = {
     edgeMode: 'smooth',
     backdrop: '#1c2335', frame: { color: ANIME_LINE, width: 4 },
     coast: { color: '#ffffff2e', widths: [1.1, 0.7, 0.4] },
+    line: { color: ANIME_LINE, width: 2.5 },
     pixelated: false,
     grid: '#ffffff40',
     terrain: {
+        'clouds': { fill: '#cfe6fb', pattern: 'puffs', ink: '#ffffff' },
         'deep-sea': { fill: '#2f7fd6', pattern: 'sparkle', ink: '#5a9de4' },
         'sea': { fill: '#48a6f2', pattern: 'sparkle', ink: '#8ccaf8' },
         'shallows': { fill: '#82d3f6', edge: { color: '#ffffffaa', width: 3 } },
@@ -168,8 +175,10 @@ const townmap: MapStyle = {
     backdrop: '#101820', frame: { color: '#f8f8f8', width: 4 },
     pixelated: true,
     cellBorder: '#20402888',
+    line: { color: '#203028', width: 2 },
     grid: '#ffffff30',
     terrain: {
+        'clouds': { fill: '#c8dcf0', pattern: 'px-clouds', ink: '#f0f8ff' },
         'deep-sea': { fill: '#3868c0', pattern: 'px-waves', ink: '#4878d0' },
         'sea': { fill: '#5890e0', pattern: 'px-waves', ink: '#70a8f0' },
         'shallows': { fill: '#78b0f0' },
@@ -212,8 +221,10 @@ const overworld: MapStyle = {
     edgeMode: 'blocky',
     backdrop: '#101010', frame: { color: '#000000', width: 2 },
     pixelated: true,
+    line: { color: '#202020', width: 2 },
     grid: '#00000030',
     terrain: {
+        'clouds': { fill: '#d8e8f8', pattern: 'px-clouds', ink: '#ffffff' },
         'deep-sea': { fill: '#3070d8', pattern: 'px-water', ink: '#5890f0' },
         'sea': { fill: '#4890f0', pattern: 'px-water', ink: '#88c0f8' },
         'shallows': { fill: '#70b8f8', pattern: 'px-water', ink: '#a8d8f8' },

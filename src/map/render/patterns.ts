@@ -36,6 +36,9 @@ const line = (c: CanvasRenderingContext2D, w: number) => {
     c.lineWidth = w; c.lineCap = 'round'; c.lineJoin = 'round';
 };
 
+/** Offsets that draw a shape again across each edge of the tile. */
+const WRAP: [number, number][] = [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]];
+
 const SMOOTH: Record<string, Painter> = {
     waves(c, S, ink, r) {
         c.strokeStyle = ink; line(c, S / 70);
@@ -173,6 +176,40 @@ const SMOOTH: Record<string, Painter> = {
             c.beginPath(); c.moveTo(x - w, y); c.quadraticCurveTo(x, y - h * 1.2, x + w * 0.5, y - h); c.lineTo(x + w, y); c.fill();
         }
     },
+    clouds(c, S, ink, r) {
+        /* A cartographer's cloud bank: rows of scalloped curls with a flat
+           underside, drawn across the tile's edge so the repeat has no seam. */
+        c.strokeStyle = ink; line(c, S / 80);
+        for (let i = 0; i < 3; i++) {
+            const x = r() * S, y = r() * S, rad = S * (0.045 + r() * 0.02), n = 3 + (r() * 2 | 0);
+            for (const [ox, oy] of WRAP) {
+                const bx = x + ox * S, by = y + oy * S;
+                c.beginPath();
+                for (let k = 0; k < n; k++) {
+                    const cx = bx + k * rad * 1.3, lift = Math.sin((k + 0.5) / n * Math.PI) * rad * 0.9;
+                    c.arc(cx, by - lift, rad, Math.PI * 0.9, Math.PI * 2.1);
+                }
+                c.stroke();
+                c.beginPath();
+                c.moveTo(bx - rad * 0.9, by + rad * 0.35);
+                c.lineTo(bx + (n - 1) * rad * 1.3 + rad * 0.9, by + rad * 0.35);
+                c.stroke();
+            }
+        }
+    },
+    puffs(c, S, ink, r) {
+        /* Soft round puffs, lit from above, overlapping into banks. */
+        for (let i = 0; i < 5; i++) {
+            const x = r() * S, y = r() * S, rad = S * (0.05 + r() * 0.035);
+            for (const [ox, oy] of WRAP) {
+                const cx = x + ox * S, cy = y + oy * S;
+                c.fillStyle = '#9ec2e633';
+                c.beginPath(); c.ellipse(cx, cy + rad * 0.35, rad * 1.5, rad * 0.8, 0, 0, 7); c.fill();
+                c.fillStyle = ink;
+                c.beginPath(); c.arc(cx - rad * 0.8, cy, rad * 0.75, 0, 7); c.arc(cx, cy - rad * 0.3, rad, 0, 7); c.arc(cx + rad * 0.85, cy + rad * 0.05, rad * 0.7, 0, 7); c.fill();
+            }
+        }
+    },
     canopy(c, S, ink, r) {
         const n = 3;
         for (let row = 0; row < n; row++) {
@@ -262,6 +299,17 @@ const PIXEL: Record<string, Painter> = {
             let x = r() * S, y = r() * S;
             for (let k = 0; k < 4; k++) { px(c, x, y, 2, 1); x += 2; y += (r() * 3 | 0) - 1; }
         }
+    },
+    'px-clouds'(c, _S, ink) {
+        /* Two stacked puffs a tile, the flat shade under each. */
+        const puff = (x: number, y: number) => {
+            c.fillStyle = '#a8c0e0';
+            px(c, x + 1, y + 6, 12, 1);
+            c.fillStyle = ink;
+            px(c, x + 4, y, 5, 1); px(c, x + 2, y + 1, 9, 1); px(c, x + 1, y + 2, 12, 3); px(c, x, y + 3, 14, 2); px(c, x + 1, y + 5, 12, 1);
+        };
+        puff(2, 4);
+        puff(17, 20);
     },
     'px-bricks'(c, S, ink) {
         c.fillStyle = ink;

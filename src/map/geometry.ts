@@ -129,6 +129,22 @@ export function chaikinClosed(loop: Pt[]): Pt[] {
    back in sample units, where sample i's centre is i + 0.5. */
 
 export function traceLevels(levels: Uint8Array, w: number, h: number, thresholds: number[]): Pt[][][] {
+    return traceTagged(levels, w, h, thresholds).map((l) => l.loops);
+}
+
+/** Says what a stretch of outline is: called for each boundary square with
+    the threshold's index, the lowest value at or above it and the highest
+    below it, and where in the traced grid those two samples are (-1 for
+    outside the grid). Its answer is kept per stretch. */
+export type Tagger = (k: number, upper: number, lower: number, iUpper: number, iLower: number) => number;
+
+export interface TaggedLevel {
+    loops: Pt[][];
+    /** Per loop, per point: the tag of the stretch from that point to the next. */
+    tags: Uint8Array[];
+}
+
+export function traceTagged(levels: Uint8Array, w: number, h: number, thresholds: number[], tagger?: Tagger): TaggedLevel[] {
     const W = w + 4, H = h + 4;
     const g = new Uint8Array(W * H);
     for (let y = 1; y < H - 1; y++) {
@@ -141,6 +157,13 @@ export function traceLevels(levels: Uint8Array, w: number, h: number, thresholds
     /* +1 above so the empty outer ring (0) is below every threshold. */
     const ts = thresholds.map((t) => t + 1);
     const nexts = ts.map(() => new Map<number, number>());
+    const tagMaps = tagger ? ts.map(() => new Map<number, number>()) : null;
+    /* A padded grid point back to its sample, -1 on the outer ring. */
+    const sampleOf = (pi: number): number => {
+        const x = pi % W, y = (pi - x) / W;
+        if (x === 0 || y === 0 || x === W - 1 || y === H - 1) return -1;
+        return Math.max(0, Math.min(h - 1, y - 2)) * w + Math.max(0, Math.min(w - 1, x - 2));
+    };
 
     /* Edge points are keyed by which grid edge they sit on:
        horizontal edge (x,y)-(x+1,y) -> 2*(y*W+x); vertical (x,y)-(x,y+1) -> 2*(y*W+x)+1. */
@@ -159,21 +182,35 @@ export function traceLevels(levels: Uint8Array, w: number, h: number, thresholds
                 /* Every segment keeps the filled side on the same hand, so
                    following `next` walks each loop one way round. The two
                    saddles join their filled corners diagonally. */
+                let s1 = -1, s2 = -1;
                 switch (code) {
-                    case 1: next.set(bottom, left); break;
-                    case 2: next.set(right, bottom); break;
-                    case 3: next.set(right, left); break;
-                    case 4: next.set(top, right); break;
-                    case 5: next.set(top, left); next.set(bottom, right); break;
-                    case 6: next.set(top, bottom); break;
-                    case 7: next.set(top, left); break;
-                    case 8: next.set(left, top); break;
-                    case 9: next.set(bottom, top); break;
-                    case 10: next.set(left, bottom); next.set(right, top); break;
-                    case 11: next.set(right, top); break;
-                    case 12: next.set(left, right); break;
-                    case 13: next.set(bottom, right); break;
-                    case 14: next.set(left, bottom); break;
+                    case 1: next.set(s1 = bottom, left); break;
+                    case 2: next.set(s1 = right, bottom); break;
+                    case 3: next.set(s1 = right, left); break;
+                    case 4: next.set(s1 = top, right); break;
+                    case 5: next.set(s1 = top, left); next.set(s2 = bottom, right); break;
+                    case 6: next.set(s1 = top, bottom); break;
+                    case 7: next.set(s1 = top, left); break;
+                    case 8: next.set(s1 = left, top); break;
+                    case 9: next.set(s1 = bottom, top); break;
+                    case 10: next.set(s1 = left, bottom); next.set(s2 = right, top); break;
+                    case 11: next.set(s1 = right, top); break;
+                    case 12: next.set(s1 = left, right); break;
+                    case 13: next.set(s1 = bottom, right); break;
+                    case 14: next.set(s1 = left, bottom); break;
+                }
+                if (tagMaps && s1 >= 0) {
+                    /* The two sides of this stretch: the lowest value on the
+                       filled side, the highest on the other. */
+                    let up = 256, low = -1, iu = -1, il = -1;
+                    const corners = [i, i + 1, i + W + 1, i + W];
+                    for (const pi of corners) {
+                        const v = g[pi];
+                        if (v >= t) { if (v < up) { up = v; iu = pi; } } else if (v > low) { low = v; il = pi; }
+                    }
+                    const tag = tagger!(k, up - 1, low - 1, sampleOf(iu), low > 0 ? sampleOf(il) : -1);
+                    tagMaps[k].set(s1, tag);
+                    if (s2 >= 0) tagMaps[k].set(s2, tag);
                 }
             }
         }
@@ -188,22 +225,62 @@ export function traceLevels(levels: Uint8Array, w: number, h: number, thresholds
         return [(vert ? x : x + 0.5) - 1.5, (vert ? y + 0.5 : y) - 1.5];
     };
 
-    return nexts.map((next) => {
+    return nexts.map((next, lk) => {
         const loops: Pt[][] = [];
+        const tags: Uint8Array[] = [];
         const seen = new Set<number>();
+        const tagMap = tagMaps?.[lk];
         for (const start of next.keys()) {
             if (seen.has(start)) continue;
             const loop: Pt[] = [];
+            const keys: number[] = [];
             let k: number | undefined = start;
             while (k !== undefined && !seen.has(k)) {
                 seen.add(k);
                 loop.push(pos(k));
+                keys.push(k);
                 k = next.get(k);
             }
-            if (loop.length >= 3) loops.push(loop);
+            if (loop.length >= 3) {
+                loops.push(loop);
+                tags.push(tagMap ? Uint8Array.from(keys, (key) => tagMap.get(key) ?? 0) : new Uint8Array(loop.length));
+            }
         }
-        return loops;
+        return { loops, tags };
     });
+}
+
+/** Chaikin on a loop that carries a tag per stretch: each new stretch keeps
+    the tag of the old one it lies on, and a cut corner takes the tag of the
+    stretch it leads into. */
+export function chaikinTagged(loop: Pt[], tags: Uint8Array): { loop: Pt[]; tags: Uint8Array } {
+    const n = loop.length;
+    if (n < 3) return { loop, tags };
+    const out: Pt[] = [];
+    const outTags = new Uint8Array(n * 2);
+    for (let i = 0; i < n; i++) {
+        const a = loop[i], b = loop[(i + 1) % n];
+        out.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25]);
+        out.push([a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]);
+        outTags[2 * i] = tags[i];
+        outTags[2 * i + 1] = tags[(i + 1) % n];
+    }
+    return { loop: out, tags: outTags };
+}
+
+/** dropCollinear for a tagged loop: a point where the tag changes stays,
+    straight or not, so every run of one tag keeps its own ends. */
+export function dropCollinearTagged(loop: Pt[], tags: Uint8Array): { loop: Pt[]; tags: Uint8Array } {
+    const n = loop.length;
+    if (n < 4) return { loop, tags };
+    const out: Pt[] = [];
+    const outTags: number[] = [];
+    for (let i = 0; i < n; i++) {
+        const a = loop[(i + n - 1) % n], b = loop[i], c = loop[(i + 1) % n];
+        const cross = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+        if (Math.abs(cross) > 1e-9 || tags[(i + n - 1) % n] !== tags[i]) { out.push(b); outTags.push(tags[i]); }
+    }
+    return out.length >= 3 ? { loop: out, tags: Uint8Array.from(outTags) } : { loop, tags };
 }
 
 /** One boolean mask's outline, in cell units of a one-sample-a-cell grid. */

@@ -149,6 +149,7 @@ one would orphan both its picture and every stamp of it on every map.
 
 | Terrain | File, in `<Style>/terrain/` |
 |---|---|
+| Clouds | `clouds.png` |
 | Deep sea | `deep-sea.png` |
 | Sea | `sea.png` |
 | Shallows | `shallows.png` |

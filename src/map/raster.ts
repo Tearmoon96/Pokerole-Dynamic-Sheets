@@ -1,4 +1,4 @@
-import { FALLBACK_TERRAIN, TERRAINS, TERRAIN_BY_CODE } from './terrain';
+import { FALLBACK_TERRAIN, TERRAINS } from './terrain';
 import { warp } from './noise';
 import { chaikinClosed, traceLevels } from './geometry';
 import type { Pt } from './geometry';
@@ -26,11 +26,19 @@ export function pickRes(cols: number, rows: number): number {
     return RES_STEPS.find((r) => cols * rows * r * r <= MAX_SAMPLES) ?? 1;
 }
 
+/* A sample nothing was painted on, or that was rubbed out: it shows the map's
+   background, whatever that is at the time. So the background is a real
+   layer under the painting — change it and every bare patch changes with it.
+   Stored as `_`. */
+export const EMPTY = 255;
+export const EMPTY_CODE = '_';
+
 /** Terrain code -> its index in TERRAINS, the byte a raster holds. */
 const INDEX = new Map(TERRAINS.map((t, i) => [t.code, i]));
 const FALLBACK_INDEX = INDEX.get(FALLBACK_TERRAIN.code)!;
 
 export function codeIndex(code: string): number {
+    if (code === EMPTY_CODE) return EMPTY;
     return INDEX.get(code) ?? FALLBACK_INDEX;
 }
 
@@ -41,11 +49,24 @@ export interface Raster {
     data: Uint8Array;
 }
 
+/** What a brush or the bucket paints into: one or more layers of samples,
+    all the same size, each taking its own value wherever the paint lands.
+    The terrain brush writes the terrain and the painted border layer
+    together, so a Spray speck carries its border setting exactly where it
+    fell. */
+export interface Canvas {
+    w: number;
+    h: number;
+    res: number;
+    layers: { data: Uint8Array; value: number }[];
+}
+
 export function isEncoded(terrain: string): boolean {
     return /\d/.test(terrain.slice(0, 12));
 }
 
-export function encode(data: Uint8Array): string {
+/** Run-length encode any byte raster, one letter per value. */
+export function encodeWith(data: Uint8Array, letter: (v: number) => string): string {
     const parts: string[] = [];
     let i = 0;
     const n = data.length;
@@ -53,30 +74,43 @@ export function encode(data: Uint8Array): string {
         const v = data[i];
         let j = i + 1;
         while (j < n && data[j] === v) j++;
-        parts.push(TERRAINS[v].code + (j - i));
+        parts.push(letter(v) + (j - i));
         i = j;
     }
     return parts.join('');
 }
 
-/** Runs back to samples. A short string is padded with the fallback terrain,
-    a long one cut: whatever came off disk, the raster is the right size. */
-export function decode(terrain: string, length: number): Uint8Array {
-    const data = new Uint8Array(length).fill(FALLBACK_INDEX);
+/** Runs back to bytes. A short string is padded with `pad`, a long one cut:
+    whatever came off disk, the raster is the right size. */
+export function decodeWith(text: string, length: number, value: (letter: string) => number, pad: number): Uint8Array {
+    const data = new Uint8Array(length).fill(pad);
     let at = 0;
-    const re = /([A-Za-z])(\d+)/g;
+    const re = /([A-Za-z_])(\d+)/g;
     let m: RegExpExecArray | null;
-    while ((m = re.exec(terrain)) && at < length) {
-        const v = codeIndex(m[1]);
+    while ((m = re.exec(text)) && at < length) {
         const end = Math.min(length, at + Number(m[2]));
-        data.fill(v, at, end);
+        data.fill(value(m[1]), at, end);
         at = end;
     }
     return data;
 }
 
-export function filled(w: number, h: number, code: string): string {
-    return (TERRAIN_BY_CODE.has(code) ? code : FALLBACK_TERRAIN.code) + w * h;
+/** The total the runs add up to — whether a stored string fits its map. */
+export function runTotal(text: string): number {
+    return (text.match(/\d+/g) ?? []).reduce((s, n) => s + Number(n), 0);
+}
+
+export function encode(data: Uint8Array): string {
+    return encodeWith(data, (v) => (v === EMPTY ? EMPTY_CODE : TERRAINS[v].code));
+}
+
+export function decode(terrain: string, length: number): Uint8Array {
+    return decodeWith(terrain, length, codeIndex, EMPTY);
+}
+
+/** A raster with nothing painted on it: all background. */
+export function blank(length: number): string {
+    return EMPTY_CODE + length;
 }
 
 /* Decoding a big map is a few milliseconds; the renderer and the brush both
@@ -100,6 +134,20 @@ export function rasterOf(doc: { cols: number; rows: number; res: number; terrain
 export function remember(terrain: string, data: Uint8Array): void {
     cache.set(terrain, data);
     if (cache.size > 6) cache.delete(cache.keys().next().value as string);
+}
+
+/** The samples as they LOOK: every bare one reads as the background. What
+    the renderer draws and the bucket fills by. */
+let seen: { data: Uint8Array; bg: number; out: Uint8Array } | null = null;
+
+export function resolvedOf(doc: { cols: number; rows: number; res: number; terrain: string; background: string }): Raster {
+    const r = rasterOf(doc);
+    const bg = codeIndex(doc.background);
+    if (seen && seen.data === r.data && seen.bg === bg) return { ...r, data: seen.out };
+    const out = r.data.slice();
+    for (let i = 0; i < out.length; i++) if (out[i] === EMPTY) out[i] = bg;
+    seen = { data: r.data, bg, out };
+    return { ...r, data: out };
 }
 
 /* ------------------------------------------------------------ old maps
@@ -145,11 +193,18 @@ export function fromCells(cells: string, cols: number, rows: number, res: number
     return data;
 }
 
-/** Fill closed loops (in cells) into a raster with the even-odd rule, a
-    sample being inside when its centre is. A scanline fill: each row
-    collects where the loops' edges cross it, and fills between pairs. */
-export function fillLoops(data: Uint8Array, w: number, h: number, res: number, loops: Pt[][], value: number): void {
-    const rowsX: number[][] = Array.from({ length: h }, () => []);
+/** Every run of samples inside closed loops (in cells), by the even-odd
+    rule, a sample being inside when its centre is. A scanline pass: each row
+    collects where the loops' edges cross it, and the runs lie between pairs.
+    `clip`, in samples and inclusive, keeps it to one window of the raster —
+    the Classic brush redraws only round the cells it just took. */
+export function scanLoops(w: number, h: number, res: number, loops: Pt[][],
+    run: (row: number, from: number, to: number) => void,
+    clip?: { x0: number; y0: number; x1: number; y1: number }): void {
+    const cx0 = Math.max(0, clip?.x0 ?? 0), cx1 = Math.min(w - 1, clip?.x1 ?? w - 1);
+    const cy0 = Math.max(0, clip?.y0 ?? 0), cy1 = Math.min(h - 1, clip?.y1 ?? h - 1);
+    if (cx1 < cx0 || cy1 < cy0) return;
+    const rowsX: number[][] = Array.from({ length: cy1 - cy0 + 1 }, () => []);
     for (const loop of loops) {
         const n = loop.length;
         for (let i = 0; i < n; i++) {
@@ -158,45 +213,56 @@ export function fillLoops(data: Uint8Array, w: number, h: number, res: number, l
             if (y0 === y1) continue;
             const ya = Math.min(y0, y1), yb = Math.max(y0, y1);
             /* Half-open [ya, yb): a vertex shared by two edges counts once. */
-            const r0 = Math.max(0, Math.ceil(ya - 0.5)), r1 = Math.min(h - 1, Math.ceil(yb - 0.5) - 1);
+            const r0 = Math.max(cy0, Math.ceil(ya - 0.5)), r1 = Math.min(cy1, Math.ceil(yb - 0.5) - 1);
             for (let sy = r0; sy <= r1; sy++) {
                 const yc = sy + 0.5;
-                rowsX[sy].push(x0 + (yc - y0) * (x1 - x0) / (y1 - y0));
+                rowsX[sy - cy0].push(x0 + (yc - y0) * (x1 - x0) / (y1 - y0));
             }
         }
     }
-    for (let sy = 0; sy < h; sy++) {
-        const xs = rowsX[sy];
+    for (let sy = cy0; sy <= cy1; sy++) {
+        const xs = rowsX[sy - cy0];
         if (xs.length < 2) continue;
         xs.sort((a, b) => a - b);
         for (let i = 0; i + 1 < xs.length; i += 2) {
-            const s0 = Math.max(0, Math.ceil(xs[i] - 0.5)), s1 = Math.min(w - 1, Math.ceil(xs[i + 1] - 0.5) - 1);
-            if (s1 >= s0) data.fill(value, sy * w + s0, sy * w + s1 + 1);
+            const s0 = Math.max(cx0, Math.ceil(xs[i] - 0.5)), s1 = Math.min(cx1, Math.ceil(xs[i + 1] - 0.5) - 1);
+            if (s1 >= s0) run(sy, s0, s1);
         }
     }
 }
 
+/** Fill closed loops (in cells) into a raster — see scanLoops. */
+export function fillLoops(data: Uint8Array, w: number, h: number, res: number, loops: Pt[][], value: number): void {
+    scanLoops(w, h, res, loops, (sy, s0, s1) => data.fill(value, sy * w + s0, sy * w + s1 + 1));
+}
+
 /* ------------------------------------------------------------ editing */
 
-/** Four-way flood fill from one sample. Returns whether anything changed. */
-export function floodFill(r: Raster, sx: number, sy: number, value: number): boolean {
-    const { w, h, data } = r;
+/** Four-way flood fill from one sample, over the patch that LOOKS alike: a
+    bare sample and one painted in the background's own terrain are the same
+    ground to whoever is clicking. `looks` is the resolved raster (see
+    resolvedOf); the canvas's layers are what get written. Returns whether
+    anything changed. */
+export function floodFill(c: Canvas, looks: Uint8Array, sx: number, sy: number): boolean {
+    const { w, h, layers } = c;
     if (sx < 0 || sy < 0 || sx >= w || sy >= h) return false;
-    const from = data[sy * w + sx];
-    if (from === value) return false;
+    const from = looks[sy * w + sx];
+    const seen = new Uint8Array(w * h);
     const stack = new Int32Array(w * h);
     let top = 0;
+    let changed = false;
     stack[top++] = sy * w + sx;
-    data[sy * w + sx] = value;
+    seen[sy * w + sx] = 1;
     while (top) {
         const i = stack[--top];
+        for (const l of layers) if (l.data[i] !== l.value) { l.data[i] = l.value; changed = true; }
         const x = i % w;
-        if (x > 0 && data[i - 1] === from) { data[i - 1] = value; stack[top++] = i - 1; }
-        if (x < w - 1 && data[i + 1] === from) { data[i + 1] = value; stack[top++] = i + 1; }
-        if (i >= w && data[i - w] === from) { data[i - w] = value; stack[top++] = i - w; }
-        if (i + w < w * h && data[i + w] === from) { data[i + w] = value; stack[top++] = i + w; }
+        if (x > 0 && !seen[i - 1] && looks[i - 1] === from) { seen[i - 1] = 1; stack[top++] = i - 1; }
+        if (x < w - 1 && !seen[i + 1] && looks[i + 1] === from) { seen[i + 1] = 1; stack[top++] = i + 1; }
+        if (i >= w && !seen[i - w] && looks[i - w] === from) { seen[i - w] = 1; stack[top++] = i - w; }
+        if (i + w < w * h && !seen[i + w] && looks[i + w] === from) { seen[i + w] = 1; stack[top++] = i + w; }
     }
-    return true;
+    return changed;
 }
 
 /** A new size, anchored top-left, at whatever resolution the new size allows. */

@@ -80,6 +80,18 @@ export interface MapGrid {
     opacity: number;
 }
 
+/** How the edge between two terrains is drawn — see edges.ts. */
+export type EdgeKind = 'style' | 'line' | 'plain' | 'soft';
+
+export interface MapBorders {
+    /** Every edge no terrain and no painted border says anything about. */
+    kind: EdgeKind;
+    /** How wide a Soft edge blends, in cells. */
+    soft: number;
+    /** A terrain's own edges, by slug; absent follows `kind`. */
+    terrain: Partial<Record<string, EdgeKind>>;
+}
+
 export interface MapDoc {
     id: string;
     name: string;
@@ -95,6 +107,13 @@ export interface MapDoc {
         rather than an array because it is by far the biggest thing in the
         file, and an immutable string is what lets undo snapshots share it. */
     terrain: string;
+    /** The terrain code every bare sample shows — the layer under the
+        painting. Rubbing terrain out uncovers it. */
+    background: string;
+    /** The painted border layer, run-length encoded like the terrain; empty
+        when nothing was painted. See edges.ts. */
+    edges: string;
+    borders: MapBorders;
     paths: MapPath[];
     stamps: MapStamp[];
     tokens: MapToken[];
@@ -109,4 +128,4 @@ export interface Selection {
     id: string;
 }
 
-export type Tool = 'select' | 'paint' | 'fill' | 'erase' | 'path' | 'stamp' | 'token' | 'label' | 'pan';
+export type Tool = 'select' | 'paint' | 'fill' | 'erase' | 'edge' | 'path' | 'stamp' | 'token' | 'label' | 'pan';

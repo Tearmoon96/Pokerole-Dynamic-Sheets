@@ -11,7 +11,8 @@ export const TOOLS: { tool: Tool; icon: string; name: string; key: string }[] = 
     { tool: 'stamp', icon: 'fa-mountain-city', name: 'Place a landmark', key: 'S' },
     { tool: 'token', icon: 'fa-chess-pawn', name: 'Place a token', key: 'T' },
     { tool: 'label', icon: 'fa-font', name: 'Add a label', key: 'L' },
-    { tool: 'erase', icon: 'fa-eraser', name: 'Erase objects', key: 'E' },
+    { tool: 'erase', icon: 'fa-eraser', name: 'Eraser: rub out terrain, or remove objects', key: 'E' },
+    { tool: 'edge', icon: 'fa-bezier-curve', name: 'Borders: choose how the edges between terrains look', key: 'O' },
     { tool: 'pan', icon: 'fa-hand', name: 'Pan (or hold Space)', key: 'H' },
 ];
 
