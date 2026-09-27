@@ -1,4 +1,4 @@
-import { chaikinTagged, dropCollinearTagged, traceTagged } from '../geometry';
+import { chaikinClosed, chaikinTagged, dropCollinearTagged, traceLevels, traceTagged } from '../geometry';
 import type { Pt } from '../geometry';
 import { TERRAINS } from '../terrain';
 import type { TerrainDef } from '../terrain';
@@ -76,6 +76,10 @@ export interface TerrainGeometry {
     blocky: boolean;
     /** How wide a Soft edge blends, in cells. */
     softWidth: number;
+    /** How far each bit of water is from land, built on first draw. */
+    depthField?: DepthField | null;
+    /** The depth bands drawn from it, per style. */
+    depth?: Map<string, DepthBands | null>;
 }
 
 /* A stretch's tag while building: which of the looks it is drawn in. 0 is
@@ -301,8 +305,12 @@ function buildBlocky(doc: MapDoc, order: { t: TerrainDef; i: number }[], key: st
     const layers = order.map(({ t, i }) => ({ terrain: t, area: paths.get(i)!, outline: null }));
     const regions = new Map<number, { path: Path2D; rule: CanvasFillRule }>();
     for (const i of softTerrains) regions.set(i, { path: paths.get(i)!, rule: 'nonzero' });
+    /* Sky and water come first in z order, so they are the leading layers;
+       the depth shading goes on after them. */
+    let waterLayers = 0;
+    while (waterLayers < order.length && (order[waterLayers].t.water || order[waterLayers].t.sky)) waterLayers++;
     return {
-        key, layers, coast: null, waterLayers: 0,
+        key, layers, coast: null, waterLayers,
         styleBorders: anyStyle ? styleBorders : null,
         lines: anyLine ? lines : null,
         soft: softTerrains.size ? { path: softPath, terrains: softTerrains, box } : null,
@@ -556,6 +564,7 @@ function dither(masks: HTMLCanvasElement[], zone: HTMLCanvasElement): void {
 function drawSoft(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapDoc, style: MapStyle, textures: TextureSource): void {
     const layer = softLayer(geo, doc);
     if (!layer || !layer.masks.length) return;
+    const depth = depthBands(geo, doc, style);
     const T = ctx.getTransform();
     const corners = [[layer.x, layer.y], [layer.x + layer.w, layer.y], [layer.x, layer.y + layer.h], [layer.x + layer.w, layer.y + layer.h]]
         .map(([px, py]) => T.transformPoint(new DOMPoint(px, py)));
@@ -589,6 +598,12 @@ function drawSoft(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapD
                     tc.fillStyle = paint;
                     tc.fillRect(layer.x, layer.y, layer.w, layer.h);
                 });
+                /* Water blends in WITH its depth shading, or a soft coast
+                   would show a strip of unshaded sea along it. */
+                if (m.terrain.water && depth) {
+                    tc.globalCompositeOperation = 'source-atop';
+                    paintDepth(tc, depth, doc, style, false);
+                }
                 ac.globalCompositeOperation = 'lighter';
                 ac.drawImage(tmp, 0, 0, cw, ch, 0, 0, cw, ch);
             }
@@ -606,6 +621,191 @@ function drawSoft(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapD
     }
 }
 
+/* ------------------------------------------------------------------ depth
+
+   Water near land is banded by how far it lies from the shore: three steps of
+   shallows, palest at the coast, and then the water as painted — so a sea
+   painted in one terrain still reads as shelving off. The bands are steps,
+   not a ramp: a smooth fade round every island
+   read as the land GLOWING rather than as water getting shallow. The painted
+   Deep sea / Sea / Shallows keep their own colours underneath.
+
+   The distance comes from a chamfer transform of the samples at a few pixels
+   a cell: land is distance 0, and sky (clouds) is neither and stays
+   unshaded. The smooth styles trace each band's edge as a contour, rounded
+   like the terrain's own, and fill between them; the pixel styles keep a
+   pixel grid of bands, drawn sharp. Land counts as the nearest band, so
+   nothing is traced along the coast itself — the land is painted over it. */
+
+interface DepthField { w: number; h: number; g: number; kind: Uint8Array; dist: Float32Array }
+
+interface DepthBands {
+    /** Smooth styles: each band's own region, even-odd, nearest first. */
+    regions?: { path: Path2D; color: string }[];
+    /** Where one band meets the next. */
+    edges?: Path2D;
+    /** Pixel styles. */
+    canvas?: HTMLCanvasElement;
+}
+
+const DEPTH_BUDGET = 1_200_000;
+
+function depthField(geo: TerrainGeometry, doc: MapDoc): DepthField | null {
+    if (geo.depthField !== undefined) return geo.depthField;
+    const r = resolvedOf(doc);
+    /* Pixels per cell: a divisor of `res`, so each pixel sits on a whole
+       block of samples; fewer on a big map to keep within the budget. */
+    let g = Math.min(r.res, geo.blocky ? 4 : 8);
+    while (g > 1 && doc.cols * doc.rows * g * g > DEPTH_BUDGET) g /= 2;
+    const step = r.res / g;
+    const w = doc.cols * g, h = doc.rows * g;
+    const kind = new Uint8Array(w * h);   // 0 sky, 1 water, 2 land
+    const half = Math.floor(step / 2);
+    let anyWater = false;
+    for (let y = 0; y < h; y++) {
+        const row = (y * step + half) * r.w;
+        for (let x = 0; x < w; x++) {
+            const t = TERRAINS[r.data[row + x * step + half]];
+            const k = !t ? 2 : t.sky ? 0 : t.water ? 1 : 2;
+            kind[y * w + x] = k;
+            if (k === 1) anyWater = true;
+        }
+    }
+    if (!anyWater) { geo.depthField = null; return null; }
+    /* Two-pass 3-4 chamfer, in thirds of a pixel. */
+    const INF = 1 << 29;
+    const d = new Int32Array(w * h);
+    for (let i = 0; i < w * h; i++) d[i] = kind[i] === 2 ? 0 : INF;
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const i = y * w + x;
+            let v = d[i];
+            if (x > 0) v = Math.min(v, d[i - 1] + 3);
+            if (y > 0) {
+                v = Math.min(v, d[i - w] + 3);
+                if (x > 0) v = Math.min(v, d[i - w - 1] + 4);
+                if (x < w - 1) v = Math.min(v, d[i - w + 1] + 4);
+            }
+            d[i] = v;
+        }
+    }
+    for (let y = h - 1; y >= 0; y--) {
+        for (let x = w - 1; x >= 0; x--) {
+            const i = y * w + x;
+            let v = d[i];
+            if (x < w - 1) v = Math.min(v, d[i + 1] + 3);
+            if (y < h - 1) {
+                v = Math.min(v, d[i + w] + 3);
+                if (x < w - 1) v = Math.min(v, d[i + w + 1] + 4);
+                if (x > 0) v = Math.min(v, d[i + w - 1] + 4);
+            }
+            d[i] = v;
+        }
+    }
+    const dist = new Float32Array(w * h);
+    for (let i = 0; i < w * h; i++) dist[i] = d[i] >= INF ? Infinity : d[i] / 3 / g;
+    geo.depthField = { w, h, g, kind, dist };
+    return geo.depthField;
+}
+
+function hexRgba(hex: string): [number, number, number, number] {
+    let h = hex.replace('#', '');
+    if (h.length === 3 || h.length === 4) h = h.split('').map((c) => c + c).join('');
+    const v = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+    return [v[0], v[1], v[2], h.length >= 8 ? parseInt(h.slice(6, 8), 16) : 255];
+}
+
+function depthBands(geo: TerrainGeometry, doc: MapDoc, style: MapStyle): DepthBands | null {
+    const d = style.depth;
+    if (!d || !geo.waterLayers) return null;
+    geo.depth ??= new Map();
+    if (geo.depth.has(style.id)) return geo.depth.get(style.id)!;
+    const f = depthField(geo, doc);
+    if (!f) { geo.depth.set(style.id, null); return null; }
+    const { w, h, g, kind, dist } = f;
+    /* Band per pixel: 0 sky, 1 the band nearest the coast (land too), and
+       one more for every step passed. */
+    const band = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) {
+        if (kind[i] === 0) continue;
+        let b = 1;
+        if (kind[i] === 1) for (const s of d.steps) if (dist[i] >= s) b++;
+        band[i] = b;
+    }
+    let out: DepthBands;
+    if (geo.blocky) {
+        const canvas = scratch(w, h);
+        const c = canvas.getContext('2d')!;
+        const img = c.createImageData(w, h);
+        const cols = d.colors.map(hexRgba);
+        for (let i = 0; i < w * h; i++) {
+            if (!band[i]) continue;
+            const col = cols[Math.min(cols.length - 1, band[i] - 1)];
+            img.data.set(col, i * 4);
+        }
+        c.putImageData(img, 0, 0);
+        out = { canvas };
+    } else {
+        const levels = d.steps.map((_, k) => k + 2);
+        const traced = traceLevels(band, w, h, [1, ...levels]);
+        const scale = CELL / g;
+        const layers = traced.map((loops) => {
+            const path = new Path2D();
+            for (const raw of loops) {
+                const loop = chaikinClosed(chaikinClosed(raw));
+                path.moveTo(loop[0][0] * scale, loop[0][1] * scale);
+                for (let i = 1; i < loop.length; i++) path.lineTo(loop[i][0] * scale, loop[i][1] * scale);
+                path.closePath();
+            }
+            return path;
+        });
+        const regions: { path: Path2D; color: string }[] = [];
+        layers.forEach((layer, k) => {
+            const color = d.colors[Math.min(d.colors.length - 1, k)];
+            if (hexRgba(color)[3] === 0) return;
+            const path = new Path2D();
+            path.addPath(layer);
+            if (k + 1 < layers.length) path.addPath(layers[k + 1]);
+            regions.push({ path, color });
+        });
+        const edges = new Path2D();
+        for (const layer of layers.slice(1)) edges.addPath(layer);
+        out = { regions, edges };
+    }
+    geo.depth.set(style.id, out);
+    return out;
+}
+
+/** Lay the depth bands on in whatever compositing the caller has set. */
+function paintDepth(ctx: CanvasRenderingContext2D, bands: DepthBands, doc: MapDoc, style: MapStyle, withEdges: boolean): void {
+    if (bands.canvas) {
+        const smooth = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(bands.canvas, 0, 0, doc.cols * CELL, doc.rows * CELL);
+        ctx.imageSmoothingEnabled = smooth;
+        return;
+    }
+    for (const r of bands.regions!) {
+        ctx.fillStyle = r.color;
+        ctx.fill(r.path, 'evenodd');
+    }
+    const line = style.depth?.line;
+    if (withEdges && line && bands.edges) {
+        ctx.strokeStyle = line.color;
+        ctx.lineWidth = line.width;
+        ctx.lineJoin = 'round';
+        ctx.stroke(bands.edges);
+    }
+}
+
+function drawDepth(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapDoc, style: MapStyle): void {
+    const bands = depthBands(geo, doc, style);
+    if (!bands) return;
+    ctx.save();
+    paintDepth(ctx, bands, doc, style, true);
+    ctx.restore();
+}
+
 /** Draw the map's ground under the transform already set on `ctx` (world px). */
 export function drawTerrain(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapDoc, style: MapStyle,
     textures: TextureSource = probeTexture): void {
@@ -617,16 +817,32 @@ export function drawTerrain(ctx: CanvasRenderingContext2D, geo: TerrainGeometry,
     ctx.imageSmoothingEnabled = !style.pixelated;
 
     geo.layers.forEach((layer, idx) => {
+        if (idx === geo.waterLayers) drawDepth(ctx, geo, doc, style);
         if (idx === geo.waterLayers && geo.coast && style.coast) {
-            ctx.strokeStyle = style.coast.color;
-            ctx.lineJoin = 'round';
-            for (const w of style.coast.widths) {
-                ctx.lineWidth = w * 2 * CELL;
-                ctx.stroke(geo.coast);
+            const first = geo.layers[0];
+            const skyOnly = !!style.coast.skyOnly;
+            if (!skyOnly || first.terrain.sky) {
+                ctx.save();
+                if (skyOnly && geo.layers.length > 1 && geo.layers[1].terrain.water) {
+                    /* The cloud alone: everything less the water above it. */
+                    const sky = new Path2D();
+                    sky.addPath(first.area);
+                    sky.addPath(geo.layers[1].area);
+                    ctx.clip(sky, 'evenodd');
+                }
+                ctx.strokeStyle = style.coast.color;
+                ctx.lineJoin = 'round';
+                for (const w of style.coast.widths) {
+                    ctx.lineWidth = w * 2 * CELL;
+                    ctx.stroke(geo.coast);
+                }
+                ctx.restore();
             }
         }
         fillLayer(ctx, style, layer.terrain, layer.area, textures);
     });
+    /* A map that is all water has no land layer to come after it. */
+    if (geo.waterLayers >= geo.layers.length) drawDepth(ctx, geo, doc, style);
 
     drawSoft(ctx, geo, doc, style, textures);
 

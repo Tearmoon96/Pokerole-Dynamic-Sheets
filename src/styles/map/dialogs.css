@@ -12,6 +12,10 @@
     -webkit-backdrop-filter: blur(2px);
 }
 
+/* The confirm dialog is raised from inside these (deleting a map from the map
+   list), so it has to sit above them; the board's own 80 is under 100. */
+.gm-overlay { z-index: 130; }
+
 .modal-box {
     position: relative;
     background: var(--panel-strong);
@@ -168,3 +172,69 @@
 
 .map-ok { color: var(--ok); }
 .map-miss { color: var(--text-muted); }
+
+/* ---------------- Keyboard shortcuts ---------------- */
+
+.modal-box.map-hotkeys { width: min(38rem, calc(100vw - 2rem)); display: flex; flex-direction: column; overflow: hidden; }
+
+.map-hotkey-profile { align-items: flex-end; }
+.map-hotkey-profile-actions { display: flex; gap: 0.25rem; flex: 0 0 auto; }
+.map-hotkey-profile-actions .icon-btn:disabled { opacity: 0.35; cursor: default; }
+
+.map-hotkey-note { color: var(--crit); font-weight: 600; }
+
+.map-hotkey-scroll { overflow-y: auto; min-height: 0; padding-right: 4px; }
+
+.map-hotkey-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding: 0.22rem 0.3rem;
+    border-radius: 7px;
+}
+
+.map-hotkey-row:hover { background: var(--primary-faint); }
+
+.map-hotkey-name { font-size: 0.84rem; min-width: 0; }
+
+.map-hotkey-keys { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.3rem; }
+
+.map-keycap-wrap { display: inline-flex; }
+
+.map-keycap {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.74rem;
+    min-width: 2rem;
+    padding: 0.18rem 0.45rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    border-bottom-width: 2px;
+    background: var(--panel-solid);
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.map-keycap-wrap .map-keycap { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+
+.map-keycap-x {
+    padding: 0 0.35rem;
+    font-size: 0.65rem;
+    border: 1px solid var(--border-color);
+    border-left: 0;
+    border-bottom-width: 2px;
+    border-radius: 0 6px 6px 0;
+    background: var(--panel-solid);
+    color: var(--text-secondary);
+}
+
+.map-keycap-x:hover { color: var(--danger); }
+
+.map-keycap.add { color: var(--text-secondary); min-width: 1.8rem; }
+
+.map-keycap.recording {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
+    font-style: italic;
+}

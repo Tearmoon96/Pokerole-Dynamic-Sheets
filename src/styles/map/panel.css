@@ -375,3 +375,44 @@
     vertical-align: 1px;
     box-shadow: 0 0 0 1px #fff4;
 }
+
+/* ---------------- Label type settings ---------------- */
+
+.map-type-editor .map-subhead {
+    margin: 0.7rem 0 0.4rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+}
+
+.map-type-editor .map-subhead:first-child { margin-top: 0.3rem; }
+
+/* Three short numbers fit a 290px panel side by side. */
+.map-type-editor .map-field-row { gap: 0.4rem; }
+.map-type-editor .map-field input[type="number"] { padding-left: 0.3rem; padding-right: 0.2rem; }
+
+.map-type-toggles {
+    display: flex;
+    gap: 0.4rem;
+    margin-bottom: 0.55rem;
+}
+
+.map-type-toggles .map-segmented { flex: 1 1 auto; }
+.map-type-toggles .map-segmented button { font-size: 0.78rem; padding: 0.32rem 0.2rem; }
+
+.map-color-field input[type="color"] {
+    height: 1.9rem;
+    padding: 2px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--panel-solid);
+    cursor: pointer;
+}
+
+.map-bend { margin-bottom: 0.55rem; }
+
+.map-type-reset { margin-top: 0.2rem; }

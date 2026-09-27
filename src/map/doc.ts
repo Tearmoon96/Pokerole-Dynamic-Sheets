@@ -132,12 +132,38 @@ export function normalizeDoc(raw: unknown): MapDoc | null {
             })),
         labels: arr<MapLabel>(r.labels).filter((l) => l && typeof l.text === 'string')
             .map((l) => ({
-                ...l, id: l.id || uid(), x: num(l.x, 0), y: num(l.y, 0),
+                id: l.id || uid(), text: l.text, x: num(l.x, 0), y: num(l.y, 0),
                 role: (['region', 'town', 'route', 'small'].includes(l.role) ? l.role : 'town') as LabelRole,
                 scale: num(l.scale, 1), rotation: num(l.rotation, 0),
+                ...labelTypeFields(l),
             })),
         updatedAt: str(r.updatedAt, new Date().toISOString()),
     };
+}
+
+/** A label's optional type settings, each kept only when it is the right
+    kind of value — a hand-edited file cannot hand the renderer a string for
+    a number. */
+function labelTypeFields(l: MapLabel): Partial<MapLabel> {
+    const out: Partial<MapLabel> = {};
+    const n = (k: 'weight' | 'haloWidth' | 'opacity' | 'spacing' | 'lineHeight' | 'bend' | 'slant' | 'stretch', lo: number, hi: number) => {
+        const v = l[k];
+        if (typeof v === 'number' && isFinite(v)) out[k] = Math.max(lo, Math.min(hi, v));
+    };
+    const s = (k: 'font' | 'color' | 'halo') => { if (typeof l[k] === 'string' && l[k]) out[k] = l[k]; };
+    const one = <K extends 'caps' | 'align' | 'direction' | 'warp'>(k: K, allowed: string[]) => {
+        if (allowed.includes(l[k] as string)) out[k] = l[k];
+    };
+    s('font'); s('color'); s('halo');
+    n('weight', 100, 900); n('haloWidth', 0, 1); n('opacity', 0, 1); n('spacing', -0.5, 2);
+    n('lineHeight', 0.5, 4); n('bend', -100, 100); n('slant', -60, 60); n('stretch', 0.2, 4);
+    one('caps', ['none', 'upper', 'lower', 'title']);
+    one('align', ['left', 'center', 'right']);
+    one('direction', ['horizontal', 'vertical']);
+    one('warp', ['none', 'arc', 'arch', 'circle', 'wave', 'flag', 'rise', 'bulge']);
+    if (typeof l.italic === 'boolean') out.italic = l.italic;
+    if (typeof l.shadow === 'boolean') out.shadow = l.shadow;
+    return out;
 }
 
 /** The terrain most of the map's outer edge is painted in: the sea round a

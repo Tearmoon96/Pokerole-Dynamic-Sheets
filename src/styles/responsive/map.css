@@ -38,7 +38,8 @@ html[data-device="phone"] .map-topbar .spacer { display: none; }
 
 html[data-device="phone"] .map-name-btn { flex: 1 1 8rem; max-width: none; }
 
-html[data-device="phone"] .map-styles { border-left: 0; padding-left: 0; }
+html[data-device="phone"] .map-styles,
+html[data-device="phone"] .map-history { border-left: 0; padding-left: 0; }
 
 html[data-device="phone"] .map-topbar .session-status { order: 10; flex-basis: 100%; max-width: none; }
 html[data-device="phone"] .map-topbar .session-status:empty { display: none; }

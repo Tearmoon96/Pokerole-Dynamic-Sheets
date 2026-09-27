@@ -216,3 +216,14 @@
     border: 1px solid var(--border-color);
     border-radius: 4px;
 }
+
+/* Undo and redo, just before the style picker. */
+.map-history {
+    display: flex;
+    gap: 0.25rem;
+    padding-left: 0.6rem;
+    border-left: 1px solid var(--border-color);
+    flex: 0 0 auto;
+}
+
+.map-history .icon-btn:disabled { opacity: 0.35; cursor: default; }

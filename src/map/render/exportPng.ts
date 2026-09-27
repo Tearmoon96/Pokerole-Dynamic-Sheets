@@ -10,6 +10,9 @@ import { CELL } from './patterns';
 import { buildGeometry, drawGrid, drawTerrain } from './terrain';
 import type { TextureSource } from './terrain';
 import type { MapDoc, MapLabel, MapPath, MapStamp, MapToken } from '../types';
+import {
+    applyLabelTransform, fontOf, isPlain, labelType, layoutGlyphs, lineBaselines, measureWith, plainLineX, shadowOf,
+} from '../labelText';
 
 /* The whole map as one PNG.
 
@@ -245,27 +248,67 @@ async function drawStamp(ctx: CanvasRenderingContext2D, s: MapStamp, style: MapS
 /* ------------------------------------------------------------ labels */
 
 function drawLabel(ctx: CanvasRenderingContext2D, l: MapLabel, style: MapStyle): void {
-    const look = style.label[l.role];
-    const size = look.size * CELL * l.scale;
-    const text = look.upper ? l.text.toUpperCase() : l.text;
-    const lines = text.split('\n');
+    const t = labelType(l, style, CELL);
+    const font = fontOf(t);
+    const measure = measureWith(font);
     ctx.save();
-    ctx.translate(l.x * CELL, l.y * CELL);
-    if (l.rotation) ctx.rotate(l.rotation * Math.PI / 180);
-    ctx.font = `${look.italic ? 'italic ' : ''}${look.weight} ${size}px ${look.font}`;
-    (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = (look.spacing ? look.spacing * size : 0) + 'px';
-    ctx.textAlign = 'center';
+    ctx.globalAlpha = t.opacity;
+    const T = ctx.getTransform();
+    const k = Math.hypot(T.a, T.b);
+    applyLabelTransform(ctx, l, t, CELL);
+    ctx.font = font;
     ctx.textBaseline = 'alphabetic';
     ctx.lineJoin = 'round';
-    lines.forEach((ln, i) => {
-        /* The same baselines as the page's <tspan>s. */
-        const y = (-(lines.length - 1) / 2 * 1.15 + 0.35 + i * 1.15) * size;
-        ctx.strokeStyle = look.halo;
-        ctx.lineWidth = size * 0.2;
-        ctx.strokeText(ln, 0, y);
-        ctx.fillStyle = look.color;
-        ctx.fillText(ln, 0, y);
-    });
+    ctx.strokeStyle = t.halo;
+    ctx.lineWidth = t.haloWidth;
+    ctx.fillStyle = t.color;
+    const plain = isPlain(t);
+    const glyphs = plain ? [] : layoutGlyphs(t, measure).glyphs;
+    const x0 = plain ? plainLineX(t, measure) : 0;
+    const baselines = lineBaselines(t);
+    /* `outline` draws only the outermost silhouette — the halo, or the
+       letters when there is none — which is what casts the shadow. */
+    const paint = (outline: boolean) => {
+        const ink = (text: string, x: number, y: number) => {
+            if (t.haloWidth > 0) ctx.strokeText(text, x, y);
+            if (!outline || t.haloWidth <= 0) ctx.fillText(text, x, y);
+        };
+        if (plain) {
+            (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = t.spacing + 'px';
+            ctx.textAlign = t.align;
+            /* The same baselines as the page's <tspan>s. */
+            baselines.forEach((y, i) => ink(t.lines[i], x0, y));
+            return;
+        }
+        ctx.textAlign = 'center';
+        /* Every halo, then every letter, as on the page. */
+        const each = (draw: (ch: string) => void) => {
+            for (const g of glyphs) {
+                ctx.save();
+                ctx.translate(g.x, g.y);
+                if (g.rot) ctx.rotate(g.rot * Math.PI / 180);
+                if (g.sx !== 1 || g.sy !== 1) ctx.scale(g.sx, g.sy);
+                draw(g.ch);
+                ctx.restore();
+            }
+        };
+        if (t.haloWidth > 0) each((ch) => ctx.strokeText(ch, 0, 0));
+        if (!outline || t.haloWidth <= 0) each((ch) => ctx.fillText(ch, 0, 0));
+    };
+    /* The shadow first, for the whole label at once, so no letter's shadow
+       falls across its neighbour. In device px and unturned, as on the page,
+       where it sits on a group outside the label's transform. */
+    if (t.shadow) {
+        const sh = shadowOf(t);
+        ctx.save();
+        ctx.shadowColor = sh.color;
+        ctx.shadowBlur = sh.blur * k;
+        ctx.shadowOffsetX = sh.dx * k;
+        ctx.shadowOffsetY = sh.dy * k;
+        paint(true);
+        ctx.restore();
+    }
+    paint(false);
     ctx.restore();
 }
 
@@ -363,6 +406,7 @@ export async function renderMapPng(doc: MapDoc, opts: ExportOptions, load: Image
        font that has not arrived draws its glyphs as empty boxes. */
     const fonts = new Set<string>([`900 20px ${FA_FONT}`, '600 20px Outfit']);
     for (const l of Object.values(style.label)) fonts.add(`${l.italic ? 'italic ' : ''}${l.weight} 20px ${l.font}`);
+    for (const l of doc.labels) fonts.add(fontOf({ ...labelType(l, style, CELL), size: 20 }));
     await Promise.all([...fonts].map((f) => document.fonts.load(f).catch(() => [])));
 
     const textures = new Map<string, LoadedImage | null>();

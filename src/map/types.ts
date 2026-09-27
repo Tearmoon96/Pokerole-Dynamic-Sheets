@@ -60,6 +60,10 @@ export interface MapToken {
 
 export type LabelRole = 'region' | 'town' | 'route' | 'small';
 
+export type LabelAlign = 'left' | 'center' | 'right';
+export type LabelCase = 'none' | 'upper' | 'lower' | 'title';
+export type LabelWarp = 'none' | 'arc' | 'arch' | 'circle' | 'wave' | 'flag' | 'rise' | 'bulge';
+
 export interface MapLabel {
     id: string;
     text: string;
@@ -69,6 +73,34 @@ export interface MapLabel {
     /** Multiplies the role's own size. */
     scale: number;
     rotation: number;
+    /* Type settings. Every one is optional: absent follows the role's look
+       in the map's style, so switching style still restyles an untouched
+       label. See labelText.ts. */
+    /** An id from LABEL_FONTS. */
+    font?: string;
+    weight?: number;
+    italic?: boolean;
+    caps?: LabelCase;
+    color?: string;
+    halo?: string;
+    /** The halo's width as a fraction of the size; 0 for none. */
+    haloWidth?: number;
+    /** 0..1 */
+    opacity?: number;
+    /** Extra letter spacing, in ems. */
+    spacing?: number;
+    /** Baseline to baseline, in ems. */
+    lineHeight?: number;
+    align?: LabelAlign;
+    direction?: 'horizontal' | 'vertical';
+    warp?: LabelWarp;
+    /** -100..100 */
+    bend?: number;
+    /** Degrees the letters lean, -45..45. */
+    slant?: number;
+    /** Horizontal scale, 0.3..3. */
+    stretch?: number;
+    shadow?: boolean;
 }
 
 export interface MapGrid {

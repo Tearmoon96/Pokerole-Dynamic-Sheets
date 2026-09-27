@@ -7,16 +7,18 @@ import { TERRAINS, TERRAIN_BY_CODE } from '../../map/terrain';
 import { LANDMARK_GROUPS, LANDMARKS, landmarkOf } from '../../map/landmarks';
 import type { LandmarkGroup } from '../../map/landmarks';
 import { landmarkChain, markerChain, onImageArrived, pokemonTokenChain, probeImage, terrainTextureUrl } from '../../map/sprites';
-import { patternDataUrl } from '../../map/render/patterns';
+import { TILE_CELLS, patternDataUrl, tileCells } from '../../map/render/patterns';
 import { snapPoint, uid } from '../../map/doc';
 import { typeColors } from '../../lib/themeTables';
 import { MapSprite } from './MapSprite';
 import { TokenPicker } from './TokenPicker';
 import { BrushControls } from './BrushControls';
+import { LabelTypeEditor } from './LabelTypeEditor';
 import { EDGE_KINDS, EDGE_NAME, paintValue } from '../../map/edges';
 import { EDGE_TINT } from '../../map/render/terrain';
 import type { EdgeKind, MapDoc, MapLabel, MapPath, MapStamp, MapToken, Selection } from '../../map/types';
 import type { MapStore } from '../../map/store';
+import { brushSizeHint, panHint, useHotkeys } from '../../map/hotkeys';
 
 /* The right-hand panel: what the current tool lays down, and — once something
    is selected — the inspector for it. Every field is controlled (`value=`) and
@@ -34,7 +36,9 @@ export function swatchBackground(style: MapStyle, slug: string): string {
     const tex = probeImage(terrainTextureUrl(style, slug));
     if (tex) return `url("${tex.src}") center / 50% repeat, ${fill}`;
     const tile = look?.pattern ? patternDataUrl(look.pattern, look.ink ?? '#0003') : null;
-    return tile ? `url("${tile}") 0 0 / 100% repeat, ${fill}` : fill;
+    /* A chip shows two cells' worth, whatever size the tile is. */
+    const size = look?.pattern ? tileCells(look.pattern) / TILE_CELLS * 100 : 100;
+    return tile ? `url("${tile}") 0 0 / ${size}% repeat, ${fill}` : fill;
 }
 
 function TerrainPalette({ style }: { style: MapStyle }) {
@@ -69,7 +73,7 @@ function TerrainPalette({ style }: { style: MapStyle }) {
             <p className="map-hint">
                 {ui.tool === 'fill'
                     ? 'Click to fill the whole connected patch of the terrain under the pointer.'
-                    : 'Drag to paint. [ and ] change the size. Hold Space to pan.'}
+                    : 'Drag to paint. ' + brushSizeHint() + panHint()}
             </p>
         </section>
     );
@@ -190,7 +194,7 @@ function LandmarkPalette({ style }: { style: MapStyle }) {
                 ))}
                 {!list.length && <p className="map-hint">No landmark matches.</p>}
             </div>
-            <p className="map-hint">Click the map to place. Hold Space to pan.</p>
+            <p className="map-hint">Click the map to place. {panHint()}</p>
         </section>
     );
 }
@@ -591,10 +595,7 @@ function Inspector({ doc, sel }: { doc: MapDoc; sel: Selection }) {
                         <button key={r.role} className="map-chip" aria-pressed={l.role === r.role} onClick={() => set({ role: r.role })}>{r.name}</button>
                     ))}
                 </div>
-                <div className="map-field-row">
-                    <NumberField label="Scale" value={l.scale} step={0.1} min={0.2} max={8} onChange={(v) => set({ scale: v })} />
-                    <NumberField label="Turn°" value={l.rotation} step={5} min={-360} max={360} onChange={(v) => set({ rotation: v })} />
-                </div>
+                <LabelTypeEditor label={l} set={set} />
             </>
         );
     } else {
@@ -635,6 +636,7 @@ function Inspector({ doc, sel }: { doc: MapDoc; sel: Selection }) {
 
 export function SidePanel() {
     const { doc, ui } = useMap();
+    useHotkeys();
     const style = styleOf(doc.styleId);
     let palette: ReactElement | null = null;
     switch (ui.tool) {
@@ -646,7 +648,7 @@ export function SidePanel() {
         case 'select': palette = !ui.selection.length ? <p className="map-hint map-section">Click something on the map to select it. Drag to move; drag a landmark's corner to resize it or its knob to turn it. Ctrl-click to select several, or drag a box round them.</p> : null; break;
         case 'erase': palette = <ErasePalette />; break;
         case 'edge': palette = <EdgePalette />; break;
-        case 'pan': palette = <p className="map-hint map-section">Drag to move around the map; the wheel or a pinch zooms.</p>; break;
+        case 'pan': palette = <p className="map-hint map-section">Drag to move around the map; the wheel or a pinch zooms. The middle mouse button pans under any tool.</p>; break;
     }
     return (
         <aside className="map-side">

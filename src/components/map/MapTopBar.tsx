@@ -10,6 +10,7 @@ import {
     readMapHandle, rememberMapHandle, writeMapFile,
 } from '../../map/files';
 import type { MapDoc } from '../../map/types';
+import { keyHint, useHotkeys } from '../../map/hotkeys';
 
 /* The bar across the top: which map, how it is drawn, and its file. */
 
@@ -17,8 +18,11 @@ function escapeHtml(s: string): string {
     return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 }
 
-export function MapTopBar({ onMaps, onSprites }: { onMaps: () => void; onSprites: () => void }) {
+export function MapTopBar({ onMaps, onSprites, onHotkeys }: {
+    onMaps: () => void; onSprites: () => void; onHotkeys: () => void;
+}) {
     const { store, doc } = useMap();
+    useHotkeys();
     const { data } = useAppData();
     const toast = useToast();
     const confirm = useGmConfirm();
@@ -122,6 +126,15 @@ export function MapTopBar({ onMaps, onSprites }: { onMaps: () => void; onSprites
                 <i className="fa-solid fa-caret-down"></i>
             </button>
 
+            <div className="map-history" role="group" aria-label="History">
+                <button className="icon-btn" title={'Undo' + keyHint('undo')} disabled={!store.undoStack.length} onClick={() => store.undo()}>
+                    <i className="fa-solid fa-rotate-left"></i>
+                </button>
+                <button className="icon-btn" title={'Redo' + keyHint('redo')} disabled={!store.redoStack.length} onClick={() => store.redo()}>
+                    <i className="fa-solid fa-rotate-right"></i>
+                </button>
+            </div>
+
             <div className="map-styles">
                 <StyleControl />
                 <BackgroundControl />
@@ -150,6 +163,9 @@ export function MapTopBar({ onMaps, onSprites }: { onMaps: () => void; onSprites
                 </button>
                 <button className="icon-btn" onClick={() => { void open(); }} title="Open a saved map .json">
                     <i className="fa-solid fa-folder-open"></i><span className="map-btn-text"> Open</span>
+                </button>
+                <button className="icon-btn" onClick={onHotkeys} title="Keyboard shortcuts: choose or edit a hotkey profile">
+                    <i className="fa-solid fa-keyboard"></i>
                 </button>
             </div>
             <span className="version">{data.version ? 'v' + data.version : ''}</span>

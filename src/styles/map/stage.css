@@ -50,8 +50,10 @@
 .map-stage[data-tool="erase"] .map-obj { pointer-events: auto; }
 .map-stage[data-tool="select"] .map-hit,
 .map-stage[data-tool="erase"] .map-hit { pointer-events: stroke; }
-.map-stage[data-tool="select"] .map-label,
-.map-stage[data-tool="erase"] .map-label { pointer-events: bounding-box; }
+.map-label text { pointer-events: none; }
+.map-label-hit { fill: transparent; stroke: none; pointer-events: none; }
+.map-stage[data-tool="select"] .map-label-hit,
+.map-stage[data-tool="erase"] .map-label-hit { pointer-events: all; }
 
 .map-stage[data-tool="select"] .map-obj,
 .map-stage[data-tool="select"] .map-hit { cursor: move; }
@@ -213,7 +215,12 @@ img.pixelated { image-rendering: pixelated; }
 .map-path-label, .map-route-no { pointer-events: none; user-select: none; }
 
 .map-label { user-select: none; }
-.map-label.selected { text-decoration: underline dashed; text-decoration-color: var(--accent); }
+.map-label.selected .map-label-hit {
+    stroke: var(--accent);
+    stroke-width: 1.5px;
+    stroke-dasharray: 5 4;
+    vector-effect: non-scaling-stroke;
+}
 
 /* ---------------- Brush and readout ---------------- */
 

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { MapSprite } from './MapSprite';
 import { landmarkOf } from '../../map/landmarks';
@@ -7,6 +8,10 @@ import type { Pt } from '../../map/geometry';
 import { CELL } from '../../map/render/patterns';
 import { typeColors, TYPE_ICONS } from '../../lib/themeTables';
 import type { MapStyle } from '../../map/styles';
+import {
+    ANCHOR, fontOf, isPlain, labelTransform, labelType, layoutGlyphs, lineBaselines, measureWith,
+    plainBox, plainLineX, shadowOf,
+} from '../../map/labelText';
 import type { MapDoc, MapLabel, MapPath, MapStamp, MapToken, Selection } from '../../map/types';
 
 /* Everything placed ON the ground, in world px (the parent is scaled by the
@@ -188,34 +193,68 @@ export function StampsLayer({ doc, style, selection, onDown }: {
 function LabelText({ label, style, selected, onDown }: {
     label: MapLabel; style: MapStyle; selected: boolean; onDown: ObjectDown;
 }) {
-    const look = style.label[label.role];
-    const size = look.size * CELL * label.scale;
-    const text = look.upper ? label.text.toUpperCase() : label.text;
-    const lines = text.split('\n');
+    const t = labelType(label, style, CELL);
+    const measure = measureWith(fontOf(t));
+    const plain = isPlain(t);
+    const laid = plain ? null : layoutGlyphs(t, measure);
+    const box = laid ? laid.box : plainBox(t, measure);
+    const ink = {
+        fontFamily: t.family,
+        fontSize: t.size,
+        fontWeight: t.weight,
+        fontStyle: t.italic ? 'italic' : undefined,
+        fill: t.color,
+        stroke: t.haloWidth > 0 ? t.halo : 'none',
+        strokeWidth: t.haloWidth,
+        strokeLinejoin: 'round' as const,
+        paintOrder: 'stroke',
+    };
+    const sh = t.shadow ? shadowOf(t) : null;
+    const lineX = plain ? plainLineX(t, measure) : 0;
+    const baselines = lineBaselines(t);
     return (
-        <text
+        /* The shadow's filter goes on an outer group with no transform of its
+           own, so the shadow falls the same way however the label is turned —
+           as it does in the PNG export. */
+        <g
             className={'map-obj map-label' + (selected ? ' selected' : '')}
             data-obj={'label:' + label.id}
-            x={label.x * CELL}
-            y={label.y * CELL}
-            transform={label.rotation ? `rotate(${label.rotation} ${label.x * CELL} ${label.y * CELL})` : undefined}
-            textAnchor="middle"
-            fontFamily={look.font}
-            fontSize={size}
-            fontWeight={look.weight}
-            fontStyle={look.italic ? 'italic' : undefined}
-            letterSpacing={look.spacing ? look.spacing * size : undefined}
-            fill={look.color}
-            stroke={look.halo}
-            strokeWidth={size * 0.2}
-            strokeLinejoin="round"
-            paintOrder="stroke"
+            opacity={t.opacity < 1 ? t.opacity : undefined}
+            style={sh ? { filter: `drop-shadow(${sh.dx}px ${sh.dy}px ${sh.blur}px ${sh.color})` } : undefined}
             onPointerDown={(e) => onDown(e, { kind: 'label', id: label.id }, 'move')}
         >
-            {lines.map((ln, i) => (
-                <tspan key={i} x={label.x * CELL} dy={i === 0 ? (-(lines.length - 1) / 2 * 1.15 + 0.35) + 'em' : '1.15em'}>{ln || ' '}</tspan>
-            ))}
-        </text>
+            <g transform={labelTransform(label, t, CELL)}>
+                <rect className="map-label-hit" x={box.x} y={box.y} width={box.w} height={box.h} rx={t.size * 0.12} />
+                {plain ? (
+                    <text textAnchor={ANCHOR[t.align]} letterSpacing={t.spacing || undefined} {...ink}>
+                        {t.lines.map((ln, i) => (
+                            <tspan key={i} x={lineX} y={baselines[i]}>{ln || ' '}</tspan>
+                        ))}
+                    </text>
+                ) : (
+                    /* Letter by letter, every halo first and every letter
+                       after, so one letter's halo never paints over the one
+                       beside it — which a stroke per letter would. */
+                    (t.haloWidth > 0 ? ['halo', 'fill'] : ['fill']).map((pass) => (
+                        <g key={pass}>
+                            {laid!.glyphs.map((g, i) => (
+                                <text
+                                    key={i}
+                                    textAnchor="middle"
+                                    transform={`translate(${g.x} ${g.y})` + (g.rot ? ` rotate(${g.rot})` : '')
+                                        + (g.sx !== 1 || g.sy !== 1 ? ` scale(${g.sx} ${g.sy})` : '')}
+                                    {...ink}
+                                    fill={pass === 'halo' ? 'none' : t.color}
+                                    stroke={pass === 'halo' ? t.halo : 'none'}
+                                >
+                                    {g.ch}
+                                </text>
+                            ))}
+                        </g>
+                    ))
+                )}
+            </g>
+        </g>
     );
 }
 
@@ -223,6 +262,25 @@ export function LabelsLayer({ doc, style, selection, onDown }: {
     doc: MapDoc; style: MapStyle; selection: Selection[]; onDown: ObjectDown;
 }) {
     const W = doc.cols * CELL, H = doc.rows * CELL;
+    /* Bent labels are measured on a canvas, which measures with whatever has
+       loaded so far — so a font that arrives later has to lay them out again. */
+    const [, setFontsSeen] = useState(0);
+    useEffect(() => {
+        const fonts = document.fonts;
+        if (!fonts) return;
+        const again = () => setFontsSeen((n) => n + 1);
+        fonts.addEventListener('loadingdone', again);
+        return () => fonts.removeEventListener('loadingdone', again);
+    }, []);
+    useEffect(() => {
+        /* Ask for every font a label names: a web font the page links to is
+           only fetched once something on the page uses it, and a canvas
+           measuring it does not count. */
+        for (const l of doc.labels) {
+            const t = labelType(l, style, CELL);
+            document.fonts?.load(fontOf({ ...t, size: 20 })).catch(() => []);
+        }
+    }, [doc.labels, style]);
     return (
         <svg className="map-svg map-labels" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
             {doc.labels.map((l) => (
