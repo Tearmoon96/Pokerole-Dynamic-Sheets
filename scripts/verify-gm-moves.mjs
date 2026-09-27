@@ -76,7 +76,11 @@ for (const name of SPECIES) {
         for (const held of HELD) {
             const sheet = { ...base, heldItem: held };
             checked++;
-            if (legacy.painPenalty(dex, sheet) !== ported.painPenalty(dex, sheet)) {
+            /* A sheet with no HP yet is where the port departs on purpose:
+               the original read it as 0 HP and charged the full pain
+               penalty; the port reads it as the card does, at Base HP. */
+            const legacyPain = legacy.painPenalty(dex, sheet.hp == null ? { ...sheet, hp: dex.BaseHP } : sheet);
+            if (legacyPain !== ported.painPenalty(dex, sheet)) {
                 bad++; console.log('MISMATCH painPenalty ' + name);
             }
             /* This species' learnset plus a fixed spread of others. */

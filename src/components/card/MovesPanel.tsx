@@ -53,6 +53,12 @@ export function MovesPanel({ speciesMoves, onEditMove, onDeleteMove }: {
 
     const allMoves = getOrderedMoves(speciesMoves, customMoves, sheet);
 
+    const itemByName = (name: string) => {
+        const want = String(name || '').trim().toLowerCase();
+        if (!want) return null;
+        return data.items.find((i) => String(i.Name || '').trim().toLowerCase() === want) || null;
+    };
+
     /* "Pinned" is a cross-cutting filter (show only pinned moves); the rest of
        activeFilters are learn-ranks. They combine — e.g. Pinned together with
        Ace shows only pinned Ace moves. */
@@ -325,7 +331,7 @@ export function MovesPanel({ speciesMoves, onEditMove, onDeleteMove }: {
                         <div className="no-moves-msg">{emptyMsg}</div>
                     ) : filteredMoves.map((base) => {
                         const move = applyMoveOverrides(sheet, base);
-                        const totals = computeMoveTotals(src, move);
+                        const totals = computeMoveTotals(src, move, itemByName);
                         const isExpanded = expanded.has(move.Name);
                         return (
                             <MoveCard

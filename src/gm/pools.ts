@@ -1,6 +1,7 @@
 import type { PokedexEntry } from '../data/types';
 import type { CardSheet } from '../card/types';
 import type { TrainerState } from '../state/types';
+import { statAilmentPenalty } from '../card/pools';
 
 /* Dice pools, ported from the Pokémon card.
 
@@ -42,6 +43,21 @@ export function monPoolMax(
     return Math.max(1, monStat(dex, sheet, 'insight') + 3 + ((sheet && sheet.willMaxBonus) || 0));
 }
 
+/** What a pool holds right now. A sheet that has never been opened on the
+    card carries no HP or Will yet; the card starts those at its own defaults
+    (Base HP, and 5 Will), so this does too — reading the gap as 0 showed an
+    empty bar and the full 2-success pain penalty on a healthy Pokemon. */
+export function monPoolCur(
+    dex: PokedexEntry | null, sheet: Partial<CardSheet> | null, key: 'hp' | 'will',
+): number {
+    const v = sheet ? (sheet as unknown as Record<string, unknown>)[key] : undefined;
+    const max = monPoolMax(dex, sheet, key);
+    if (typeof v === 'number' && isFinite(v)) return v;
+    if (key === 'will') return Math.min(5, max);
+    const base = dex ? (dex._id === 'egg' ? (dex.BaseHP || 0) + (dex.Vitality || 0) : dex.BaseHP || 0) : max;
+    return Math.min(base, max);
+}
+
 export function trainerPoolMax(t: TrainerState, key: 'hp' | 'will'): number {
     const stats = t.stats || ({} as TrainerState['stats']);
     if (key === 'hp') {
@@ -58,7 +74,12 @@ export function trainerPoolValue(data: TrainerState, name: string): number {
     const token = String(name || '').trim().toLowerCase();
     const stats = data.stats as unknown as Record<string, number> | undefined;
     const skills = data.skills as unknown as Record<string, number> | undefined;
-    if (stats && token in stats) return stats[token] || 0;
+    if (stats && token in stats) {
+        /* A trainer can be paralysed from this screen too; the status lives in
+           their shared record beside the stats. */
+        const status = (data as unknown as { status?: { major?: string | null } }).status;
+        return Math.max(0, (stats[token] || 0) - statAilmentPenalty(status, token));
+    }
     if (skills && token in skills) return skills[token] || 0;
     if (token === 'will' || token === 'willpower') return trainerPoolMax(data, 'will');
     if (token === 'hp') return trainerPoolMax(data, 'hp');
@@ -73,7 +94,8 @@ export function resolvePoolValue(
     if (!token) return null;
     const s = (sheet || {}) as Partial<CardSheet>;
     if (COMBAT_STATS.includes(token) || SOCIAL_STATS.includes(token)) {
-        return statBase(dex, s, token) + ((s.trainedStats && s.trainedStats[token]) || 0);
+        const own = statBase(dex, s, token) + ((s.trainedStats && s.trainedStats[token]) || 0);
+        return Math.max(0, own - statAilmentPenalty(s.status, token));
     }
     if (token === 'will' || token === 'willpower') return monPoolMax(dex, s, 'will');
     if (token === 'hp') return monPoolMax(dex, s, 'hp');

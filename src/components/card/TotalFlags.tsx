@@ -47,6 +47,16 @@ export function TotalFlags({ totals, kind }: { totals: MoveTotals; kind: 'acc' |
                     <i className="fa-solid fa-hand"></i>
                 </span>
             )}
+            {kind === 'pow' && totals.bonus.parts.map((b) => (
+                <span
+                    key={b.label}
+                    className={'total-flag buffed ' + (b.label === 'STAB' ? 'flag-stab' : 'flag-item')}
+                    title={(b.label === 'STAB' ? 'Same-type attack bonus' : 'Held item: ' + b.label)
+                        + ': ' + signed(b.value) + ' damage'}
+                >
+                    <i className={'fa-solid ' + (b.label === 'STAB' ? 'fa-star' : 'fa-gem')}></i>
+                </span>
+            ))}
             {!!totals.pain && <PainFlag pain={totals.pain} />}
         </span>
     );

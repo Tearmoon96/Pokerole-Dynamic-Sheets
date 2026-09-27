@@ -247,3 +247,25 @@
     opacity: 0.3;
 }
 
+
+/* Paralysis: the dots keep the Pokemon's own Dexterity, and this says what
+   every roll off it is losing meanwhile. It runs on past the label's fixed
+   width into the gap before the dots, rather than wrapping the row taller. */
+.stat-label.ailing { white-space: nowrap; }
+
+.stat-ail {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    margin-left: 0.35rem;
+    padding: 0 0.3rem;
+    border-radius: 999px;
+    font-size: 0.7em;
+    font-weight: 700;
+    color: #eedc00;
+    border: 1px solid rgba(238, 220, 0, 0.5);
+    background: rgba(238, 220, 0, 0.12);
+    vertical-align: middle;
+}
+
+:where(:root.light-theme) .stat-ail { color: #8a7a00; }

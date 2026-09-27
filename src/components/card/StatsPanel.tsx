@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useCard } from '../../card/CardContext';
 import { COMBAT_STAT_KEYS, SOCIAL_STAT_KEYS } from '../../card/defaults';
-import { getPoolMax, getStatBase, getStatMax } from '../../card/pools';
+import { getPoolMax, getStatBase, getStatMax, statAilmentPenalty } from '../../card/pools';
 import { STAT_LABELS } from '../../lib/pills';
 import type { CardSheet } from '../../card/types';
 import type { PokedexEntry } from '../../data/types';
@@ -32,6 +32,7 @@ function StatRow({ statKey, totalDots }: { statKey: string; totalDots: number })
     const base = getStatBase(src, statKey);
     const maxVal = getStatMax(src, statKey);
     const trained = sheet.trainedStats[statKey] || 0;
+    const ailing = statAilmentPenalty(sheet.status, statKey);
 
     const toggleTrain = (trainedValue: number) => store.update((s) => {
         withPoolsFollowingStats(pokemon, s, () => {
@@ -53,7 +54,18 @@ function StatRow({ statKey, totalDots }: { statKey: string; totalDots: number })
 
     return (
         <div className="stat-row">
-            <span className="stat-label">{STAT_LABELS[statKey]}</span>
+            <span className={'stat-label' + (ailing ? ' ailing' : '')}>
+                {STAT_LABELS[statKey]}
+                {!!ailing && (
+                    <span
+                        className="stat-ail"
+                        title={`Paralysis: −${ailing} Dexterity in every roll that uses it `
+                            + '(Evasion, Initiative, Accuracy, Damage) until it is cured'}
+                    >
+                        <i className="fa-solid fa-bolt"></i>−{ailing}
+                    </span>
+                )}
+            </span>
             <div className={cls} id={'stat-' + statKey}>
                 {Array.from({ length: totalDots }, (_, i) => i + 1).map((i) => {
                     if (i <= base) return <div className="dot filled" key={i} />;

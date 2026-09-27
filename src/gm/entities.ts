@@ -5,7 +5,7 @@ import type { TrainerState } from '../state/types';
 import type { GmCombatant, GmState, GmWild } from './types';
 import { STATUS_ICONS, normalizeStatus } from './ailments';
 import type { GmStatus } from './ailments';
-import { monPoolMax, resolvePoolValue, trainerPoolMax, trainerPoolValue } from './pools';
+import { monPoolCur, monPoolMax, resolvePoolValue, trainerPoolMax, trainerPoolValue } from './pools';
 import { mutateWorkingTrainer, workingTrainerData } from './workingSet';
 
 /* One way to reach any subject on the screen.
@@ -162,8 +162,7 @@ export function entityPool(
         return { cur: ref.data[key] || 0, max: trainerPoolMax(ref.data, key) };
     }
     if ((ref.kind === 'mon' || ref.kind === 'wild') && ref.sheet) {
-        const sheet = ref.sheet as unknown as Record<string, number>;
-        return { cur: sheet[key] || 0, max: monPoolMax(ref.dex ?? null, ref.sheet, key) };
+        return { cur: monPoolCur(ref.dex ?? null, ref.sheet, key), max: monPoolMax(ref.dex ?? null, ref.sheet, key) };
     }
     return null;
 }
@@ -323,15 +322,17 @@ export function adjustPool(
             if (!slot) return;
             if (!slot.sheet) slot.sheet = {};
             const sheet = slot.sheet as unknown as Record<string, number>;
-            const max = monPoolMax(dexById(slot.dexId), slot.sheet as Partial<CardSheet>, key);
-            sheet[key] = clamp((sheet[key] || 0) + delta, max);
+            const dex = dexById(slot.dexId);
+            const max = monPoolMax(dex, slot.sheet as Partial<CardSheet>, key);
+            sheet[key] = clamp(monPoolCur(dex, slot.sheet as Partial<CardSheet>, key) + delta, max);
         });
     } else if (parts[0] === 'w') {
         const w = state.wilds.find((x) => x.gid === parts[1]);
         if (!w) return;
         const sheet = wildLiveSheet(w) as unknown as Record<string, number>;
-        const max = monPoolMax(dexById(w.dexId), sheet as Partial<CardSheet>, key);
-        sheet[key] = clamp((sheet[key] || 0) + delta, max);
+        const dex = dexById(w.dexId);
+        const max = monPoolMax(dex, sheet as Partial<CardSheet>, key);
+        sheet[key] = clamp(monPoolCur(dex, sheet as Partial<CardSheet>, key) + delta, max);
         /* Write back wherever that sheet came from: the card's own key once the
            wild has been opened, otherwise our loaded copy */
         if (w.pushed && localStorage.getItem(wildKey(w))) {

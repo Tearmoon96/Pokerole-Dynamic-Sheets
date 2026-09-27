@@ -399,3 +399,8 @@
     gap: 4px;
 }
 
+
+/* STAB wears the Willpower star's colour, so it follows the theme with it. */
+.total-flag.buffed.flag-stab {
+    color: var(--will-color);
+}

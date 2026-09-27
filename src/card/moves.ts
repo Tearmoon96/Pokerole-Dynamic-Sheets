@@ -1,4 +1,6 @@
-import type { MoveEntry } from '../data/types';
+import type { ItemEntry, MoveEntry } from '../data/types';
+import { damageBonuses } from '../gm/moves';
+import type { DamageBonus } from '../gm/moves';
 import { RANKS } from '../lib/ranks';
 import { formatPoolTotal, painPenalty, resolvePoolString } from './pools';
 import type { StatSource } from './pools';
@@ -67,10 +69,20 @@ export interface MoveTotals {
     accBase: number;
     powBase: number;
     powOffset: number;
+    /** STAB and a type-boosting held item, each a die on the damage pool.
+        Empty unless the caller passed an item lookup. */
+    bonus: DamageBonus;
 }
 
 /** Dice pool totals: resolve stat/skill names against the sheet's current values. */
-export function computeMoveTotals(src: StatSource, move: CardMove): MoveTotals {
+export function computeMoveTotals(
+    src: StatSource, move: CardMove,
+    /* Given, the damage total also counts STAB (+1 die when the move shares a
+       type with the Pokémon) and a held item that boosts the move's type
+       (Charcoal: +1 to every Fire move, whatever the holder's own type) —
+       the same two the GM screen's move panel adds. */
+    itemByName?: (name: string) => ItemEntry | null,
+): MoveTotals {
     /* Two separate things that both move the accuracy, and they stack: the
        move's own Low Accuracy, and whatever the user typed into the move editor.
        Kept apart in the return value so the card can say which is which — the
@@ -97,12 +109,16 @@ export function computeMoveTotals(src: StatSource, move: CardMove): MoveTotals {
     }
     let pow: string | null = null;
     let powBase = 0;
-    if (move.Power > 0 || move.Damage1 || move.Damage2 || powOffset) {
+    const noBonus: DamageBonus = { parts: [], total: 0 };
+    const hasPower = move.Power > 0 || !!move.Damage1 || !!move.Damage2 || !!powOffset;
+    const bonus = itemByName && hasPower
+        ? damageBonuses(src.pokemon, src.sheet, move, itemByName) : noBonus;
+    if (hasPower) {
         const r = resolvePoolString(src, [move.Damage1, move.Damage2].filter(Boolean).join(' + '));
         powBase = r.total + (move.Power || 0);
-        pow = formatPoolTotal(r, (move.Power || 0) + powOffset);
+        pow = formatPoolTotal(r, (move.Power || 0) + powOffset + bonus.total);
     }
-    return { acc, pow, accOffset, movePenalty, userOffset, pain, accBase, powBase, powOffset };
+    return { acc, pow, accOffset, movePenalty, userOffset, pain, accBase, powBase, powOffset, bonus };
 }
 
 /** Signed number with a real minus sign, for anything the reader has to add up. */
@@ -167,12 +183,15 @@ export function totalTitle(totals: MoveTotals, kind: 'acc' | 'pow'): string {
     const acc = kind === 'acc';
     const own = acc ? totals.movePenalty : 0;
     const manual = acc ? totals.userOffset : totals.powOffset;
-    if (!own && !manual) return '';
+    const extras = acc ? [] : totals.bonus.parts;
+    if (!own && !manual && !extras.length) return '';
     const base = acc ? totals.accBase : totals.powBase;
     const bits = [(acc ? 'Accuracy pool ' : 'Power ') + base];
     if (own) bits.push('default offset ' + signed(own));
     if (manual) bits.push('manual offset ' + signed(manual));
+    extras.forEach((b) => bits.push(b.label + ' ' + signed(b.value)));
     /* Pain is absent on purpose: it is not part of this sum. Its own glyph says
        what it costs, off the successes rather than the pool. */
-    return bits.join(' \u00b7 ') + ' = ' + (base + own + manual);
+    const extra = extras.reduce((a, b) => a + b.value, 0);
+    return bits.join(' \u00b7 ') + ' = ' + (base + own + manual + extra);
 }

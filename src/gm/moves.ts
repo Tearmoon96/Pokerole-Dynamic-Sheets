@@ -1,4 +1,4 @@
-import { formatPoolTotal, monPoolMax, resolvePoolString } from './pools';
+import { formatPoolTotal, monPoolCur, monPoolMax, resolvePoolString } from './pools';
 import type { PokedexEntry, ItemEntry, MoveEntry } from '../data/types';
 import type { CardSheet } from '../card/types';
 
@@ -136,7 +136,7 @@ export function computeMoveTotals(
 }
 
 export function painPenalty(dex: PokedexEntry | null, sheet: Partial<CardSheet> | null): number {
-    return painFromHp((sheet && sheet.hp) || 0, monPoolMax(dex, sheet, 'hp'));
+    return painFromHp(monPoolCur(dex, sheet, 'hp'), monPoolMax(dex, sheet, 'hp'));
 }
 
 /** The same rule off a bare pool, for a trainer — who has HP and takes the

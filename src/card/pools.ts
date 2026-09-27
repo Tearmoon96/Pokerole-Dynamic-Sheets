@@ -34,6 +34,19 @@ export function getStatMax({ pokemon, sheet }: StatSource, key: string): number 
 const STAT_KEYS = ['strength', 'dexterity', 'vitality', 'special', 'insight',
     'tough', 'cool', 'beauty', 'cute', 'clever'];
 
+/** Paralysis takes 2 points off Dexterity for as long as it lasts. */
+export const PARALYSIS_DEX = 2;
+
+/** What an ailment takes off an attribute right now — only paralysis does, and
+    only Dexterity. Read at every calculation rather than written into the
+    sheet, so curing it gives the points straight back. The dots on the stats
+    panel still show the Pokémon's own score. */
+export function statAilmentPenalty(
+    status: { major?: string | null } | null | undefined, key: string,
+): number {
+    return key === 'dexterity' && status && status.major === 'paralysis' ? PARALYSIS_DEX : 0;
+}
+
 /** One token of a pool string, or null when nothing on this sheet answers to it. */
 export function resolvePoolValue(src: StatSource, name: string): number | null {
     const token = name.trim().toLowerCase();
@@ -41,7 +54,8 @@ export function resolvePoolValue(src: StatSource, name: string): number | null {
     const { sheet } = src;
 
     if (STAT_KEYS.includes(token)) {
-        return getStatBase(src, token) + (sheet.trainedStats[token] || 0);
+        const own = getStatBase(src, token) + (sheet.trainedStats[token] || 0);
+        return Math.max(0, own - statAilmentPenalty(sheet.status, token));
     }
     if (token === 'will' || token === 'willpower') return getPoolMax(src, 'will');
     if (token === 'hp') return getPoolMax(src, 'hp');

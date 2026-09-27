@@ -112,7 +112,10 @@ for (const name of SPECIES) {
             if (!base) continue;
             checked++;
             const a = JSON.stringify(legacy.computeMoveTotals(legacy.applyMoveOverrides(base)));
-            const b = JSON.stringify(ported.computeMoveTotals(src, ported.applyMoveOverrides(sheet, base)));
+            /* `bonus` (STAB and a type item) is new on the card, and only
+               filled when an item lookup is passed — which this call does not. */
+            const { bonus: _bonus, ...totals } = ported.computeMoveTotals(src, ported.applyMoveOverrides(sheet, base));
+            const b = JSON.stringify(totals);
             if (a !== b) { bad++; console.log(`MISMATCH ${name} v${variant} move ${mn}\n  legacy ${a}\n  ported ${b}`); }
         }
     }
