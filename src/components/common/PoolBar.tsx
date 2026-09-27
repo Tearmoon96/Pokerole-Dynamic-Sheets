@@ -95,7 +95,7 @@ export function PoolBar({ current, max, colorClass, onSetCurrent, onSetMax, read
         <>
             <button
                 className="pool-btn"
-                title="Spend 1 (hold to repeat)"
+                aria-label="Spend 1"
                 onPointerDown={(e) => { e.preventDefault(); startStep(-1); }}
             >
                 <i className="fa-solid fa-minus"></i>
@@ -123,7 +123,7 @@ export function PoolBar({ current, max, colorClass, onSetCurrent, onSetMax, read
 
             <button
                 className="pool-btn"
-                title="Restore 1 (hold to repeat)"
+                aria-label="Restore 1"
                 onPointerDown={(e) => { e.preventDefault(); startStep(1); }}
             >
                 <i className="fa-solid fa-plus"></i>

@@ -4,6 +4,7 @@ import { photoAdjustVars, photoUploadDir, readPhotoFile } from '../../lib/photo'
 import { deleteCustomImage, readCustomImage } from '../../lib/fileSystem';
 import { EQUIP_SLOTS } from '../../state/constants';
 import type { TrainerState } from '../../state/types';
+import { showAlert } from '../../lib/dialog';
 
 /** Worn slots plus carried gear — what puts the dot on the Equipment pill. */
 export function equippedCount(sheet: TrainerState): number {
@@ -45,7 +46,7 @@ export function PhotoArch({ onAdjust, onOpenEquipment }: {
                 if (photoFile) s.photoFile = photoFile;
             });
         } catch (e) {
-            alert((e as Error).message);
+            void showAlert((e as Error).message);
         }
     };
 

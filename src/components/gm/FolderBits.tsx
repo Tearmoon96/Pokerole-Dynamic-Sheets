@@ -42,10 +42,10 @@ export function FolderBar({ folder, moved, count, canUp, canDown, onToggle, onRe
             />
             <span className="folder-count">{count}</span>
             <div className="folder-move">
-                <button disabled={!canUp} title="Move this folder up" onClick={() => onMove(-1)}>
+                <button disabled={!canUp} aria-label="Move this folder up" onClick={() => onMove(-1)}>
                     <i className="fa-solid fa-chevron-up"></i>
                 </button>
-                <button disabled={!canDown} title="Move this folder down" onClick={() => onMove(1)}>
+                <button disabled={!canDown} aria-label="Move this folder down" onClick={() => onMove(1)}>
                     <i className="fa-solid fa-chevron-down"></i>
                 </button>
             </div>
@@ -74,10 +74,10 @@ export function ItemMove({ folders, folder, canUp, canDown, onMove, onSetFolder,
 }) {
     return (
         <div className="item-move" onClick={(e) => e.stopPropagation()}>
-            <button disabled={!canUp} title={'Move ' + label + ' up'} onClick={() => onMove(-1)}>
+            <button disabled={!canUp} aria-label={'Move ' + label + ' up'} onClick={() => onMove(-1)}>
                 <i className="fa-solid fa-chevron-up"></i>
             </button>
-            <button disabled={!canDown} title={'Move ' + label + ' down'} onClick={() => onMove(1)}>
+            <button disabled={!canDown} aria-label={'Move ' + label + ' down'} onClick={() => onMove(1)}>
                 <i className="fa-solid fa-chevron-down"></i>
             </button>
             {/* Hidden entirely until there is somewhere to move to: a board

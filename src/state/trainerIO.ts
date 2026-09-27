@@ -5,6 +5,7 @@ import { markSaved, readTrainerOrder, trainerFileName, trainerJson } from './wor
 import { sortByOrder } from '../lib/reorder';
 import type { WorkingTrainer } from './workingSet';
 import { dirEntries, ensureWorkingFolderScaffold, getDirHandle, rememberDirHandle } from '../lib/fileSystem';
+import { showAlert } from '../lib/dialog';
 
 /* Reading and writing the trainer .json files.
 
@@ -192,7 +193,7 @@ export async function writeTrainerFile(
         try {
             if (dir.requestPermission) {
                 const perm = await dir.requestPermission({ mode: 'readwrite' });
-                if (perm !== 'granted') { alert('Write permission was denied.'); return null; }
+                if (perm !== 'granted') { void showAlert('Write permission was denied.', { title: 'Not saved', icon: 'fa-lock' }); return null; }
             }
             const h = await dir.getFileHandle(fname, { create: true });
             const w = await h.createWritable();
@@ -201,7 +202,7 @@ export async function writeTrainerFile(
             entry.handle = h;
             entry.fileName = h.name;
             return { message: '<i class="fa-solid fa-circle-check"></i> Saved ' + entry.fileName + ' to the folder' };
-        } catch (e) { alert('Could not save the file: ' + (e as Error).message); return null; }
+        } catch (e) { void showAlert('Could not save the file: ' + (e as Error).message, { title: 'Not saved', icon: 'fa-triangle-exclamation' }); return null; }
     }
 
     if (window.showSaveFilePicker) {

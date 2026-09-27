@@ -5,10 +5,11 @@
    and the trainer nav are both at the top, and the GM board's toast comes in at
    the top right.
 
-   Its colours are literals rather than the theme variables every other panel
-   uses, and that is on purpose: it is drawn on four pages whose palettes are set
-   by the loaded Pokemon's typing, so a themed bar would be a different colour on
-   every sheet and occasionally unreadable against the page behind it. */
+   Themed like the tooltip and the dialogs: the same strong panel, hairline
+   and text colours, so it reads as part of whichever palette the page is in —
+   the Pokemon's typing on the card, the chosen theme on the License. It used
+   hard-coded slate blues, which on every page but the GM board read as a
+   system bar dropped in from somewhere else. */
 .update-prompt {
     position: fixed;
     left: 50%;
@@ -27,18 +28,18 @@
     gap: 0.6rem;
     max-width: min(34rem, calc(100vw - 24px));
     padding: 0.55rem 0.7rem 0.55rem 0.85rem;
-    border: 1px solid #ffffff2e;
+    border: 1px solid var(--border-color);
     border-radius: 999px;
-    background: #171a21f2;
-    color: #e8eaf0;
+    background: var(--panel-strong);
+    color: var(--text-primary);
     font-family: inherit;
     font-size: 0.82rem;
-    box-shadow: 0 10px 30px #000000a6;
+    box-shadow: 0 10px 30px #000000a6, 0 0 18px 1px var(--border-glow);
 }
 
 .update-prompt-icon {
     flex: 0 0 auto;
-    color: #7dd3fc;
+    color: var(--accent);
     font-size: 0.85rem;
 }
 
@@ -59,25 +60,24 @@
 }
 
 .update-prompt-go {
-    border: 1px solid #38bdf8;
-    background: #38bdf82e;
-    color: #bae6fd;
+    border: 1px solid var(--ghost-color);
+    background: var(--primary-soft);
+    color: var(--text-primary);
 }
 
 .update-prompt-go:hover {
-    background: #38bdf84d;
-    color: #ffffff;
+    box-shadow: 0 0 10px var(--ghost-color-glow);
 }
 
 .update-prompt-later {
     border: 1px solid transparent;
     background: none;
-    color: #9aa3b2;
+    color: var(--text-secondary);
 }
 
 .update-prompt-later:hover {
-    border-color: #ffffff2e;
-    color: #e8eaf0;
+    border-color: var(--border-color);
+    color: var(--text-primary);
 }
 
 /* A phone has no room for a pill: full width, and the buttons get a line of
@@ -105,4 +105,10 @@
     .update-prompt-go {
         margin-left: auto;
     }
+}
+
+/* The light themes: a softer shadow, and a hairline dark enough to show */
+:where(:root.light-theme) .update-prompt {
+    border-color: #00000024;
+    box-shadow: 0 8px 24px #0000002e, 0 0 14px 1px var(--border-glow);
 }

@@ -315,7 +315,7 @@
     flex-direction: column;
     gap: 8px;
     padding: 10px 12px;
-    background: #0d0914f2;
+    background: var(--panel-strong);
     border: 1px solid var(--border-glow);
     border-radius: 12px;
     box-shadow: 0 8px 24px #000000cc;

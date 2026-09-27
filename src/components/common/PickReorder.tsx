@@ -19,14 +19,14 @@ export function PickReorder({ index, count, label, onMove }: {
         <span className="pick-reorder" onClick={(e) => e.stopPropagation()}>
             <button
                 disabled={index === 0}
-                title={'Move ' + label + ' up'}
+                aria-label={'Move ' + label + ' up'}
                 onClick={() => onMove(index, index - 1)}
             >
                 <i className="fa-solid fa-chevron-up"></i>
             </button>
             <button
                 disabled={index === count - 1}
-                title={'Move ' + label + ' down'}
+                aria-label={'Move ' + label + ' down'}
                 onClick={() => onMove(index, index + 1)}
             >
                 <i className="fa-solid fa-chevron-down"></i>

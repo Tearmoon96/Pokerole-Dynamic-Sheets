@@ -12,6 +12,7 @@ import {
 } from '../../lib/coreBook';
 import type { CoreBookVersion } from '../../lib/coreBook';
 import { isHostedOrigin } from '../../data/paths';
+import { showAlert, showConfirm } from '../../lib/dialog';
 
 /* The rulebook picker: pick an edition, then jump straight to a page.
 
@@ -82,7 +83,7 @@ export function ManualPicker({ open, onClose }: { open: boolean; onClose: () => 
 
     const chooseFolder = async () => {
         if (!window.showDirectoryPicker) {
-            alert('This browser cannot open a folder. Choosing the manuals folder needs the File '
+            void showAlert('This browser cannot open a folder. Choosing the manuals folder needs the File '
                 + 'System Access API (Chrome or Edge).');
             return;
         }
@@ -126,7 +127,7 @@ export function ManualPicker({ open, onClose }: { open: boolean; onClose: () => 
     const openManualAt = async (page: number) => {
         if (inFolder && await openCoreBookPdf(manual.file, page)) return;
         if (pdfMissing) {
-            alert('"' + manual.file + '" is not part of this site — the Core Book is not ours '
+            void showAlert('"' + manual.file + '" is not part of this site — the Core Book is not ours '
                 + 'to hand out.\n\nClick "Manuals folder" and choose the folder where you keep '
                 + 'your own copy, named exactly "' + manual.file + '".');
             return;
@@ -140,15 +141,15 @@ export function ManualPicker({ open, onClose }: { open: boolean; onClose: () => 
         const label = newVersion.trim();
         if (!label) return;
         if (/[\\/:*?"<>|]/.test(label)) {
-            alert('A version name can\'t contain any of \\ / : * ? " < > |');
+            void showAlert('A version name can\'t contain any of \\ / : * ? " < > |');
             return;
         }
         if (allManuals().some((m) => m.label.toLowerCase() === label.toLowerCase())) {
-            alert('A "v' + label + '" edition already exists.');
+            void showAlert('A "v' + label + '" edition already exists.');
             return;
         }
         if (!window.showDirectoryPicker) {
-            alert('This browser can\'t save new editions to the "' + CORE_BOOK_DIR_NAME
+            void showAlert('This browser can\'t save new editions to the "' + CORE_BOOK_DIR_NAME
                 + '" folder. New editions need the File System Access API (Chrome or Edge).');
             return;
         }
@@ -165,10 +166,12 @@ export function ManualPicker({ open, onClose }: { open: boolean; onClose: () => 
             setPendingLabel(null);
             return;
         }
-        if (!confirm('Delete the "v' + label + '" edition? Its quick-link file '
-            + '(' + manualJsonFor(label) + ') is removed from the Core Book folder.')) return;
+        if (!await showConfirm('Its quick-link file (' + manualJsonFor(label)
+            + ') is removed from the Core Book folder.', {
+            title: 'Delete the "v' + label + '" edition?', confirmLabel: 'Delete', danger: true,
+        })) return;
         if (!await deleteCoreBookVersionFile(label)) {
-            alert('Could not delete "' + manualJsonFor(label) + '" from the "'
+            void showAlert('Could not delete "' + manualJsonFor(label) + '" from the "'
                 + CORE_BOOK_DIR_NAME + '" folder. Grant access to that folder and try again.');
             return;
         }
@@ -504,7 +507,7 @@ function QuickLinkModal({ label, versions, onCancel, onSaved }: {
             if (!isNaN(page) && page >= 1) bookmarks.push({ icon: t.icon, label: t.label, page });
         });
         if (!await writeCoreBookVersion(label, bookmarks)) {
-            alert('Could not save "' + manualJsonFor(label) + '" to the "' + CORE_BOOK_DIR_NAME
+            void showAlert('Could not save "' + manualJsonFor(label) + '" to the "' + CORE_BOOK_DIR_NAME
                 + '" folder. Grant access to that folder and try again.');
             return;   // keep the form open so the entered pages aren't lost
         }

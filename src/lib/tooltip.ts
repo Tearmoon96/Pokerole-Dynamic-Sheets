@@ -9,7 +9,10 @@
    maths are what make it feel like a native hint rather than a popup. */
 
 export function installTooltips(): () => void {
-const SHOW_DELAY = 350;     // beats the native bubble to the punch
+/* Long enough that resting the pointer on a control between clicks, or
+   crossing a dense row on the way somewhere else, draws nothing. 350 did, and
+   every such hint landed on the line being read. */
+const SHOW_DELAY = 600;
 const LONG_PRESS = 500;     // touch: press-and-hold to reveal
 const TOUCH_LINGER = 3500;  // touch: auto-dismiss again
 const GAP = 10;             // between target and bubble
@@ -25,6 +28,10 @@ let body: HTMLSpanElement | null = null;
 let target: HTMLElement | null = null;   // element whose title we are holding
 let showTimer = 0, hideTimer = 0;
 let press: { x: number; y: number } | null = null;   // in-flight long press
+/* The element last pressed. Its hint stays down until the pointer leaves it:
+   the button has been found and used, and sliding onto its own label or icon
+   is a new pointerover that would otherwise draw the hint straight back. */
+let pressed: HTMLElement | null = null;
 let swallowClick = false;   // eat the click a long press would fire
 
 function tooltipBox(): HTMLDivElement {
@@ -89,31 +96,99 @@ function release(el: HTMLElement | null): void {
     if (t && !el.hasAttribute('title')) el.setAttribute('title', t);
 }
 
-function place(rect: DOMRect): void {
+/* Floating panels a hint must never be drawn over: an open popover, menu or
+   dropdown is what is being read or clicked while the pointer rests on its
+   anchor, and the anchor's hint landing on top of it hid the very button the
+   panel was opened for (the ailment popover's Roll row). Anything can opt in
+   with data-tt-avoid. A panel that CONTAINS the target is not an obstacle —
+   that is where the target lives. */
+const OBSTACLES = '[data-tt-avoid], [role="dialog"], [role="listbox"], [role="menu"], '
+    + '.move-suggestions, .filter-picker-menu, .def-offset-pop';
+
+function obstacles(el: HTMLElement): DOMRect[] {
+    const out: DOMRect[] = [];
+    document.querySelectorAll<HTMLElement>(OBSTACLES).forEach((o) => {
+        if (o.contains(el) || o === box) return;
+        const r = o.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) out.push(r);
+    });
+    return out;
+}
+
+const overlaps = (a: { left: number; top: number; right: number; bottom: number }, b: DOMRect) =>
+    a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+
+type Side = 'above' | 'below' | 'right' | 'left';
+
+/* Above the target, then below, then beside it — the first side that fits
+   the viewport and clears every open panel. False when none does: no hint
+   beats one drawn over a popover. */
+function place(el: HTMLElement): boolean {
     const box = tooltipBox();
-    box.classList.remove('below');
+    box.classList.remove('below', 'right', 'left');
     box.style.left = '0px';
     box.style.top = '0px';
     const w = box.offsetWidth, h = box.offsetHeight;
+    const rect = el.getBoundingClientRect();
+    const blocks = obstacles(el);
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    const clampX = (x: number) => Math.max(EDGE, Math.min(x, window.innerWidth - w - EDGE));
+    const clampY = (y: number) => Math.max(EDGE, Math.min(y, window.innerHeight - h - EDGE));
 
-    const below = rect.top - GAP - h < EDGE;
-    box.classList.toggle('below', below);
-    let top = below ? rect.bottom + GAP : rect.top - GAP - h;
-    top = Math.max(EDGE, Math.min(top, window.innerHeight - h - EDGE));
+    const spot = (side: Side): { left: number; top: number } | null => {
+        let left: number, top: number;
+        if (side === 'above' || side === 'below') {
+            top = side === 'above' ? rect.top - GAP - h : rect.bottom + GAP;
+            if (top < EDGE || top + h > window.innerHeight - EDGE) return null;
+            left = clampX(cx - w / 2);
+        } else {
+            left = side === 'right' ? rect.right + GAP : rect.left - GAP - w;
+            if (left < EDGE || left + w > window.innerWidth - EDGE) return null;
+            top = clampY(cy - h / 2);
+        }
+        const r = { left, top, right: left + w, bottom: top + h };
+        return blocks.some((b) => overlaps(r, b)) ? null : { left, top };
+    };
 
-    const centre = rect.left + rect.width / 2;
-    const left = Math.max(EDGE, Math.min(centre - w / 2, window.innerWidth - w - EDGE));
+    const order: Side[] = ['above', 'below', 'right', 'left'];
+    let side: Side | null = null, at: { left: number; top: number } | null = null;
+    for (const s of order) {
+        at = spot(s);
+        if (at) { side = s; break; }
+    }
+    if (!side || !at) {
+        /* A target taller than the room either side of it, with nothing open
+           around it: pin to the nearer edge as before rather than drop it. */
+        if (blocks.length) return false;
+        side = rect.top - GAP - h < EDGE ? 'below' : 'above';
+        at = {
+            left: clampX(cx - w / 2),
+            top: clampY(side === 'below' ? rect.bottom + GAP : rect.top - GAP - h),
+        };
+    }
 
-    box.style.left = Math.round(left) + 'px';
-    box.style.top = Math.round(top) + 'px';
-    /* The arrow tracks the target, not the bubble's own centre, so
-       it still points at the right thing after an edge clamp */
+    if (side !== 'above') box.classList.add(side);
+    box.style.left = Math.round(at.left) + 'px';
+    box.style.top = Math.round(at.top) + 'px';
+    /* The arrow tracks the target, not the bubble's own centre, so it still
+       points at the right thing after an edge clamp */
     box.style.setProperty('--tt-arrow-x',
-        Math.round(Math.max(12, Math.min(centre - left, w - 12))) + 'px');
+        Math.round(Math.max(12, Math.min(cx - at.left, w - 12))) + 'px');
+    box.style.setProperty('--tt-arrow-y',
+        Math.round(Math.max(10, Math.min(cy - at.top, h - 10))) + 'px');
+    return true;
 }
 
-function render(el: HTMLElement, text: string): void {
-    if (!el.isConnected) return;
+/* A hint that only repeats the element's own visible text — a name in a
+   narrow column — says nothing unless that text is cut off. */
+function redundant(el: HTMLElement, text: string): boolean {
+    const own = (el.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!own || own !== text.replace(/\s+/g, ' ').trim()) return false;
+    return el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1;
+}
+
+function render(el: HTMLElement, text: string): boolean {
+    if (!el.isConnected) return false;
     if (!box) build();
     const bx = box!, hd = head!, bd = body!;
     const nl = text.indexOf('\n');
@@ -126,8 +201,12 @@ function render(el: HTMLElement, text: string): void {
         bd.textContent = text;
         bx.append(bd);
     }
-    place(el.getBoundingClientRect());
+    if (redundant(el, text) || !place(el)) {
+        bx.classList.remove('show');
+        return false;
+    }
     bx.classList.add('show');
+    return true;
 }
 
 function hide() {
@@ -143,7 +222,7 @@ document.addEventListener('pointerover', (e: PointerEvent) => {
     const el = hintOwner(e.target);
     if (el === target) return;
     hide();
-    if (!el) return;
+    if (!el || el === pressed) return;
     const text = claim(el);   // strip now, draw after the delay
     if (!text) return;
     target = el;
@@ -153,6 +232,7 @@ document.addEventListener('pointerover', (e: PointerEvent) => {
 document.addEventListener('pointerout', (e: PointerEvent) => {
     /* Sliding onto a child of the same target isn't leaving it;
        a genuine switch is handled by pointerover above */
+    if (pressed && !(e.relatedTarget && pressed.contains(e.relatedTarget as Node))) pressed = null;
     if (!target || (e.relatedTarget && target.contains(e.relatedTarget as Node))) return;
     hide();
 }, true);
@@ -160,8 +240,8 @@ document.addEventListener('pointerout', (e: PointerEvent) => {
 document.addEventListener('pointerdown', (e: PointerEvent) => {
     hide();
     swallowClick = false;
-    if (e.pointerType === 'mouse') return;
     const el = hintOwner(e.target);
+    if (e.pointerType === 'mouse') { pressed = el; return; }
     if (!el) return;
     /* Never preventDefault here: taps, drags and the hold-to-repeat
        pool buttons have to keep working exactly as before */
@@ -170,7 +250,7 @@ document.addEventListener('pointerdown', (e: PointerEvent) => {
         const text = claim(el);
         if (!text) return;
         target = el;
-        render(el, text);
+        if (!render(el, text)) return;
         /* Reading a hint shouldn't also press the button, so the
            click this press ends in is dropped */
         swallowClick = true;

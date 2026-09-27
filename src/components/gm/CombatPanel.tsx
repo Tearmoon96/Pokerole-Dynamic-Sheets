@@ -111,15 +111,21 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
     const rollInitiative = (token: string, pid: string) => {
         const ref = entityRef(state, dexById, token);
         if (!ref || ref.kind === 'custom') return;
+        /* The roll is made on the Dexterity the subject has now, paralysis
+           included, so the history shows what it really rolled. The FIELD keeps
+           the unparalysed number and the row shifts it for display, so curing
+           the paralysis later puts the 2 back without a re-roll. */
         const bonus = ref.value('Dexterity') + ref.value('Alert');
+        const mod = initOffset(ref.status);
         store.update((s) => {
             const entry = roll(1, 6, { who: ref.name, what: 'Initiative', bonus }, CRIT_MARGIN);
+            const raw = entry.total - mod;
             s.dice = { ...s.dice, history: [entry, ...s.dice.history].slice(0, HISTORY_LIMIT) };
             s.combats = s.combats.map((c) => (c.gid === gid ? {
                 ...c,
                 participants: c.participants.map((p) =>
                     ((p as unknown as Record<string, string>).pid === pid
-                        ? { ...p, init: entry.total } : p)),
+                        ? { ...p, init: raw } : p)),
             } : c));
         });
     };
@@ -205,7 +211,7 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
             onReorder={onReorder}
             actions={
                 <>
-                    <span className="round-pill" title="Current round">
+                    <span className="round-pill">
                         <i className="fa-solid fa-rotate"></i> Round <span id="round-num">{round}</span>
                     </span>
                     <button
@@ -413,12 +419,11 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
 const USED_MARKS: { key: 'usedClash' | 'usedEva'; label: string; icon: string; tip: string }[] = [
     {
         key: 'usedClash', label: 'CLASH', icon: 'fa-hand-fist',
-        tip: 'Clash — once per Round, whichever of the two pools it was rolled off. '
-            + 'Click when it is used; advancing the Round clears it.',
+        tip: 'Once per Round — click when used',
     },
     {
         key: 'usedEva', label: 'EVA', icon: 'fa-person-running',
-        tip: 'Evasion — once per Round. Click when it is used; advancing the Round clears it.',
+        tip: 'Once per Round — click when used',
     },
 ];
 
@@ -507,7 +512,7 @@ function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit,
                     {canRollInit && (
                         <button
                             className="icon-btn c-init-roll"
-                            title={'Roll initiative: 1d6 + ' + initBonus + ' (Dexterity + Alert)'}
+                            title={'Roll 1d6 + ' + initBonus + ' (Dexterity + Alert)'}
                             onClick={onRollInit}
                         >
                             <i className="fa-solid fa-dice-d6"></i>
@@ -537,7 +542,6 @@ function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit,
                             <span
                                 key={i}
                                 className={'pip ' + (i < acted ? 'used' : '')}
-                                title={acted + '/' + MAX_ACTIONS + ' actions used'}
                                 onClick={() => onPip(i)}
                             />
                         ))}
@@ -555,7 +559,7 @@ function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit,
                                     key={m.key}
                                     className={'used-mark' + (on ? ' on' : '')}
                                     aria-pressed={on}
-                                    title={m.tip + (on ? ' — used this Round.' : '')}
+                                    title={on ? 'Used this Round' : m.tip}
                                     onClick={() => onUsed(m.key)}
                                 >
                                     <i className={'fa-solid ' + m.icon}></i>{m.label}
@@ -569,10 +573,10 @@ function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit,
                     finger-sized one, without the DOM changing under React. */}
                 <div className="c-actions">
                     <div className="c-move">
-                        <button disabled={idx === 0} title="Move up" onClick={() => onMove(-1)}>
+                        <button disabled={idx === 0} aria-label="Move up" onClick={() => onMove(-1)}>
                             <i className="fa-solid fa-chevron-up"></i>
                         </button>
-                        <button disabled={idx === total - 1} title="Move down" onClick={() => onMove(1)}>
+                        <button disabled={idx === total - 1} aria-label="Move down" onClick={() => onMove(1)}>
                             <i className="fa-solid fa-chevron-down"></i>
                         </button>
                     </div>
@@ -620,18 +624,16 @@ function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit,
                                     color: f.ail.color,
                                     background: f.ail.color + '1a',
                                 }}
-                                title={f.ail.name + (f.damage
-                                    ? ` · deal ${f.damage} damage at the end of this Round`
-                                      + (dealt ? ' (already dealt)' : '') : '')}
+                                /* No hint: hovering the flag opens the ailment
+                                   popover, which says all of it, and a hint drawn
+                                   on top of that covered its Roll button. */
                             >
                                 <i className={'fa-solid ' + f.ail.icon}></i>{f.ail.name}
                                 {!!f.damage && <span className="dmg">−{f.damage} HP</span>}
                                 {canDeal && (
                                     <button
                                         className="dmg-apply"
-                                        title={dealt
-                                            ? 'Already dealt this Round — click to deal it again'
-                                            : 'Deal ' + f.damage + ' damage to ' + ref!.name}
+                                        title={dealt ? 'Dealt this Round — click to deal again' : 'Deal the damage'}
                                         onClick={(e) => onDeal(token, f.ail.key, f.damage, e)}
                                     >
                                         <i className={'fa-solid ' + (dealt ? 'fa-check' : 'fa-heart-crack')}></i>

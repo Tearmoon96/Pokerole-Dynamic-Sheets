@@ -13,6 +13,7 @@ import { readPendingRestore } from './store';
 import { sessionToTrainers, verifyRestoreAgainstDisk } from './restore';
 import type { DiskTrainer, RestoreConflict, StoredSession } from './restore';
 import { useToast } from '../components/common/Toast';
+import { showAlert } from '../lib/dialog';
 
 /* Session-level actions: which trainers are loaded, where they came from, and
    everything that writes them back to disk.
@@ -127,7 +128,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
         const { loaded, diag, error, cancelled } = await pickWorkingFolder();
         if (cancelled) return;
-        if (error) { alert(error); return; }
+        if (error) { void showAlert(error); return; }
         adopt(loaded, diag);
     }, [adopt]);
 
@@ -145,8 +146,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const outcome = await saveAllTrainers(store.trainers);
         store.save();
         store.notify();
-        if (!outcome.ok && !outcome.downloaded) { alert(outcome.message); return; }
-        if (!outcome.ok && outcome.downloaded) { alert(outcome.message); return; }
+        if (!outcome.ok && !outcome.downloaded) { void showAlert(outcome.message); return; }
+        if (!outcome.ok && outcome.downloaded) { void showAlert(outcome.message); return; }
         toast(outcome.message);
     }, [store, toast]);
 
@@ -222,7 +223,7 @@ export async function createTrainerFile(
     fileName: string, toast: (html: string) => void,
 ): Promise<WorkingTrainer | null> {
     let fname = fileName.trim();
-    if (!fname) { alert('Please name the file.'); return null; }
+    if (!fname) { void showAlert('Please name the file.'); return null; }
     if (!fname.toLowerCase().endsWith('.json')) fname += '.json';
 
     const fresh = defaultState();

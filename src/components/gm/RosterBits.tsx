@@ -25,7 +25,8 @@ export function PoolBar({ tag, cls, cur, max, onStep }: {
         <button
             className={'pool-step ' + klass}
             tabIndex={-1}
-            title={sign + ' 1 ' + tag + ' (shift: 5)'}
+            aria-label={sign + ' 1 ' + tag}
+            title="Shift-click: 5"
             onClick={(e) => onStep(delta, e)}
         >
             {sign}

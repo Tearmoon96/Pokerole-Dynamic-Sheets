@@ -6,6 +6,7 @@ import {
 } from '../../card/wild';
 import { cardStorageKey } from '../../card/cardContext';
 import type { CardMove } from '../../card/moves';
+import { showConfirm } from '../../lib/dialog';
 
 /* Save / Export / Import / Reset, shown only on a wild card.
 
@@ -102,11 +103,13 @@ export function WildActions({ onImportFolder, evolveControls }: {
        creature, and keeping the link would have the next Save silently overwrite
        the file of the one just discarded. */
     const reset = async () => {
-        const confirmText = 'Reset this sheet?\n\nStats, skills, moves, notes, HP and Will all go back to a fresh '
+        const confirmText = 'Stats, skills, moves, notes, HP and Will all go back to a fresh '
             + pokemon.Name + '. This cannot be undone.'
             + (handle ? '\n\nThe link to ' + handle.name
                 + ' is cleared too, so the next Save asks where to put the new one.' : '');
-        if (!confirm(confirmText)) return;
+        if (!await showConfirm(confirmText, {
+            title: 'Reset this sheet?', icon: 'fa-rotate-left', confirmLabel: 'Reset', danger: true,
+        })) return;
         try { localStorage.removeItem(cardStorageKey(ctx, pokemon._id)); } catch { /* private mode */ }
         await forgetWildFileHandle(ctx.wildId);
         location.reload();

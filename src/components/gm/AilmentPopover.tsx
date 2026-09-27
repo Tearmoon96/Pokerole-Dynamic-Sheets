@@ -180,7 +180,7 @@ export function AilmentPopover() {
         : null;
 
     return (
-        <div className="ail-pop open" id="ail-pop" ref={ref}>
+        <div className="ail-pop open" id="ail-pop" ref={ref} data-tt-avoid>
             <div className="ail-pop-head" style={{ color: ail.color }}>
                 <i className={'fa-solid ' + ail.icon}></i> {ail.name}
                 <span className="ail-pop-mod" style={{ background: ail.color, color: inkOn(ail.color) }}>

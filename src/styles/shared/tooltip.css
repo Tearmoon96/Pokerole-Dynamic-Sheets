@@ -88,3 +88,27 @@
     border-right: none;
 }
 
+
+/* Beside the target — above and below were both taken by an open panel.
+   The arrow sits on the edge facing the target, at --tt-arrow-y. */
+#app-tooltip.right::after,
+#app-tooltip.left::after {
+    left: auto;
+    bottom: auto;
+    top: var(--tt-arrow-y, 50%);
+    margin-left: 0;
+    margin-top: -5px;
+    border: 1px solid var(--border-color);
+}
+
+#app-tooltip.right::after {
+    left: -5px;
+    border-top: none;
+    border-right: none;
+}
+
+#app-tooltip.left::after {
+    right: -5px;
+    border-bottom: none;
+    border-left: none;
+}

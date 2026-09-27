@@ -138,7 +138,7 @@
             var(--border-glow) 0%, transparent 100%);
 }
 
-/* Pop-overs were near-opaque #0d0914; they become the light panel */
+/* The pop-overs sit on --panel-strong already; the light panel needs a lighter shadow */
 :where(:root.light-theme) .sprite-scale-editor,
 :where(:root.light-theme) .def-offset-pop {
     background: var(--panel-strong);

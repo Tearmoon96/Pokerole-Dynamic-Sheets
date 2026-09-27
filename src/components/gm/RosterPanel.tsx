@@ -286,7 +286,6 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                             </div>
                             <i
                                 className={'fa-solid fa-caret-' + (open ? 'down' : 'right') + ' trainer-toggle'}
-                                title={(open ? 'Hide' : 'Show') + " this trainer's Pokémon"}
                             />
                         </div>
 

@@ -261,7 +261,7 @@ function NpcRow({ npc, natures, nature, onNote, onNature, onRoll, onRemove }: {
             {nature && (
                 <div
                     className={'npc-desc' + (clipped ? ' clipped' : '')}
-                    title="Click to expand"
+                    title={clipped ? 'Click to expand' : undefined}
                     onClick={() => setClipped((v) => !v)}
                 >
                     {nature.Description}

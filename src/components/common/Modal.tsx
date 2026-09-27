@@ -26,6 +26,9 @@ export function Modal({ open, onClose, boxClassName, boxStyle, id, zIndex, child
         escStack.push(onClose);
         const onKey = (e: KeyboardEvent) => {
             if (e.key !== 'Escape') return;
+            /* A confirm raised from inside this dialog is above it and answers
+               the press itself; closing the dialog under it too would lose it. */
+            if (document.querySelector('.gm-overlay.open')) return;
             const top = escStack[escStack.length - 1];
             if (top !== onClose) return;   // an inner dialog owns this press
             e.stopPropagation();
@@ -57,7 +60,7 @@ export function Modal({ open, onClose, boxClassName, boxStyle, id, zIndex, child
 /** The × every dialog carries in its top corner. */
 export function ModalClose({ onClick }: { onClick: () => void }) {
     return (
-        <button className="modal-close-btn" onClick={onClick} title="Close">
+        <button className="modal-close-btn" onClick={onClick} aria-label="Close">
             <i className="fa-solid fa-xmark"></i>
         </button>
     );

@@ -33,6 +33,7 @@ import { wildSheetKey } from '../../card/cardContext';
 import { readSpriteFile, spriteUploadDir } from '../../card/customSprite';
 import type { CardMove } from '../../card/moves';
 import { HomeButton } from '../common/HomeButton';
+import { showAlert } from '../../lib/dialog';
 
 /* The whole Pokémon card.
 
@@ -197,7 +198,7 @@ export function CardApp() {
                 s.spriteType = 'Custom';
             });
         } catch (e) {
-            alert((e as Error).message);
+            void showAlert((e as Error).message);
         }
     };
 

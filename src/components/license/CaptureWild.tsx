@@ -6,6 +6,7 @@ import { WILD_MARKER, BOX_CAPACITY } from '../../state/constants';
 import { genUid } from '../../state/defaults';
 import { activeBoxIdx } from '../../state/boxes';
 import type { MonEntry, TrainerState } from '../../state/types';
+import { showAlert } from '../../lib/dialog';
 
 /** Import a wild Pokémon JSON, exported from a Pokémon card, into this trainer. */
 export function CaptureWildButton() {
@@ -17,11 +18,11 @@ export function CaptureWildButton() {
     const capture = async (file: File) => {
         let parsed: Record<string, unknown>;
         try { parsed = JSON.parse(await file.text()); }
-        catch { alert('That file is not valid JSON.'); return; }
+        catch { void showAlert('That file is not valid JSON.', { title: 'Cannot open that file', icon: 'fa-file-circle-xmark' }); return; }
 
         if (!parsed || !parsed[WILD_MARKER] || !parsed.dexId) {
-            alert('That is not a wild Pokémon file.\n\nExport one from a Pokémon card '
-                + '(Manage a Wild Pokémon → Export Wild Pokémon).');
+            void showAlert('That is not a wild Pokémon file.\n\nExport one from a Pokémon card '
+                + '(Manage a Wild Pokémon → Export Wild Pokémon).', { title: 'Cannot open that file', icon: 'fa-file-circle-xmark' });
             return;
         }
 
@@ -61,7 +62,7 @@ export function CaptureWildButton() {
                 + ' — team was full, sent to ' + escapeHtml(s.boxes[target].name) + '.';
         });
 
-        if (failure) alert(failure);
+        if (failure) void showAlert(failure);
         else if (message) toast(message);
     };
 

@@ -5,7 +5,7 @@ import { CRIT_MARGIN } from '../../gm/constants';
 import { HISTORY_LIMIT, roll } from '../../gm/dice';
 import type { RollMeta } from '../../gm/dice';
 import {
-    ROLLABLE_QUICK, computeMoveTotals, ordSuffix, painFromHp, painPenalty, pinnedMoveObjects,
+    ROLLABLE_QUICK, computeMoveTotals, painFromHp, painPenalty, pinnedMoveObjects,
 } from '../../gm/moves';
 import { resolvePoolValue } from '../../gm/pools';
 import {
@@ -59,7 +59,7 @@ function QuickRolls({ who, value, pain, doRoll }: {
             <button
                 key={key}
                 className="tip-roll"
-                title={tip + ' — click to roll ' + dice + 'd6'}
+                title={tip}
                 onClick={() => doRoll(dice, { who, what, pain })}
             >
                 {body}
@@ -72,7 +72,7 @@ function QuickRolls({ who, value, pain, doRoll }: {
             <button
                 key="init"
                 className="tip-roll"
-                title={'Dexterity + Alert — click to roll 1d6 + ' + initBonus}
+                title="Dexterity + Alert"
                 onClick={() => doRoll(1, { who, what: 'Initiative', bonus: initBonus })}
             >
                 INIT <strong>1d6+{initBonus}</strong>
@@ -95,10 +95,7 @@ function PainChip({ pain }: { pain: number }) {
     return (
         <span
             className="tip-pain"
-            title={'At half HP or less every Skill, Accuracy and Damage roll loses a success; '
-                + 'at 1 HP it loses two. It comes off the successes, not the pool, and every roll '
-                + 'started from this panel already has it taken off — the struck-out dice in the '
-                + 'result are the ones it cost.'}
+            title="Half HP or less: −1 success on every roll, −2 at 1 HP. Already taken off rolls made here."
         >
             PAIN −{pain}
         </span>
@@ -216,8 +213,8 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
         const tPart = participantForToken(state, dexById, token);
         const tAct = tPart ? Math.max(1, (tPart.acted as number) || 0) : null;
         return (
-            <div className="mon-tooltip" id="mon-tooltip" ref={ref} style={{ display: 'block' }}>
-                <button className="tip-close" title="Close" onClick={onClose}>
+            <div className="mon-tooltip" id="mon-tooltip" ref={ref} style={{ display: 'block' }} data-tt-avoid>
+                <button className="tip-close" aria-label="Close" onClick={onClose}>
                     <i className="fa-solid fa-xmark"></i>
                 </button>
                 <div className="tip-head">{asTrainer.name}</div>
@@ -234,12 +231,7 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
                     <PainChip pain={tPain} />
                 </div>
                 {tAct && (
-                    <div
-                        className="tip-action"
-                        title={`Each action in a round is harder than the last: the ${tAct}${ordSuffix(tAct)} `
-                            + `needs ${tAct} ${tAct === 1 ? 'success' : 'successes'} to land. Advancing `
-                            + 'the round resets it.'}
-                    >
+                    <div className="tip-action">
                         Action <strong>{tAct}</strong> · needs{' '}
                         <strong>{tAct}</strong> {tAct === 1 ? 'success' : 'successes'}
                     </div>
@@ -259,8 +251,8 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
 
     if (!dex) {
         return (
-            <div className="mon-tooltip" id="mon-tooltip" ref={ref} style={{ display: 'block' }}>
-                <button className="tip-close" title="Close" onClick={onClose}>
+            <div className="mon-tooltip" id="mon-tooltip" ref={ref} style={{ display: 'block' }} data-tt-avoid>
+                <button className="tip-close" aria-label="Close" onClick={onClose}>
                     <i className="fa-solid fa-xmark"></i>
                 </button>
                 <div className="tip-empty">Species data unavailable.</div>
@@ -286,8 +278,8 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
     const types = [dex.Type1, dex.Type2].filter(Boolean).join(' / ');
 
     return (
-        <div className="mon-tooltip" id="mon-tooltip" ref={ref} style={{ display: 'block' }}>
-            <button className="tip-close" title="Close" onClick={onClose}>
+        <div className="mon-tooltip" id="mon-tooltip" ref={ref} style={{ display: 'block' }} data-tt-avoid>
+            <button className="tip-close" aria-label="Close" onClick={onClose}>
                 <i className="fa-solid fa-xmark"></i>
             </button>
             <div className="tip-head">{who}</div>
@@ -298,12 +290,7 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
             </div>
 
             {act && (
-                <div
-                    className="tip-action"
-                    title={`Each action in a round is harder than the last: the ${act.n}${ordSuffix(act.n)} `
-                        + `needs ${need} ${need === 1 ? 'success' : 'successes'} to land. The Accuracy pool `
-                        + 'itself does not change. Advancing the round resets it.'}
-                >
+                <div className="tip-action">
                     Action <strong>{act.n}</strong> · needs{' '}
                     <strong>{need}</strong> {need === 1 ? 'success' : 'successes'}
                 </div>
@@ -318,16 +305,10 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
                 const tc = typeColors[move.Type] || '#e5e7eb';
                 const cc = CAT_COLORS[move.Category || ''] || 'var(--text-secondary)';
 
-                /* The Accuracy pool is the move's own and does not move with the
-                   round; only the number of successes it has to make does. */
-                const accTip = totals.accN == null ? 'This move has no Accuracy pool'
-                    : act ? `Accuracy ${totals.acc} — needs ${need} `
-                            + `${need === 1 ? 'success' : 'successes'} on action ${act.n}`
-                          : `Accuracy ${totals.acc}`;
-                const dmgTip = 'Damage ' + (totals.powN == null ? '—' : totals.powN)
-                    + (totals.bonus.parts.length
-                        ? ' (includes ' + totals.bonus.parts.map((b) => b.label + ' +' + b.value).join(', ') + ')'
-                        : '');
+                /* No hints on the pools or the bonus chips. The action line
+                   above already says how many successes this round needs, and
+                   the chips beside DMG are what it includes — the hints only
+                   repeated both, drawn over the move above. */
                 const accText = totals.acc == null ? '—' : totals.acc;
 
                 return (
@@ -347,24 +328,23 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
                             {(totals.accN ?? 0) > 0 ? (
                                 <button
                                     className="tip-pool acc"
-                                    title={accTip + ' — click to roll'}
                                     onClick={() => doRoll(totals.accN!, {
                                         who, what: move.Name + ' accuracy', need, pain,
                                         /* carried so a hit can roll the damage in one
                                            more click, and a critical already boosted */
                                         dmg: (totals.powN ?? 0) > 0
-                                            ? { token, mi, dice: totals.powN! } : null,
+                                            ? { token, mi, dice: totals.powN!, what: move.Name + ' damage' }
+                                            : null,
                                     })}
                                 >
                                     ACC <strong>{accText}</strong>
                                 </button>
                             ) : (
-                                <span className="tip-pool acc" title={accTip}>ACC <strong>{accText}</strong></span>
+                                <span className="tip-pool acc">ACC <strong>{accText}</strong></span>
                             )}
                             {(totals.powN ?? 0) > 0 ? (
                                 <button
                                     className="tip-pool dmg"
-                                    title={dmgTip + ' — click to roll'}
                                     onClick={() => doRoll(totals.powN!, {
                                         who, what: move.Name + ' damage', pain,
                                     })}
@@ -372,16 +352,12 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
                                     DMG <strong>{totals.pow}</strong>
                                 </button>
                             ) : (
-                                <span className="tip-pool dmg" title={dmgTip}>
+                                <span className="tip-pool dmg">
                                     DMG <strong>{totals.pow == null ? '—' : totals.pow}</strong>
                                 </span>
                             )}
                             {totals.bonus.parts.map((b) => (
-                                <span
-                                    className="tip-bonus"
-                                    key={b.label}
-                                    title={b.label + ' adds ' + b.value + ' to the damage pool'}
-                                >
+                                <span className="tip-bonus" key={b.label}>
                                     {b.label} +{b.value}
                                 </span>
                             ))}
