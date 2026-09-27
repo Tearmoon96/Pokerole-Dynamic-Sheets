@@ -38,8 +38,10 @@
 }
 
 /* The words on the bar's buttons go first when the window narrows; the
-   glyphs stay, and each button keeps its hint. */
-@media (max-width: 1320px) {
+   glyphs stay, and each button keeps its hint. The bar is exactly full at
+   about 1480px with the words showing; any narrower and .map-settings (which
+   may shrink, though its buttons cannot) is painted over by the next group. */
+@media (max-width: 1480px) {
     .map-btn-text { display: none; }
 }
 

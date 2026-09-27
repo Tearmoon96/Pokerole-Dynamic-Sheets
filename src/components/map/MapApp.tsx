@@ -9,6 +9,7 @@ import { cleanSize } from '../../map/brushes';
 import { slotOf } from '../../map/store';
 import { MapListDialog, SpriteChecklist } from './MapDialogs';
 import { HotkeysDialog } from './HotkeysDialog';
+import { RecipeDialog } from './RecipeDialog';
 import { actionFor } from '../../map/hotkeys';
 import type { HotkeyAction } from '../../map/hotkeys';
 import type { Tool } from '../../map/types';
@@ -25,7 +26,7 @@ function typing(target: EventTarget | null): boolean {
 export function MapApp({ dataOk }: { dataOk: boolean }) {
     const { store, doc } = useMap();
     const toast = useToast();
-    const [dialog, setDialog] = useState<'maps' | 'sprites' | 'hotkeys' | null>(null);
+    const [dialog, setDialog] = useState<'maps' | 'sprites' | 'hotkeys' | 'recipe' | null>(null);
     const [spaceHeld, setSpaceHeld] = useState(false);
 
     useEffect(() => {
@@ -120,6 +121,7 @@ export function MapApp({ dataOk }: { dataOk: boolean }) {
                 onMaps={() => setDialog('maps')}
                 onSprites={() => setDialog('sprites')}
                 onHotkeys={() => setDialog('hotkeys')}
+                onRecipe={() => setDialog('recipe')}
             />
             {!dataOk && (
                 <div id="data-missing" style={{ display: 'block' }}>
@@ -132,9 +134,10 @@ export function MapApp({ dataOk }: { dataOk: boolean }) {
                 <MapCanvas spaceHeld={spaceHeld} />
                 <SidePanel />
             </div>
-            <MapListDialog open={dialog === 'maps'} onClose={() => setDialog(null)} />
+            <MapListDialog open={dialog === 'maps'} onClose={() => setDialog(null)} onRecipe={() => setDialog('recipe')} />
             <SpriteChecklist open={dialog === 'sprites'} onClose={() => setDialog(null)} />
             <HotkeysDialog open={dialog === 'hotkeys'} onClose={() => setDialog(null)} />
+            <RecipeDialog open={dialog === 'recipe'} onClose={() => setDialog(null)} />
         </>
     );
 }

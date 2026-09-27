@@ -18,8 +18,8 @@ function escapeHtml(s: string): string {
     return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 }
 
-export function MapTopBar({ onMaps, onSprites, onHotkeys }: {
-    onMaps: () => void; onSprites: () => void; onHotkeys: () => void;
+export function MapTopBar({ onMaps, onSprites, onHotkeys, onRecipe }: {
+    onMaps: () => void; onSprites: () => void; onHotkeys: () => void; onRecipe: () => void;
 }) {
     const { store, doc } = useMap();
     useHotkeys();
@@ -151,6 +151,9 @@ export function MapTopBar({ onMaps, onSprites, onHotkeys }: {
             <span className="spacer"></span>
             <span className={'session-status' + (status.warn ? ' warn' : '')}>{status.text}</span>
             <div className="session-actions">
+                <button className="icon-btn" onClick={onRecipe} title="Map from a description: a chat assistant draws it from your words">
+                    <i className="fa-solid fa-scroll"></i>
+                </button>
                 <button className="icon-btn" onClick={onSprites} title="Sprite checklist: which art the page has found">
                     <i className="fa-solid fa-images"></i>
                 </button>

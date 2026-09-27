@@ -62,6 +62,9 @@
 
 .map-dialog button.accent { width: 100%; padding: 0.45rem; font-size: 0.85rem; margin-top: 0.3rem; }
 .map-new-btn { margin-bottom: 0.6rem; }
+.map-new-row { display: flex; gap: 0.4rem; }
+.map-new-row .map-new-btn { flex: 1 1 0; margin-top: 0.3rem; padding: 0.45rem; font-size: 0.85rem; }
+.map-dialog .map-new-row button.accent { width: auto; }
 
 .map-new {
     padding: 0.7rem;
@@ -238,3 +241,54 @@
     box-shadow: 0 0 8px var(--accent-glow);
     font-style: italic;
 }
+
+/* ---------------- Map from a description ---------------- */
+
+.modal-box.map-recipe { width: min(40rem, calc(100vw - 2rem)); }
+
+.map-recipe-intro { margin: -0.3rem 0 0.2rem; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.45; }
+
+.map-recipe-mode { margin-bottom: 0.6rem; }
+.map-recipe-mode button { font-size: 0.78rem; padding: 0.38rem 0.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.map-recipe-settings { margin-bottom: 0.2rem; }
+.map-recipe-settings .map-chips { margin-bottom: 0.5rem; }
+
+.map-recipe-actions { display: flex; gap: 0.4rem; align-items: stretch; }
+.map-recipe-actions button { flex: 1 1 0; margin-top: 0; padding: 0.45rem; font-size: 0.85rem; }
+.map-dialog .map-recipe-actions button.accent { width: auto; margin-top: 0; }
+
+.map-recipe-reply { font-family: 'Fira Code', ui-monospace, monospace; font-size: 0.74rem !important; }
+
+.map-recipe-note { margin: 0.4rem 0 0; font-size: 0.78rem; color: var(--text-secondary); }
+.map-recipe-note.inline { display: inline; }
+.map-recipe-note.ok i, .map-recipe-note.ok { color: var(--ok); }
+.map-recipe-note.warn i { color: var(--crit); }
+.map-recipe-note.bad { color: var(--danger); }
+
+.map-recipe-check { margin-bottom: 0.4rem; }
+
+.map-recipe-issues {
+    list-style: none;
+    margin: 0.4rem 0;
+    padding: 0.4rem 0.5rem;
+    max-height: 11rem;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--primary-faint);
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+.map-recipe-issues li { padding: 0.12rem 0 0.12rem 0.9rem; position: relative; overflow-wrap: anywhere; }
+.map-recipe-issues li::before { content: ''; position: absolute; left: 0; top: 0.5rem; width: 0.4rem; height: 0.4rem; border-radius: 50%; }
+.map-recipe-issues li.error::before { background: var(--danger); }
+.map-recipe-issues li.warning::before { background: var(--crit); }
+.map-recipe-issues code { font-family: 'Fira Code', monospace; font-size: 0.7rem; color: var(--text-primary); }
+
+.map-recipe-copy-issues { font-size: 0.76rem; padding: 0.3rem 0.6rem; }
+
+.map-dialog button.map-recipe-build { margin-top: 0.5rem; }
+.map-dialog button.map-recipe-build:disabled { opacity: 0.45; cursor: default; }
+.map-recipe .map-hint { margin: 0 0 0.6rem; font-size: 0.78rem; color: var(--text-secondary); line-height: 1.45; }

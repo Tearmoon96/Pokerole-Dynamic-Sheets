@@ -12,7 +12,7 @@ import type { MapDoc, StyleId } from '../../map/types';
 /* ------------------------------------------------------------- new map */
 
 /* Starting points, not limits: a cell means whatever the map says it does. */
-const PRESETS = [
+export const PRESETS = [
     { name: 'Region', cols: 64, rows: 44, background: 'sea', scale: '1 cell = 2 km' },
     { name: 'Sky isles', cols: 48, rows: 36, background: 'clouds', scale: '1 cell = 1 km' },
     { name: 'Route or area', cols: 40, rows: 28, background: 'grassland', scale: '1 cell = 50 m' },
@@ -80,7 +80,7 @@ function NewMapForm({ onCreate }: { onCreate: (d: MapDoc) => void }) {
     );
 }
 
-export function MapListDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function MapListDialog({ open, onClose, onRecipe }: { open: boolean; onClose: () => void; onRecipe: () => void }) {
     const { store } = useMap();
     const confirm = useGmConfirm();
     const [renaming, setRenaming] = useState<string | null>(null);
@@ -97,9 +97,14 @@ export function MapListDialog({ open, onClose }: { open: boolean; onClose: () =>
             {creating ? (
                 <NewMapForm onCreate={(d) => { store.addMap(d); onClose(); }} />
             ) : (
-                <button className="accent map-new-btn" onClick={() => setCreating(true)}>
-                    <i className="fa-solid fa-plus"></i> New map
-                </button>
+                <div className="map-new-row">
+                    <button className="accent map-new-btn" onClick={() => setCreating(true)}>
+                        <i className="fa-solid fa-plus"></i> New map
+                    </button>
+                    <button className="map-new-btn" onClick={onRecipe}>
+                        <i className="fa-solid fa-scroll"></i> From a description
+                    </button>
+                </div>
             )}
             <ul className="map-list">
                 {maps.map((m) => (
