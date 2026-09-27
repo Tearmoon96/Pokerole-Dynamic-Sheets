@@ -30,6 +30,50 @@
 
 .stepper input { width: 3.2rem; text-align: center; }
 
+/* The successes-first switch: a checkbox drawn as a small track. */
+.dice-sort {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+/* The real checkbox, invisible and laid over the whole switch, so the
+   whole row is what a finger or the keyboard reaches. */
+.dice-sort input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+
+.dice-sort-track {
+    position: relative;
+    width: 2rem;
+    height: 1.1rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--panel-solid);
+    transition: background 0.15s, border-color 0.15s;
+    flex: none;
+}
+
+.dice-sort-track::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0.15rem;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    background: var(--text-secondary);
+    transform: translateY(-50%);
+    transition: left 0.15s, background 0.15s;
+}
+
+.dice-sort input:checked + .dice-sort-track { background: var(--accent-faint); border-color: var(--accent); }
+.dice-sort input:checked + .dice-sort-track::after { left: 1.05rem; background: var(--accent); }
+.dice-sort input:focus-visible + .dice-sort-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 #roll-btn {
     font-size: 0.95rem;
     font-weight: 800;
@@ -75,7 +119,6 @@
 /* Gold, not the theme's accent: on this palette the accent is a salmon
    red and a top face would read the same as a rolled 1 */
 .die-face.max { border-color: var(--crit); color: var(--crit); box-shadow: 0 0 6px var(--crit-glow); }
-.die-face.one { border-color: var(--danger); color: #fca5a5; }
 
 /* A success cancelled by the pain penalty: still shown, because the
    roll happened, but struck through and dimmed so the arithmetic on

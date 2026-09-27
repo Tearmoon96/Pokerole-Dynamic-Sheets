@@ -1,7 +1,7 @@
 import { Panel } from './Panel';
 import { useGm } from '../../gm/GmContext';
 import { CRIT_DAMAGE, CRIT_MARGIN } from '../../gm/constants';
-import { HISTORY_LIMIT, VERDICTS, painStruck, roll } from '../../gm/dice';
+import { HISTORY_LIMIT, VERDICTS, faceOrder, painStruck, roll } from '../../gm/dice';
 import type { RollEntry, RollMeta } from '../../gm/dice';
 
 /* The dice roller: quick d-chips, a count/sides stepper, the last roll in full
@@ -9,20 +9,35 @@ import type { RollEntry, RollMeta } from '../../gm/dice';
 
 const QUICK_DICE = [4, 6, 8, 10, 12, 20, 100];
 
-export function DicePanel({ onReorder, onRollDamage }: {
+export function DicePanel({ onReorder }: {
     onReorder: (from: string, to: string) => void;
-    /** A hit rolls its damage from here rather than sending the GM back to the
-        move panel; a critical rolls it already boosted. */
-    onRollDamage: (token: string, mi: number, extra: number) => void;
 }) {
     const { state, store } = useGm();
     const { count, sides, history } = state.dice;
+    const sorted = !!state.dice.sortResults;
     const latest = (history[0] as RollEntry | undefined) || null;
 
     const doRoll = (meta: RollMeta = {}) => store.update((s) => {
         const entry = roll(s.dice.count, s.dice.sides, meta, CRIT_MARGIN);
         s.dice = { ...s.dice, history: [entry, ...s.dice.history].slice(0, HISTORY_LIMIT) };
     });
+
+    /* A hit rolls its damage from here rather than sending the GM back to the
+       move panel; a critical rolls it already boosted. Everything the damage
+       roll needs rode along on the accuracy entry — the pool, who rolled it
+       and the pain penalty, which strikes damage successes just the same. */
+    const rollDamage = (from: RollEntry, extra: number) => {
+        const d = from.dmg;
+        if (!d || !(d.dice + extra > 0)) return;
+        const what = d.what || (from.what || '').replace(/ accuracy$/, '') + ' damage';
+        store.update((s) => {
+            const entry = roll(d.dice + extra, 6, {
+                who: from.who, what: what + (extra ? ' (critical)' : ''), pain: from.pain,
+            }, CRIT_MARGIN);
+            s.dice = { ...s.dice, count: d.dice + extra, sides: 6,
+                history: [entry, ...s.dice.history].slice(0, HISTORY_LIMIT) };
+        });
+    };
 
     return (
         <Panel
@@ -96,16 +111,31 @@ export function DicePanel({ onReorder, onRollDamage }: {
                         />
                     </div>
                 </div>
+                <label
+                    className="dice-sort"
+                    title="Show a pool's successes first and the other dice after them"
+                >
+                    <input
+                        type="checkbox"
+                        checked={sorted}
+                        onChange={(e) => {
+                            const on = e.currentTarget.checked;
+                            store.update((s) => { s.dice = { ...s.dice, sortResults: on }; });
+                        }}
+                    />
+                    <span className="dice-sort-track" aria-hidden="true"></span>
+                    Successes first
+                </label>
                 <button id="roll-btn" onClick={() => doRoll()}>Roll {count}d{sides}</button>
                 <div id="roll-output">
-                    {latest && <RollOutput entry={latest} onRollDamage={onRollDamage} />}
+                    {latest && <RollOutput entry={latest} sorted={sorted} onRollDamage={rollDamage} />}
                 </div>
                 <div id="roll-history">
                     {(history.slice(1) as RollEntry[]).map((e, i) => (
                         <div className="roll-history-entry" key={e.t + '-' + i}>
                             <span className="h-label">{e.label}</span>
                             <span className="h-vals">
-                                {e.vals.join(' ')}
+                                {faceOrder(e.vals, e.succ != null, sorted).map((i) => e.vals[i]).join(' ')}
                                 {e.bonus != null && (e.bonus < 0 ? ' − ' + Math.abs(e.bonus) : ' + ' + e.bonus)}
                             </span>
                             <span className="h-total">
@@ -130,15 +160,19 @@ export function DicePanel({ onReorder, onRollDamage }: {
     );
 }
 
-function RollOutput({ entry, onRollDamage }: {
+function RollOutput({ entry, sorted, onRollDamage }: {
     entry: RollEntry;
-    onRollDamage: (token: string, mi: number, extra: number) => void;
+    sorted: boolean;
+    onRollDamage: (from: RollEntry, extra: number) => void;
 }) {
     const sides = parseInt(entry.label.split('d')[1], 10);
     const struck = painStruck(entry.vals, entry.pain);
     const time = new Date(entry.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const v = entry.verdict ? VERDICTS[entry.verdict] : null;
-    const showFollowUp = entry.dmg && (entry.verdict === 'hit' || entry.verdict === 'crit');
+    /* After a hit — or after an accuracy roll with no target number to judge
+       it by, from outside a fight, where the GM makes the call. Never after a
+       miss. */
+    const showFollowUp = entry.dmg && (entry.verdict === 'hit' || entry.verdict === 'crit' || !entry.verdict);
     const extra = entry.verdict === 'crit' ? CRIT_DAMAGE : 0;
 
     return (
@@ -153,9 +187,12 @@ function RollOutput({ entry, onRollDamage }: {
                 {/* A sum roll's flat part sits in the row of faces as a chip of
                     its own, so what was rolled and what was added read as one
                     sentence rather than the total appearing from nowhere. */}
-                {entry.vals.map((val, i) => {
+                {/* A 1 is one of the misses and nothing more: no border of its
+                    own, and nothing anywhere counts ones. */}
+                {faceOrder(entry.vals, entry.succ != null, sorted).map((i) => {
+                    const val = entry.vals[i];
                     const cls = entry.succ != null && val >= 4 ? 'success'
-                        : val === sides ? 'max' : val === 1 ? 'one' : '';
+                        : val === sides ? 'max' : '';
                     const out = struck.has(i) ? ' struck' : '';
                     return (
                         <span
@@ -195,7 +232,7 @@ function RollOutput({ entry, onRollDamage }: {
             {showFollowUp && entry.dmg && (
                 <button
                     className="roll-followup"
-                    onClick={() => onRollDamage(entry.dmg!.token, entry.dmg!.mi, extra)}
+                    onClick={() => onRollDamage(entry, extra)}
                 >
                     <i className="fa-solid fa-dice"></i>
                     {' '}Roll damage {entry.dmg.dice + extra}d6{extra ? ' (+' + extra + ' critical)' : ''}

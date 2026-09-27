@@ -111,11 +111,7 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
             <RosterPanel key="roster" onReorder={reorder} onOpenTip={setTipToken} cycleStatus={cycleStatus} />
         ),
         dice: (
-            <DicePanel
-                key="dice"
-                onReorder={reorder}
-                onRollDamage={(token, mi, extra) => { setTipToken(token); void mi; void extra; }}
-            />
+            <DicePanel key="dice" onReorder={reorder} />
         ),
         npc: <NpcPanel key="npc" onReorder={reorder} />,
         generator: <GeneratorPanel key="generator" onReorder={reorder} />,

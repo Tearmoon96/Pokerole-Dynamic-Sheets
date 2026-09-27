@@ -23,8 +23,9 @@ export interface RollEntry {
     bonus?: number | null;
     pain?: number;
     verdict?: string;
-    /** Carried so a hit can roll the damage in one more click. */
-    dmg?: { token: string; mi: number; dice: number } | null;
+    /** Carried so a hit can roll the damage in one more click. `what` names
+        the damage roll; older entries without it fall back to the accuracy's. */
+    dmg?: { token: string; mi: number; dice: number; what?: string } | null;
 }
 
 export type RollMeta = Partial<Omit<RollEntry, 'label' | 'vals' | 'total' | 'succ' | 'net' | 't'>>;
@@ -84,6 +85,16 @@ export function painStruck(vals: number[] | undefined, pain: number | undefined)
         .slice(0, pain)
         .forEach((x) => out.add(x.i));
     return out;
+}
+
+/** The order to show a roll's faces in: as rolled, or — with sorting on and
+    on a pool that counts successes — every success first, then the rest, each
+    group keeping its rolled order. A 1 is simply one of the rest. Indices, so
+    the pain penalty's struck set still points at the right faces. */
+export function faceOrder(vals: number[], counted: boolean, sorted: boolean): number[] {
+    const idx = vals.map((_, i) => i);
+    if (!sorted || !counted) return idx;
+    return idx.filter((i) => vals[i] >= 4).concat(idx.filter((i) => vals[i] < 4));
 }
 
 export const HISTORY_LIMIT = 30;

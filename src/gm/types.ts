@@ -70,6 +70,9 @@ export interface GmDice {
     count: number;
     sides: number;
     history: unknown[];
+    /** Show a pool's successes first and the rest after them. Display only:
+        the stored faces keep the order they were rolled in. */
+    sortResults?: boolean;
 }
 
 export interface GmNameOpts {
