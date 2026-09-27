@@ -386,3 +386,8 @@
     opacity: 1;
 }
 
+
+:root.light-theme .currency-opt[aria-pressed="true"] {
+    background: #0000000d;
+    border-color: #00000017;
+}

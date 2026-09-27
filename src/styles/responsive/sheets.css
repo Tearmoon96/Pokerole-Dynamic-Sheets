@@ -391,3 +391,6 @@ html[data-device="tablet"] .card-container::before {
 html[data-pointer="coarse"] .sprite-top-right {
     gap: 18px;
 }
+
+/* The License purse's two currency buttons, finger-sized. */
+html[data-pointer="coarse"] .currency-opt { width: 1.9rem; height: 1.9rem; }

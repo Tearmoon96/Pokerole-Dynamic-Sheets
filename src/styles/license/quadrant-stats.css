@@ -388,3 +388,80 @@
     color: #f43f5e;
 }
 
+
+/* The purse: Pokédollars, or three coin counts in the same pill. The
+   switch sits at the pill's end and flips between them. */
+.pill-field.money-field { gap: 6px; }
+
+.currency-switch {
+    flex: none;
+    display: inline-flex;
+    gap: 2px;
+}
+
+.currency-opt {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-secondary);
+    opacity: 0.55;
+    cursor: pointer;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.78rem;
+    font-weight: 600;
+    transition: color 0.15s, background 0.15s, opacity 0.15s, box-shadow 0.15s;
+}
+
+.currency-opt:hover { opacity: 0.9; }
+
+/* The purse in use glows softly; the other stays dim until hovered. */
+.currency-opt[aria-pressed="true"] {
+    opacity: 1;
+    color: var(--accent);
+    background: #ffffff12;
+    border-color: #ffffff1f;
+    box-shadow: 0 0 8px var(--accent-glow, #ffffff22);
+}
+
+.pill-field.coins { padding-left: 10px; padding-right: 8px; }
+.pill-field.money-field:not(.coins) { padding-right: 8px; }
+
+.pill-field .coin {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    /* The pill's label rule is uppercase and spaced for "MONEY:"; a coin
+       box is a plain wrapper around its mark and field. */
+    letter-spacing: 0;
+    font-size: inherit;
+    font-weight: inherit;
+    text-transform: none;
+}
+
+.pill-field .coin-mark {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.05rem;
+    height: 1.05rem;
+    border-radius: 50%;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.62rem;
+    font-weight: 800;
+    color: #1a1208;
+}
+
+.coin-c .coin-mark { background: linear-gradient(145deg, #e6a36a, #a55a26); }
+.coin-s .coin-mark { background: linear-gradient(145deg, #f1f3f6, #9aa3ad); }
+.coin-g .coin-mark { background: linear-gradient(145deg, #ffe27a, #c79a1c); }
+
+.pill-field .coin input { width: 100%; font-family: 'Fira Code', monospace; }

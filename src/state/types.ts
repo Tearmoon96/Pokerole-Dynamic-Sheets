@@ -15,6 +15,10 @@ export type SpriteType = 'Home' | 'Book' | 'Box' | 'Shuffle' | 'Custom';
 
 export interface PhotoAdjust { scale: number; offsetX: number; offsetY: number }
 
+export type Currency = 'modern' | 'medieval';
+
+export interface Coins { c: number; s: number; g: number }
+
 export interface TrainerStats {
     strength: number; dexterity: number; vitality: number; special: number; insight: number;
     tough: number; cool: number; beauty: number; cute: number; clever: number;
@@ -111,6 +115,11 @@ export interface TrainerState {
     exp: number;
     age: string;
     money: number;
+    /** Which purse the sheet shows: Pokédollars, or copper, silver and gold
+        for a medieval-style campaign. The two are kept apart — switching
+        converts nothing and loses nothing. */
+    currency: Currency;
+    coins: Coins;
     team: TeamSlot[];
     /** PC storage — Pokémon owned but not carried. */
     boxes: BoxEntry[];

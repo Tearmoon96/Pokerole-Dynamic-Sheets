@@ -87,6 +87,8 @@ export function defaultState(): TrainerState {
         exp: 0,
         age: '',
         money: 1500,
+        currency: 'modern',
+        coins: { c: 0, s: 0, g: 0 },
         team: defaultTeam(),
         boxes: defaultBoxes(),
         activeBox: 0,

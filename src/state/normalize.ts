@@ -125,6 +125,10 @@ export function normalizeState(parsed: unknown): TrainerState {
             qty: Math.max(1, parseInt(e && e.qty, 10) || 1),
         }))
         .filter((e) => e.name);
+    s.currency = p.currency === 'medieval' ? 'medieval' : 'modern';
+    const coins: Loose = (p.coins && typeof p.coins === 'object') ? p.coins : {};
+    const coin = (v: unknown) => Math.max(0, parseInt(String(v), 10) || 0);
+    s.coins = { c: coin(coins.c), s: coin(coins.s), g: coin(coins.g) };
     if (!Array.isArray(s.extras) || !s.extras.length) {
         s.extras = [{ name: '', value: 0 }, { name: '', value: 0 }];
     }
