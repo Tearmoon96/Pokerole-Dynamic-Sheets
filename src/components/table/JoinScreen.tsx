@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTable } from '../../table/TableContext';
+import { HomeButton } from '../common/HomeButton';
 import { LIMITS } from '../../table/protocol';
 import { formatLobbyId, normaliseLobbyId } from '../../table/encoding';
 import { relayConfigured, relayReachable, usingLocalRelay } from '../../table/relay';
@@ -44,6 +45,7 @@ export function JoinScreen() {
         return (
             <div className="join-screen">
                 <div className="join-card">
+                    <HomeButton className="icon-btn join-home" />
                     <h1>Rolling Table</h1>
                     <p className="setup-warning">
                         <i className="fa-solid fa-triangle-exclamation"></i>{' '}
@@ -60,6 +62,7 @@ export function JoinScreen() {
     return (
         <div className="join-screen">
             <div className="join-card">
+                <HomeButton className="icon-btn join-home" />
                 <h1><i className="fa-solid fa-dice"></i> Rolling Table</h1>
                 <p className="lede">
                     A shared space for dice. Everyone sees every roll, and the GM's

@@ -10,6 +10,7 @@
 }
 
 .join-card {
+    position: relative;
     width: 100%;
     max-width: 27rem;
     border: 1px solid var(--border-color);
@@ -138,4 +139,11 @@ button.big {
 .offline-card .site-link:hover {
     border-color: var(--accent);
     box-shadow: 0 0 10px var(--accent-glow);
+}
+
+/* Back to the chooser, in the card's corner — the join screen has no bar. */
+.join-home {
+    position: absolute;
+    top: 0.9rem;
+    right: 0.9rem;
 }
