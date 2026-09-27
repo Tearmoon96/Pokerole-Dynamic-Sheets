@@ -46,13 +46,31 @@ export function DicePanel({ onReorder }: {
             title="Dice"
             onReorder={onReorder}
             actions={
-                <button
-                    className="icon-btn"
-                    onClick={() => store.update((s) => { s.dice = { ...s.dice, history: [] }; })}
-                    title="Clear roll history"
-                >
-                    <i className="fa-solid fa-eraser"></i>
-                </button>
+                <>
+                    <label
+                        className="dice-sort"
+                        title="Show a pool's successes first and the other dice after them"
+                    >
+                        <input
+                            type="checkbox"
+                            aria-label="Successes first"
+                            checked={sorted}
+                            onChange={(e) => {
+                                const on = e.currentTarget.checked;
+                                store.update((s) => { s.dice = { ...s.dice, sortResults: on }; });
+                            }}
+                        />
+                        <span className="dice-sort-track" aria-hidden="true"></span>
+                        <span className="dice-sort-text">Successes first</span>
+                    </label>
+                    <button
+                        className="icon-btn"
+                        onClick={() => store.update((s) => { s.dice = { ...s.dice, history: [] }; })}
+                        title="Clear roll history"
+                    >
+                        <i className="fa-solid fa-eraser"></i>
+                    </button>
+                </>
             }
         >
             <div className="panel-body">
@@ -111,21 +129,6 @@ export function DicePanel({ onReorder }: {
                         />
                     </div>
                 </div>
-                <label
-                    className="dice-sort"
-                    title="Show a pool's successes first and the other dice after them"
-                >
-                    <input
-                        type="checkbox"
-                        checked={sorted}
-                        onChange={(e) => {
-                            const on = e.currentTarget.checked;
-                            store.update((s) => { s.dice = { ...s.dice, sortResults: on }; });
-                        }}
-                    />
-                    <span className="dice-sort-track" aria-hidden="true"></span>
-                    Successes first
-                </label>
                 <button id="roll-btn" onClick={() => doRoll()}>Roll {count}d{sides}</button>
                 <div id="roll-output">
                     {latest && <RollOutput entry={latest} sorted={sorted} onRollDamage={rollDamage} />}

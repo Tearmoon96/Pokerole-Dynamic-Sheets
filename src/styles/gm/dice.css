@@ -40,6 +40,10 @@
     color: var(--text-secondary);
     cursor: pointer;
     user-select: none;
+    /* It sits in the panel head, beside the eraser: one line, never squeezed. */
+    flex: none;
+    white-space: nowrap;
+    margin-right: 0.25rem;
 }
 
 /* The real checkbox, invisible and laid over the whole switch, so the
@@ -73,6 +77,11 @@
 .dice-sort input:checked + .dice-sort-track { background: var(--accent-faint); border-color: var(--accent); }
 .dice-sort input:checked + .dice-sort-track::after { left: 1.05rem; background: var(--accent); }
 .dice-sort input:focus-visible + .dice-sort-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* A narrow dice panel keeps the switch and drops its words (the hint still
+   says them), rather than squeezing the title to "D…" and wrapping the lock. */
+.panel[data-panel-kind="dice"] .panel-head { container-type: inline-size; }
+@container (max-width: 340px) { .dice-sort-text { display: none; } }
 
 #roll-btn {
     font-size: 0.95rem;

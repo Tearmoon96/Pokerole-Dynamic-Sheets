@@ -130,7 +130,7 @@ export function AilmentPopover() {
         store.update((s) => {
             const entry = rollDice(spec.dice, 6, {}, CRIT_MARGIN);
             entrySucc = entry.succ || 0;
-            s.dice = { count: spec.dice, sides: 6, history: [entry, ...s.dice.history].slice(0, HISTORY_LIMIT) };
+            s.dice = { ...s.dice, count: spec.dice, sides: 6, history: [entry, ...s.dice.history].slice(0, HISTORY_LIMIT) };
         });
         const lead = `${escapeHtml(spec.label)} ${spec.dice}d6 &rarr; `;
 

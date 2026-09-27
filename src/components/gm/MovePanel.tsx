@@ -197,7 +197,7 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
         if (!(dice > 0)) return;
         store.update((s) => {
             const entry = roll(dice, 6, meta, CRIT_MARGIN);
-            s.dice = { count: dice, sides: 6, history: [entry, ...s.dice.history].slice(0, HISTORY_LIMIT) };
+            s.dice = { ...s.dice, count: dice, sides: 6, history: [entry, ...s.dice.history].slice(0, HISTORY_LIMIT) };
         });
     };
 
