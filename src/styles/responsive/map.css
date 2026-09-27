@@ -101,3 +101,5 @@ html[data-pointer="coarse"] .map-search { font-size: 16px; }
 
 html[data-pointer="coarse"] .map-borders-terrains li { min-height: 36px; }
 html[data-pointer="coarse"] .map-borders-terrains summary { min-height: 32px; display: flex; align-items: center; }
+html[data-pointer="coarse"] .map-smart-item { min-height: 34px; }
+html[data-pointer="coarse"] .map-fog-actions button { min-height: 34px; }

@@ -348,6 +348,7 @@ export function ExportControl() {
     const [px, setPx] = useState(32);
     const [grid, setGrid] = useState(doc.grid.show);
     const [tokens, setTokens] = useState(true);
+    const [fog, setFog] = useState(true);
     const [busy, setBusy] = useState(false);
     const [folder, setFolder] = useState<FileSystemDirectoryHandle | null>(null);
     const [note, setNote] = useState<{ text: string; warn: boolean } | null>(null);
@@ -381,7 +382,7 @@ export function ExportControl() {
                     throw e;
                 }
             }
-            const out = await renderMapPng(doc, { pxPerCell: px, grid, tokens }, exportLoader(dir));
+            const out = await renderMapPng(doc, { pxPerCell: px, grid, tokens, fog }, exportLoader(dir));
             if (handle) {
                 const w = await handle.createWritable();
                 await w.write(out.blob);
@@ -442,6 +443,12 @@ export function ExportControl() {
                     <input type="checkbox" checked={tokens} onChange={(e) => setTokens(e.currentTarget.checked)} /> Tokens
                     <span className="muted">— off for a clean handout</span>
                 </label>
+                {doc.fog && (
+                    <label className="map-check">
+                        <input type="checkbox" checked={fog} onChange={(e) => setFog(e.currentTarget.checked)} /> Fog of war
+                        <span className="muted">— off for the GM's copy</span>
+                    </label>
+                )}
                 {disk && (
                     <div className="map-export-folder">
                         <p className="map-hint">

@@ -7,6 +7,7 @@ import { midpoint, polygonD, sampleCurve, smoothPathD, taperOutline } from '../g
 import type { Pt } from '../geometry';
 import { typeColors, TYPE_ICONS } from '../../lib/themeTables';
 import { CELL } from './patterns';
+import { fogImage } from './fog';
 import { buildGeometry, drawGrid, drawTerrain } from './terrain';
 import type { TextureSource } from './terrain';
 import type { MapDoc, MapLabel, MapPath, MapStamp, MapToken } from '../types';
@@ -18,7 +19,7 @@ import {
 
    The page draws the ground on a canvas and everything else as elements, so
    an export redraws the lot onto one canvas, in the page's own order and with
-   its own measurements: terrain, grid, paths, landmarks, labels, tokens.
+   its own measurements: terrain, grid, paths, landmarks, labels, tokens, fog.
 
    Every picture goes through `load`, which the caller supplies, because where
    a picture may come from decides whether the canvas can be saved at all. A
@@ -31,6 +32,8 @@ export interface ExportOptions {
     pxPerCell: number;
     grid: boolean;
     tokens: boolean;
+    /** The fog of war, over everything else. */
+    fog?: boolean;
 }
 
 export interface LoadedImage {
@@ -432,6 +435,12 @@ export async function renderMapPng(doc: MapDoc, opts: ExportOptions, load: Image
     for (const s of doc.stamps) if (!(await drawStamp(ctx, s, style, load))) missing++;
     for (const l of doc.labels) drawLabel(ctx, l, style);
     if (opts.tokens) for (const t of doc.tokens) if (!(await drawToken(ctx, t, style, load))) missing++;
+    const fog = opts.fog ? fogImage(doc) : null;
+    if (fog) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(fog, 0, 0, doc.cols * CELL, doc.rows * CELL);
+    }
 
     const blob = await new Promise<Blob>((resolve, reject) => {
         try {

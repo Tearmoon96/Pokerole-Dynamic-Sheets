@@ -15,6 +15,7 @@ import { TokenPicker } from './TokenPicker';
 import { BrushControls } from './BrushControls';
 import { LabelTypeEditor } from './LabelTypeEditor';
 import { EDGE_KINDS, EDGE_NAME, paintValue } from '../../map/edges';
+import { FOG_COLORS, fogValue, fullFog } from '../../map/fog';
 import { EDGE_TINT } from '../../map/render/terrain';
 import type { EdgeKind, MapDoc, MapLabel, MapPath, MapStamp, MapToken, Selection } from '../../map/types';
 import type { MapStore } from '../../map/store';
@@ -64,6 +65,7 @@ function TerrainPalette({ style }: { style: MapStyle }) {
                 ))}
             </div>
             {ui.tool !== 'fill' && <BrushControls slot="paint" />}
+            {ui.tool !== 'fill' && <SmartPaint backgrounds={backgrounds} pixelated={!!style.pixelated} />}
             <EdgeChoice
                 label="Its edges"
                 value={ui.paintEdge}
@@ -76,6 +78,58 @@ function TerrainPalette({ style }: { style: MapStyle }) {
                     : 'Drag to paint. ' + brushSizeHint() + panHint()}
             </p>
         </section>
+    );
+}
+
+/** Where the terrain brush may land. Two switches that combine: a list of
+    terrains to leave alone, and a stroke that keeps to the terrain it began
+    on — the edge of that patch stops it without anyone tracing it. */
+function SmartPaint({ backgrounds, pixelated }: { backgrounds: Map<string, string>; pixelated: boolean }) {
+    const { store, ui } = useMap();
+    const locked = new Set(ui.lockedTerrains);
+    const toggle = (code: string) => store.setUi({
+        lockedTerrains: locked.has(code) ? ui.lockedTerrains.filter((c) => c !== code) : [...ui.lockedTerrains, code],
+    });
+    return (
+        <div className="map-smart">
+            <label className="map-check">
+                <input type="checkbox" checked={ui.stayOnStart} onChange={(e) => store.setUi({ stayOnStart: e.currentTarget.checked })} />
+                Stay on the terrain the stroke starts on
+            </label>
+            <label className="map-check">
+                <input type="checkbox" checked={ui.smartPaint} onChange={(e) => store.setUi({ smartPaint: e.currentTarget.checked })} />
+                Smart painting: only over the ticked terrains
+            </label>
+            {ui.smartPaint && (
+                <>
+                    <div className="map-smart-bar">
+                        <button className="map-chip" onClick={() => store.setUi({ lockedTerrains: [] })}>All</button>
+                        <button className="map-chip" onClick={() => store.setUi({ lockedTerrains: TERRAINS.map((t) => t.code) })}>None</button>
+                    </div>
+                    <div className="map-smart-list" role="group" aria-label="Terrains the brush may paint over">
+                        {TERRAINS.map((t) => (
+                            <button
+                                key={t.code}
+                                className="map-smart-item"
+                                aria-pressed={!locked.has(t.code)}
+                                title={t.name}
+                                onClick={() => toggle(t.code)}
+                            >
+                                <i className={'fa-solid ' + (locked.has(t.code) ? 'fa-lock' : 'fa-check')}></i>
+                                <span className={'map-swatch-chip' + (pixelated ? ' pixelated' : '')} style={{ background: backgrounds.get(t.slug) }}></span>
+                                <span className="map-swatch-name">{t.name}</span>
+                            </button>
+                        ))}
+                    </div>
+                </>
+            )}
+            {(ui.smartPaint || ui.stayOnStart) && (
+                <p className="map-hint">
+                    {ui.stayOnStart ? 'Each stroke covers only the terrain under the point where you pressed, until you let go. ' : ''}
+                    {ui.smartPaint ? 'Locked terrains are left as they are. Bare ground counts as the map\'s background terrain.' : ''}
+                </p>
+            )}
+        </div>
     );
 }
 
@@ -150,6 +204,67 @@ function EdgePalette() {
                 Paint over the edges between terrains to choose how they look there — a line, none, or a soft
                 blend of one terrain into the next. What you paint is tinted while this tool is out. The rest
                 follow the Borders settings on the top bar (now: {EDGE_NAME[doc.borders.kind]}).
+            </p>
+        </section>
+    );
+}
+
+/* ------------------------------------------------------------- fog */
+
+/** The two fog brushes: one lays fog of the chosen colour and strength over
+    everything, the other clears it. Neither touches the terrain. */
+function FogPalette({ clear }: { clear: boolean }) {
+    const { store, ui, doc } = useMap();
+    const strength = ui.fogStrength;
+    /* The tint over a checkerboard, so its strength reads. */
+    const tint = (rgb: [number, number, number]) => {
+        const c = `rgba(${rgb.join(',')},${strength / 100})`;
+        return `linear-gradient(${c}, ${c}), repeating-conic-gradient(#8a8a8a 0 25%, #d8d8d8 0 50%) 0 0 / 7px 7px`;
+    };
+    return (
+        <section className="map-section map-fog-panel">
+            <h3>{clear ? 'Clear fog' : 'Fog of war'}</h3>
+            {!clear && (
+                <>
+                    <div className="map-segmented map-fog-colors" role="group" aria-label="Fog colour">
+                        {FOG_COLORS.map((c) => (
+                            <button key={c.color} aria-pressed={ui.fogColor === c.color} onClick={() => store.setUi({ fogColor: c.color })}>
+                                <span className="map-fog-chip" style={{ background: tint(c.rgb) }}></span>
+                                {c.name}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="map-row">
+                        <label htmlFor="map-fog-strength">Strength</label>
+                        <input
+                            id="map-fog-strength" type="range" min={5} max={100} step={5}
+                            value={strength}
+                            onChange={(e) => store.setUi({ fogStrength: Number(e.currentTarget.value) })}
+                        />
+                        <span className="map-num map-fog-pct">{strength}%</span>
+                    </div>
+                </>
+            )}
+            <BrushControls slot={clear ? 'unfog' : 'fog'} />
+            <div className="map-fog-actions">
+                {!clear && (
+                    <button onClick={() => store.edit((d) => { d.fog = fullFog(d, fogValue(ui.fogColor, strength)); })}>
+                        <i className="fa-solid fa-smog"></i> Cover the whole map
+                    </button>
+                )}
+                <button disabled={!doc.fog} onClick={() => store.edit((d) => { d.fog = ''; })}>
+                    <i className="fa-solid fa-broom"></i> Clear all fog
+                </button>
+            </div>
+            <label className="map-check map-fog-hide">
+                <input type="checkbox" checked={ui.fogHidden} onChange={(e) => store.setUi({ fogHidden: e.currentTarget.checked })} />
+                Hide the fog while using the other tools
+            </label>
+            <p className="map-hint">
+                {clear
+                    ? 'Drag to clear the fog and reveal what is under it. The terrain and everything on it stay as they were.'
+                    : 'Drag to lay fog over the map — terrain, landmarks, labels and tokens alike. Painting over fog sets it to this colour and strength. '
+                        + brushSizeHint()}
             </p>
         </section>
     );
@@ -648,6 +763,7 @@ export function SidePanel() {
         case 'select': palette = !ui.selection.length ? <p className="map-hint map-section">Click something on the map to select it. Drag to move; drag a landmark's corner to resize it or its knob to turn it. Ctrl-click to select several, or drag a box round them.</p> : null; break;
         case 'erase': palette = <ErasePalette />; break;
         case 'edge': palette = <EdgePalette />; break;
+        case 'fog': case 'unfog': palette = <FogPalette clear={ui.tool === 'unfog'} />; break;
         case 'pan': palette = <p className="map-hint map-section">Drag to move around the map; the wheel or a pinch zooms. The middle mouse button pans under any tool.</p>; break;
     }
     return (

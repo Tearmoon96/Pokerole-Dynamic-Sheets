@@ -17,6 +17,8 @@ export const TOOLS: { tool: Tool; icon: string; name: string }[] = [
     { tool: 'label', icon: 'fa-font', name: 'Add a label' },
     { tool: 'erase', icon: 'fa-eraser', name: 'Eraser: rub out terrain, or remove objects' },
     { tool: 'edge', icon: 'fa-bezier-curve', name: 'Borders: choose how the edges between terrains look' },
+    { tool: 'fog', icon: 'fa-smog', name: 'Fog of war: paint fog over the map' },
+    { tool: 'unfog', icon: 'fa-wind', name: 'Clear fog: reveal what is under it' },
 ];
 
 export function ToolRail() {

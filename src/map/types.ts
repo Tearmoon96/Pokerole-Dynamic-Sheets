@@ -146,6 +146,9 @@ export interface MapDoc {
         when nothing was painted. See edges.ts. */
     edges: string;
     borders: MapBorders;
+    /** Fog of war over everything, run-length encoded on the terrain's
+        samples; empty when there is none. See fog.ts. */
+    fog: string;
     paths: MapPath[];
     stamps: MapStamp[];
     tokens: MapToken[];
@@ -160,4 +163,4 @@ export interface Selection {
     id: string;
 }
 
-export type Tool = 'select' | 'paint' | 'fill' | 'erase' | 'edge' | 'path' | 'stamp' | 'token' | 'label' | 'pan';
+export type Tool = 'select' | 'paint' | 'fill' | 'erase' | 'edge' | 'fog' | 'unfog' | 'path' | 'stamp' | 'token' | 'label' | 'pan';

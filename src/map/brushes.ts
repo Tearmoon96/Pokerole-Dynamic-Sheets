@@ -164,9 +164,10 @@ function classicDab(c: Canvas, stroke: Stroke, cx: number, cy: number, size: num
 
 /** Paint one dab. Returns whether any sample of any layer changed. */
 export function dab(c: Canvas, id: BrushId, cx: number, cy: number, size: number, stroke?: Stroke): boolean {
-    const { w, h, res, layers } = c;
+    const { w, h, res, layers, guard } = c;
     let changed = false;
     const put = (i: number) => {
+        if (guard && !guard.allow[guard.looks[i]]) return;
         for (const l of layers) if (l.data[i] !== l.value) { l.data[i] = l.value; changed = true; }
     };
     const set = (sx: number, sy: number) => {

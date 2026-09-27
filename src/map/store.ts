@@ -1,5 +1,6 @@
 import { createDoc, normalizeDoc } from './doc';
 import type { BrushId } from './brushes';
+import type { FogColor } from './fog';
 import type { EdgeKind, LabelRole, MapDoc, PathKind, Selection, Tool } from './types';
 
 /* One mutable store behind the Map Maker, in the same shape as the GM screen's
@@ -34,7 +35,7 @@ export interface PendingToken {
 }
 
 /** The three tools that paint with a brush, each with a brush of its own. */
-export type BrushSlot = 'paint' | 'erase' | 'edge';
+export type BrushSlot = 'paint' | 'erase' | 'edge' | 'fog' | 'unfog';
 
 export interface BrushSetting {
     shape: BrushId;
@@ -44,7 +45,7 @@ export interface BrushSetting {
 
 /** Which brush a tool paints with, if any. */
 export function slotOf(tool: Tool): BrushSlot | null {
-    return tool === 'paint' ? 'paint' : tool === 'erase' ? 'erase' : tool === 'edge' ? 'edge' : null;
+    return tool === 'paint' || tool === 'erase' || tool === 'edge' || tool === 'fog' || tool === 'unfog' ? tool : null;
 }
 
 export interface MapUi {
@@ -55,6 +56,19 @@ export interface MapUi {
     /** The border look the terrain brush and the bucket lay down with the
         terrain — 'map' leaves it to the terrain's and the map's settings. */
     paintEdge: EdgeKind | 'map';
+    /** Smart painting: the terrain brush covers only the terrains not in
+        `lockedTerrains`. The list is kept while it is off. */
+    smartPaint: boolean;
+    /** Terrain codes the brush leaves alone while smart painting is on. */
+    lockedTerrains: string[];
+    /** Edge detection: a stroke covers only the terrain under the point it
+        started on, until the button is let go. */
+    stayOnStart: boolean;
+    /** The fog brush's colour, and its strength in percent (5-100). */
+    fogColor: FogColor;
+    fogStrength: number;
+    /** Leave the fog off the screen while editing — the map's fog is kept. */
+    fogHidden: boolean;
     /** What the Borders brush paints. */
     edgeKind: EdgeKind | 'map';
     /** The eraser rubs out terrain, or removes whatever object it touches. */
@@ -102,8 +116,12 @@ export class MapStore {
             paint: { shape: 'circle', size: 2 },
             erase: { shape: 'circle', size: 1 },
             edge: { shape: 'circle', size: 2 },
+            fog: { shape: 'circle', size: 4 },
+            unfog: { shape: 'circle', size: 3 },
         },
         paintEdge: 'map', edgeKind: 'soft', eraseMode: 'terrain',
+        smartPaint: false, lockedTerrains: [], stayOnStart: false,
+        fogColor: 'dark', fogStrength: 100, fogHidden: false,
         landmark: 'mountain', pathKind: 'road', labelRole: 'town', token: null, selection: [],
     };
 
@@ -381,7 +399,7 @@ export function findObject(doc: MapDoc, sel: Selection): { id: string } | undefi
 /* Cheap equality for the fields a drag can touch: every array and the terrain
    are replaced, never mutated, so identity is enough. */
 function sameDoc(a: MapDoc, b: MapDoc): boolean {
-    return a.terrain === b.terrain && a.edges === b.edges && a.stamps === b.stamps && a.tokens === b.tokens
+    return a.terrain === b.terrain && a.edges === b.edges && a.fog === b.fog && a.stamps === b.stamps && a.tokens === b.tokens
         && a.labels === b.labels && a.paths === b.paths;
 }
 

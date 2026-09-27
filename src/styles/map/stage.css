@@ -249,3 +249,13 @@ img.pixelated { image-rendering: pixelated; }
     background: var(--accent-faint);
     pointer-events: none;
 }
+
+/* Fog of war: over every object, never in the way of a click. Smoothed even
+   in the pixel styles — its samples must never show as squares. */
+.map-fog {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+    image-rendering: auto;
+}

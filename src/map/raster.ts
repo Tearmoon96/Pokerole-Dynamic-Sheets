@@ -59,6 +59,21 @@ export interface Canvas {
     h: number;
     res: number;
     layers: { data: Uint8Array; value: number }[];
+    /** Smart painting: when set, a sample is painted only if `allow` has a 1
+        for the terrain it LOOKED like when the stroke began (`looks`, a
+        resolved raster — see resolvedOf). A sample the table refuses keeps
+        every layer as it was, its border look included. The snapshot is
+        taken once, at the press, so what the stroke itself lays down never
+        changes what it may cover. */
+    guard?: { looks: Uint8Array; allow: Uint8Array };
+}
+
+/** The table a guard reads: 1 for every terrain index `ok` accepts. Index
+    EMPTY never occurs in a resolved raster; it stays 0. */
+export function allowTable(ok: (index: number) => boolean): Uint8Array {
+    const allow = new Uint8Array(256);
+    for (let i = 0; i < TERRAINS.length; i++) if (ok(i)) allow[i] = 1;
+    return allow;
 }
 
 export function isEncoded(terrain: string): boolean {

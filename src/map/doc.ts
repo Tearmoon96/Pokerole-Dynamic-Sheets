@@ -5,6 +5,7 @@ import {
 } from './raster';
 import type { Raster } from './raster';
 import { DEFAULT_BORDERS, MAX_SOFT, MIN_SOFT, decodeEdges, edgesOf, encodeEdges, isEdgeKind, rememberEdges } from './edges';
+import { decodeFog, encodeFog, fogOf, rememberFog } from './fog';
 import type { EdgeKind, LabelRole, MapBorders, MapDoc, MapLabel, MapPath, MapStamp, MapToken, StyleId } from './types';
 
 /* Pure operations on a MapDoc. Nothing here touches the DOM or storage, so the
@@ -42,6 +43,7 @@ export function createDoc(opts: {
         background,
         edges: '',
         borders: { ...DEFAULT_BORDERS, terrain: {} },
+        fog: '',
         paths: [],
         stamps: [],
         tokens: [],
@@ -100,6 +102,10 @@ export function normalizeDoc(raw: unknown): MapDoc | null {
 
     let edges = str(r.edges, '');
     if (edges && runTotal(edges) !== cols * res * rows * res) edges = encodeEdges(decodeEdges(edges, cols * res * rows * res));
+    /* A map from before fog, or an old map whose samples were just made:
+       no fog, or fog cut to fit. */
+    let fog = str(r.fog, '');
+    if (fog && runTotal(fog) !== cols * res * rows * res) fog = encodeFog(decodeFog(fog, cols * res * rows * res));
 
     return {
         id: str(r.id, '') || uid(),
@@ -118,6 +124,7 @@ export function normalizeDoc(raw: unknown): MapDoc | null {
         background,
         edges,
         borders: normalizeBorders(r.borders),
+        fog,
         paths: arr<MapPath>(r.paths).filter((p) => p && Array.isArray(p.points) && p.points.length >= 2)
             .map((p) => ({ ...p, id: p.id || uid(), width: num(p.width, 0.6) })),
         stamps: arr<MapStamp>(r.stamps).filter((s) => s && typeof s.landmark === 'string')
@@ -218,6 +225,14 @@ export function resizeDoc(doc: MapDoc, cols: number, rows: number): MapDoc {
         edges = encodeEdges(moved.data);
         rememberEdges(edges, moved.data);
     }
+    let fog = '';
+    const fogged = fogOf(doc);
+    if (fogged) {
+        const was: Raster = { w: doc.cols * doc.res, h: doc.rows * doc.res, res: doc.res, data: fogged };
+        const moved = resizeRaster(was, cols, rows, 0);
+        fog = encodeFog(moved.data);
+        rememberFog(fog, moved.data);
+    }
     const cx = (v: number) => Math.max(0, Math.min(cols, v));
     const cy = (v: number) => Math.max(0, Math.min(rows, v));
     return {
@@ -227,6 +242,7 @@ export function resizeDoc(doc: MapDoc, cols: number, rows: number): MapDoc {
         res: next.res,
         terrain,
         edges,
+        fog,
         stamps: doc.stamps.map((s) => ({ ...s, x: cx(s.x), y: cy(s.y) })),
         tokens: doc.tokens.map((t) => ({ ...t, x: cx(t.x), y: cy(t.y) })),
         labels: doc.labels.map((l) => ({ ...l, x: cx(l.x), y: cy(l.y) })),

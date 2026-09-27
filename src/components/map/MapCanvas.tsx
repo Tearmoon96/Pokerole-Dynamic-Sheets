@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react';
 import { useMap } from '../../map/MapContext';
 import { PATH_KINDS, styleOf } from '../../map/styles';
 import { snapPoint, snapsFor, uid } from '../../map/doc';
-import { EMPTY, codeIndex, encode, floodFill, rasterOf, remember, resolvedOf } from '../../map/raster';
+import { EMPTY, allowTable, codeIndex, encode, floodFill, rasterOf, remember, resolvedOf } from '../../map/raster';
 import type { Canvas } from '../../map/raster';
 import { BRUSH_BY_ID, newStroke, strokeSegment } from '../../map/brushes';
 import type { Stroke } from '../../map/brushes';
 import { PAINT_INHERIT, blankEdges, edgesOf, encodeEdges, paintValue, rememberEdges } from '../../map/edges';
+import { FOG_CLEAR, blankFog, encodeFog, fogOf, fogValue, rememberFog } from '../../map/fog';
+import { fogImage } from '../../map/render/fog';
 import { slotOf } from '../../map/store';
 import type { BrushSetting, MapUi } from '../../map/store';
 import { distToPolyline, simplify } from '../../map/geometry';
@@ -60,14 +62,16 @@ type Gesture =
 
 const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
 
-/** A brush stroke under way: the painting tool, the eraser's terrain mode
-    and the Borders brush all stroke the same way, into their own layers. */
+/** A brush stroke under way: the painting tool, the eraser's terrain mode,
+    the Borders brush and the two fog brushes all stroke the same way, into
+    their own layers. */
 interface Stroking {
     last: Pt;
     canvas: Canvas;
     /** The copies being painted, whichever of the two this stroke writes. */
     terrain: Uint8Array | null;
     edges: Uint8Array | null;
+    fog: Uint8Array | null;
     brush: BrushSetting;
     stroke: Stroke;
     frame: number | null;
@@ -75,15 +79,19 @@ interface Stroking {
 
 /** The layers one press of a painting tool writes, as copies to paint into:
     terrain and its border look for the brush, bare ground and no border for
-    the eraser, the border look alone for the Borders brush. */
-function strokeLayers(d: MapDoc, tool: Tool, ui: Pick<MapUi, 'terrain' | 'paintEdge' | 'edgeKind'>):
-    { terrain: Uint8Array | null; edges: Uint8Array | null; canvas: Canvas } {
+    the eraser, the border look alone for the Borders brush, and the fog
+    alone for the two fog brushes — which never touch the ground under it. */
+function strokeLayers(d: MapDoc, tool: Tool, ui: Pick<MapUi, 'terrain' | 'paintEdge' | 'edgeKind' | 'fogColor' | 'fogStrength'>):
+    { terrain: Uint8Array | null; edges: Uint8Array | null; fog: Uint8Array | null; canvas: Canvas } {
     const r = rasterOf(d);
     const had = edgesOf(d);
     const edgeCopy = () => (had ? had.slice() : blankEdges(d));
     const layers: Canvas['layers'] = [];
-    let terrain: Uint8Array | null = null, edges: Uint8Array | null = null;
-    if (tool === 'edge') {
+    let terrain: Uint8Array | null = null, edges: Uint8Array | null = null, fog: Uint8Array | null = null;
+    if (tool === 'fog' || tool === 'unfog') {
+        fog = fogOf(d)?.slice() ?? blankFog(d);
+        layers.push({ data: fog, value: tool === 'fog' ? fogValue(ui.fogColor, ui.fogStrength) : FOG_CLEAR });
+    } else if (tool === 'edge') {
         edges = edgeCopy();
         layers.push({ data: edges, value: paintValue(ui.edgeKind) });
     } else {
@@ -98,7 +106,23 @@ function strokeLayers(d: MapDoc, tool: Tool, ui: Pick<MapUi, 'terrain' | 'paintE
             layers.push({ data: edges, value: edge });
         }
     }
-    return { terrain, edges, canvas: { w: r.w, h: r.h, res: r.res, layers } };
+    return { terrain, edges, fog, canvas: { w: r.w, h: r.h, res: r.res, layers } };
+}
+
+/** What a terrain stroke pressed at `at` may cover — see Canvas.guard.
+    Smart painting refuses the locked terrains; staying on the start refuses
+    everything but the terrain under the press. Both together keep only what
+    both allow. Null when neither is on: the brush covers anything. */
+function strokeGuard(d: MapDoc, ui: Pick<MapUi, 'smartPaint' | 'lockedTerrains' | 'stayOnStart'>, at: Pt): Canvas['guard'] | null {
+    if (!ui.smartPaint && !ui.stayOnStart) return null;
+    const r = resolvedOf(d);
+    const locked = new Set(ui.smartPaint ? ui.lockedTerrains.map(codeIndex) : []);
+    const sx = Math.min(r.w - 1, Math.floor(at[0] * r.res)), sy = Math.min(r.h - 1, Math.floor(at[1] * r.res));
+    const start = r.data[sy * r.w + sx];
+    return {
+        looks: r.data,
+        allow: allowTable((i) => !locked.has(i) && (!ui.stayOnStart || i === start)),
+    };
 }
 
 /* Capture keeps a drag coming to the stage after it leaves the element it
@@ -274,11 +298,13 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         if (g.frame != null) { cancelAnimationFrame(g.frame); g.frame = null; }
         const terrain = g.terrain ? encode(g.terrain) : store.doc.terrain;
         const edges = g.edges ? encodeEdges(g.edges) : store.doc.edges;
-        if (terrain === store.doc.terrain && edges === store.doc.edges) return;
+        const fog = g.fog ? encodeFog(g.fog) : store.doc.fog;
+        if (terrain === store.doc.terrain && edges === store.doc.edges && fog === store.doc.fog) return;
         /* Copies for the cache: the stroke goes on painting into its own. */
         if (g.terrain && terrain !== store.doc.terrain) remember(terrain, g.terrain.slice());
         if (g.edges && edges !== store.doc.edges) rememberEdges(edges, g.edges.slice());
-        store.live((m) => { m.terrain = terrain; m.edges = edges; });
+        if (g.fog && fog !== store.doc.fog) rememberFog(fog, g.fog.slice());
+        store.live((m) => { m.terrain = terrain; m.edges = edges; m.fog = fog; });
     };
 
     const paintAlong = (g: Stroking, from: Pt, to: Pt) => {
@@ -328,6 +354,8 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         switch (tool) {
             case 'paint':
             case 'edge':
+            case 'fog':
+            case 'unfog':
             case 'erase': {
                 if (tool === 'erase' && store.ui.eraseMode === 'objects') {
                     store.checkpoint();
@@ -344,6 +372,13 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                     brush: store.ui.brushes[slotOf(tool)!],
                     stroke: newStroke(d.cols, d.rows),
                 };
+                if (tool === 'paint') {
+                    const guard = strokeGuard(d, store.ui, at);
+                    if (guard) {
+                        g.canvas.guard = guard;
+                        if (!guard.allow.some((v) => v)) toast('<i class="fa-solid fa-lock"></i> Nothing here to paint over: this terrain is locked in Smart painting.');
+                    }
+                }
                 gesture.current = g;
                 paintAlong(g, at, at);
                 return;
@@ -631,6 +666,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 <StampsLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} />
                 <LabelsLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} />
                 <TokensLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} />
+                {(!ui.fogHidden || ui.tool === 'fog' || ui.tool === 'unfog') && <FogLayer doc={doc} />}
                 {box && (
                     <div
                         className="map-marquee"
@@ -656,10 +692,28 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     );
 }
 
+/** The fog, over everything placed on the map: a canvas one pixel a sample,
+    stretched to the map and smoothed. Redrawn only when the fog changes —
+    a stroke publishes at most once a frame. */
+function FogLayer({ doc }: { doc: MapDoc }) {
+    const ref = useRef<HTMLCanvasElement>(null);
+    const { cols, rows, res, fog } = doc;
+    const image = useMemo(() => fogImage({ cols, rows, res, fog }), [cols, rows, res, fog]);
+    useLayoutEffect(() => {
+        const c = ref.current;
+        if (!c || !image) return;
+        c.width = image.width;
+        c.height = image.height;
+        c.getContext('2d')?.drawImage(image, 0, 0);
+    }, [image]);
+    if (!image) return null;
+    return <canvas ref={ref} className="map-fog" style={{ width: cols * CELL, height: rows * CELL }} aria-hidden="true" />;
+}
+
 /** Whether a tool paints with a brush right now — the eraser only when it
     rubs out terrain. */
 function brushTool(tool: string, eraseMode: string): boolean {
-    return tool === 'paint' || tool === 'edge' || (tool === 'erase' && eraseMode === 'terrain');
+    return tool === 'paint' || tool === 'edge' || tool === 'fog' || tool === 'unfog' || (tool === 'erase' && eraseMode === 'terrain');
 }
 
 /* Where the brush will land, drawn in world px. Its shape is the brush's own:

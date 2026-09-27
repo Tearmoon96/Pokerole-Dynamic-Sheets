@@ -67,7 +67,9 @@ function SizeField({ value, label, onChange }: { value: number; label: string; o
     );
 }
 
-const SIZE_LABEL: Record<BrushSlot, string> = { paint: 'Brush size in cells', erase: 'Eraser size in cells', edge: 'Border brush size in cells' };
+const SIZE_LABEL: Record<BrushSlot, string> = { paint: 'Brush size in cells', erase: 'Eraser size in cells', edge: 'Border brush size in cells',
+    fog: 'Fog brush size in cells', unfog: 'Fog clearing brush size in cells',
+};
 
 /** The brush of one tool — painting, the eraser, the Borders brush each have
     their own, so a fine eraser does not shrink the paint brush. */

@@ -416,3 +416,43 @@
 .map-bend { margin-bottom: 0.55rem; }
 
 .map-type-reset { margin-top: 0.2rem; }
+
+/* Smart painting, under the paint brush */
+.map-smart { margin-top: 0.7rem; }
+.map-smart .map-check { align-items: flex-start; margin-bottom: 0.35rem; }
+.map-smart .map-check input { margin-top: 0.15rem; }
+.map-smart-bar { display: flex; gap: 0.25rem; margin: 0.2rem 0 0.35rem; }
+
+.map-smart-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.2rem;
+}
+
+.map-smart-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.15rem 0.3rem;
+    min-width: 0;
+    text-align: left;
+}
+
+.map-smart-item > i { flex: 0 0 0.8rem; font-size: 0.65rem; color: var(--accent); }
+.map-smart-item .map-swatch-chip { width: 20px; height: 14px; }
+.map-smart-item[aria-pressed="false"] { opacity: 0.5; }
+.map-smart-item[aria-pressed="false"] > i { color: var(--text-secondary); }
+
+/* Fog of war */
+.map-fog-colors { margin-bottom: 0.2rem; }
+.map-fog-colors button { display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; }
+.map-fog-chip {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    border: 1px solid #0006;
+}
+.map-fog-pct { min-width: 2.6rem; }
+.map-fog-actions { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.6rem; }
+.map-fog-actions button { font-size: 0.74rem; padding: 0.3rem 0.55rem; }
+.map-fog-hide { margin-top: 0.6rem; }

@@ -148,6 +148,18 @@ zoom or grid setting ever moves anything.
   paint their exact shape into it at any size, and the renderer draws what is
   there without bending it. Maps from before the samples are converted on load,
   keeping their look.
+- **Smart painting**: a terrain stroke can carry a guard (`Canvas.guard`) — a
+  snapshot of what every sample looked like at the press, and a table of the
+  terrains it may cover. Locked terrains and "stay on the terrain the stroke
+  starts on" both build that table (`strokeGuard` in `MapCanvas.tsx`); a
+  refused sample keeps every layer, its border look included.
+- **Fog of war** ([`src/map/fog.ts`](src/map/fog.ts)): its own layer on the
+  terrain's samples, `MapDoc.fog`, run-length encoded — dark grey or soft
+  white at 5-100% strength in steps of 5, one byte a sample. The Fog and
+  Clear fog tools paint it with the ordinary brushes and never touch the
+  terrain. [`render/fog.ts`](src/map/render/fog.ts) turns it into one
+  blurred picture that the page lays over every object (`FogLayer` in
+  `MapCanvas.tsx`) and the PNG export draws last.
 - **The background** is a layer under the painting: a bare sample (stored as
   `_`) shows the map's `background` terrain, whatever it is at the time. The
   eraser paints bare samples, so rubbing out uncovers it, and swapping the
@@ -178,6 +190,14 @@ zoom or grid setting ever moves anything.
 - **Storage**: each map under its own `localStorage` key, `pokerole_map_<id>`,
   with the list in `pokerole_maps`, so two tabs on two maps never overwrite
   each other. Save and Open write one map per `.json` file.
+- **Map from a description** ([`src/map/recipe.ts`](src/map/recipe.ts)): a map
+  written as JSON (terrain shapes, paths, landmarks, labels, tokens) for a chat
+  assistant to produce. The page writes the assistant's instructions
+  ([`recipeBrief.ts`](src/map/recipeBrief.ts)) from the same tables the parser
+  checks against, and builds the result ([`recipeBuild.ts`](src/map/recipeBuild.ts))
+  with the ordinary fill and brush code. A natural outline is a noise-warped
+  lookup into an exact mask, so a coarse polygon comes out as a coastline.
+  The page never contacts a service: the owner carries the text both ways.
 
 ## The rolling table
 
