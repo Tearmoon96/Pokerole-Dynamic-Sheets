@@ -39,10 +39,11 @@ export const TERRAINS: TerrainDef[] = [
     { slug: 'tundra', name: 'Tundra', code: 'u', z: 14, icon: 'fa-icicles' },
     { slug: 'snow', name: 'Snow', code: 'n', z: 15, icon: 'fa-snowflake' },
     { slug: 'mountain', name: 'Mountain', code: 'm', z: 16, icon: 'fa-mountain' },
-    { slug: 'volcanic', name: 'Volcanic', code: 'v', z: 17, icon: 'fa-volcano' },
-    { slug: 'cave-floor', name: 'Cave floor', code: 'c', z: 18, icon: 'fa-dungeon' },
-    { slug: 'road', name: 'Road', code: 'r', z: 19, icon: 'fa-road' },
-    { slug: 'town-paving', name: 'Town paving', code: 'p', z: 20, icon: 'fa-border-all' },
+    { slug: 'snow-mountain', name: 'Snow mountain', code: 'M', z: 17, icon: 'fa-mountain-sun' },
+    { slug: 'volcanic', name: 'Volcanic', code: 'v', z: 18, icon: 'fa-volcano' },
+    { slug: 'cave-floor', name: 'Cave floor', code: 'c', z: 19, icon: 'fa-dungeon' },
+    { slug: 'road', name: 'Road', code: 'r', z: 20, icon: 'fa-road' },
+    { slug: 'town-paving', name: 'Town paving', code: 'p', z: 21, icon: 'fa-border-all' },
 ];
 
 export const TERRAIN_BY_CODE = new Map(TERRAINS.map((t) => [t.code, t]));

@@ -19,7 +19,10 @@ export interface TerrainLook {
     pattern?: string;
     /** Colour the pattern draws in. */
     ink?: string;
-    /** The outline where this terrain's region ends, in world px at 1x. */
+    /** The outline where this terrain's region ends, in world px at 1x. A
+        tint of the terrain's own colour, never the style's ink: a hard dark
+        rim on a few terrains read as a mistake beside the rest. A map that
+        wants dark lines picks the Line border look, on every terrain alike. */
     edge?: { color: string; width: number };
 }
 
@@ -100,9 +103,9 @@ const handdrawn: MapStyle = {
         'deep-sea': { fill: '#9fb4ae', pattern: 'waves', ink: '#5d7a74' },
         'sea': { fill: '#b6c8bd', pattern: 'waves', ink: '#7d968c' },
         'shallows': { fill: '#cbd8c6', pattern: 'ripples', ink: '#8fa89a' },
-        'lake': { fill: '#b6c8bd', pattern: 'ripples', ink: '#7d968c', edge: { color: HAND_INK, width: 1.6 } },
+        'lake': { fill: '#b6c8bd', pattern: 'ripples', ink: '#7d968c', edge: { color: '#5d7a7466', width: 1 } },
         'swamp': { fill: '#b3b58c', pattern: 'swamp', ink: '#5f7a3c', edge: { color: '#6b6a4588', width: 1 } },
-        'beach': { fill: '#ecdfb2', pattern: 'sand', ink: '#b8a472', edge: { color: HAND_INK, width: 2.2 } },
+        'beach': { fill: '#ecdfb2', pattern: 'sand', ink: '#b8a472', edge: { color: '#b8a47299', width: 1 } },
         'grassland': { fill: '#e2dcae', pattern: 'tussocks', ink: '#7f9a4a' },
         'flower-field': { fill: '#f3d9dc', pattern: 'flowers', ink: '#7f9a4a', edge: { color: '#b0808888', width: 1 } },
         'tall-grass': { fill: '#cbd29a', pattern: 'tall-tussocks', ink: '#5f7a34', edge: { color: '#6f7a3e88', width: 1 } },
@@ -113,10 +116,11 @@ const handdrawn: MapStyle = {
         'tundra': { fill: '#e4e3d4', pattern: 'bare-trees', ink: '#6e665a', edge: { color: '#8a908f88', width: 1 } },
         'snow': { fill: '#f5f2e8', pattern: 'snow', ink: '#a8b0b4', edge: { color: '#7a808488', width: 1 } },
         'mountain': { fill: '#d0c19f', pattern: 'peaks', ink: HAND_INK, edge: { color: '#3b2f2499', width: 1.2 } },
-        'volcanic': { fill: '#b39a8c', pattern: 'volcanoes', ink: HAND_INK, edge: { color: HAND_INK, width: 1.4 } },
-        'cave-floor': { fill: '#c2b294', pattern: 'rocks', ink: '#6b5a44', edge: { color: HAND_INK, width: 1.4 } },
+        'snow-mountain': { fill: '#cdcbc4', pattern: 'snow-peaks', ink: '#4e5660', edge: { color: '#6a707899', width: 1.2 } },
+        'volcanic': { fill: '#b39a8c', pattern: 'volcanoes', ink: HAND_INK, edge: { color: '#7a5a4c99', width: 1.2 } },
+        'cave-floor': { fill: '#c2b294', pattern: 'rocks', ink: '#6b5a44', edge: { color: '#6b5a4499', width: 1.2 } },
         'road': { fill: '#dccb9f', edge: { color: '#3b2f2499', width: 1 } },
-        'town-paving': { fill: '#d9cab0', pattern: 'bricks', ink: '#9a8a70', edge: { color: HAND_INK, width: 1.4 } },
+        'town-paving': { fill: '#d9cab0', pattern: 'bricks', ink: '#9a8a70', edge: { color: '#9a8a7099', width: 1 } },
     },
     paths: {
         'river': { color: '#6f8f96', casing: HAND_INK, widthScale: 1, taper: true, cap: 'round' },
@@ -155,23 +159,24 @@ const anime: MapStyle = {
         'deep-sea': { fill: '#2f7fd6', pattern: 'sparkle', ink: '#5a9de4' },
         'sea': { fill: '#48a6f2', pattern: 'sparkle', ink: '#8ccaf8' },
         'shallows': { fill: '#82d3f6', edge: { color: '#ffffffaa', width: 3 } },
-        'lake': { fill: '#5cbaf2', pattern: 'sparkle', ink: '#a8dcfa', edge: { color: ANIME_LINE, width: 2.5 } },
-        'swamp': { fill: '#78a05e', pattern: 'swamp', ink: '#4e8a3c', edge: { color: ANIME_LINE, width: 2 } },
-        'beach': { fill: '#f7e4a4', edge: { color: ANIME_LINE, width: 3 } },
+        'lake': { fill: '#5cbaf2', pattern: 'sparkle', ink: '#a8dcfa', edge: { color: '#3a94dc', width: 2 } },
+        'swamp': { fill: '#78a05e', pattern: 'swamp', ink: '#4e8a3c', edge: { color: '#4e7a3c', width: 2 } },
+        'beach': { fill: '#f7e4a4', edge: { color: '#d9b862', width: 2 } },
         'grassland': { fill: '#86d66f', pattern: 'tussocks', ink: '#56a848', edge: { color: '#4f9a4a', width: 2 } },
         'flower-field': { fill: '#f8d0dc', pattern: 'flowers', ink: '#5aa84a', edge: { color: '#d88aa4', width: 2 } },
         'tall-grass': { fill: '#6cbf58', pattern: 'tall-tussocks', ink: '#3a8f3a', edge: { color: '#3f8a3f', width: 2 } },
-        'forest': { fill: '#40a04a', pattern: 'forest-fill', ink: '#2f8040', edge: { color: ANIME_LINE, width: 2.5 } },
-        'jungle': { fill: '#2f8c4c', pattern: 'jungle-fill', ink: '#237038', edge: { color: ANIME_LINE, width: 2.5 } },
+        'forest': { fill: '#40a04a', pattern: 'forest-fill', ink: '#2f8040', edge: { color: '#2a7a38', width: 2 } },
+        'jungle': { fill: '#2f8c4c', pattern: 'jungle-fill', ink: '#237038', edge: { color: '#1e6a34', width: 2 } },
         'desert': { fill: '#f4d26e', pattern: 'blobs', ink: '#ecc25a', edge: { color: '#c89a3a', width: 2 } },
         'badlands': { fill: '#dd8e56', pattern: 'shrubs', ink: '#b06a38', edge: { color: '#9a5a2e', width: 2 } },
         'tundra': { fill: '#d4eaf0', pattern: 'bare-trees', ink: '#6a6660', edge: { color: '#8ab4c4', width: 2 } },
         'snow': { fill: '#fafdff', pattern: 'sparkle', ink: '#d4ecf8', edge: { color: '#8ab4c4', width: 2 } },
-        'mountain': { fill: '#b09a80', pattern: 'blobs', ink: '#9a8468', edge: { color: ANIME_LINE, width: 2.5 } },
-        'volcanic': { fill: '#6e4a46', pattern: 'volcanoes', ink: '#3a2624', edge: { color: ANIME_LINE, width: 2.5 } },
-        'cave-floor': { fill: '#8e7c68', pattern: 'rocks', ink: '#5e4e3e', edge: { color: ANIME_LINE, width: 2.5 } },
+        'mountain': { fill: '#b09a80', pattern: 'blobs', ink: '#9a8468', edge: { color: '#8a7258', width: 2 } },
+        'snow-mountain': { fill: '#aebccc', pattern: 'snow-peaks', ink: '#5a6a80', edge: { color: '#8394a8', width: 2 } },
+        'volcanic': { fill: '#6e4a46', pattern: 'volcanoes', ink: '#3a2624', edge: { color: '#4e3230', width: 2 } },
+        'cave-floor': { fill: '#8e7c68', pattern: 'rocks', ink: '#5e4e3e', edge: { color: '#6a5846', width: 2 } },
         'road': { fill: '#ebd6a6', edge: { color: '#b89a64', width: 2 } },
-        'town-paving': { fill: '#dcd7cf', pattern: 'bricks', ink: '#c4beb4', edge: { color: ANIME_LINE, width: 2 } },
+        'town-paving': { fill: '#dcd7cf', pattern: 'bricks', ink: '#c4beb4', edge: { color: '#b0a89c', width: 2 } },
     },
     paths: {
         'river': { color: '#48a6f2', casing: ANIME_LINE, widthScale: 1, taper: true, cap: 'round' },
@@ -217,6 +222,7 @@ const townmap: MapStyle = {
         'tundra': { fill: '#c8e0e8' },
         'snow': { fill: '#f0f8f8' },
         'mountain': { fill: '#b09068' },
+        'snow-mountain': { fill: '#b8c0d0' },
         'volcanic': { fill: '#886058' },
         'cave-floor': { fill: '#907860' },
         'road': { fill: '#f0e080' },
@@ -265,6 +271,7 @@ const overworld: MapStyle = {
         'tundra': { fill: '#d0e0e0', pattern: 'px-bare-trees', ink: '#605850' },
         'snow': { fill: '#f8f8f8', pattern: 'px-sand', ink: '#d8e8f0' },
         'mountain': { fill: '#a88860', pattern: 'px-rock', ink: '#806040' },
+        'snow-mountain': { fill: '#d0d8e0', pattern: 'px-snow-peaks', ink: '#8890a0' },
         'volcanic': { fill: '#584040', pattern: 'px-volcanic', ink: '#e05020' },
         'cave-floor': { fill: '#886850', pattern: 'px-rocks', ink: '#5a4230' },
         'road': { fill: '#d8b878', pattern: 'px-sand', ink: '#c09858' },

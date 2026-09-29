@@ -179,7 +179,7 @@ const TERRAIN_SYNONYMS: Record<string, string> = {
     marsh: 'swamp', bog: 'swamp', wetland: 'swamp', sand: 'beach', grass: 'grassland', plains: 'grassland',
     meadow: 'grassland', field: 'grassland', woods: 'forest', trees: 'forest', rainforest: 'jungle',
     dunes: 'desert', canyon: 'badlands', mesa: 'badlands', ice: 'snow', glacier: 'snow', mountains: 'mountain',
-    hills: 'mountain', rock: 'mountain', lava: 'volcanic', volcano: 'volcanic', cave: 'cave-floor',
+    hills: 'mountain', rock: 'mountain', peaks: 'snow-mountain', 'snowy-mountain': 'snow-mountain', 'snowy-peaks': 'snow-mountain', alpine: 'snow-mountain', lava: 'volcanic', volcano: 'volcanic', cave: 'cave-floor',
     town: 'town-paving', city: 'town-paving', street: 'town-paving', path: 'road', sky: 'clouds',
 };
 const LANDMARK_SLUGS = LANDMARKS.map((l) => l.slug);

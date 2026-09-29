@@ -281,6 +281,25 @@ const SMOOTH: Record<string, Painter> = {
             c.beginPath(); c.moveTo(x, y - w * 1.1); c.lineTo(x + w * 0.25, y - w * 0.3); c.stroke();
         }
     },
+    /* The Mountain's peaks with white caps: the shaded body, then the snow
+       down to a ragged line, then the outline over both so the cap never
+       eats the ink. */
+    'snow-peaks'(c, S, ink, r) {
+        c.strokeStyle = ink; line(c, S / 100);
+        for (let i = 0; i < 5; i++) {
+            const x = r() * S, y = r() * S, w = S * (0.08 + r() * 0.05), h = w * 1.2;
+            c.fillStyle = '#00000014';
+            c.beginPath(); c.moveTo(x - w, y); c.lineTo(x, y - h); c.lineTo(x + w, y); c.fill();
+            const k = 0.45, cy = y - h * (1 - k), cw = w * k;
+            c.fillStyle = '#ffffff';
+            c.beginPath();
+            c.moveTo(x, y - h); c.lineTo(x + cw, cy); c.lineTo(x + cw * 0.35, cy - h * 0.09);
+            c.lineTo(x, cy + h * 0.05); c.lineTo(x - cw * 0.45, cy - h * 0.1); c.lineTo(x - cw, cy);
+            c.closePath(); c.fill();
+            c.beginPath(); c.moveTo(x - w, y); c.lineTo(x, y - h); c.lineTo(x + w, y); c.stroke();
+            c.beginPath(); c.moveTo(x, y - h); c.lineTo(x + w * 0.25, y - w * 0.3); c.stroke();
+        }
+    },
     bricks(c, S, ink) {
         c.strokeStyle = ink; line(c, S / 140);
         const rowsN = 8, h = S / rowsN, w = S / 4;
@@ -669,6 +688,19 @@ const PIXEL: Record<string, Painter> = {
         for (let i = 0; i < 6; i++) { const x = r() * S, y = r() * S; px(c, x, y, 3, 1); px(c, x + 2, y + 1, 1, 2); }
         c.fillStyle = '#ffffff30';
         for (let i = 0; i < 5; i++) { const x = r() * S, y = r() * S; px(c, x, y, 2, 1); }
+    },
+    'px-snow-peaks'(c, S, ink, r) {
+        /* A few small peaks a tile, rock in the ink and the top two rows
+           white, with a lit left flank. */
+        for (let i = 0; i < 3; i++) {
+            const x = r() * S, y = r() * S;
+            for (let row = 0; row < 6; row++) {
+                c.fillStyle = row < 2 ? '#ffffff' : ink;
+                px(c, x + 5 - row, y + row, 2 + row * 2, 1);
+            }
+            c.fillStyle = '#ffffff70';
+            for (let row = 2; row < 6; row++) px(c, x + 5 - row, y + row);
+        }
     },
     'px-clouds'(c, _S, ink) {
         /* Two stacked puffs a tile, the flat shade under each. */

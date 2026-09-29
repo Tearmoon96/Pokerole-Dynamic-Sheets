@@ -61,6 +61,7 @@ one would orphan both its picture and every stamp of it on every map.
 | Woods | `woods.png` |
 | Jungle | `jungle.png` |
 | Grassland | `grassland.png` |
+| Flower field | `flower-field.png` |
 | Tall grass | `tall-grass.png` |
 | Flower field | `flower-field.png` |
 | Giant tree | `giant-tree.png` |
@@ -165,6 +166,7 @@ one would orphan both its picture and every stamp of it on every map.
 | Tundra | `tundra.png` |
 | Snow | `snow.png` |
 | Mountain | `mountain.png` |
+| Snow mountain | `snow-mountain.png` |
 | Volcanic | `volcanic.png` |
 | Cave floor | `cave-floor.png` |
 | Road | `road.png` |
