@@ -323,9 +323,11 @@ export function panHint(): string {
         : 'Drag with the middle mouse button to pan.';
 }
 
-/** "[ and ] change the size." in the active profile's words. */
+/** "[ and ], or Shift + the scroll wheel, change the size." in the active
+    profile's words. The wheel is the same in every profile. */
 export function brushSizeHint(): string {
     const b = activeProfile().bindings;
     const a = (b['brush-smaller'] || [])[0], z = (b['brush-larger'] || [])[0];
-    return a && z ? comboLabel(a) + ' and ' + comboLabel(z) + ' change the size. ' : '';
+    return a && z ? comboLabel(a) + ' and ' + comboLabel(z) + ', or Shift + the scroll wheel, change the size. '
+        : 'Shift + the scroll wheel changes the size. ';
 }

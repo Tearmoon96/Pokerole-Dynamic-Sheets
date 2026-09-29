@@ -119,7 +119,7 @@ export function HotkeysDialog({ open, onClose }: { open: boolean; onClose: () =>
                 {active.builtin
                     ? 'A built-in profile. Change any key and a copy of it is made for you to edit.'
                     : 'Click a key to change it, + to add another, × to remove one.'}
-                {' '}The middle mouse button pans in every profile. {note && <strong className="map-hotkey-note">{note}</strong>}
+                {' '}In every profile the middle mouse button pans, and Shift + the scroll wheel resizes the brush. {note && <strong className="map-hotkey-note">{note}</strong>}
             </p>
 
             <div className="map-hotkey-scroll">

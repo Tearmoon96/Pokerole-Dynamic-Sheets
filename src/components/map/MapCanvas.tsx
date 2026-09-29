@@ -5,7 +5,7 @@ import { PATH_KINDS, styleOf } from '../../map/styles';
 import { snapPoint, snapsFor, uid } from '../../map/doc';
 import { EMPTY, allowTable, codeIndex, encode, floodFill, rasterOf, remember, resolvedOf } from '../../map/raster';
 import type { Canvas } from '../../map/raster';
-import { BRUSH_BY_ID, newStroke, strokeSegment } from '../../map/brushes';
+import { BRUSH_BY_ID, cleanSize, newStroke, strokeSegment } from '../../map/brushes';
 import type { Stroke } from '../../map/brushes';
 import { PAINT_INHERIT, blankEdges, edgesOf, encodeEdges, paintValue, rememberEdges } from '../../map/edges';
 import { FOG_CLEAR, blankFog, encodeFog, fogOf, fogValue, rememberFog } from '../../map/fog';
@@ -272,14 +272,28 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         const onWheel = (e: WheelEvent) => {
             e.preventDefault();
             const r = el.getBoundingClientRect();
-            const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+            const lines = e.deltaMode === 1 ? 16 : 1;
+            /* Shift + wheel resizes the brush of the tool that is out, on the
+               same log scale as the size slider: a notch is about 16%. Chrome
+               turns Shift + a mouse wheel into a sideways scroll, so the notch
+               arrives as deltaX. A tool with no brush zooms as usual. */
+            if (e.shiftKey && !e.ctrlKey) {
+                const ui = store.ui;
+                const slot = brushTool(ui.tool, ui.eraseMode) ? slotOf(ui.tool) : null;
+                const d = (e.deltaY || e.deltaX) * lines;
+                if (slot) {
+                    if (d) store.setBrush(slot, { size: cleanSize(ui.brushes[slot].size * Math.exp(-d * 0.0015)) });
+                    return;
+                }
+            }
+            const dy = e.deltaY * lines;
             zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-dy * 0.0015));
         };
         el.addEventListener('wheel', onWheel, { passive: false });
         const onZoom = (e: Event) => zoomAt(el.clientWidth / 2, el.clientHeight / 2, (e as CustomEvent<number>).detail);
         window.addEventListener('map-zoom', onZoom);
         return () => { el.removeEventListener('wheel', onWheel); window.removeEventListener('map-zoom', onZoom); };
-    }, [zoomAt]);
+    }, [zoomAt, store]);
 
     /* -------------------------------------------------------------- gestures */
 

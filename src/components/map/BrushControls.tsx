@@ -39,7 +39,7 @@ const fromSlider = (v: number) => cleanSize(Math.exp(LOG_MIN + (v / 1000) * (LOG
 function SizeField({ value, label, onChange }: { value: number; label: string; onChange: (v: number) => void }) {
     const [draft, setDraft] = useState<string | null>(null);
     const input = useRef<HTMLInputElement>(null);
-    /* Changed from elsewhere — the slider, [ and ] — while not being typed
+    /* Changed from elsewhere — the slider, [ and ], Shift + wheel — while not being typed
        in: show the new size, not what was last typed. */
     useEffect(() => {
         if (document.activeElement !== input.current) setDraft(null);

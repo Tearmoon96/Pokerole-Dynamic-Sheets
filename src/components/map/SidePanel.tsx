@@ -175,7 +175,7 @@ function ErasePalette() {
                     <BrushControls slot="erase" />
                     <p className="map-hint">
                         Drag to rub terrain out: the map's background{bg ? ' (' + bg.name + ')' : ''} shows through.
-                        Change the background on the top bar. [ and ] change the size.
+                        Change the background on the top bar. {brushSizeHint()}
                     </p>
                 </>
             ) : (
