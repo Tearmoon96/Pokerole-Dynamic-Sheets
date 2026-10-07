@@ -10,7 +10,7 @@
 /*  `wrangler deploy` prints the URL it published to. Paste it here with the  */
 /*  scheme changed from https:// to wss:// and no trailing slash.            */
 /* ------------------------------------------------------------------------ */
-export const PRODUCTION_RELAY = 'wss://pokerole-rolling-table.YOUR-SUBDOMAIN.workers.dev';
+export const PRODUCTION_RELAY = 'wss://pokerole-rolling-table.tearmoon96.workers.dev';
 
 /* A local override counts as configured, or testing against `wrangler dev`
    before the first deploy would hit the "no relay set up" notice instead of the
