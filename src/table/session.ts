@@ -208,8 +208,12 @@ export class TableSession {
     private room: RoomSecrets | null = null;
     private identity: Identity | null = null;
 
-    /* Fresh every page load, so a reloaded tab starting its counter at zero is
-       not mistaken for a replay of the old one. */
+    /* Fresh with every join (begin), alongside the counter going back to zero,
+       so a session starting again is not mistaken for a replay of the old one.
+       It used to be fresh only per page load: a player removed by the GM, or
+       who left, and joined again without reloading kept the old sid with a
+       counter back at 1, and the GM dropped everything they sent as replays —
+       they saw the table but could not roll. */
     private sid = randomId(6);
     private seq = 0;
     private seen = new Map<string, number>();
@@ -317,6 +321,7 @@ export class TableSession {
         this.room = await deriveRoom(lobbyId, password);
         this.identity = identity;
         this.files = new BlobChannel(this.room.key, this.room.addr, isHost ? await hostUploadKey(lobbyId) : null);
+        this.sid = randomId(6);
         this.seq = 0;
         this.seen.clear();
         this.queue = [];
