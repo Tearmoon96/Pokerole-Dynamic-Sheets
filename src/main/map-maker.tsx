@@ -7,6 +7,7 @@ import { GM_TOAST, ToastProvider } from '../components/common/Toast';
 import { ConfirmProvider } from '../components/gm/ConfirmDialog';
 import { MapStoreProvider } from '../map/MapContext';
 import { MapStore } from '../map/store';
+import { TableLiveLink } from '../map/tableLive';
 import { MapApp } from '../components/map/MapApp';
 import { installTooltips } from '../lib/tooltip';
 import { initDevice } from '../lib/device';
@@ -19,6 +20,12 @@ import '../styles/map-maker.css';
 /* Built before React mounts, like the other pages' stores, so the first render
    already has the saved maps. */
 const store = new MapStore();
+
+/* The line to a rolling table open in another tab. It listens from the
+   start, so the Table button appears as soon as one is. */
+const tableLink = new TableLiveLink(store);
+tableLink.start();
+window.addEventListener('pagehide', () => tableLink.dispose());
 
 function Root() {
     const [data, setData] = useState<AppData | null>(null);
@@ -47,7 +54,7 @@ function Root() {
             <MapStoreProvider store={store}>
                 <ToastProvider skin={GM_TOAST}>
                     <ConfirmProvider>
-                        <MapApp dataOk={dataOk} />
+                        <MapApp dataOk={dataOk} tableLink={tableLink} />
                     </ConfirmProvider>
                 </ToastProvider>
             </MapStoreProvider>

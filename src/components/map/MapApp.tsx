@@ -13,6 +13,8 @@ import { RecipeDialog } from './RecipeDialog';
 import { actionFor } from '../../map/hotkeys';
 import type { HotkeyAction } from '../../map/hotkeys';
 import type { Tool } from '../../map/types';
+import type { TableLiveLink } from '../../map/tableLive';
+import { TableLiveBanner } from './TableLinkControl';
 
 /* The Map Maker: top bar, tool rail, the map, and the side panel. */
 
@@ -23,7 +25,7 @@ function typing(target: EventTarget | null): boolean {
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
 }
 
-export function MapApp({ dataOk }: { dataOk: boolean }) {
+export function MapApp({ dataOk, tableLink }: { dataOk: boolean; tableLink: TableLiveLink }) {
     const { store, doc } = useMap();
     const toast = useToast();
     const [dialog, setDialog] = useState<'maps' | 'sprites' | 'hotkeys' | 'recipe' | null>(null);
@@ -98,6 +100,7 @@ export function MapApp({ dataOk }: { dataOk: boolean }) {
                 case 'zoom-out': window.dispatchEvent(new CustomEvent('map-zoom', { detail: 0.8 })); return;
                 case 'fit': window.dispatchEvent(new CustomEvent('map-fit')); return;
                 case 'grid': store.edit((d) => { d.grid = { ...d.grid, show: !d.grid.show }; }); return;
+                case 'table-live': tableLink.togglePause(); return;
                 default: return;
             }
         };
@@ -113,7 +116,7 @@ export function MapApp({ dataOk }: { dataOk: boolean }) {
             window.removeEventListener('keyup', onUp);
             window.removeEventListener('blur', onBlur);
         };
-    }, [store, dialog]);
+    }, [store, dialog, tableLink]);
 
     return (
         <>
@@ -122,7 +125,9 @@ export function MapApp({ dataOk }: { dataOk: boolean }) {
                 onSprites={() => setDialog('sprites')}
                 onHotkeys={() => setDialog('hotkeys')}
                 onRecipe={() => setDialog('recipe')}
+                tableLink={tableLink}
             />
+            <TableLiveBanner link={tableLink} />
             {!dataOk && (
                 <div id="data-missing" style={{ display: 'block' }}>
                     <i className="fa-solid fa-triangle-exclamation"></i> The <code>app-data</code> folder was not found next

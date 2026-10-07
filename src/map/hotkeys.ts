@@ -21,7 +21,8 @@ export type HotkeyAction =
     | `tool:${Tool}`
     | 'pan-hold' | 'fit' | 'zoom-in' | 'zoom-out' | 'grid'
     | 'undo' | 'redo' | 'duplicate' | 'select-all' | 'delete' | 'deselect'
-    | 'brush-smaller' | 'brush-larger';
+    | 'brush-smaller' | 'brush-larger'
+    | 'table-live';
 
 export interface HotkeyActionDef { action: HotkeyAction; name: string; group: string }
 
@@ -51,6 +52,7 @@ export const HOTKEY_ACTIONS: HotkeyActionDef[] = [
     { action: 'deselect', name: 'Clear the selection', group: 'Edit' },
     { action: 'brush-smaller', name: 'Smaller brush', group: 'Brush' },
     { action: 'brush-larger', name: 'Larger brush', group: 'Brush' },
+    { action: 'table-live', name: 'Pause or resume the live map at the table', group: 'Rolling table' },
 ];
 
 export type Bindings = Partial<Record<HotkeyAction, string[]>>;
@@ -75,6 +77,7 @@ const COMMON: Bindings = {
     deselect: ['Escape'],
     'brush-smaller': ['['],
     'brush-larger': [']'],
+    'table-live': ['Ctrl+Shift+L'],
 };
 
 export const BUILTIN_PROFILES: HotkeyProfile[] = [

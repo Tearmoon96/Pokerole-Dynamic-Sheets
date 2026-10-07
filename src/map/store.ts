@@ -186,6 +186,12 @@ export class MapStore {
         this.notify();
     }
 
+    /** True between `checkpoint()` and `settle()` / `cancel()`: a stroke or a
+        drag is still in progress, and what is on screen is not a step yet. */
+    get dragging(): boolean {
+        return this.pending !== null;
+    }
+
     /** Record the state a drag starts from. */
     checkpoint(): void {
         this.pending = this.doc;

@@ -229,3 +229,79 @@
 }
 
 .map-history .icon-btn:disabled { opacity: 0.35; cursor: default; }
+
+/* ---------------- The rolling table link ---------------- */
+
+/* Only on the bar while a table this browser hosts is open. The mode is the
+   colour: red while live (what you draw is being shown), amber when paused
+   or holding an update back. */
+.map-table-btn { flex: 0 0 auto; white-space: nowrap; }
+.map-table-btn.mode-live { border-color: var(--danger); color: #fecaca; background: #ef444422; }
+.map-table-btn.mode-paused,
+.map-table-btn.mode-held { border-color: var(--crit); color: var(--crit); }
+.map-table-btn.mode-held { animation: map-held-pulse 1.2s ease-in-out infinite; }
+
+@keyframes map-held-pulse {
+    50% { background: #f0b42933; }
+}
+
+.map-table-pop { width: 21rem; }
+.map-table-pop .map-hint strong { color: var(--text-primary); }
+.map-table-pop .map-field span { line-height: 1.3; }
+
+.map-table-actions {
+    display: flex;
+    gap: 0.4rem;
+    margin: 0.5rem 0 0.3rem;
+}
+.map-table-actions button { flex: 1; justify-content: center; }
+.map-table-actions button:disabled { opacity: 0.45; cursor: default; }
+
+.map-table-preview { margin: 0.6rem 0 0; }
+.map-table-preview img {
+    display: block;
+    width: 100%;
+    max-height: 14rem;
+    object-fit: contain;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: #0006;
+}
+.map-table-preview figcaption { font-size: 0.68rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+.map-live-banner {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 1rem;
+    font-size: 0.8rem;
+    border-bottom: 1px solid var(--border-color);
+}
+.map-live-banner > span { flex: 1; min-width: 0; }
+.map-live-banner button { flex: 0 0 auto; }
+.map-live-banner.live { background: #ef44441a; color: #fecaca; }
+.map-live-banner.paused { background: #f0b4291a; color: var(--text-secondary); }
+.map-live-banner.held { background: #f0b42933; color: var(--text-primary); font-weight: 600; }
+.map-live-banner.held > i,
+.map-live-banner.paused > i { color: var(--crit); }
+
+.map-live-dot {
+    flex: 0 0 auto;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: var(--danger);
+    box-shadow: 0 0 0 0 #ef444499;
+    animation: map-live-dot 1.6s ease-out infinite;
+}
+
+@keyframes map-live-dot {
+    70% { box-shadow: 0 0 0 0.45rem #ef444400; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .map-live-dot, .map-table-btn.mode-held { animation: none; }
+}
+
+html[data-device="phone"] .map-live-banner { flex-wrap: wrap; padding: 0.4rem 0.6rem; }

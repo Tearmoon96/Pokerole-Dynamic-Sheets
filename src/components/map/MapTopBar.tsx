@@ -11,6 +11,8 @@ import {
 } from '../../map/files';
 import type { MapDoc } from '../../map/types';
 import { keyHint, useHotkeys } from '../../map/hotkeys';
+import type { TableLiveLink } from '../../map/tableLive';
+import { TableLinkControl } from './TableLinkControl';
 
 /* The bar across the top: which map, how it is drawn, and its file. */
 
@@ -18,8 +20,9 @@ function escapeHtml(s: string): string {
     return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 }
 
-export function MapTopBar({ onMaps, onSprites, onHotkeys, onRecipe }: {
+export function MapTopBar({ onMaps, onSprites, onHotkeys, onRecipe, tableLink }: {
     onMaps: () => void; onSprites: () => void; onHotkeys: () => void; onRecipe: () => void;
+    tableLink: TableLiveLink;
 }) {
     const { store, doc } = useMap();
     useHotkeys();
@@ -151,6 +154,7 @@ export function MapTopBar({ onMaps, onSprites, onHotkeys, onRecipe }: {
             <span className="spacer"></span>
             <span className={'session-status' + (status.warn ? ' warn' : '')}>{status.text}</span>
             <div className="session-actions">
+                <TableLinkControl link={tableLink} />
                 <button className="icon-btn" onClick={onRecipe} title="Map from a description: a chat assistant draws it from your words">
                     <i className="fa-solid fa-scroll"></i>
                 </button>

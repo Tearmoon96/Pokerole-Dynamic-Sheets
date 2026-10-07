@@ -7,7 +7,7 @@ import { midpoint, polygonD, sampleCurve, smoothPathD, taperOutline } from '../g
 import type { Pt } from '../geometry';
 import { typeColors, TYPE_ICONS } from '../../lib/themeTables';
 import { CELL } from './patterns';
-import { fogImage } from './fog';
+import { fogImage, fogSealImage } from './fog';
 import { buildGeometry, drawGrid, drawTerrain } from './terrain';
 import type { TextureSource } from './terrain';
 import type { MapDoc, MapLabel, MapPath, MapStamp, MapToken } from '../types';
@@ -34,6 +34,12 @@ export interface ExportOptions {
     tokens: boolean;
     /** The fog of war, over everything else. */
     fog?: boolean;
+    /** Put every sample under full-strength fog back at 100% after the blur
+        (see `fogSealImage`). The shared table's render always asks for it. */
+    sealFog?: boolean;
+    /** The image format; PNG unless asked. */
+    type?: 'image/png' | 'image/webp' | 'image/jpeg';
+    quality?: number;
 }
 
 export interface LoadedImage {
@@ -441,10 +447,16 @@ export async function renderMapPng(doc: MapDoc, opts: ExportOptions, load: Image
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(fog, 0, 0, doc.cols * CELL, doc.rows * CELL);
     }
+    const seal = opts.fog && opts.sealFog ? fogSealImage(doc) : null;
+    if (seal) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(seal, 0, 0, doc.cols * CELL, doc.rows * CELL);
+    }
 
     const blob = await new Promise<Blob>((resolve, reject) => {
         try {
-            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('The browser could not encode the image.'))), 'image/png');
+            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('The browser could not encode the image.'))),
+                opts.type ?? 'image/png', opts.quality);
         } catch (e) {
             reject(e);
         }

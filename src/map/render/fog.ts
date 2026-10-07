@@ -63,3 +63,36 @@ export function fogImage(doc: Pick<MapDoc, 'cols' | 'rows' | 'res' | 'fog'>): HT
     octx.drawImage(padded, -p, -p);
     return out;
 }
+
+/** The samples under FULL-strength fog, unblurred: one pixel a sample, the
+    fog's colour, fully opaque; everything else transparent.
+
+    The shared table draws this over the soft fog, scaled up without
+    smoothing. The blur that makes fog drift also thins it for a sample or two
+    inside its own edge, which is fine on the GM's screen and is a leak on a
+    player's: whatever sits just inside a fogged area would show faintly at
+    the rim. Over the soft layer this puts every hidden sample back at 100%,
+    and leaves the halo outside the edge as it was. Fog the GM painted at a
+    lower strength is see-through by intent, and left alone. */
+export function fogSealImage(doc: Pick<MapDoc, 'cols' | 'rows' | 'res' | 'fog'>): HTMLCanvasElement | null {
+    const data = fogOf(doc);
+    if (!data) return null;
+    const w = doc.cols * doc.res, h = doc.rows * doc.res;
+    const out = canvas(w, h);
+    const ctx = out.getContext('2d')!;
+    const img = ctx.createImageData(w, h);
+    const px = img.data;
+    const rgb = new Map(FOG_COLORS.map((c) => [c.color, c.rgb]));
+    let any = false;
+    for (let i = 0; i < data.length; i++) {
+        const look = fogLook(data[i]);
+        if (!look || look.alpha < 1) continue;
+        const [r, g, b] = rgb.get(look.color)!;
+        const o = i * 4;
+        px[o] = r; px[o + 1] = g; px[o + 2] = b; px[o + 3] = 255;
+        any = true;
+    }
+    if (!any) return null;
+    ctx.putImageData(img, 0, 0);
+    return out;
+}
