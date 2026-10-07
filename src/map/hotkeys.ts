@@ -22,7 +22,7 @@ export type HotkeyAction =
     | 'pan-hold' | 'fit' | 'zoom-in' | 'zoom-out' | 'grid'
     | 'undo' | 'redo' | 'duplicate' | 'select-all' | 'delete' | 'deselect'
     | 'brush-smaller' | 'brush-larger'
-    | 'table-live';
+    | 'table-live' | 'table-sync';
 
 export interface HotkeyActionDef { action: HotkeyAction; name: string; group: string }
 
@@ -53,6 +53,7 @@ export const HOTKEY_ACTIONS: HotkeyActionDef[] = [
     { action: 'brush-smaller', name: 'Smaller brush', group: 'Brush' },
     { action: 'brush-larger', name: 'Larger brush', group: 'Brush' },
     { action: 'table-live', name: 'Pause or resume the live map at the table', group: 'Rolling table' },
+    { action: 'table-sync', name: 'Sync the live map: send your changes to the table', group: 'Rolling table' },
 ];
 
 export type Bindings = Partial<Record<HotkeyAction, string[]>>;
@@ -78,6 +79,7 @@ const COMMON: Bindings = {
     'brush-smaller': ['['],
     'brush-larger': [']'],
     'table-live': ['Ctrl+Shift+L'],
+    'table-sync': ['Ctrl+Enter'],
 };
 
 export const BUILTIN_PROFILES: HotkeyProfile[] = [

@@ -240,6 +240,8 @@
 .map-table-btn.mode-paused,
 .map-table-btn.mode-held { border-color: var(--crit); color: var(--crit); }
 .map-table-btn.mode-held { animation: map-held-pulse 1.2s ease-in-out infinite; }
+/* Live with changes the players have not been sent: the button says Sync. */
+.map-table-btn.mode-live.pending { border-color: var(--accent); color: var(--text-primary); box-shadow: 0 0 8px var(--accent-glow); }
 
 @keyframes map-held-pulse {
     50% { background: #f0b42933; }
@@ -278,7 +280,14 @@
     font-size: 0.8rem;
     border-bottom: 1px solid var(--border-color);
 }
-.map-live-banner > span { flex: 1; min-width: 0; }
+.map-live-banner > span:not(.map-live-dot) { flex: 1; min-width: 0; }
+/* Changes waiting: the one button that sends them is the one to find. */
+.map-live-banner.pending [data-live-sync] {
+    border-color: var(--accent);
+    color: var(--text-primary);
+    background: var(--accent-faint);
+    box-shadow: 0 0 8px var(--accent-glow);
+}
 .map-live-banner button { flex: 0 0 auto; }
 .map-live-banner.live { background: #ef44441a; color: #fecaca; }
 .map-live-banner.paused { background: #f0b4291a; color: var(--text-secondary); }

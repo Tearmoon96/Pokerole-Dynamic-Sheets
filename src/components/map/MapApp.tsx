@@ -101,6 +101,7 @@ export function MapApp({ dataOk, tableLink }: { dataOk: boolean; tableLink: Tabl
                 case 'fit': window.dispatchEvent(new CustomEvent('map-fit')); return;
                 case 'grid': store.edit((d) => { d.grid = { ...d.grid, show: !d.grid.show }; }); return;
                 case 'table-live': tableLink.togglePause(); return;
+                case 'table-sync': tableLink.syncNow(); return;
                 default: return;
             }
         };

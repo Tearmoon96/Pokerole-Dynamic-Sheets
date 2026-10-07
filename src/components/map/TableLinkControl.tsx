@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Popover } from './Popover';
 import { useGmConfirm } from '../gm/ConfirmDialog';
 import { keyHint } from '../../map/hotkeys';
-import { HOLD_MS } from '../../map/tableLive';
+import { MAX_HOLD_MS, MIN_HOLD_MS } from '../../map/tableLive';
 import type { LiveState, TableLiveLink } from '../../map/tableLive';
 
 /* The Map Maker's button for the rolling table, and the bar that says what
@@ -37,14 +37,14 @@ export function TableLinkControl({ link }: { link: TableLiveLink }) {
         await link.goLive();
     };
 
-    const label = s.mode === 'live' ? 'Live' : s.mode === 'paused' ? 'Paused' : s.mode === 'held' ? 'Held' : 'Table';
+    const label = s.mode === 'live' ? (s.pending && !s.auto ? 'Sync' : 'Live') : s.mode === 'paused' ? 'Paused' : s.mode === 'held' ? 'Held' : 'Table';
     const icon = s.mode === 'live' ? 'fa-tower-broadcast' : s.mode === 'paused' ? 'fa-pause' : s.mode === 'held' ? 'fa-hand' : 'fa-dice';
 
     return (
         <>
             <button
                 ref={anchor}
-                className={'icon-btn map-table-btn mode-' + s.mode}
+                className={'icon-btn map-table-btn mode-' + s.mode + (s.mode === 'live' && s.pending ? ' pending' : '')}
                 aria-expanded={open}
                 data-table-link=""
                 title="Show this map at the rolling table"
@@ -72,6 +72,14 @@ export function TableLinkControl({ link }: { link: TableLiveLink }) {
                 ) : (
                     <div className="map-table-actions">
                         {s.mode === 'live' && (
+                            <button
+                                className="accent" data-table-sync="" disabled={!s.pending || s.busy}
+                                onClick={() => link.syncNow()} title={'Send your changes to the table' + keyHint('table-sync')}
+                            >
+                                <i className="fa-solid fa-rotate"></i> Sync
+                            </button>
+                        )}
+                        {s.mode === 'live' && (
                             <button onClick={() => link.pause()} title={'Pause live' + keyHint('table-live')}>
                                 <i className="fa-solid fa-pause"></i> Pause
                             </button>
@@ -96,9 +104,36 @@ export function TableLinkControl({ link }: { link: TableLiveLink }) {
 
                 {s.mode !== 'off' && (
                     <p className="map-hint">
-                        Live follows <strong>{s.mapName || 'this map'}</strong>. A change reaches the table
-                        {' '}{HOLD_MS / 1000} seconds after you stop editing; undo before then and nothing is sent.
+                        Live follows <strong>{s.mapName || 'this map'}</strong>.{' '}
+                        {s.auto
+                            ? 'Your changes go to the table by themselves once the map has been still for the wait below; undo before then and nothing is sent.'
+                            : 'Make your changes, then press Sync to send them all at once.'}
                     </p>
+                )}
+
+                <label className="map-check">
+                    <input type="checkbox" checked={s.auto} data-table-auto="" onChange={(e) => link.setAuto(e.currentTarget.checked)} />
+                    <span>Sync automatically</span>
+                </label>
+                {s.auto && (
+                    <>
+                        <label className="map-field">
+                            <span>After a change: wait {(s.editHold / 1000).toFixed(1)} s</span>
+                            <input
+                                type="range" min={MIN_HOLD_MS / 1000} max={MAX_HOLD_MS / 1000} step={0.5}
+                                value={s.editHold / 1000} data-edit-hold=""
+                                onChange={(e) => link.setHold('edit', Number(e.currentTarget.value) * 1000)}
+                            />
+                        </label>
+                        <label className="map-field">
+                            <span>After a change that uncovers fog: wait {(s.revealHold / 1000).toFixed(1)} s</span>
+                            <input
+                                type="range" min={MIN_HOLD_MS / 1000} max={MAX_HOLD_MS / 1000} step={0.5}
+                                value={s.revealHold / 1000} data-reveal-hold=""
+                                onChange={(e) => link.setHold('reveal', Number(e.currentTarget.value) * 1000)}
+                            />
+                        </label>
+                    </>
                 )}
 
                 <label className="map-field">
@@ -134,7 +169,9 @@ export function TableLinkControl({ link }: { link: TableLiveLink }) {
     update waiting for a decision, or why live is paused. */
 export function TableLiveBanner({ link }: { link: TableLiveLink }) {
     const s = useTableLive(link);
-    const [now, setNow] = useState(Date.now());
+    /* Only a re-render clock: the countdown reads the time itself, so it is
+       right on the first frame rather than one tick behind. */
+    const [, setNow] = useState(0);
 
     useEffect(() => {
         if (!s.dueAt) return;
@@ -174,14 +211,23 @@ export function TableLiveBanner({ link }: { link: TableLiveLink }) {
     }
 
     if (s.mode === 'live') {
-        const left = s.dueAt ? Math.max(0, Math.ceil((s.dueAt - now) / 1000)) : 0;
+        const left = s.dueAt ? Math.max(0, Math.ceil((s.dueAt - Date.now()) / 1000)) : 0;
+        const status = s.busy ? ' · sending…'
+            : s.dueAt ? ' · update in ' + left + ' s'
+                : s.pending ? ' · changes not sent yet'
+                    : ' · players are up to date';
         return (
-            <div className="map-live-banner live" data-live-banner="live">
+            <div className={'map-live-banner live' + (s.pending ? ' pending' : '')} data-live-banner="live">
                 <span className="map-live-dot"></span>
                 <span>
-                    LIVE at the table: <strong>{s.mapName || 'this map'}</strong>
-                    {s.busy ? ' · sending…' : s.dueAt ? ' · update in ' + left + ' s' : ''}
+                    LIVE at the table: <strong>{s.mapName || 'this map'}</strong>{status}
                 </span>
+                <button
+                    className="accent" data-live-sync="" disabled={!s.pending || s.busy}
+                    onClick={() => link.syncNow()} title={'Send your changes to the table' + keyHint('table-sync')}
+                >
+                    <i className="fa-solid fa-rotate"></i> Sync
+                </button>
                 <button onClick={() => link.pause()} title={'Pause live' + keyHint('table-live')}>
                     <i className="fa-solid fa-pause"></i> Pause
                 </button>

@@ -15,8 +15,11 @@ import type { MapDoc } from './types';
    Live is the one that can hurt — a slip of the unfog brush is on every
    player's screen a moment later — so it is built to fail shut:
 
-   - nothing is sent mid-stroke, and nothing is sent until the map has been
-     still for HOLD_MS. An undo inside that window means nothing leaves;
+   - by default nothing is sent until the GM presses Sync: they finish their
+     changes, look, and send them in one go. Automatic sync is a choice, and
+     then nothing is sent mid-stroke or until the map has been still for the
+     GM's own wait — `editHold` after any change, `revealHold` after one that
+     uncovers fog. An undo inside that wait means nothing leaves;
    - an update that uncovers more than `threshold` of the map, or clears the
      fog entirely, is HELD. Live stops until the GM publishes it or throws it
      away;
@@ -27,7 +30,13 @@ import type { MapDoc } from './types';
    And the picture itself is the players' view (render/playerView.ts): fog
    always on and sealed, hidden objects not drawn, no map data sent. */
 
-export const HOLD_MS = 3000;
+export const MIN_HOLD_MS = 500;
+export const MAX_HOLD_MS = 10_000;
+const DEFAULT_EDIT_HOLD_MS = 1000;
+const DEFAULT_REVEAL_HOLD_MS = 2000;
+const AUTO_KEY = 'pokerole_map_table_auto';
+const EDIT_HOLD_KEY = 'pokerole_map_table_edit_hold';
+const REVEAL_HOLD_KEY = 'pokerole_map_table_reveal_hold';
 const ACK_TIMEOUT_MS = 180_000;
 const THRESHOLD_KEY = 'pokerole_map_table_threshold';
 export const DEFAULT_THRESHOLD = 0.15;
@@ -58,6 +67,27 @@ export interface LiveState {
     error: string;
     /** Share of the map one update may uncover before it is held, 0..1. */
     threshold: number;
+    /** Changes go out by themselves after a wait; off, only on Sync. */
+    auto: boolean;
+    /** Automatic sync: how long the map must be still before a change goes, ms. */
+    editHold: number;
+    /** ...and before a change that uncovers fog goes, ms. */
+    revealHold: number;
+    /** Live, with changes on the map that the players have not been sent. */
+    pending: boolean;
+}
+
+function loadHold(key: string, fallback: number): number {
+    try {
+        const v = Number(localStorage.getItem(key));
+        return v >= MIN_HOLD_MS && v <= MAX_HOLD_MS ? v : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+function loadAuto(): boolean {
+    try { return localStorage.getItem(AUTO_KEY) === '1'; } catch { return false; }
 }
 
 function loadThreshold(): number {
@@ -75,6 +105,8 @@ export class TableLiveLink {
     state: LiveState = {
         connected: false, table: '', shown: false, mode: 'off', mapId: null, mapName: '', why: '', held: null,
         dueAt: null, busy: false, lastUrl: null, lastAt: null, error: '', threshold: loadThreshold(),
+        auto: loadAuto(), editHold: loadHold(EDIT_HOLD_KEY, DEFAULT_EDIT_HOLD_MS),
+        revealHold: loadHold(REVEAL_HOLD_KEY, DEFAULT_REVEAL_HOLD_MS), pending: false,
     };
 
     private channel: BroadcastChannel | null = null;
@@ -94,6 +126,8 @@ export class TableLiveLink {
     private seq = 0;
     private acks = new Map<number, (m: Extract<LinkMessage, { t: 'ack' }>) => void>();
     private sending = false;
+    /** Sync was pressed while a picture was still on its way. */
+    private syncAfter = false;
     private loader = exportLoader(null);
 
     constructor(private store: MapStore) {}
@@ -179,7 +213,7 @@ export class TableLiveLink {
         this.landed = false;
         this.published = null;
         this.publishedDoc = null;
-        this.set({ mode: 'off', mapId: null, mapName: '', held: null, dueAt: null, why: '', error: why });
+        this.set({ mode: 'off', mapId: null, mapName: '', held: null, dueAt: null, why: '', error: why, pending: false });
     }
 
     /* --------------------------------------------------------- the map side */
@@ -199,7 +233,22 @@ export class TableLiveLink {
         if (doc === this.seenDoc) return;
         this.seenDoc = doc;
         if (doc.name !== s.mapName) this.set({ mapName: doc.name });
-        this.schedule(HOLD_MS);
+        this.changed();
+    }
+
+    /** The map moved on from what players have: wait for Sync, or for the
+        automatic wait. An undo back to what they have is no change at all. */
+    private changed(): void {
+        const doc = this.store.doc;
+        const pending = doc !== this.publishedDoc;
+        if (pending !== this.state.pending) this.set({ pending });
+        if (!pending) { this.clearHold(); this.set({ dueAt: null }); return; }
+        if (this.state.auto) this.schedule(this.holdFor(doc));
+    }
+
+    /** How long this version of the map waits: longer if it uncovers fog. */
+    private holdFor(doc: MapDoc): number {
+        return revealStats(this.published, doc).revealed > 0 ? this.state.revealHold : this.state.editHold;
     }
 
     private clearHold(): void {
@@ -216,10 +265,10 @@ export class TableLiveLink {
     /** The hold window ran out: guard, then send. */
     private async due(): Promise<void> {
         if (this.state.mode !== 'live') return;
-        if (this.sending) { this.schedule(500); return; }
+        if (this.sending) { this.syncAfter = true; return; }
         const doc = this.store.doc;
         if (doc.id !== this.state.mapId) { this.onStore(); return; }
-        if (doc === this.publishedDoc) { this.set({ dueAt: null }); return; }
+        if (doc === this.publishedDoc) { this.set({ dueAt: null, pending: false }); return; }
 
         const stats = revealStats(this.published, doc);
         if (stats.clearedAll || stats.revealed > this.state.threshold) {
@@ -264,7 +313,10 @@ export class TableLiveLink {
                 this.publishedDoc = doc;
                 this.landed = true;
             }
-            this.set({ busy: false, lastUrl: URL.createObjectURL(view.blob), lastAt: Date.now() });
+            this.set({
+                busy: false, lastUrl: URL.createObjectURL(view.blob), lastAt: Date.now(),
+                pending: this.state.mode === 'live' && this.store.doc !== this.publishedDoc,
+            });
             return true;
         } catch (e) {
             this.set({ busy: false, error: 'Could not draw the map: ' + (e instanceof Error ? e.message : 'unknown error') });
@@ -275,7 +327,8 @@ export class TableLiveLink {
             /* Changed while it was being sent: that change waits its own turn. */
             if (this.state.mode === 'live' && this.store.doc !== doc && this.store.activeId === this.state.mapId) {
                 this.seenDoc = this.store.doc;
-                this.schedule(HOLD_MS);
+                if (this.syncAfter) { this.syncAfter = false; void this.due(); }
+                else this.changed();
             }
         }
     }
@@ -321,8 +374,27 @@ export class TableLiveLink {
         }
         this.seenDoc = this.store.doc;
         this.set({ mode: 'live', why: '', error: '' });
-        /* What changed while paused goes through the guard like any edit. */
-        this.schedule(0);
+        /* What changed while paused goes through the guard like any edit:
+           at once when syncing by itself, on Sync otherwise. */
+        if (this.state.auto) this.schedule(0);
+        else this.changed();
+    }
+
+    /** Send what is on the map now. Still through the reveal guard. */
+    syncNow(): void {
+        if (this.state.mode !== 'live') return;
+        this.clearHold();
+        this.set({ dueAt: null });
+        void this.due();
+    }
+
+    /** Sync by itself after a wait, or only when asked. */
+    setAuto(auto: boolean): void {
+        try { localStorage.setItem(AUTO_KEY, auto ? '1' : '0'); } catch { /* private mode */ }
+        this.set({ auto });
+        if (this.state.mode !== 'live') return;
+        if (auto) this.changed();
+        else { this.clearHold(); this.set({ dueAt: null }); }
     }
 
     togglePause(): void {
@@ -337,7 +409,7 @@ export class TableLiveLink {
         this.landed = false;
         this.published = null;
         this.publishedDoc = null;
-        this.set({ mode: 'off', mapId: null, mapName: '', why: '', held: null, dueAt: null });
+        this.set({ mode: 'off', mapId: null, mapName: '', why: '', held: null, dueAt: null, pending: false });
         if (mapId) this.post({ t: 'unlive', mapId });
     }
 
@@ -360,5 +432,11 @@ export class TableLiveLink {
         const t = Math.max(0.01, Math.min(1, v));
         try { localStorage.setItem(THRESHOLD_KEY, String(t)); } catch { /* private mode */ }
         this.set({ threshold: t });
+    }
+
+    setHold(which: 'edit' | 'reveal', ms: number): void {
+        const v = Math.round(Math.max(MIN_HOLD_MS, Math.min(MAX_HOLD_MS, ms)));
+        try { localStorage.setItem(which === 'edit' ? EDIT_HOLD_KEY : REVEAL_HOLD_KEY, String(v)); } catch { /* private mode */ }
+        this.set(which === 'edit' ? { editHold: v } : { revealHold: v });
     }
 }
