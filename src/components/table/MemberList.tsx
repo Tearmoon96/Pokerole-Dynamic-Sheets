@@ -6,6 +6,7 @@
 
 import { useTable } from '../../table/TableContext';
 import { CHANNELS } from '../../table/protocol';
+import { FoldTitle, useFold } from './Fold';
 import type { MemberMusic } from '../../table/music/music';
 
 /** The GM's view of one player's music: in time, catching up, or silent. */
@@ -27,17 +28,18 @@ export function MemberList() {
     const { members, myId, isHost } = state;
     const music = session.music.view;
     const playing = isHost && CHANNELS.some((c) => music.decks[c].playing);
+    const [open, toggle] = useFold('members');
 
     return (
         <div className="member-list">
-            <h2 className="side-title">
-                <i className="fa-solid fa-users"></i> At the table
-                <span className="count">{members.length}</span>
-            </h2>
+            <FoldTitle id="members" open={open} onToggle={toggle} icon="fa-users"
+                extra={<span className="count">{members.length}</span>}>
+                At the table
+            </FoldTitle>
 
-            {!members.length && <p className="muted">Waiting for the roster…</p>}
+            {open && !members.length && <p className="muted">Waiting for the roster…</p>}
 
-            <ul>
+            {open && <ul>
                 {members.map((m) => (
                     <li key={m.id} className={m.id === myId ? 'me' : ''}>
                         <span className="who">
@@ -64,9 +66,9 @@ export function MemberList() {
                         )}
                     </li>
                 ))}
-            </ul>
+            </ul>}
 
-            {isHost && members.length > 1 && (
+            {open && isHost && members.length > 1 && (
                 <p className="muted">
                     Removing someone disconnects them, but the password is what really
                     guards the table — change it by starting a new lobby.

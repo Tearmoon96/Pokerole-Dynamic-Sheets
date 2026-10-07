@@ -18,7 +18,17 @@
    player last reported (`mstat`): downloaded, sound enabled, nothing failed.
    If anyone is not ready the GM sees who and why, and either waits — the deck
    starts by itself the moment they all are — or starts anyway. A player who
-   catches up later comes in at the right place on their own. */
+   catches up later comes in at the right place on their own.
+
+   Headphones that lag — Bluetooth ones by 150-250 ms — need nothing extra. A
+   media element's currentTime is the moment reaching the speaker: the browser
+   counts the output's own delay into the media clock. So steering currentTime
+   onto the table clock already puts what each person HEARS in time, whatever
+   they listen through.
+
+   Titles stay with the GM unless they reveal one (`reveal` on a library
+   entry): a hidden track goes out with an empty title, so the name never
+   reaches a player's browser at all. */
 
 import { MissingFileError } from '../blobs';
 import { LIMITS } from '../protocol';
@@ -28,7 +38,7 @@ import type { TableApi } from '../link';
 import { cleanText } from '../validate';
 import { FileOutput, YtOutput, loadYouTube, parseYouTube, youTubeReady } from './outputs';
 import type { Output } from './outputs';
-import { correctionRate, driftOf, positionAt } from './position';
+import { correctionRate, driftOf, fadeActive, fadeGain, fadeStartFor, fadedOut, positionAt } from './position';
 import { loadDecks, loadLibrary, loadUploads, saveDecks, saveLibrary, saveUploads } from './library';
 import type { LibEntry } from './library';
 
@@ -51,7 +61,16 @@ const STAT_STALE_MS = 20_000;
 const RETRY_MS = 10_000;
 const VERIFY_MS = 10 * 60_000;
 
+/* Fades: in a touch longer than out, so a scene settles in and an ambience
+   slips away. The lead gives the message time to land before the volume
+   starts to move; FADER_MS is how often the volume steps while it does. */
+const FADE_IN_MS = 3500;
+const FADE_OUT_MS = 2500;
+const FADE_LEAD_MS = 250;
+const FADER_MS = 40;
+
 const MIX_KEY = 'pokerole_table_mix';
+const FADE_KEY = 'pokerole_table_fade';
 const ACCEPTED_AUDIO = /^(audio\/|video\/(mp4|webm|ogg))/;
 
 export type TrackState = 'queued' | 'loading' | 'ready' | 'failed';
@@ -79,6 +98,8 @@ export interface GmTrack {
     kind: 'file' | 'yt';
     yt?: string;
     dur: number;
+    /** Players see the title. */
+    reveal: boolean;
     size: number;
     /** 0..1 while it is going up to the relay. */
     upload: number | null;
@@ -93,9 +114,6 @@ export interface LocalMix {
     bg: number;
     scene: number;
     muted: boolean;
-    /** Milliseconds this browser plays ahead, to make up for speakers that
-        lag — Bluetooth headphones are often 150-250 ms behind. */
-    delay: number;
 }
 
 /** Someone who is not ready for a track, and why. */
@@ -118,15 +136,26 @@ export interface MusicView {
     errors: Record<ChannelId, string>;
     members: Record<string, MemberMusic>;
     waiting: Record<ChannelId, boolean>;
+    /** GM: this deck fades in on Play and out on Pause or Stop. */
+    fadeOn: Record<ChannelId, boolean>;
     busy: string;
 }
 
 export function silentDeck(): ChannelState {
-    return { track: null, playing: false, pos: 0, ref: 0, loop: true, vol: 1 };
+    return { track: null, playing: false, pos: 0, ref: 0, loop: true, vol: 1, fade: null };
+}
+
+function loadFadeOn(): Record<ChannelId, boolean> {
+    try {
+        const raw = JSON.parse(localStorage.getItem(FADE_KEY) || 'null');
+        return { bg: raw?.bg === true, scene: raw?.scene === true };
+    } catch {
+        return { bg: false, scene: false };
+    }
 }
 
 function loadMix(): LocalMix {
-    const base: LocalMix = { master: 0.8, bg: 1, scene: 1, muted: false, delay: 0 };
+    const base: LocalMix = { master: 0.8, bg: 1, scene: 1, muted: false };
     try {
         const raw = JSON.parse(localStorage.getItem(MIX_KEY) || 'null');
         if (!raw || typeof raw !== 'object') return base;
@@ -136,7 +165,6 @@ function loadMix(): LocalMix {
             bg: unit(raw.bg, 1),
             scene: unit(raw.scene, 1),
             muted: raw.muted === true,
-            delay: typeof raw.delay === 'number' && raw.delay >= 0 && raw.delay <= 500 ? raw.delay : 0,
         };
     } catch {
         return base;
@@ -156,6 +184,7 @@ export function emptyMusicView(): MusicView {
         errors: { bg: '', scene: '' },
         members: {},
         waiting: { bg: false, scene: false },
+        fadeOn: loadFadeOn(),
         busy: '',
     };
 }
@@ -309,7 +338,8 @@ export class MusicController {
                 if (e.kind === 'file' && e.blob) this.sources.set(e.id, { url: URL.createObjectURL(e.blob), file: 'local' });
             }
             /* Forget decks that point at tracks no longer in the library. */
-            const known = (d: ChannelState) => (d.track && !this.entries.some((e) => e.id === d.track) ? silentDeck() : d);
+            const known = (d: ChannelState): ChannelState => (d.track && !this.entries.some((e) => e.id === d.track)
+                ? silentDeck() : { ...silentDeck(), ...d, fade: d.fade ?? null });
             if (saved) this.view = { ...this.view, rev: saved.rev, decks: { bg: known(saved.bg), scene: known(saved.scene) } };
             this.refreshGm();
             if (this.entries.some((e) => e.kind === 'yt')) void loadYouTube().catch(() => {});
@@ -325,8 +355,8 @@ export class MusicController {
         this.generation++;
         document.removeEventListener('pointerdown', this.onGesture, true);
         document.removeEventListener('keydown', this.onGesture, true);
-        for (const t of [this.ticker, this.beat, this.verifier]) if (t !== null) clearInterval(t);
-        this.ticker = this.beat = this.verifier = null;
+        for (const t of [this.ticker, this.beat, this.verifier, this.fader]) if (t !== null) clearInterval(t);
+        this.ticker = this.beat = this.verifier = this.fader = null;
         if (this.statTimer !== null) clearTimeout(this.statTimer);
         if (this.libraryTimer !== null) clearTimeout(this.libraryTimer);
         this.libraryTimer = null;
@@ -393,6 +423,7 @@ export class MusicController {
     }
 
     private tick(): void {
+        if (this.host && this.api.clock.synced) this.finishFades();
         this.reconcileAll();
         const now = Date.now();
         if (now - this.viewDriftAt > 1000) {
@@ -426,6 +457,36 @@ export class MusicController {
         if (!this.api.clock.synced) return;
         const now = this.api.clock.now();
         for (const c of CHANNELS) this.reconcile(c, now);
+        this.keepFading(now);
+    }
+
+    /** What this browser plays a deck at: the GM's mix, this person's own,
+        and any fade under way. */
+    private volumeOf(ch: ChannelId, now: number): number {
+        const st = this.view.decks[ch];
+        const mix = this.view.mix;
+        return mix.muted ? 0 : st.vol * mix[ch] * mix.master * fadeGain(st.fade, now);
+    }
+
+    private fader: number | null = null;
+
+    /* The 250 ms tick is too coarse for a fade — the volume would audibly
+       step — so while one runs, the volume alone is updated far more often. */
+    private keepFading(now: number): void {
+        const active = CHANNELS.some((c) => this.view.decks[c].playing && fadeActive(this.view.decks[c].fade, now));
+        if (active && this.fader === null) this.fader = window.setInterval(() => this.applyVolumes(), FADER_MS);
+        else if (!active && this.fader !== null) { clearInterval(this.fader); this.fader = null; }
+    }
+
+    private applyVolumes(): void {
+        if (!this.api.clock.synced) return;
+        const now = this.api.clock.now();
+        for (const c of CHANNELS) {
+            const t = this.trackOf(this.view.decks[c].track);
+            const out = t?.kind === 'yt' ? this.decks[c].yt : t ? this.decks[c].file : null;
+            out?.setVolume(this.volumeOf(c, now));
+        }
+        this.keepFading(now);
     }
 
     /** Steers one deck to where the table says it should be. */
@@ -449,14 +510,15 @@ export class MusicController {
             out.load(track.yt!);
         }
 
-        const mix = this.view.mix;
         out.setLoop(st.loop);
-        out.setVolume(mix.muted ? 0 : st.vol * mix[ch] * mix.master);
+        out.setVolume(this.volumeOf(ch, now));
 
         const dur = (track.dur || 0) || out.duration;
-        const p = positionAt(st, dur, now + mix.delay);
+        const p = positionAt(st, dur, now);
 
-        if (!st.playing || p.ended) {
+        /* A fade-out that has run its course is as good as paused, here and
+           now, whether or not the GM's word that it is has arrived yet. */
+        if (!st.playing || p.ended || fadedOut(st.fade, now)) {
             out.pause();
             out.setRate(1);
             /* Only a file is parked at the paused spot: YouTube starts playing
@@ -472,7 +534,7 @@ export class MusicController {
             if (out.kind === 'file' && out.ready && Math.abs(out.time() - st.pos) > 0.05) out.seek(st.pos);
             /* Wake exactly when the start is due rather than up to a tick late. */
             if (deck.startTimer === null) {
-                const wait = Math.max(0, st.ref - (now + mix.delay));
+                const wait = Math.max(0, st.ref - now);
                 deck.startTimer = window.setTimeout(() => {
                     deck.startTimer = null;
                     this.reconcile(ch, this.api.clock.now());
@@ -539,7 +601,7 @@ export class MusicController {
     /** Where each deck's player actually is against where the table says it
         should be, read at one instant. For the local test harnesses. */
     probe(): Record<ChannelId, { time: number; expected: number; paused: boolean; rate: number; volume: number; kind: string }> {
-        const now = this.api.clock.now() + this.view.mix.delay;
+        const now = this.api.clock.now();
         const one = (ch: ChannelId) => {
             const st = this.view.decks[ch];
             const t = this.trackOf(st.track);
@@ -761,9 +823,10 @@ export class MusicController {
     private wireTracks(): WireTrack[] {
         const out: WireTrack[] = [];
         for (const e of this.entries) {
-            if (e.kind === 'yt' && e.yt) out.push({ id: e.id, title: e.title, kind: 'yt', yt: e.yt, dur: e.dur });
+            const title = e.reveal ? e.title : '';
+            if (e.kind === 'yt' && e.yt) out.push({ id: e.id, title, kind: 'yt', yt: e.yt, dur: e.dur });
             else if (e.kind === 'file' && this.uploads[e.id]) {
-                out.push({ id: e.id, title: e.title, kind: 'file', file: this.uploads[e.id], dur: e.dur });
+                out.push({ id: e.id, title, kind: 'file', file: this.uploads[e.id], dur: e.dur });
             }
         }
         return out.slice(0, LIMITS.MAX_TRACKS);
@@ -793,7 +856,7 @@ export class MusicController {
 
     private refreshGm(): void {
         const gm: GmTrack[] = this.entries.map((e) => ({
-            id: e.id, title: e.title, kind: e.kind, yt: e.yt, dur: e.dur,
+            id: e.id, title: e.title, kind: e.kind, yt: e.yt, dur: e.dur, reveal: e.reveal === true,
             size: e.blob?.size ?? 0,
             upload: this.uploading.get(e.id) ?? null,
             uploadError: this.uploadErrors.get(e.id) ?? '',
@@ -924,6 +987,15 @@ export class MusicController {
         this.announceLibrary();
     }
 
+    /** Whether players see this track's title. */
+    setReveal(id: string, reveal: boolean): void {
+        if (!this.host) return;
+        this.entries = this.entries.map((e) => (e.id === id ? { ...e, reveal } : e));
+        this.persistLibrary();
+        this.refreshGm();
+        this.announceLibrary();
+    }
+
     remove(id: string): void {
         if (!this.host) return;
         const ref = this.uploads[id];
@@ -969,7 +1041,7 @@ export class MusicController {
         if (!this.host) return;
         const wasPlaying = this.view.decks[ch].playing;
         this.setWaiting(ch, false);
-        this.setDeck(ch, { track: id, playing: false, pos: 0, ref: 0 });
+        this.setDeck(ch, { track: id, playing: false, pos: 0, ref: 0, fade: null });
         if (wasPlaying) this.play(ch);
     }
 
@@ -1008,11 +1080,63 @@ export class MusicController {
         this.set({ waiting: { ...this.view.waiting, [ch]: on } });
     }
 
+    /* ------------------------------------------------------------ fades */
+
+    setFadeOn(ch: ChannelId, on: boolean): void {
+        const fadeOn = { ...this.view.fadeOn, [ch]: on };
+        this.set({ fadeOn });
+        try { localStorage.setItem(FADE_KEY, JSON.stringify(fadeOn)); } catch { /* private mode */ }
+    }
+
+    private fadingOut(ch: ChannelId): boolean {
+        const st = this.view.decks[ch];
+        return st.playing && st.fade?.dir === 'out';
+    }
+
+    /** Fades a playing deck out from wherever its volume is now, then
+        pauses or stops it (finishFades). */
+    private fadeOut(ch: ChannelId, then: 'pause' | 'stop'): void {
+        const now = this.api.clock.now();
+        const from = now + FADE_LEAD_MS;
+        const gain = fadeGain(this.view.decks[ch].fade, now);
+        this.setDeck(ch, { fade: { dir: 'out', at: fadeStartFor('out', gain, FADE_OUT_MS, from), ms: FADE_OUT_MS, then } });
+    }
+
+    /** Can this deck go out with a fade, rather than at once? */
+    private canFade(ch: ChannelId): boolean {
+        const p = this.positionOf(ch);
+        return this.view.fadeOn[ch] && this.view.decks[ch].playing && !p.before && !p.ended;
+    }
+
+    /** A fade-out that has finished becomes the pause or stop it was for. */
+    private finishFades(): void {
+        const now = this.api.clock.now();
+        for (const c of CHANNELS) {
+            const st = this.view.decks[c];
+            if (!st.playing || !st.fade || !fadedOut(st.fade, now)) continue;
+            if (st.fade.then === 'stop') {
+                this.setDeck(c, { playing: false, pos: 0, ref: 0, fade: null });
+            } else {
+                const dur = this.durationOf(c);
+                const p = positionAt(st, dur, st.fade.at + st.fade.ms);
+                this.setDeck(c, { playing: false, pos: Math.min(p.t, dur || p.t), ref: 0, fade: null });
+            }
+        }
+    }
+
     /** Play, with the ready check. */
     play(ch: ChannelId): void {
         if (!this.host) return;
         const st = this.view.decks[ch];
         if (!st.track) return;
+        /* Fading out: bring it back up from where it is, no ready check —
+           everyone is already playing it. */
+        if (this.fadingOut(ch)) {
+            const now = this.api.clock.now();
+            const gain = fadeGain(st.fade, now);
+            this.setDeck(ch, { fade: { dir: 'in', at: fadeStartFor('in', gain, FADE_IN_MS, now + FADE_LEAD_MS), ms: FADE_IN_MS, then: null } });
+            return;
+        }
         if (this.blockers(st.track).length === 0) { this.start(ch); return; }
         this.setWaiting(ch, true);
     }
@@ -1025,7 +1149,9 @@ export class MusicController {
         const p = this.positionOf(ch);
         const pos = p.ended || (p.dur > 0 && p.t >= p.dur - 0.05) ? 0 : p.t;
         this.setWaiting(ch, false);
-        this.setDeck(ch, { playing: true, pos, ref: Math.round(this.api.clock.now() + LEAD_MS) });
+        const ref = Math.round(this.api.clock.now() + LEAD_MS);
+        const fade = this.view.fadeOn[ch] ? { dir: 'in' as const, at: ref, ms: FADE_IN_MS, then: null } : null;
+        this.setDeck(ch, { playing: true, pos, ref, fade });
     }
 
     cancelWait(ch: ChannelId): void {
@@ -1043,14 +1169,25 @@ export class MusicController {
         const st = this.view.decks[ch];
         this.setWaiting(ch, false);
         if (!st.playing) return;
+        if (this.canFade(ch)) {
+            if (!this.fadingOut(ch)) this.fadeOut(ch, 'pause');
+            return;
+        }
         const p = this.positionOf(ch);
-        this.setDeck(ch, { playing: false, pos: Math.min(p.t, p.dur || p.t), ref: 0 });
+        this.setDeck(ch, { playing: false, pos: Math.min(p.t, p.dur || p.t), ref: 0, fade: null });
     }
 
     stop(ch: ChannelId): void {
         if (!this.host) return;
         this.setWaiting(ch, false);
-        this.setDeck(ch, { playing: false, pos: 0, ref: 0 });
+        const st = this.view.decks[ch];
+        if (this.canFade(ch)) {
+            /* Already on its way out: it now ends at the start, not where it is. */
+            if (this.fadingOut(ch) && st.fade) this.setDeck(ch, { fade: { ...st.fade, then: 'stop' } });
+            else this.fadeOut(ch, 'stop');
+            return;
+        }
+        this.setDeck(ch, { playing: false, pos: 0, ref: 0, fade: null });
     }
 
     seek(ch: ChannelId, t: number): void {

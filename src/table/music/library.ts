@@ -24,6 +24,8 @@ export interface LibEntry {
     blob?: Blob;
     yt?: string;
     dur: number;
+    /** Players see the title. Off unless the GM turns it on. */
+    reveal?: boolean;
 }
 
 export interface SavedDecks {

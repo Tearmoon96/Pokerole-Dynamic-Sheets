@@ -72,17 +72,56 @@
     background: #f0b42914;
 }
 
-.table-banner,
-.table-notice {
+.table-banner {
     margin: 0;
     padding: 0.5rem 1rem;
     font-size: 0.78rem;
     border-bottom: 1px solid var(--border-glow);
     flex: 0 0 auto;
+    background: #ef44441a;
+    color: #fca5a5;
 }
 
-.table-banner { background: #ef44441a; color: #fca5a5; }
-.table-notice { background: var(--primary-faint); color: var(--text-secondary); }
+/* A passing notice floats over the page rather than taking a row of it, so
+   nothing below jumps down and back up again four seconds later. */
+.table-notice {
+    position: fixed;
+    left: 50%;
+    top: 3.5rem;
+    transform: translateX(-50%);
+    z-index: 180;
+    max-width: min(26rem, calc(100vw - 2rem));
+    margin: 0;
+    padding: 0.45rem 0.85rem;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: var(--text-primary);
+    background: var(--panel-strong);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: 0 6px 20px #0006;
+    pointer-events: none;
+    animation: table-notice-in 0.18s ease-out;
+}
+
+@keyframes table-notice-in {
+    from { opacity: 0; transform: translate(-50%, -6px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* A copy button glows faintly for a moment once the text is on the clipboard. */
+.copy-flash { animation: copy-flash 0.9s ease-out; }
+
+@keyframes copy-flash {
+    0%   { box-shadow: 0 0 0 0 transparent; border-color: var(--border-color); }
+    20%  { box-shadow: 0 0 8px 1px var(--accent-glow); border-color: var(--accent-border); }
+    100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .table-notice { animation: none; }
+    .copy-flash { animation-duration: 0.01s; }
+}
 
 .table-body {
     flex: 1;
@@ -101,13 +140,30 @@
     overflow-y: auto;
 }
 
-.table-main {
+/* The rolls when no map is out: the feed alone, in the middle. */
+.table-center {
     flex: 1;
     min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* The dice, always on the right; with a map out, the feed above them. */
+.table-main {
+    flex: 0 0 22rem;
+    width: 22rem;
+    min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
+    overflow-y: auto;
 }
+
+/* Down at the bottom, where the hand rests, without the top becoming
+   unreachable when the column overflows (justify-content: flex-end would). */
+.table-main > :first-child { margin-top: auto; }
 
 .feed-scroll {
     flex: 1;
@@ -140,6 +196,30 @@
     align-items: center;
     gap: 0.4rem;
 }
+
+/* The whole title is the fold button: a big target with the caret at its
+   head, and whatever the panel keeps on show while folded to its right. */
+.side-title .side-fold {
+    flex: 1;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.side-title .side-fold:hover { color: var(--text-primary); background: none; }
+.side-title .side-fold:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.side-twist { flex: 0 0 auto; }
 
 .side-title .count {
     margin-left: auto;
@@ -176,6 +256,11 @@
 /* The masked password is 32 bullets; letting it stretch the sidebar would push
    the copy button off the edge. */
 .cred-value.secret { letter-spacing: 0.04em; }
+
+/* Masked, a short row of bullets (the count says nothing: every password is 32).
+   Shown, the password wraps so all 32 characters are readable at once. */
+.cred-value.secret.masked { overflow: hidden; }
+.cred-value.secret:not(.masked) { white-space: normal; word-break: break-all; overflow: visible; }
 
 button.wide {
     width: 100%;
@@ -230,5 +315,7 @@ button.wide {
 @media (max-width: 900px) {
     .table-body { flex-direction: column; overflow-y: auto; }
     .table-side { flex: 0 0 auto; width: auto; overflow: visible; }
+    .table-center { flex: 0 0 auto; }
+    .table-main { flex: 0 0 auto; width: auto; overflow: visible; }
     .feed-scroll { overflow: visible; }
 }

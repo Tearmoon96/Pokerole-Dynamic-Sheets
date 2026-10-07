@@ -58,6 +58,7 @@ export interface WireFile {
     YouTube video everyone loads in their own player. */
 export interface WireTrack {
     id: string;
+    /** Empty while the GM keeps the title to themself, which is the default. */
     title: string;
     kind: 'file' | 'yt';
     file?: WireFile;
@@ -86,6 +87,19 @@ export interface ChannelState {
     loop: boolean;
     /** The GM's mix for this deck, 0..1. Players scale it by their own. */
     vol: number;
+    /** A fade in or out under way, or null. */
+    fade: Fade | null;
+}
+
+/** A deck's sound sweeping in or out over `ms`, from table-clock time `at`.
+    Everyone works out the same volume from the clock, so the whole table
+    fades together. A fade-out ends the deck: it `then` pauses where it got
+    to, or stops and goes back to the start. */
+export interface Fade {
+    dir: 'in' | 'out';
+    at: number;
+    ms: number;
+    then: 'pause' | 'stop' | null;
 }
 
 /** A shared map image, as shown. */
@@ -186,6 +200,7 @@ export const LIMITS = {
     MAX_PARTS: 64,
     /** Ten hours: longer than any track or session needs. */
     MAX_SECONDS: 36_000,
+    MAX_FADE_MS: 10_000,
     /** The largest map image side, in pixels. */
     MAX_MAP_SIDE: 8192,
 } as const;

@@ -2,23 +2,25 @@
 
 import { useRef } from 'react';
 import { useTable } from '../../table/TableContext';
+import { FoldTitle, useFold } from './Fold';
 
 export function MapControls() {
     const { session } = useTable();
     const map = session.map.view;
     const input = useRef<HTMLInputElement>(null);
+    const [open, toggle] = useFold('map');
 
     return (
         <div className="side-panel map-controls">
-            <h2 className="side-title">
-                <i className="fa-solid fa-map"></i> Map
-                {map.ready && (
-                    <span className={'map-state ' + (map.show ? 'on' : 'off')}>
-                        {map.show ? 'shown' : 'hidden'}
-                    </span>
-                )}
-            </h2>
+            <FoldTitle id="map" open={open} onToggle={toggle} icon="fa-map" extra={map.ready && (
+                <span className={'map-state ' + (map.show ? 'on' : 'off')}>
+                    {map.show ? 'shown' : 'hidden'}
+                </span>
+            )}>
+                Map
+            </FoldTitle>
 
+            {open && <>
             {map.ready ? (
                 <>
                     <div className="map-current">
@@ -75,6 +77,7 @@ export function MapControls() {
                 sends a snapshot here, or keeps the map live as you edit it. Players only ever see a
                 picture with the fog drawn in.
             </p>
+            </>}
         </div>
     );
 }

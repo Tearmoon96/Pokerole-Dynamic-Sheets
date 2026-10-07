@@ -8,6 +8,7 @@ import { CHANNELS } from '../../table/protocol';
 import type { ChannelId } from '../../table/protocol';
 import { formatTime } from '../../table/music/position';
 import type { GmTrack } from '../../table/music/music';
+import { FoldTitle, useFold } from './Fold';
 
 const DECK_NAMES: Record<ChannelId, string> = { bg: 'Background', scene: 'Scene' };
 const DECK_ICONS: Record<ChannelId, string> = { bg: 'fa-water', scene: 'fa-masks-theater' };
@@ -60,9 +61,13 @@ function Deck({ ch }: { ch: ChannelId }) {
             <div className="deck-head">
                 <i className={'fa-solid ' + DECK_ICONS[ch] + ' deck-icon'}></i>
                 <span className="deck-name">{DECK_NAMES[ch]}</span>
-                <span className="deck-track" title={track?.title}>
-                    {track ? track.title : <span className="muted">nothing marked</span>}
+                <span className="deck-track" title={track?.title || undefined}>
+                    {!track ? <span className="muted">nothing marked</span>
+                        : track.title ? track.title : <span className="muted">title hidden</span>}
                 </span>
+                {host && track && !(track as GmTrack).reveal && (
+                    <i className="fa-solid fa-eye-slash title-hidden-mark" title="Players do not see this title"></i>
+                )}
                 {track?.kind === 'yt' && <i className="fa-brands fa-youtube yt-mark" aria-label="YouTube"></i>}
             </div>
 
@@ -89,7 +94,7 @@ function Deck({ ch }: { ch: ChannelId }) {
 
                     {host && (
                         <div className="deck-controls">
-                            {st.playing && !pos.ended ? (
+                            {st.playing && !pos.ended && st.fade?.dir !== 'out' ? (
                                 <button className="icon-btn" data-pause={ch} title="Pause for everyone" onClick={() => music.pause(ch)}>
                                     <i className="fa-solid fa-pause"></i>
                                 </button>
@@ -104,6 +109,15 @@ function Deck({ ch }: { ch: ChannelId }) {
                             )}
                             <button className="icon-btn" data-stop={ch} title="Stop and go back to the start" onClick={() => music.stop(ch)}>
                                 <i className="fa-solid fa-stop"></i>
+                            </button>
+                            <button
+                                className="icon-btn" aria-pressed={m.fadeOn[ch]} data-fade={ch}
+                                title={m.fadeOn[ch]
+                                    ? 'Fades: on. Play fades in, Pause and Stop fade out'
+                                    : 'Fades: off. Play, Pause and Stop act at once'}
+                                onClick={() => music.setFadeOn(ch, !m.fadeOn[ch])}
+                            >
+                                <i className="fa-solid fa-wave-square"></i>
                             </button>
                             <button
                                 className="icon-btn" aria-pressed={st.loop} data-loop={ch}
@@ -180,6 +194,13 @@ function TrackRow({ t }: { t: GmTrack }) {
                     </span>
                 )}
                 <span className="track-dur">{t.dur ? formatTime(t.dur) : ''}</span>
+                <button
+                    className="icon-btn track-reveal" data-reveal="" aria-pressed={t.reveal}
+                    title={t.reveal ? 'Players see this title. Click to hide it' : 'Players do not see this title. Click to show it'}
+                    onClick={() => music.setReveal(t.id, !t.reveal)}
+                >
+                    <i className={'fa-solid ' + (t.reveal ? 'fa-eye' : 'fa-eye-slash')}></i>
+                </button>
             </div>
             <div className="track-meta">
                 {on.map((c) => <span key={c} className={'deck-chip ' + c}>{DECK_NAMES[c]}</span>)}
@@ -256,8 +277,9 @@ function Library() {
             </form>
             {busy && <p className="muted"><i className="fa-solid fa-circle-notch fa-spin"></i> Reading the files…</p>}
             <p className="muted">
-                Files are sent to the table once and kept in this browser for next time. A YouTube box
-                appears in the corner while a video plays; adverts can put a player out of step for a moment.
+                Files are sent to the table once and kept in this browser for next time. Players see a
+                track's title only once you reveal it with the eye. YouTube adverts can put a player out
+                of step for a moment.
             </p>
         </div>
     );
@@ -274,7 +296,7 @@ function PlayerLibrary() {
     return (
         <p className="muted" data-player-library="">
             <i className="fa-solid fa-download"></i> {ready}/{files.length} tracks ready
-            {loading ? ' · ' + loading.title + ' ' + (m.tracks[loading.id]?.pct ?? 0) + '%' : ''}
+            {loading ? ' · ' + (loading.title ? loading.title + ' ' : 'downloading ') + (m.tracks[loading.id]?.pct ?? 0) + '%' : ''}
             {failed ? ' · ' + failed + ' waiting to be resent' : ''}
         </p>
     );
@@ -315,17 +337,7 @@ function LocalMixer() {
                             />
                         </label>
                     ))}
-                    <label className="mix-field">
-                        <span>Speaker delay {mix.delay} ms</span>
-                        <input
-                            type="range" min={0} max={400} step={10} value={mix.delay}
-                            onChange={(e) => music.setMix({ delay: Number(e.currentTarget.value) })}
-                        />
-                    </label>
-                    <p className="muted">
-                        Only on this device. Bluetooth headphones play late; a delay of 150–250 ms puts them back
-                        in time with everyone else.
-                    </p>
+                    <p className="muted">Only on this device.</p>
                 </div>
             )}
         </div>
@@ -336,16 +348,29 @@ export function MusicPanel() {
     const { session, state } = useTable();
     const m = session.music.view;
     const anything = state.isHost || m.library.length > 0 || CHANNELS.some((c) => m.decks[c].track);
+    const [open, toggle] = useFold('music');
+    /* Folded, the title still says what the music is doing — above all a
+       ready check, which would otherwise wait out of sight. */
+    const waiting = state.isHost && CHANNELS.some((c) => m.waiting[c]);
+    const playing = CHANNELS.some((c) => m.decks[c].playing && m.decks[c].fade?.dir !== 'out');
 
     if (!anything) return null;
 
     return (
         <div className="side-panel music-panel">
-            <h2 className="side-title"><i className="fa-solid fa-music"></i> Music</h2>
-            {!m.unlocked && <SoundGate />}
-            {CHANNELS.map((c) => <Deck key={c} ch={c} />)}
-            <LocalMixer />
-            {state.isHost ? <Library /> : <PlayerLibrary />}
+            <FoldTitle id="music" open={open} onToggle={toggle} icon="fa-music" extra={!open && (
+                waiting ? <span className="music-state wait"><i className="fa-solid fa-hourglass-half"></i> waiting</span>
+                    : playing ? <span className="music-state on"><i className="fa-solid fa-play"></i> playing</span>
+                        : null
+            )}>
+                Music
+            </FoldTitle>
+            {open && <>
+                {!m.unlocked && <SoundGate />}
+                {CHANNELS.map((c) => <Deck key={c} ch={c} />)}
+                <LocalMixer />
+                {state.isHost ? <Library /> : <PlayerLibrary />}
+            </>}
         </div>
     );
 }

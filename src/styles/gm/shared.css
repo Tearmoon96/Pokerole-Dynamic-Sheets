@@ -44,7 +44,7 @@ button.icon-btn[aria-pressed="true"]:hover {
     border-color: var(--accent);
 }
 
-input[type="text"], input[type="number"], textarea {
+input[type="text"], input[type="password"], input[type="number"], textarea {
     font-family: inherit;
     color: var(--text-primary);
     background: var(--panel-solid);

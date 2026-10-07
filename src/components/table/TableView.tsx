@@ -26,6 +26,14 @@ export function TableView() {
         ? (isHost || hostOnline ? 'live' : 'waiting')
         : status === 'connecting' ? 'connecting' : 'offline';
 
+    /* The dice always sit in the right-hand column. The feed joins them there
+       while a map takes the middle, and has the middle to itself otherwise. */
+    const feed = (
+        <div className="feed-scroll">
+            <RollFeed rolls={state.rolls} myName={state.myName} />
+        </div>
+    );
+
     const CONNECTION_TEXT: Record<string, string> = {
         live: 'Connected',
         waiting: 'Waiting for the GM',
@@ -90,16 +98,16 @@ export function TableView() {
                     <MusicPanel />
                 </aside>
 
-                {mapOn && (
+                {mapOn ? (
                     <section className="table-stage" aria-label="The shared map">
                         <MapStage />
                     </section>
+                ) : (
+                    <section className="table-center" aria-label="Rolls">{feed}</section>
                 )}
 
                 <main className="table-main">
-                    <div className="feed-scroll">
-                        <RollFeed rolls={state.rolls} myName={state.myName} />
-                    </div>
+                    {mapOn && feed}
 
                     {pending.length > 0 && (
                         <div className="pending-strip">

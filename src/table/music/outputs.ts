@@ -167,15 +167,17 @@ const YT_ERRORS: Record<number, string> = {
     150: 'That video’s owner does not allow it to play outside YouTube.',
 };
 
-/* YouTube's terms do not allow a hidden player, so each deck's player is a
-   small visible box in a dock the page owns, outside React: a re-render must
-   never tear down an iframe that is playing. */
+/* Each deck's YouTube player lives in a dock the page owns, outside React: a
+   re-render must never tear down an iframe that is playing. Only the sound is
+   wanted, so the dock is see-through and takes no clicks or focus. It stays
+   inside the viewport at a real size rather than off-screen or display: none,
+   which browsers may treat as a frame nobody is watching and throttle. */
 function dock(): HTMLElement {
     let d = document.getElementById('yt-dock');
     if (!d) {
         d = document.createElement('div');
         d.id = 'yt-dock';
-        d.setAttribute('aria-label', 'YouTube players');
+        d.setAttribute('aria-hidden', 'true');
         document.body.appendChild(d);
     }
     return d;
@@ -199,11 +201,7 @@ export class YtOutput implements Output {
         this.box = document.createElement('div');
         this.box.className = 'yt-box';
         this.box.dataset.deck = label;
-        const tag = document.createElement('span');
-        tag.className = 'yt-box-label';
-        tag.textContent = label;
-        const slot = document.createElement('div');
-        this.box.append(tag, slot);
+        this.box.append(document.createElement('div'));
         this.box.hidden = true;
         dock().appendChild(this.box);
     }
@@ -232,6 +230,7 @@ export class YtOutput implements Output {
                     onReady: () => {
                         this.playerReady = true;
                         this.player?.setVolume(this.wantVolume);
+                        this.box.querySelector('iframe')?.setAttribute('tabindex', '-1');
                     },
                     onStateChange: (e: { data: number }) => {
                         this.state = e.data;

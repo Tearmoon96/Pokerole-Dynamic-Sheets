@@ -62,3 +62,8 @@ html[data-pointer="coarse"] .map-stage-head .icon-btn {
     min-width: 2.5rem;
     min-height: 2.5rem;
 }
+
+/* A panel's title folds it: a full-width row, tall enough for a thumb. */
+html[data-pointer="coarse"] .side-title .side-fold {
+    min-height: 2.5rem;
+}

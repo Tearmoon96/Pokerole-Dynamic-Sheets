@@ -38,7 +38,8 @@
 
 /* ---------------- The GM's map controls ---------------- */
 
-.map-state {
+.map-state,
+.music-state {
     margin-left: auto;
     font-size: 0.62rem;
     letter-spacing: 0.06em;
@@ -48,6 +49,10 @@
 }
 .map-state.on { color: var(--ok); border-color: var(--ok); }
 .map-state.off { color: var(--text-muted); }
+.music-state { display: inline-flex; align-items: center; gap: 0.3rem; text-transform: none; }
+.music-state i { font-size: 0.55rem; }
+.music-state.on { color: var(--ok); border-color: var(--ok); }
+.music-state.wait { color: var(--crit); border-color: var(--crit); }
 
 .map-current { display: flex; gap: 0.55rem; align-items: center; min-width: 0; }
 .map-thumb {
@@ -74,11 +79,6 @@
     display: flex;
 }
 
-/* With a map out, the feed narrows to a column of its own on the right. */
-.table-body.with-map .table-main {
-    flex: 0 0 22rem;
-    width: 22rem;
-}
 
 .map-stage {
     flex: 1;
@@ -194,6 +194,7 @@
 }
 .deck-track { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .yt-mark { color: #ff4e45; }
+.title-hidden-mark { color: var(--text-muted); font-size: 0.72rem; }
 
 .deck-seek { display: flex; align-items: center; gap: 0.4rem; }
 .deck-seek input[type="range"] { flex: 1; }
@@ -288,44 +289,22 @@ button.link-btn {
 
 /* ---------------- YouTube players ---------------- */
 
-/* YouTube's terms want its player visible, so each deck playing a video has a
-   small box here. The dock lives outside React (music/outputs.ts). */
+/* The YouTube players, for their sound only: present and playing, never seen
+   and never in the way. The dock lives outside React (music/outputs.ts). */
 #yt-dock {
     position: fixed;
-    left: 0.75rem;
-    bottom: 0.75rem;
-    z-index: 90;
+    left: 0;
+    bottom: 0;
+    z-index: -1;
     display: flex;
-    gap: 0.5rem;
+    opacity: 0;
     pointer-events: none;
 }
-
-.yt-box {
-    pointer-events: auto;
-    background: #000;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 6px 18px #000a;
-}
+#yt-dock * { pointer-events: none; }
 .yt-box[hidden] { display: none; }
-.yt-box-label {
-    display: block;
-    font-size: 0.58rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    padding: 0.15rem 0.4rem;
-    background: var(--panel-strong);
-}
-.yt-box iframe { display: block; width: 192px; height: 108px; }
-
-/* While a box is up, the side rail leaves room for it at the bottom. */
-body:has(#yt-dock .yt-box:not([hidden])) .table-side { padding-bottom: 9rem; }
+.yt-box iframe { display: block; width: 200px; height: 112px; }
 
 @media (max-width: 900px) {
-    .table-body.with-map .table-main { flex: 0 0 auto; width: auto; }
     .table-stage { order: -1; flex: 0 0 auto; height: 62vh; min-height: 18rem; }
     .phone-switch {
         display: flex;
@@ -340,5 +319,4 @@ body:has(#yt-dock .yt-box:not([hidden])) .table-side { padding-bottom: 9rem; }
     .table-body.with-map.show-rolls .table-stage { display: none; }
     /* Alone on screen, the map takes all of it. */
     .table-body.with-map.show-map .table-stage { flex: 1 1 auto; height: auto; }
-    .yt-box iframe { width: 144px; height: 81px; }
 }

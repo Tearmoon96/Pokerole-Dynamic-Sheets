@@ -2,7 +2,7 @@
 
    Pure arithmetic, kept apart so a harness can check it without a browser. */
 
-import type { ChannelState } from '../protocol';
+import type { ChannelState, Fade } from '../protocol';
 
 export interface Position {
     /** Seconds into the track. */
@@ -44,6 +44,40 @@ export function driftOf(actual: number, expected: number, dur: number, loop: boo
     wrong. */
 export function correctionRate(drift: number): number {
     return 1 - Math.max(-0.05, Math.min(0.05, drift / 1.2));
+}
+
+/* Fades. The volume follows a square law rather than a straight line: the
+   ear hears loudness roughly logarithmically, so a linear sweep seems to do
+   nothing for most of its length and then drop away at the end. */
+
+function fadeProgress(f: Fade, now: number): number {
+    return Math.max(0, Math.min(1, (now - f.at) / f.ms));
+}
+
+/** 0..1, the share of the deck's volume a fade lets through at `now`. */
+export function fadeGain(f: Fade | null, now: number): number {
+    if (!f) return 1;
+    const t = fadeProgress(f, now);
+    return f.dir === 'in' ? t * t : (1 - t) * (1 - t);
+}
+
+/** The fade is under way: the volume is still moving. */
+export function fadeActive(f: Fade | null, now: number): boolean {
+    return !!f && now < f.at + f.ms;
+}
+
+/** A fade-out has run its course: the deck is silent and should be still. */
+export function fadedOut(f: Fade | null, now: number): boolean {
+    return !!f && f.dir === 'out' && now >= f.at + f.ms;
+}
+
+/** Where a new fade has to have begun for it to pick up at `gain` — so
+    stopping halfway through a fade-in fades out from where the sound is,
+    rather than jumping to full volume first. */
+export function fadeStartFor(dir: 'in' | 'out', gain: number, ms: number, from: number): number {
+    const g = Math.sqrt(Math.max(0, Math.min(1, gain)));
+    const t = dir === 'in' ? g : 1 - g;
+    return Math.round(from - t * ms);
 }
 
 export function formatTime(s: number): string {

@@ -8,18 +8,23 @@ import { useState } from 'react';
 import { useTable } from '../../table/TableContext';
 import { formatLobbyId } from '../../table/encoding';
 import { copyText } from './copy';
+import { FoldTitle, useFold } from './Fold';
 
 export function Credentials() {
     const { session, state } = useTable();
     const [shown, setShown] = useState(false);
     const [copied, setCopied] = useState('');
+    const [open, toggle] = useFold('invite');
 
     const pretty = formatLobbyId(state.lobbyId);
 
-    const copy = async (what: string, text: string) => {
+    /* A copy that worked says so on the button itself — a brief glow and a
+       tick — so only a failure needs a notice. */
+    const copy = async (button: HTMLElement, what: string, text: string) => {
         const ok = await copyText(text);
         setCopied(ok ? what : '');
-        session.notify(ok ? what + ' copied.' : 'Could not reach the clipboard.');
+        if (ok) flash(button);
+        else session.notify('Could not reach the clipboard.');
         window.setTimeout(() => setCopied(''), 2000);
     };
 
@@ -33,26 +38,26 @@ export function Credentials() {
 
     return (
         <div className="credentials">
-            <h2 className="side-title"><i className="fa-solid fa-key"></i> Invite</h2>
+            <FoldTitle id="invite" open={open} onToggle={toggle} icon="fa-key">Invite</FoldTitle>
 
-            <div className="cred-row">
+            {open && <div className="cred-row">
                 <span className="cred-label">Lobby id</span>
                 <code className="cred-value">{pretty}</code>
                 <button
                     className="icon-btn"
                     title="Copy the lobby id"
-                    onClick={() => void copy('Lobby id', state.lobbyId)}
+                    onClick={(e) => void copy(e.currentTarget, 'Lobby id', state.lobbyId)}
                 >
                     <i className={'fa-solid ' + (copied === 'Lobby id' ? 'fa-check' : 'fa-copy')}></i>
                 </button>
-            </div>
+            </div>}
 
-            {state.isHost && (
+            {open && state.isHost && (
                 <>
                     <div className="cred-row">
                         <span className="cred-label">Password</span>
-                        <code className="cred-value secret">
-                            {shown ? state.password : '•'.repeat(32)}
+                        <code className={'cred-value secret' + (shown ? '' : ' masked')}>
+                            {shown ? state.password : '•'.repeat(12)}
                         </code>
                         <button
                             className="icon-btn"
@@ -64,14 +69,14 @@ export function Credentials() {
                         <button
                             className="icon-btn"
                             title="Copy the password"
-                            onClick={() => void copy('Password', state.password)}
+                            onClick={(e) => void copy(e.currentTarget, 'Password', state.password)}
                         >
                             <i className={'fa-solid ' + (copied === 'Password' ? 'fa-check' : 'fa-copy')}></i>
                         </button>
                     </div>
 
-                    <button className="accent wide" onClick={() => void copy('Invite', invite)}>
-                        <i className="fa-solid fa-paper-plane"></i> Copy the whole invite
+                    <button className="accent wide" onClick={(e) => void copy(e.currentTarget, 'Invite', invite)}>
+                        <i className={'fa-solid ' + (copied === 'Invite' ? 'fa-check' : 'fa-paper-plane')}></i> Copy the whole invite
                     </button>
 
                     <p className="muted">
@@ -82,4 +87,12 @@ export function Credentials() {
             )}
         </div>
     );
+}
+
+/** Restarts the glow even on a second click while the first is still fading. */
+function flash(el: HTMLElement): void {
+    el.classList.remove('copy-flash');
+    void el.offsetWidth;
+    el.classList.add('copy-flash');
+    el.addEventListener('animationend', () => el.classList.remove('copy-flash'), { once: true });
 }

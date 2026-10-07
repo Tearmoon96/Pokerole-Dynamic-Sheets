@@ -12,7 +12,7 @@
 
 import { LIMITS } from './protocol';
 import type {
-    Body, ChannelId, ChannelState, Inner, TrackLoad, WireFile, WireMapImage, WireMember, WireRoll, WireTrack,
+    Body, ChannelId, ChannelState, Fade, Inner, TrackLoad, WireFile, WireMapImage, WireMember, WireRoll, WireTrack,
 } from './protocol';
 
 /* Keys that must never survive a parse. `__proto__` in a JSON object literal is
@@ -153,9 +153,10 @@ export function parseFile(raw: unknown): WireFile | null {
 function parseTrack(raw: unknown): WireTrack | null {
     if (!isRecord(raw) || !exactly(raw, ['id', 'title', 'kind', 'file', 'yt', 'dur'])) return null;
     const id = idText(raw.id);
-    const title = cleanText(raw.title, LIMITS.MAX_TITLE);
+    /* '' is a title the GM has not revealed. */
+    const title = raw.title === '' ? '' : cleanText(raw.title, LIMITS.MAX_TITLE);
     const dur = num(raw.dur, 0, LIMITS.MAX_SECONDS);
-    if (!id || !title || dur === null) return null;
+    if (typeof raw.title !== 'string' || !id || (!title && raw.title !== '') || dur === null) return null;
     if (raw.kind === 'file') {
         if (raw.yt !== undefined) return null;
         const file = parseFile(raw.file);
@@ -170,8 +171,19 @@ function parseTrack(raw: unknown): WireTrack | null {
     return null;
 }
 
+function parseFade(raw: unknown): Fade | null | undefined {
+    if (raw === null) return null;
+    if (!isRecord(raw) || !exactly(raw, ['dir', 'at', 'ms', 'then'])) return undefined;
+    const at = int(raw.at, 0, Number.MAX_SAFE_INTEGER);
+    const ms = int(raw.ms, 1, LIMITS.MAX_FADE_MS);
+    if (at === null || ms === null) return undefined;
+    if (raw.dir === 'in' && raw.then === null) return { dir: 'in', at, ms, then: null };
+    if (raw.dir === 'out' && (raw.then === 'pause' || raw.then === 'stop')) return { dir: 'out', at, ms, then: raw.then };
+    return undefined;
+}
+
 function parseChannel(raw: unknown): ChannelState | null {
-    if (!isRecord(raw) || !exactly(raw, ['track', 'playing', 'pos', 'ref', 'loop', 'vol'])) return null;
+    if (!isRecord(raw) || !exactly(raw, ['track', 'playing', 'pos', 'ref', 'loop', 'vol', 'fade'])) return null;
     const track = raw.track === null ? null : idText(raw.track);
     if (raw.track !== null && !track) return null;
     const pos = num(raw.pos, 0, LIMITS.MAX_SECONDS);
@@ -179,7 +191,9 @@ function parseChannel(raw: unknown): ChannelState | null {
     const vol = num(raw.vol, 0, 1);
     if (pos === null || ref === null || vol === null) return null;
     if (typeof raw.playing !== 'boolean' || typeof raw.loop !== 'boolean') return null;
-    return { track, playing: raw.playing, pos, ref, loop: raw.loop, vol };
+    const fade = parseFade(raw.fade);
+    if (fade === undefined) return null;
+    return { track, playing: raw.playing, pos, ref, loop: raw.loop, vol, fade };
 }
 
 function parseMapImage(raw: unknown): WireMapImage | null {

@@ -249,13 +249,17 @@ The fog of war is enforced by what is drawn
 ([`playerView.ts`](src/map/render/playerView.ts)): the map data never leaves
 the GM's browser, the fog is always drawn and sealed back to full strength
 after its blur, objects anchored under full fog are not drawn at all, a live
-change waits three seconds of quiet (an undo inside them sends nothing), and an
+change goes out when the GM presses **Sync** (or Ctrl+Enter), unless they
+turned on automatic sync, which waits for the map to be still for their own
+two waits — after any change, and after one that uncovers fog; an undo inside
+the wait sends nothing — and an
 update that uncovers more than a set share of the map, or clears it, is held
 until the GM says yes.
 
 **The music** ([`src/table/music/`](src/table/music/)) is never streamed. Every
 browser holds its own copy of each track — files downloaded ahead of time,
-YouTube links in each player's own small YouTube box — and the GM publishes only
+YouTube links in each player's own YouTube player, kept on the page for its
+sound but never shown — and the GM publishes only
 what the two decks (Background and Scene) are doing: track, playing or not,
 and "`pos` seconds in at table-clock time `ref`". The table clock is the relay's
 ([`clock.ts`](src/table/clock.ts)): every browser pings it NTP-style over its
@@ -264,7 +268,12 @@ player to where the clock says the deck should be — jumping when far out,
 playing up to 5% faster or slower when a little out, and learning how late its
 player starts so a jump lands on time. Starts are scheduled 1.2 s ahead, and a
 **ready check** holds a start until every player has the track and has enabled
-sound, or until the GM starts anyway.
+sound, or until the GM starts anyway. The media clock already counts the
+output's own delay, so Bluetooth headphones need no setting of their own. A
+track's title reaches the players only once the GM reveals it; until then it
+goes out empty. A deck can fade: the fade travels in the deck's state as a
+start time on the table clock and a length, so every browser sweeps its own
+volume in step, and a fade-out ends in the pause or stop it was for.
 
 ## Phones and tablets
 

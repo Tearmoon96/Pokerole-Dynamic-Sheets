@@ -7,6 +7,7 @@
 @import './gm/base.css';
 @import './gm/shared.css';
 @import './gm/dice.css';
+@import './gm/expanders.css';
 @import './table/layout.css';
 @import './table/join.css';
 @import './table/feed.css';
