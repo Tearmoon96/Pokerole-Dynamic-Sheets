@@ -18,6 +18,15 @@ const WINDOW = 8;
 /** On connect: a quick burst, so music can start within a few seconds. */
 const BURST = 5;
 const BURST_GAP_MS = 400;
+/* Then one every few seconds for the first minute or so. The burst lands
+   while the page is busiest — a player who has just loaded is downloading
+   and decrypting every track — so its answers are read late and every one
+   of them can be a few hundred ms out. Over the internet that left a player
+   audibly off the beat until the next steady sample, 30 s later. A few more
+   samples once things are quiet find a clean round trip, and the
+   fastest-wins rule keeps it. */
+const FOLLOW = 15;
+const FOLLOW_GAP_MS = 3000;
 /** After that, often enough to follow a drifting clock and no more. */
 const STEADY_MS = 30_000;
 /** A ping with no answer by then is forgotten. */
@@ -65,6 +74,9 @@ export class ServerClock {
         this.stop();
         for (let i = 0; i < BURST; i++) {
             this.timers.push(window.setTimeout(() => this.ping(), i * BURST_GAP_MS));
+        }
+        for (let i = 1; i <= FOLLOW; i++) {
+            this.timers.push(window.setTimeout(() => this.ping(), BURST * BURST_GAP_MS + i * FOLLOW_GAP_MS));
         }
         this.steady = window.setInterval(() => this.ping(), STEADY_MS);
     }

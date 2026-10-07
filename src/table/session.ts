@@ -192,12 +192,14 @@ const BUCKET_REFILL_MS = 2000;
 /* What this browser itself may send. The relay closes a socket that sends
    more than 40 frames in 10 seconds — for good, since reconnecting into the
    same flood would only repeat it — and the clock pings come out of the same
-   allowance. So messages leave through one queue, at most 30 in a burst and
-   three a second after that. The queue also keeps them in sequence order:
-   signing is asynchronous, and two messages overtaking each other on the way
-   out would have the later one rejected as a replay. */
-const SEND_BURST = 30;
-const SEND_PER_SECOND = 3;
+   allowance. So messages leave through one queue, at most 12 in a burst and
+   two a second after that: the most any 10 seconds can then hold is 12 + 20,
+   plus the clock's pings (at most 4 while it settles) and the keepalive, which
+   stays under 40 with room to spare. The queue also keeps them in sequence
+   order: signing is asynchronous, and two messages overtaking each other on
+   the way out would have the later one rejected as a replay. */
+const SEND_BURST = 12;
+const SEND_PER_SECOND = 2;
 
 export class TableSession {
     readonly store = new TableStore();
