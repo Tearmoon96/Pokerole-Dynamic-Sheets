@@ -31,6 +31,12 @@ import type { Body, Inner, WireMember, WireRoll } from './protocol';
 import { roomUrl } from './relay';
 import { fabricateD6, fabricateTotal } from './scripted';
 import { RelayTransport } from './transport';
+import { BlobChannel } from './blobs';
+import { ServerClock } from './clock';
+import { hostUploadKey } from './identity';
+import type { TableApi } from './link';
+import { MapShare } from './mapShare';
+import { MusicController } from './music/music';
 import type { TransportStatus } from './transport';
 import { cleanText, parseInner, parseSigned, safeParse } from './validate';
 
@@ -183,6 +189,16 @@ interface Bucket { tokens: number; last: number }
 const BUCKET_MAX = 5;
 const BUCKET_REFILL_MS = 2000;
 
+/* What this browser itself may send. The relay closes a socket that sends
+   more than 40 frames in 10 seconds — for good, since reconnecting into the
+   same flood would only repeat it — and the clock pings come out of the same
+   allowance. So messages leave through one queue, at most 30 in a burst and
+   three a second after that. The queue also keeps them in sequence order:
+   signing is asynchronous, and two messages overtaking each other on the way
+   out would have the later one rejected as a replay. */
+const SEND_BURST = 30;
+const SEND_PER_SECOND = 3;
+
 export class TableSession {
     readonly store = new TableStore();
 
@@ -214,6 +230,27 @@ export class TableSession {
 
     private heartbeat: number | null = null;
     private hostSeenAt = 0;
+
+    private outbox: Promise<unknown> = Promise.resolve();
+    private sendTokens = SEND_BURST;
+    private sendTokensAt = 0;
+
+    /* The shared map and the music. They reach the table only through this. */
+    private files: BlobChannel | null = null;
+    readonly clock = new ServerClock((frame) => this.transport?.send(frame) ?? false);
+    private api: TableApi = {
+        clock: this.clock,
+        publish: (body) => this.publish(body),
+        notify: (text) => this.notify(text),
+        files: () => this.files,
+        isHost: () => this.store.state.isHost,
+        lobbyId: () => this.store.state.lobbyId,
+        members: () => this.store.state.members,
+        myId: () => this.store.state.myId,
+        changed: () => this.store.update(() => { /* a feature's view moved */ }),
+    };
+    readonly map = new MapShare(this.api);
+    readonly music = new MusicController(this.api);
 
     /* ------------------------------------------------------------- joining */
 
@@ -277,6 +314,7 @@ export class TableSession {
 
         this.room = await deriveRoom(lobbyId, password);
         this.identity = identity;
+        this.files = new BlobChannel(this.room.key, this.room.addr, isHost ? await hostUploadKey(lobbyId) : null);
         this.seq = 0;
         this.seen.clear();
         this.queue = [];
@@ -308,10 +346,24 @@ export class TableSession {
         this.transport = new RelayTransport(roomUrl(this.room.addr), {
             onMessage: (text) => { void this.receive(text); },
             onStatus: (status, detail) => this.onStatus(status, detail),
+            onClock: (text) => this.clock.onFrame(text),
         });
         this.transport.start();
 
         this.heartbeat = window.setInterval(() => this.tick(), HEARTBEAT_MS);
+
+        /* The GM takes the room's file store before anything is uploaded to it;
+           both features start once that is settled either way. */
+        const files = this.files;
+        void (async () => {
+            if (isHost && !await files.claim()) {
+                this.notify('The relay\u2019s file space could not be reached; music and maps will retry.');
+            }
+            if (this.files !== files) return;
+            this.map.onMissing = (id) => this.music.reportMissing(id);
+            await this.map.begin(isHost, lobbyId);
+            await this.music.begin(isHost, lobbyId);
+        })();
     }
 
     private teardown(): void {
@@ -319,10 +371,14 @@ export class TableSession {
             clearInterval(this.heartbeat);
             this.heartbeat = null;
         }
+        this.map.end();
+        this.music.end();
+        this.clock.stop();
         this.transport?.stop();
         this.transport = null;
         this.room = null;
         this.identity = null;
+        this.files = null;
     }
 
     private fail(message: string): void {
@@ -341,7 +397,25 @@ export class TableSession {
 
     /* ------------------------------------------------------------ outbound */
 
-    private async publish(body: Body): Promise<boolean> {
+    private publish(body: Body): Promise<boolean> {
+        const run = this.outbox.then(() => this.publishNow(body));
+        this.outbox = run.catch(() => false);
+        return run;
+    }
+
+    private async takeSendToken(): Promise<void> {
+        for (;;) {
+            const now = performance.now();
+            this.sendTokens = Math.min(SEND_BURST, this.sendTokens + (now - this.sendTokensAt) / 1000 * SEND_PER_SECOND);
+            this.sendTokensAt = now;
+            if (this.sendTokens >= 1) { this.sendTokens -= 1; return; }
+            await new Promise((r) => setTimeout(r, Math.ceil((1 - this.sendTokens) / SEND_PER_SECOND * 1000)));
+        }
+    }
+
+    private async publishNow(body: Body): Promise<boolean> {
+        if (!this.room || !this.identity || !this.transport?.connected) return false;
+        await this.takeSendToken();
         if (!this.room || !this.identity) return false;
 
         const inner: Inner = {
@@ -377,9 +451,17 @@ export class TableSession {
         });
 
         if (status === 'online') {
+            this.clock.start();
             /* Announce first so the host can put us back in the roster, then
                replay anything that piled up while the socket was down. */
-            void this.announce().then(() => this.flushQueue());
+            void this.announce().then(() => {
+                this.flushQueue();
+                this.music.hello();
+            });
+            /* A relay that idled out forgot the GM's claim; take it back. */
+            if (this.store.state.isHost) void this.files?.claim();
+        } else {
+            this.clock.stop();
         }
     }
 
@@ -406,6 +488,9 @@ export class TableSession {
         if (this.store.state.isHost) {
             this.prunePresence();
             void this.publishRoster();
+            /* Anyone whose socket dropped for a moment missed what changed. */
+            this.map.greet();
+            this.music.greet();
         } else {
             const online = Date.now() - this.hostSeenAt < PRESENCE_TIMEOUT_MS;
             if (online !== this.store.state.hostOnline) {
@@ -488,6 +573,10 @@ export class TableSession {
                and this is it. */
             if (body.k === 'hello') this.onHello(inner.f, body.name, inner.sid);
             else if (body.k === 'request') this.onRequest(inner.f, body);
+            else if (body.k === 'mstat' && this.names.has(inner.f)) {
+                this.music.onStat(inner.f, body);
+                if (body.failed.some((id) => this.map.missing(id))) void this.map.verify();
+            }
             return;
         }
 
@@ -533,6 +622,18 @@ export class TableSession {
                 this.store.update((s) => { s.rolls = []; });
                 break;
 
+            case 'library':
+                this.music.onLibrary(body.tracks);
+                break;
+
+            case 'music':
+                this.music.onMusic(body);
+                break;
+
+            case 'map':
+                this.map.onMap(body);
+                break;
+
             case 'kick':
                 if (body.id === this.store.state.myId) {
                     this.leave();
@@ -566,6 +667,8 @@ export class TableSession {
                 .slice(0, LIMITS.MAX_SYNC)
                 .map(stripLocal);
             if (rolls.length) void this.publish({ k: 'sync', rolls });
+            this.map.greet();
+            this.music.greet();
         }
     }
 
@@ -619,6 +722,7 @@ export class TableSession {
                 this.lastSeenAt.delete(id);
                 this.names.delete(id);
                 this.greeted.delete(id);
+                this.music.forget(id);
                 changed = true;
             }
         }
@@ -723,6 +827,7 @@ export class TableSession {
         this.lastSeenAt.delete(id);
         this.greeted.delete(id);
         this.buckets.delete(id);
+        this.music.forget(id);
         void this.publish({ k: 'kick', id });
         void this.publishRoster();
     }

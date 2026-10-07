@@ -1,15 +1,26 @@
 /* The table itself, once you are in it. */
 
+import { useState } from 'react';
 import { useTable } from '../../table/TableContext';
 import { Credentials } from './Credentials';
 import { MemberList } from './MemberList';
 import { RollControls } from './RollControls';
 import { RollFeed } from './RollFeed';
 import { HomeButton } from '../common/HomeButton';
+import { MapStage } from './MapStage';
+import { MapControls } from './MapControls';
+import { MusicPanel } from './MusicPanel';
+import { CHANNELS } from '../../table/protocol';
 
 export function TableView() {
     const { session, state } = useTable();
     const { status, isHost, hostOnline, pending } = state;
+    const map = session.map.view;
+    const music = session.music.view;
+    const mapOn = map.show && (!!map.url || map.loading !== null || !!map.error);
+    /* On a phone the map and the rolls take turns; the map first. */
+    const [phoneView, setPhoneView] = useState<'map' | 'rolls'>('map');
+    const silenced = !music.unlocked && CHANNELS.some((c) => music.decks[c].playing);
 
     const connection = status === 'online'
         ? (isHost || hostOnline ? 'live' : 'waiting')
@@ -45,17 +56,45 @@ export function TableView() {
                 <p className="table-banner">{state.statusDetail}</p>
             )}
 
+            {silenced && (
+                <p className="table-sound-banner" role="status">
+                    <i className="fa-solid fa-music"></i> The GM is playing music.
+                    <button className="accent" onClick={() => session.music.unlock()}>
+                        <i className="fa-solid fa-volume-high"></i> Enable sound
+                    </button>
+                </p>
+            )}
+
             {state.notice && (
                 /* Plain text child, never innerHTML — names here come from other
                    people's browsers. */
                 <p className="table-notice" role="status">{state.notice}</p>
             )}
 
-            <div className="table-body">
+            {mapOn && (
+                <div className="phone-switch" role="tablist" aria-label="Map or table">
+                    <button role="tab" aria-selected={phoneView === 'map'} onClick={() => setPhoneView('map')}>
+                        <i className="fa-solid fa-map"></i> Map
+                    </button>
+                    <button role="tab" aria-selected={phoneView === 'rolls'} onClick={() => setPhoneView('rolls')}>
+                        <i className="fa-solid fa-dice"></i> Table
+                    </button>
+                </div>
+            )}
+
+            <div className={'table-body' + (mapOn ? ' with-map show-' + phoneView : '')}>
                 <aside className="table-side">
                     <Credentials />
                     <MemberList />
+                    {isHost && <MapControls />}
+                    <MusicPanel />
                 </aside>
+
+                {mapOn && (
+                    <section className="table-stage" aria-label="The shared map">
+                        <MapStage />
+                    </section>
+                )}
 
                 <main className="table-main">
                     <div className="feed-scroll">

@@ -10,7 +10,13 @@ export type TransportStatus = 'offline' | 'connecting' | 'online';
 export interface TransportHandlers {
     onMessage: (text: string) => void;
     onStatus: (status: TransportStatus, detail: string) => void;
+    /** The relay's answer to a clock ping — see clock.ts. */
+    onClock?: (text: string) => void;
 }
+
+/** The plaintext prefix of a clock frame. Never a valid sealed envelope,
+    which always starts with `{`. */
+export const CLOCK_PREFIX = '\u0001t';
 
 /* A dropped GM must come back quickly enough that the table barely notices, but
    a relay that is down must not be hammered by every client at once. Start
@@ -86,7 +92,9 @@ export class RelayTransport {
         };
 
         ws.onmessage = (ev) => {
-            if (typeof ev.data === 'string') this.handlers.onMessage(ev.data);
+            if (typeof ev.data !== 'string') return;
+            if (ev.data.startsWith(CLOCK_PREFIX)) this.handlers.onClock?.(ev.data);
+            else this.handlers.onMessage(ev.data);
         };
 
         ws.onerror = () => {

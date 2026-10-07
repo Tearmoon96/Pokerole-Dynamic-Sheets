@@ -99,7 +99,7 @@ than imported, so Vite never parses or bundles them. One line in each page shell
 | `src/state/` | Trainer sheet store, working set, trainer file I/O, PC boxes, IndexedDB |
 | `src/card/` | Card logic: pools, moves, evolution, type chart, weather, ailments, wild import |
 | `src/gm/` | GM logic: entities and tokens, combat, ailments, dice, names, the random Pokémon generator with its habitat and generation tables, session files, folders |
-| `src/table/` | Rolling table: crypto, identity, protocol, validation, transport, session |
+| `src/table/` | Rolling table: crypto, identity, protocol, validation, transport, session, the relay's file store and clock, the shared map (`mapShare.ts`) and the music (`music/`) |
 | `src/map/` | Map Maker logic: the map document, terrain and landmark catalogues, styles, contours, rendering, the store, map files |
 | `src/data/` | Loading `app-data/`, and the context that serves it to components |
 | `src/lib/` | Cross-page helpers: themes, sprites, colour, gear, file system, manuals, update check, device class, touch reordering, the rank table |
@@ -228,6 +228,43 @@ shared table and the solo GM board cannot drift on what a die does. Receivers
 recompute a roll's total and successes from its faces rather than trusting the
 summary — which is also why a GM's scripted roll fabricates real faces that add
 up to the intended outcome instead of asserting a number.
+
+### The shared map and the music
+
+Both move files too big for a socket frame, so the relay also keeps a small
+**file store** per room ([`blobs.ts`](src/table/blobs.ts)): a file is cut into
+1 MB parts, each sealed with the room key, its index and the part count as
+additional data (so the store cannot reorder, drop or swap them), and only a
+reference — id, size and SHA-256 — travels on the socket, signed by the GM. The
+store is still blind. Only the GM writes to it: the host's page claims the room
+with a random upload key on connect, and the relay keeps only that key's hash.
+
+**The map** ([`mapShare.ts`](src/table/mapShare.ts)) is a picture the GM's
+browser uploads and then shows or hides. A hidden map is never announced, so no
+player can fetch it early. The picture comes from an image file or from the Map
+Maker in another tab of the same browser, over a same-origin `BroadcastChannel`
+([`src/lib/tableLink.ts`](src/lib/tableLink.ts)): a one-off snapshot, or **live**,
+where every finished edit is sent on its own ([`src/map/tableLive.ts`](src/map/tableLive.ts)).
+The fog of war is enforced by what is drawn
+([`playerView.ts`](src/map/render/playerView.ts)): the map data never leaves
+the GM's browser, the fog is always drawn and sealed back to full strength
+after its blur, objects anchored under full fog are not drawn at all, a live
+change waits three seconds of quiet (an undo inside them sends nothing), and an
+update that uncovers more than a set share of the map, or clears it, is held
+until the GM says yes.
+
+**The music** ([`src/table/music/`](src/table/music/)) is never streamed. Every
+browser holds its own copy of each track — files downloaded ahead of time,
+YouTube links in each player's own small YouTube box — and the GM publishes only
+what the two decks (Background and Scene) are doing: track, playing or not,
+and "`pos` seconds in at table-clock time `ref`". The table clock is the relay's
+([`clock.ts`](src/table/clock.ts)): every browser pings it NTP-style over its
+socket, and the relay answers the sender alone. Each browser steers its own
+player to where the clock says the deck should be — jumping when far out,
+playing up to 5% faster or slower when a little out, and learning how late its
+player starts so a jump lands on time. Starts are scheduled 1.2 s ahead, and a
+**ready check** holds a start until every player has the track and has enabled
+sound, or until the GM starts anyway.
 
 ## Phones and tablets
 

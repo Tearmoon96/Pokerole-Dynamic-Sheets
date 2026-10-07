@@ -1,0 +1,344 @@
+/* ---------------- Rolling table: the shared map and the music ---------------- */
+
+/* The side panels added for these follow .credentials / .member-list. */
+.side-panel {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--card-bg);
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.side-panel .muted { font-size: 0.72rem; margin: 0; line-height: 1.4; }
+.side-panel .muted strong { color: var(--text-secondary); }
+
+.side-subtitle {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+}
+
+.warn-text { color: #fca5a5; font-size: 0.74rem; margin: 0; }
+
+.progress {
+    height: 0.4rem;
+    border-radius: 999px;
+    background: var(--panel-solid);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+.progress span { display: block; height: 100%; background: var(--accent); transition: width 0.2s; }
+.progress.thin { height: 0.3rem; flex: 1; min-width: 0; }
+
+.side-panel input[type="range"] { accent-color: var(--accent); min-width: 0; }
+
+/* ---------------- The GM's map controls ---------------- */
+
+.map-state {
+    margin-left: auto;
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+}
+.map-state.on { color: var(--ok); border-color: var(--ok); }
+.map-state.off { color: var(--text-muted); }
+
+.map-current { display: flex; gap: 0.55rem; align-items: center; min-width: 0; }
+.map-thumb {
+    flex: 0 0 auto;
+    width: 4.5rem;
+    height: 3.2rem;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: #0006;
+}
+.map-current-text { display: flex; flex-direction: column; min-width: 0; font-size: 0.8rem; }
+.map-current-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.map-buttons { display: flex; gap: 0.4rem; }
+.map-buttons > button:first-child { flex: 1; }
+
+/* ---------------- The map in the middle ---------------- */
+
+.table-stage {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+}
+
+/* With a map out, the feed narrows to a column of its own on the right. */
+.table-body.with-map .table-main {
+    flex: 0 0 22rem;
+    width: 22rem;
+}
+
+.map-stage {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--card-bg);
+    overflow: hidden;
+}
+
+.map-stage-head {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--panel-strong);
+    font-size: 0.82rem;
+}
+.map-stage-title { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-stage-title i { color: var(--ghost-color); }
+.map-stage-loading { font-size: 0.72rem; color: var(--text-secondary); white-space: nowrap; }
+
+.map-live-tag {
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    padding: 0.08rem 0.4rem;
+    border-radius: 999px;
+    background: var(--danger);
+    color: #fff;
+}
+
+.map-stage-view {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    cursor: grab;
+    touch-action: none;
+    background:
+        repeating-conic-gradient(#ffffff06 0% 25%, transparent 0% 50%) 0 0 / 24px 24px,
+        #0b0a0a;
+}
+.map-stage-view:active { cursor: grabbing; }
+
+.map-stage-img {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+    max-width: none;
+    user-select: none;
+    -webkit-user-drag: none;
+    image-rendering: auto;
+}
+
+.map-stage-empty,
+.map-stage-error {
+    position: absolute;
+    inset: auto 0 0 0;
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.78rem;
+    text-align: center;
+}
+.map-stage-empty { inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+.map-stage-error { background: #000a; color: #fca5a5; }
+
+/* The Map / Rolls switch is a phone thing; a wider screen shows both. */
+.phone-switch { display: none; }
+
+.table-sound-banner {
+    margin: 0;
+    padding: 0.45rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.8rem;
+    background: var(--accent-faint);
+    border-bottom: 1px solid var(--accent-border);
+    flex: 0 0 auto;
+}
+.table-sound-banner i { color: var(--accent); }
+
+/* ---------------- Music ---------------- */
+
+.sound-gate { justify-content: center; }
+
+.deck {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.5rem 0.55rem;
+    border: 1px solid var(--border-color);
+    border-radius: 9px;
+    background: var(--panel-solid);
+}
+.deck.playing { border-color: var(--accent-border); box-shadow: 0 0 10px var(--accent-faint); }
+
+.deck-head { display: flex; align-items: center; gap: 0.4rem; min-width: 0; font-size: 0.8rem; }
+.deck-icon { color: var(--ghost-color); font-size: 0.75rem; }
+.deck-name {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    flex: 0 0 auto;
+}
+.deck-track { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.yt-mark { color: #ff4e45; }
+
+.deck-seek { display: flex; align-items: center; gap: 0.4rem; }
+.deck-seek input[type="range"] { flex: 1; }
+.deck-time { font-family: 'Fira Code', monospace; font-size: 0.66rem; color: var(--text-muted); flex: 0 0 auto; }
+
+.deck-controls { display: flex; align-items: center; gap: 0.3rem; }
+.deck-controls input[type="range"] { flex: 1; }
+.deck-vol-icon { color: var(--text-muted); font-size: 0.7rem; margin-left: 0.25rem; }
+
+.deck-note { margin: 0; font-size: 0.7rem; color: var(--text-secondary); }
+
+.ready-check {
+    border: 1px dashed var(--crit);
+    border-radius: 8px;
+    padding: 0.45rem 0.55rem;
+    font-size: 0.74rem;
+    background: #f0b42912;
+}
+.ready-check p { margin: 0 0 0.3rem; color: var(--crit); }
+.ready-check ul { margin: 0 0 0.45rem; padding-left: 1rem; }
+.ready-check li { margin: 0.1rem 0; }
+.ready-buttons { display: flex; gap: 0.4rem; }
+.ready-buttons button { flex: 1; justify-content: center; }
+
+.local-mix { display: flex; flex-direction: column; gap: 0.4rem; }
+.mix-row { display: flex; align-items: center; gap: 0.35rem; }
+.mix-row input[type="range"] { flex: 1; }
+.mix-more { display: flex; flex-direction: column; gap: 0.35rem; }
+.mix-field { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.72rem; color: var(--text-secondary); }
+
+.library { display: flex; flex-direction: column; gap: 0.45rem; }
+
+.track-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+
+.track-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.35rem 0.45rem;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: var(--primary-faint);
+}
+.track-row.marked { border-color: var(--accent-border); }
+
+.track-main { display: flex; align-items: center; gap: 0.4rem; min-width: 0; font-size: 0.8rem; }
+.track-kind { color: var(--text-muted); font-size: 0.75rem; }
+.track-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.track-title-input { flex: 1; min-width: 0; }
+.track-dur { font-family: 'Fira Code', monospace; font-size: 0.64rem; color: var(--text-muted); }
+
+.track-meta { display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; font-size: 0.68rem; }
+.track-upload { color: var(--text-secondary); white-space: nowrap; }
+
+.deck-chip {
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.05rem 0.35rem;
+    border-radius: 999px;
+    border: 1px solid var(--accent-border);
+    color: var(--accent);
+}
+
+button.mini-btn { padding: 0.15rem 0.4rem; font-size: 0.66rem; }
+button.mini-btn[aria-pressed="true"] { background: var(--accent-faint); border-color: var(--accent); color: var(--accent); }
+
+button.link-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.68rem;
+    text-decoration: underline;
+}
+
+.yt-add { display: flex; gap: 0.35rem; }
+.yt-add input { flex: 1; min-width: 0; }
+
+/* ---------------- Who is in time ---------------- */
+
+.sync-dot {
+    flex: 0 0 auto;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--text-muted);
+}
+.sync-dot.good { background: var(--ok); }
+.sync-dot.fair { background: var(--crit); }
+.sync-dot.bad { background: var(--danger); }
+
+/* ---------------- YouTube players ---------------- */
+
+/* YouTube's terms want its player visible, so each deck playing a video has a
+   small box here. The dock lives outside React (music/outputs.ts). */
+#yt-dock {
+    position: fixed;
+    left: 0.75rem;
+    bottom: 0.75rem;
+    z-index: 90;
+    display: flex;
+    gap: 0.5rem;
+    pointer-events: none;
+}
+
+.yt-box {
+    pointer-events: auto;
+    background: #000;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 6px 18px #000a;
+}
+.yt-box[hidden] { display: none; }
+.yt-box-label {
+    display: block;
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    padding: 0.15rem 0.4rem;
+    background: var(--panel-strong);
+}
+.yt-box iframe { display: block; width: 192px; height: 108px; }
+
+/* While a box is up, the side rail leaves room for it at the bottom. */
+body:has(#yt-dock .yt-box:not([hidden])) .table-side { padding-bottom: 9rem; }
+
+@media (max-width: 900px) {
+    .table-body.with-map .table-main { flex: 0 0 auto; width: auto; }
+    .table-stage { order: -1; flex: 0 0 auto; height: 62vh; min-height: 18rem; }
+    .phone-switch {
+        display: flex;
+        gap: 0.4rem;
+        padding: 0.5rem 1rem 0;
+        flex: 0 0 auto;
+    }
+    .phone-switch button { flex: 1; justify-content: center; }
+    .phone-switch button[aria-selected="true"] { background: var(--accent-faint); border-color: var(--accent); color: var(--accent); }
+    .table-body.with-map.show-map .table-main,
+    .table-body.with-map.show-map .table-side { display: none; }
+    .table-body.with-map.show-rolls .table-stage { display: none; }
+    /* Alone on screen, the map takes all of it. */
+    .table-body.with-map.show-map .table-stage { flex: 1 1 auto; height: auto; }
+    .yt-box iframe { width: 144px; height: 81px; }
+}

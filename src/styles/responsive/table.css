@@ -46,3 +46,19 @@ html[data-device="tablet"] .table-bar {
 html[data-device="tablet"] .table-body {
     padding-bottom: var(--safe-bottom);
 }
+
+/* The Map / Table switch is the one control a phone user reaches for most
+   while a map is out; finger-sized, not toolbar-sized. */
+html[data-device="phone"] .phone-switch button {
+    min-height: 2.75rem;
+    font-size: 0.9rem;
+}
+
+/* The music decks' and the library's small buttons, grown to a fingertip. */
+html[data-pointer="coarse"] .deck-controls .icon-btn,
+html[data-pointer="coarse"] .track-meta .icon-btn,
+html[data-pointer="coarse"] .track-meta .mini-btn,
+html[data-pointer="coarse"] .map-stage-head .icon-btn {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+}

@@ -43,6 +43,65 @@ export interface WireMember {
     host: boolean;
 }
 
+/** A file on the relay's file store (blobs.ts). The receiver checks the
+    reassembled bytes against `sha`, which is why a reference is only ever
+    accepted from the GM. */
+export interface WireFile {
+    id: string;
+    sha: string;
+    size: number;
+    parts: number;
+    mime: string;
+}
+
+/** A track in the GM's library: a file everyone downloads ahead of time, or a
+    YouTube video everyone loads in their own player. */
+export interface WireTrack {
+    id: string;
+    title: string;
+    kind: 'file' | 'yt';
+    file?: WireFile;
+    /** An 11-character YouTube video id. */
+    yt?: string;
+    /** Seconds; 0 while unknown. */
+    dur: number;
+}
+
+/** The two decks the GM mixes: a Background bed and the current Scene. */
+export type ChannelId = 'bg' | 'scene';
+export const CHANNELS: readonly ChannelId[] = ['bg', 'scene'];
+
+/** One deck, as everyone should be hearing it.
+
+    The position is not sent as "now": it is sent as `pos` seconds at the
+    table-clock instant `ref` (clock.ts), so anyone can work out where the
+    track is at any moment — a late joiner, or a player whose tab was
+    throttled — without asking. A `ref` in the future is a scheduled start,
+    which is how everyone begins on the same beat. */
+export interface ChannelState {
+    track: string | null;
+    playing: boolean;
+    pos: number;
+    ref: number;
+    loop: boolean;
+    /** The GM's mix for this deck, 0..1. Players scale it by their own. */
+    vol: number;
+}
+
+/** A shared map image, as shown. */
+export interface WireMapImage {
+    file: WireFile;
+    w: number;
+    h: number;
+}
+
+/** What a player reports about their music, to the GM only. */
+export interface TrackLoad {
+    id: string;
+    /** Whole percent. */
+    pct: number;
+}
+
 export type Body =
     /** Any member, on connect and every heartbeat. Doubles as presence. */
     | { k: 'hello'; name: string }
@@ -57,7 +116,25 @@ export type Body =
     /** Host only. */
     | { k: 'clear' }
     /** Host only. */
-    | { k: 'kick'; id: string };
+    | { k: 'kick'; id: string }
+    /** Host only. The music library everyone prefetches. */
+    | { k: 'library'; tracks: WireTrack[] }
+    /** Host only. Both decks. Sent on every change and every few seconds. */
+    | { k: 'music'; rev: number; bg: ChannelState; scene: ChannelState }
+    /** Player to host: what this player can play, and how far off they are. */
+    | {
+        k: 'mstat';
+        unlocked: boolean;
+        ready: string[];
+        loading: TrackLoad[];
+        /** Milliseconds ahead (+) or behind (−) per deck; null when silent. */
+        drift: { bg: number | null; scene: number | null };
+        /** Decks that should be playing and cannot (buffering, an advert). */
+        stall: ChannelId[];
+        failed: string[];
+    }
+    /** Host only. The shared map, or that there is none on show. */
+    | { k: 'map'; rev: number; show: boolean; title: string; live: boolean; image: WireMapImage | null };
 
 export interface Inner {
     v: number;
@@ -101,6 +178,16 @@ export const LIMITS = {
 
     /** Roll history kept on screen. Mirrors the GM screen's HISTORY_LIMIT. */
     HISTORY: 30,
+
+    MAX_TRACKS: 40,
+    MAX_TITLE: 60,
+    /** Matches blobs.ts: 64 parts of 1 000 000 bytes. */
+    MAX_FILE_BYTES: 64_000_000,
+    MAX_PARTS: 64,
+    /** Ten hours: longer than any track or session needs. */
+    MAX_SECONDS: 36_000,
+    /** The largest map image side, in pixels. */
+    MAX_MAP_SIDE: 8192,
 } as const;
 
 /** How often everyone announces themselves, and how long the host waits before

@@ -11,7 +11,9 @@
    to try. */
 
 import { LIMITS } from './protocol';
-import type { Body, Inner, WireMember, WireRoll } from './protocol';
+import type {
+    Body, ChannelId, ChannelState, Inner, TrackLoad, WireFile, WireMapImage, WireMember, WireRoll, WireTrack,
+} from './protocol';
 
 /* Keys that must never survive a parse. `__proto__` in a JSON object literal is
    inert on its own, but the moment any code spreads or assigns that object into
@@ -59,6 +61,12 @@ export function cleanText(v: unknown, max: number): string {
 /** A short opaque id — request ids, roll ids, session ids. */
 function idText(v: unknown): string | null {
     return typeof v === 'string' && /^[A-Za-z0-9_-]{1,48}$/.test(v) ? v : null;
+}
+
+/** A finite number in range; fractions allowed. */
+function num(v: unknown, min: number, max: number): number | null {
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max) return null;
+    return v;
 }
 
 function fingerprintText(v: unknown): string | null {
@@ -127,6 +135,79 @@ function parseMember(raw: unknown): WireMember | null {
     return { id, name, host: raw.host };
 }
 
+export function parseFile(raw: unknown): WireFile | null {
+    if (!isRecord(raw) || !exactly(raw, ['id', 'sha', 'size', 'parts', 'mime'])) return null;
+    if (typeof raw.id !== 'string' || !/^[a-f0-9]{32}$/.test(raw.id)) return null;
+    if (typeof raw.sha !== 'string' || !/^[a-f0-9]{64}$/.test(raw.sha)) return null;
+    const size = int(raw.size, 1, LIMITS.MAX_FILE_BYTES);
+    const parts = int(raw.parts, 1, LIMITS.MAX_PARTS);
+    if (size === null || parts === null) return null;
+    /* The count must be the one the size implies, or a reference could ask
+       for parts that do not exist, or stop short of the end. */
+    if (parts !== Math.max(1, Math.ceil(size / 1_000_000))) return null;
+    if (typeof raw.mime !== 'string'
+        || !/^((audio|image|video)\/[a-z0-9.+-]{1,40}|application\/octet-stream)$/.test(raw.mime)) return null;
+    return { id: raw.id, sha: raw.sha, size, parts, mime: raw.mime };
+}
+
+function parseTrack(raw: unknown): WireTrack | null {
+    if (!isRecord(raw) || !exactly(raw, ['id', 'title', 'kind', 'file', 'yt', 'dur'])) return null;
+    const id = idText(raw.id);
+    const title = cleanText(raw.title, LIMITS.MAX_TITLE);
+    const dur = num(raw.dur, 0, LIMITS.MAX_SECONDS);
+    if (!id || !title || dur === null) return null;
+    if (raw.kind === 'file') {
+        if (raw.yt !== undefined) return null;
+        const file = parseFile(raw.file);
+        if (!file || !/^(audio|video)\/|^application\/octet-stream$/.test(file.mime)) return null;
+        return { id, title, kind: 'file', file, dur };
+    }
+    if (raw.kind === 'yt') {
+        if (raw.file !== undefined) return null;
+        if (typeof raw.yt !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(raw.yt)) return null;
+        return { id, title, kind: 'yt', yt: raw.yt, dur };
+    }
+    return null;
+}
+
+function parseChannel(raw: unknown): ChannelState | null {
+    if (!isRecord(raw) || !exactly(raw, ['track', 'playing', 'pos', 'ref', 'loop', 'vol'])) return null;
+    const track = raw.track === null ? null : idText(raw.track);
+    if (raw.track !== null && !track) return null;
+    const pos = num(raw.pos, 0, LIMITS.MAX_SECONDS);
+    const ref = int(raw.ref, 0, Number.MAX_SAFE_INTEGER);
+    const vol = num(raw.vol, 0, 1);
+    if (pos === null || ref === null || vol === null) return null;
+    if (typeof raw.playing !== 'boolean' || typeof raw.loop !== 'boolean') return null;
+    return { track, playing: raw.playing, pos, ref, loop: raw.loop, vol };
+}
+
+function parseMapImage(raw: unknown): WireMapImage | null {
+    if (!isRecord(raw) || !exactly(raw, ['file', 'w', 'h'])) return null;
+    const file = parseFile(raw.file);
+    const w = int(raw.w, 1, LIMITS.MAX_MAP_SIDE);
+    const h = int(raw.h, 1, LIMITS.MAX_MAP_SIDE);
+    if (!file || w === null || h === null || !file.mime.startsWith('image/')) return null;
+    return { file, w, h };
+}
+
+function idList(raw: unknown, max: number): string[] | null {
+    if (!Array.isArray(raw) || raw.length > max) return null;
+    const out: string[] = [];
+    for (const v of raw) {
+        const id = idText(v);
+        if (!id) return null;
+        out.push(id);
+    }
+    return out;
+}
+
+function driftValue(v: unknown): number | null | undefined {
+    if (v === null) return null;
+    const d = int(v, -3_600_000, 3_600_000);
+    return d === null ? undefined : d;
+}
+
 export function parseBody(raw: unknown): Body | null {
     if (!isRecord(raw) || typeof raw.k !== 'string') return null;
 
@@ -184,6 +265,65 @@ export function parseBody(raw: unknown): Body | null {
             if (!exactly(raw, ['k', 'id'])) return null;
             const id = fingerprintText(raw.id);
             return id ? { k: 'kick', id } : null;
+        }
+        case 'library': {
+            if (!exactly(raw, ['k', 'tracks'])) return null;
+            if (!Array.isArray(raw.tracks) || raw.tracks.length > LIMITS.MAX_TRACKS) return null;
+            const tracks: WireTrack[] = [];
+            for (const t of raw.tracks) {
+                const parsed = parseTrack(t);
+                if (!parsed || tracks.some((x) => x.id === parsed.id)) return null;
+                tracks.push(parsed);
+            }
+            return { k: 'library', tracks };
+        }
+        case 'music': {
+            if (!exactly(raw, ['k', 'rev', 'bg', 'scene'])) return null;
+            const rev = int(raw.rev, 0, Number.MAX_SAFE_INTEGER);
+            const bg = parseChannel(raw.bg);
+            const scene = parseChannel(raw.scene);
+            if (rev === null || !bg || !scene) return null;
+            return { k: 'music', rev, bg, scene };
+        }
+        case 'mstat': {
+            if (!exactly(raw, ['k', 'unlocked', 'ready', 'loading', 'drift', 'stall', 'failed'])) return null;
+            if (typeof raw.unlocked !== 'boolean') return null;
+            const ready = idList(raw.ready, LIMITS.MAX_TRACKS);
+            const failed = idList(raw.failed, LIMITS.MAX_TRACKS);
+            if (!ready || !failed) return null;
+            if (!Array.isArray(raw.loading) || raw.loading.length > LIMITS.MAX_TRACKS) return null;
+            const loading: TrackLoad[] = [];
+            for (const l of raw.loading) {
+                if (!isRecord(l) || !exactly(l, ['id', 'pct'])) return null;
+                const id = idText(l.id);
+                const pct = int(l.pct, 0, 100);
+                if (!id || pct === null) return null;
+                loading.push({ id, pct });
+            }
+            if (!isRecord(raw.drift) || !exactly(raw.drift, ['bg', 'scene'])) return null;
+            const bg = driftValue(raw.drift.bg);
+            const scene = driftValue(raw.drift.scene);
+            if (bg === undefined || scene === undefined) return null;
+            if (!Array.isArray(raw.stall) || raw.stall.length > 2) return null;
+            const stall: ChannelId[] = [];
+            for (const c of raw.stall) {
+                if (c !== 'bg' && c !== 'scene') return null;
+                stall.push(c);
+            }
+            return { k: 'mstat', unlocked: raw.unlocked, ready, loading, drift: { bg, scene }, stall, failed };
+        }
+        case 'map': {
+            if (!exactly(raw, ['k', 'rev', 'show', 'title', 'live', 'image'])) return null;
+            const rev = int(raw.rev, 0, Number.MAX_SAFE_INTEGER);
+            if (rev === null || typeof raw.show !== 'boolean' || typeof raw.live !== 'boolean') return null;
+            const title = raw.title === '' ? '' : cleanText(raw.title, LIMITS.MAX_TITLE);
+            if (typeof raw.title !== 'string') return null;
+            const image = raw.image === null ? null : parseMapImage(raw.image);
+            if (raw.image !== null && !image) return null;
+            /* Shown means there is a picture; hidden means there is none on
+               the wire at all — a hidden map is not sent and then masked. */
+            if (raw.show !== (image !== null)) return null;
+            return { k: 'map', rev, show: raw.show, title, live: raw.live, image };
         }
         default:
             return null;

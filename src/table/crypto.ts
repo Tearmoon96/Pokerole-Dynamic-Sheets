@@ -107,6 +107,53 @@ export async function unseal(key: CryptoKey, addr: string, wire: string): Promis
     }
 }
 
+/* ------------------------------------------------------------ file parts */
+
+/* Files too big for a socket frame — music, the shared map — go through the
+   relay's file store in parts. Each part is sealed on its own, IV first, and
+   its additional data names the room, the file, the part's index and the
+   part count. So the store, which never holds the key, also cannot swap two
+   parts, reorder them, truncate a file or move a part to another file: any of
+   those fails to open. */
+
+function partAad(addr: string, blobId: string, part: number, parts: number): Bytes {
+    return utf8(DOMAIN + '|file|' + addr + '|' + blobId + '|' + part + '|' + parts);
+}
+
+export async function sealPart(
+    key: CryptoKey, addr: string, blobId: string, part: number, parts: number, data: Bytes,
+): Promise<Bytes> {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv, additionalData: partAad(addr, blobId, part, parts) }, key, data));
+    const out = new Uint8Array(12 + ct.length);
+    out.set(iv, 0);
+    out.set(ct, 12);
+    return out;
+}
+
+/** Null for anything that does not open — the same contract as `unseal`. */
+export async function unsealPart(
+    key: CryptoKey, addr: string, blobId: string, part: number, parts: number, wire: Bytes,
+): Promise<Bytes | null> {
+    if (wire.length < 12 + 16) return null;
+    try {
+        const pt = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: wire.slice(0, 12), additionalData: partAad(addr, blobId, part, parts) },
+            key, wire.slice(12));
+        return new Uint8Array(pt);
+    } catch {
+        return null;
+    }
+}
+
+export async function sha256Hex(data: Bytes): Promise<string> {
+    const d = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
+    let s = '';
+    for (const b of d) s += b.toString(16).padStart(2, '0');
+    return s;
+}
+
 /* ------------------------------------------------------------------ signing */
 
 /** `extractable: false` applies to the private key; WebCrypto always allows the

@@ -5,10 +5,28 @@
    matches the lobby id. */
 
 import { useTable } from '../../table/TableContext';
+import { CHANNELS } from '../../table/protocol';
+import type { MemberMusic } from '../../table/music/music';
+
+/** The GM's view of one player's music: in time, catching up, or silent. */
+function syncDot(stat: MemberMusic | undefined, playing: boolean): { cls: string; text: string } | null {
+    if (!playing) return null;
+    if (!stat || Date.now() - stat.at > 20_000) return { cls: 'unknown', text: 'No music report yet' };
+    if (!stat.unlocked) return { cls: 'bad', text: 'Sound not enabled' };
+    if (stat.stall.length) return { cls: 'bad', text: 'Cannot play right now (loading or buffering)' };
+    const drifts = [stat.drift.bg, stat.drift.scene].filter((d): d is number => d !== null).map(Math.abs);
+    if (!drifts.length) return { cls: 'unknown', text: 'Not playing yet' };
+    const worst = Math.max(...drifts);
+    if (worst < 50) return { cls: 'good', text: 'Music in sync (±' + worst + ' ms)' };
+    if (worst < 250) return { cls: 'fair', text: 'Music catching up (' + worst + ' ms off)' };
+    return { cls: 'bad', text: 'Music out of step (' + worst + ' ms off)' };
+}
 
 export function MemberList() {
     const { session, state } = useTable();
     const { members, myId, isHost } = state;
+    const music = session.music.view;
+    const playing = isHost && CHANNELS.some((c) => music.decks[c].playing);
 
     return (
         <div className="member-list">
@@ -29,6 +47,12 @@ export function MemberList() {
                             {m.name}
                             {m.id === myId && <span className="you">you</span>}
                         </span>
+                        {!m.host && (() => {
+                            const dot = syncDot(music.members[m.id], playing);
+                            return dot && (
+                                <span className={'sync-dot ' + dot.cls} role="img" aria-label={dot.text} title={dot.text}></span>
+                            );
+                        })()}
                         {isHost && !m.host && (
                             <button
                                 className="icon-btn danger"

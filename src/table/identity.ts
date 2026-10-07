@@ -13,10 +13,12 @@
 
 import { idbGet, idbSet, idbDel } from '../state/idb';
 import { exportPublicKey, fingerprint, generateSigningKeys } from './crypto';
+import { toB64u } from './encoding';
 import type { Bytes } from './encoding';
 
 const HOST_PREFIX = 'pokeroleTable:host:';
 const MEMBER_PREFIX = 'pokeroleTable:member:';
+const UPLOAD_PREFIX = 'pokeroleTable:upload:';
 
 export interface Identity {
     id: string;
@@ -85,4 +87,17 @@ export async function memberIdentity(lobbyId: string): Promise<Identity> {
     between sessions is the normal case, not an exceptional one. */
 export async function forgetMemberIdentity(lobbyId: string): Promise<void> {
     await idbDel(MEMBER_PREFIX + lobbyId);
+}
+
+/** The secret that makes the GM the only one who may write to the relay's
+    file store for this lobby (see `claim` in worker/src/index.ts). Random,
+    kept beside the host's keypair, and never sent anywhere but the relay —
+    which keeps only its hash. Only a host ever asks for one. */
+export async function hostUploadKey(lobbyId: string): Promise<string> {
+    const key = UPLOAD_PREFIX + lobbyId;
+    const existing = await idbGet<string>(key);
+    if (typeof existing === 'string' && /^[A-Za-z0-9_-]{43}$/.test(existing)) return existing;
+    const fresh = toB64u(crypto.getRandomValues(new Uint8Array(32)));
+    await idbSet(key, fresh);
+    return fresh;
 }

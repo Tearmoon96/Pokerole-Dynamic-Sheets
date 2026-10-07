@@ -16,6 +16,12 @@ import '../styles/rolling-table.css';
    already knows whether a saved session is being restored. */
 const session = new TableSession();
 
+/* A handle for the test harnesses in .verify/, on a page served from this
+   machine only. It reads nothing a page's own console could not. */
+if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    (window as unknown as { __pdsTable: TableSession }).__pdsTable = session;
+}
+
 function Root() {
     useEffect(() => {
         /* Only reconnect where a connection can exist. From the disk the page
