@@ -48,9 +48,16 @@ export interface TerrainLayer {
     outline: Path2D | null;
 }
 
+/** One pair of terrains' Soft edges. `a` and `b` are indices into TERRAINS;
+    `box` is the stretch they cover, in world px. */
+export interface SoftPair { a: number; b: number; path: Path2D; box: Box }
+
+type Box = { x0: number; y0: number; x1: number; y1: number };
+
 /** The Soft edges: where they run, and which terrains meet across them. */
 export interface SoftEdges {
-    path: Path2D;
+    /** By pair, so a terrain blends only with what it has a Soft edge to. */
+    pairs: SoftPair[];
     /** Indices into TERRAINS. */
     terrains: Set<number>;
     /** The stretch they cover, in world px. */
@@ -86,11 +93,30 @@ export interface TerrainGeometry {
    not this layer's to draw. */
 const TAG: Record<EdgeKind, number> = { plain: 1, line: 2, style: 3, soft: 4 };
 
+/* A Soft stretch's tag also says which terrain lies on its other side, so a
+   run stops where that changes: SOFT_BASE + the terrain's index. The layer's
+   own terrain is the other side of the pair. */
+const SOFT_BASE = 8;
+const isSoft = (tag: number) => tag >= SOFT_BASE;
+
+/** One pair's Soft edges, made on first use. */
+function pairOf(pairs: Map<string, SoftPair>, a: number, b: number): SoftPair {
+    const key = Math.min(a, b) + ':' + Math.max(a, b);
+    let pair = pairs.get(key);
+    if (!pair) pairs.set(key, pair = { a: Math.min(a, b), b: Math.max(a, b), path: new Path2D(), box: emptyBox() });
+    return pair;
+}
+
+function growBox(box: Box, x0: number, y0: number, x1 = x0, y1 = y0): void {
+    if (x0 < box.x0) box.x0 = x0; if (x1 > box.x1) box.x1 = x1;
+    if (y0 < box.y0) box.y0 = y0; if (y1 > box.y1) box.y1 = y1;
+}
+
 /** The runs of one tag along a tagged loop, into whichever path `sink`
     names for that tag. A loop all of one tag is closed, so its line has no
     ends. */
 function addRuns(loop: Pt[], tags: Uint8Array, scale: number, sink: (tag: number) => Path2D | null,
-    grow: ((x: number, y: number) => void) | null): void {
+    grow: ((tag: number, x: number, y: number) => void) | null): void {
     const n = loop.length;
     let start = -1;
     for (let i = 0; i < n; i++) if (tags[i] !== tags[(i + n - 1) % n]) { start = i; break; }
@@ -100,21 +126,21 @@ function addRuns(loop: Pt[], tags: Uint8Array, scale: number, sink: (tag: number
         path.moveTo(loop[0][0] * scale, loop[0][1] * scale);
         for (let i = 1; i < n; i++) path.lineTo(loop[i][0] * scale, loop[i][1] * scale);
         path.closePath();
-        if (grow && tags[0] === TAG.soft) for (const p of loop) grow(p[0] * scale, p[1] * scale);
+        if (grow && isSoft(tags[0])) for (const p of loop) grow(tags[0], p[0] * scale, p[1] * scale);
         return;
     }
     let i = start;
     do {
         const tag = tags[i];
         const path = sink(tag);
-        const soft = grow && tag === TAG.soft;
+        const soft = grow && isSoft(tag);
         if (path) path.moveTo(loop[i][0] * scale, loop[i][1] * scale);
-        if (soft) grow!(loop[i][0] * scale, loop[i][1] * scale);
+        if (soft) grow!(tag, loop[i][0] * scale, loop[i][1] * scale);
         let j = i;
         do {
             j = (j + 1) % n;
             if (path) path.lineTo(loop[j][0] * scale, loop[j][1] * scale);
-            if (soft) grow!(loop[j][0] * scale, loop[j][1] * scale);
+            if (soft) grow!(tag, loop[j][0] * scale, loop[j][1] * scale);
         } while (j !== start && tags[j] === tag);
         i = j;
     } while (i !== start);
@@ -153,23 +179,24 @@ export function buildGeometry(doc: MapDoc, style: MapStyle): TerrainGeometry {
            and the map's own border is not an edge. */
         if (upper !== levels[k] || lower < 0) return 0;
         const tag = TAG[resolve(upper, lower, painted && iu >= 0 ? painted[iu] : 0, painted && il >= 0 ? painted[il] : 0)];
-        if (tag === TAG.soft) { softTerrains.add(upper); softTerrains.add(lower); }
-        return tag;
+        if (tag !== TAG.soft) return tag;
+        softTerrains.add(upper); softTerrains.add(lower);
+        return SOFT_BASE + lower;
     });
 
     const lines = new Path2D();
-    const softPath = new Path2D();
+    const pairs = new Map<string, SoftPair>();
     const box = emptyBox();
-    const grow = (x: number, y: number) => {
-        if (x < box.x0) box.x0 = x; if (x > box.x1) box.x1 = x;
-        if (y < box.y0) box.y0 = y; if (y > box.y1) box.y1 = y;
-    };
     let anyLine = false;
 
     const layers: TerrainLayer[] = [];
     let coast: Path2D | null = null;
     let waterLayers = 0;
-    order.forEach(({ t }, idx) => {
+    order.forEach(({ t, i: level }, idx) => {
+        const grow = (tag: number, x: number, y: number) => {
+            growBox(box, x, y);
+            growBox(pairOf(pairs, level, tag - SOFT_BASE).box, x, y);
+        };
         let area = full;
         let outline: Path2D | null = null;
         if (idx > 0) {
@@ -191,7 +218,7 @@ export function buildGeometry(doc: MapDoc, style: MapStyle): TerrainGeometry {
                 addRuns(loop, cur.tags, scale, (tag) => {
                     if (tag === TAG.style) { anyOwn = true; return own; }
                     if (tag === TAG.line) { anyLine = true; return lines; }
-                    if (tag === TAG.soft) return softPath;
+                    if (isSoft(tag)) return pairOf(pairs, level, tag - SOFT_BASE).path;
                     return null;
                 }, grow);
             });
@@ -220,7 +247,7 @@ export function buildGeometry(doc: MapDoc, style: MapStyle): TerrainGeometry {
     return {
         key, layers, coast, waterLayers, styleBorders: null,
         lines: anyLine ? lines : null,
-        soft: softTerrains.size ? { path: softPath, terrains: softTerrains, box } : null,
+        soft: softTerrains.size ? { pairs: [...pairs.values()], terrains: softTerrains, box } : null,
         regions, blocky: false, softWidth: doc.borders.soft,
     };
 }
@@ -249,7 +276,8 @@ function buildBlocky(doc: MapDoc, order: { t: TerrainDef; i: number }[], key: st
     /* Every sample edge between two different terrains, in the look decided
        for it. Neighbouring edges of one look along a row or column are
        joined into one line. */
-    const styleBorders = new Path2D(), lines = new Path2D(), softPath = new Path2D();
+    const styleBorders = new Path2D(), lines = new Path2D();
+    const pairs = new Map<string, SoftPair>();
     const softTerrains = new Set<number>();
     const box = emptyBox();
     let anyStyle = false, anyLine = false;
@@ -258,18 +286,20 @@ function buildBlocky(doc: MapDoc, order: { t: TerrainDef; i: number }[], key: st
         if (va === vb) return 0;
         const [iu, il] = va > vb ? [a, b] : [b, a];
         const kind = TAG[resolve(data[iu], data[il], painted ? painted[iu] : 0, painted ? painted[il] : 0)];
-        if (kind === TAG.soft) { softTerrains.add(va); softTerrains.add(vb); }
-        return kind;
+        if (kind !== TAG.soft) return kind;
+        softTerrains.add(va); softTerrains.add(vb);
+        /* Both sides in the tag: the lower and the upper terrain. */
+        return SOFT_BASE + data[il] * 256 + data[iu];
     };
     const sinkOf = (tag: number): Path2D | null => {
         if (tag === TAG.style) { anyStyle = true; return styleBorders; }
         if (tag === TAG.line) { anyLine = true; return lines; }
-        if (tag === TAG.soft) return softPath;
+        if (isSoft(tag)) return pairOf(pairs, (tag - SOFT_BASE) >> 8, (tag - SOFT_BASE) & 255).path;
         return null;
     };
-    const growBox = (x0: number, y0: number, x1: number, y1: number) => {
-        box.x0 = Math.min(box.x0, x0); box.y0 = Math.min(box.y0, y0);
-        box.x1 = Math.max(box.x1, x1); box.y1 = Math.max(box.y1, y1);
+    const grow = (tag: number, x0: number, y0: number, x1: number, y1: number) => {
+        growBox(box, x0, y0, x1, y1);
+        growBox(pairOf(pairs, (tag - SOFT_BASE) >> 8, (tag - SOFT_BASE) & 255).box, x0, y0, x1, y1);
     };
     /* Vertical edges, between sample x and x+1, run down each column. */
     for (let x = 0; x < w - 1; x++) {
@@ -281,7 +311,7 @@ function buildBlocky(doc: MapDoc, order: { t: TerrainDef; i: number }[], key: st
             const path = sinkOf(tag);
             if (path) {
                 path.moveTo((x + 1) * px, y * px); path.lineTo((x + 1) * px, end * px);
-                if (tag === TAG.soft) growBox((x + 1) * px, y * px, (x + 1) * px, end * px);
+                if (isSoft(tag)) grow(tag, (x + 1) * px, y * px, (x + 1) * px, end * px);
             }
             y = end;
         }
@@ -296,7 +326,7 @@ function buildBlocky(doc: MapDoc, order: { t: TerrainDef; i: number }[], key: st
             const path = sinkOf(tag);
             if (path) {
                 path.moveTo(x * px, (y + 1) * px); path.lineTo(end * px, (y + 1) * px);
-                if (tag === TAG.soft) growBox(x * px, (y + 1) * px, end * px, (y + 1) * px);
+                if (isSoft(tag)) grow(tag, x * px, (y + 1) * px, end * px, (y + 1) * px);
             }
             x = end;
         }
@@ -313,7 +343,7 @@ function buildBlocky(doc: MapDoc, order: { t: TerrainDef; i: number }[], key: st
         key, layers, coast: null, waterLayers,
         styleBorders: anyStyle ? styleBorders : null,
         lines: anyLine ? lines : null,
-        soft: softTerrains.size ? { path: softPath, terrains: softTerrains, box } : null,
+        soft: softTerrains.size ? { pairs: [...pairs.values()], terrains: softTerrains, box } : null,
         regions, blocky: true, softWidth: doc.borders.soft,
     };
 }
@@ -382,21 +412,44 @@ function fillLayer(ctx: CanvasRenderingContext2D, style: MapStyle, t: TerrainDef
    past it. The pixel styles turn the shares into an ordered dither, since
    pixel art mixes whole pixels rather than fading.
 
-   All of it replaces the ordinary drawing only along the Soft edges (a wide
-   stroke of them, wider than the band) and only over the soft terrains
-   themselves, so a third terrain beside the band keeps its own colour.
+   It all goes by PAIR of terrains. A terrain's ground is replaced only
+   along its own Soft edges (a wide stroke of them, wider than the band), and
+   a neighbour's colour counts only near a Soft edge between the two. A
+   terrain that is Soft somewhere else on the map, or a third one beside the
+   band, keeps its own colour: one shared set of soft terrains blurred a
+   one-cell road with a Soft end into the grass it crossed, colour and all.
 
    The masks are small: world space at a few px a cell, over only the box
    the Soft edges cover, built once per change of the terrain. Every frame
    after that scales them up in tiles of the viewport, so a big export needs
    no canvas the size of it. */
 
+interface SoftPart {
+    terrain: TerrainDef;
+    region: { path: Path2D; rule: CanvasFillRule };
+    /** The mask px its zone covers, x1 and y1 past the end. */
+    box: Box;
+    /** Its own colour's share and its Soft neighbours', at each mask px of
+        the box. They add up to its zone: 255 along its own Soft edges, 0
+        away from them. */
+    shares: { terrain: TerrainDef; share: Uint8ClampedArray }[];
+}
+
+/** One part in one style's colours: the land's colours baked into one
+    image, and each water's share kept apart for its depth shading. */
+interface PartLook {
+    ground: HTMLCanvasElement | null;
+    water: { terrain: TerrainDef; mask: HTMLCanvasElement }[];
+    /** World px the two cover: the part's box. */
+    rect: { x: number; y: number; w: number; h: number };
+}
+
 interface SoftLayer {
-    /** World px the masks cover. */
-    x: number; y: number; w: number; h: number;
-    masks: { terrain: TerrainDef; colour: HTMLCanvasElement; region: { path: Path2D; rule: CanvasFillRule } }[];
-    /** Where the blend replaces the ordinary drawing. */
-    zone: HTMLCanvasElement;
+    /** World px the masks cover, and the masks' own size. */
+    x: number; y: number; w: number; h: number; mw: number; mh: number;
+    parts: SoftPart[];
+    /** By style id, made on first draw in that style. */
+    looks: Map<string, PartLook[]>;
 }
 
 const MASK_BUDGET = 2_500_000;
@@ -412,6 +465,8 @@ function scratch(w: number, h: number): HTMLCanvasElement {
 /* The tile canvases drawSoft works in, kept between frames: a pan redraws
    every frame, and fresh ones each time are garbage for nothing. */
 let trio: [HTMLCanvasElement, HTMLCanvasElement, HTMLCanvasElement] | null = null;
+/* Each water's look over the tile, by slug — see drawSoft. */
+const wetTiles = new Map<string, HTMLCanvasElement>();
 
 function tiles(w: number, h: number): [HTMLCanvasElement, HTMLCanvasElement, HTMLCanvasElement] {
     if (!trio) trio = [scratch(w, h), scratch(w, h), scratch(w, h)];
@@ -530,7 +585,8 @@ function softLayer(geo: TerrainGeometry, doc: MapDoc): SoftLayer | null {
     };
     const blurPx = sigma * CELL * sx;
 
-    const found: { terrain: TerrainDef; region: { path: Path2D; rule: CanvasFillRule }; share: Uint8ClampedArray }[] = [];
+    /* Each soft terrain's region, blurred: its share of the colour. */
+    const shares = new Map<number, Uint8ClampedArray>();
     for (const i of soft.terrains) {
         const region = geo.regions.get(i);
         if (!region) continue;
@@ -542,68 +598,159 @@ function softLayer(geo: TerrainGeometry, doc: MapDoc): SoftLayer | null {
         hc.restore();
         const canvas = scratch(mw, mh);
         blurInto(canvas, hard, blurPx);
-        found.push({ terrain: TERRAINS[i], region, share: alphaOf(canvas) });
+        shares.set(i, alphaOf(canvas));
     }
-    if (!found.length) { soft.layer = null; return null; }
 
-    /* Where the blend goes: a stroke of the Soft edges wider than the band,
-       so the band never meets its side. Not blurred — the blend replaces
-       the drawing outright inside it, markers and all, so a half-way
-       margin would show both. */
-    reset();
+    /* Each pair's zone: a stroke of its Soft edges wider than the band, so
+       the band never meets its side. Not blurred — the blend replaces the
+       drawing outright inside it, markers and all, so a half-way margin
+       would show both. */
+    type Zone = { x0: number; y0: number; w: number; h: number; a: Uint8ClampedArray };
+    const partners = new Map<number, { other: number; zone: Zone }[]>();
     hc.strokeStyle = '#fff';
     hc.lineCap = 'round';
     hc.lineJoin = 'round';
     hc.lineWidth = B * 2.2 * CELL;
-    hc.stroke(soft.path);
-    const zone = scratch(mw, mh);
-    zone.getContext('2d')!.drawImage(hard, 0, 0);
-
-    /* Each terrain's share of the colour at each mask px, sharpened. The
-       pixel styles give each px wholly to one terrain instead, by where a
-       fixed 4x4 threshold pattern falls among the shares. */
-    const n = found.length;
-    const colour = found.map(() => new Uint8ClampedArray(mw * mh));
-    const s = new Float32Array(n);
-    for (let py = 0; py < mh; py++) {
-        for (let px = 0; px < mw; px++) {
-            const p = py * mw + px;
-            let total = 0;
-            for (let i = 0; i < n; i++) total += found[i].share[p];
-            if (!total) continue;
-            let sum = 0, top = 0;
-            for (let i = 0; i < n; i++) {
-                s[i] = sharpen(found[i].share[p] / total);
-                sum += s[i];
-                if (s[i] > s[top]) top = i;
-            }
-            if (!sum) continue;
-            if (geo.blocky) {
-                const pick = BAYER[(py % 4) * 4 + (px % 4)] * sum;
-                let run = 0, chosen = top;
-                for (let i = 0; i < n; i++) {
-                    run += s[i];
-                    if (run >= pick) { chosen = i; break; }
-                }
-                colour[chosen][p] = 255;
-                continue;
-            }
-            /* Rounded so they still add up to exactly 255. */
-            let left = 255;
-            for (let i = 0; i < n; i++) {
-                const a = Math.round(255 * s[i] / sum);
-                colour[i][p] = a;
-                left -= a;
-            }
-            colour[top][p] = Math.max(0, colour[top][p] + left);
+    for (const pair of soft.pairs) {
+        if (!shares.has(pair.a) || !shares.has(pair.b)) continue;
+        /* Only the pair's own stretch is read back: a map with one small
+           Soft patch pays for that patch, not for the whole map. */
+        const zx0 = Math.max(0, Math.floor((pair.box.x0 - reach - x) * sx));
+        const zy0 = Math.max(0, Math.floor((pair.box.y0 - reach - y) * sy));
+        const zx1 = Math.min(mw, Math.ceil((pair.box.x1 + reach - x) * sx));
+        const zy1 = Math.min(mh, Math.ceil((pair.box.y1 + reach - y) * sy));
+        if (zx1 <= zx0 || zy1 <= zy0) continue;
+        reset();
+        hc.stroke(pair.path);
+        const d = hc.getImageData(zx0, zy0, zx1 - zx0, zy1 - zy0).data;
+        const a = new Uint8ClampedArray((zx1 - zx0) * (zy1 - zy0));
+        for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3];
+        const zone = { x0: zx0, y0: zy0, w: zx1 - zx0, h: zy1 - zy0, a };
+        for (const [t, other] of [[pair.a, pair.b], [pair.b, pair.a]]) {
+            if (!partners.has(t)) partners.set(t, []);
+            partners.get(t)!.push({ other, zone });
         }
     }
 
-    soft.layer = {
-        x, y, w, h, zone,
-        masks: found.map((f, i) => ({ terrain: f.terrain, region: f.region, colour: maskCanvas(colour[i], mw, mh) })),
-    };
+    /* For each soft terrain, the shares of its own colour and its partners'
+       at each mask px of its box, sharpened. A partner counts only inside
+       its pair's zone. The pixel styles give each px wholly to one terrain
+       instead, by where a fixed 4x4 threshold pattern falls among the
+       shares. */
+    const parts: SoftLayer['parts'] = [];
+    for (const [t, list] of partners) {
+        const box = { x0: mw, y0: mh, x1: 0, y1: 0 };
+        for (const { zone: z } of list) growBox(box, z.x0, z.y0, z.x0 + z.w, z.y0 + z.h);
+        const bw = box.x1 - box.x0, bh = box.y1 - box.y0;
+        const sources = [shares.get(t)!, ...list.map((l) => shares.get(l.other)!)];
+        const zones = list.map((l) => l.zone);
+        const n = sources.length;
+        const colour = sources.map(() => new Uint8ClampedArray(bw * bh));
+        const s = new Float32Array(n);
+        let any = false;
+        for (let py = box.y0; py < box.y1; py++) {
+            for (let px = box.x0; px < box.x1; px++) {
+                const p = py * mw + px;
+                /* Nowhere near its own region: nothing of it is drawn here. */
+                if (!sources[0][p]) continue;
+                const o = (py - box.y0) * bw + (px - box.x0);
+                let total = s[0] = sources[0][p], zone = 0;
+                for (let i = 1; i < n; i++) {
+                    const z = zones[i - 1];
+                    const zx = px - z.x0, zy = py - z.y0;
+                    const v = zx >= 0 && zy >= 0 && zx < z.w && zy < z.h ? z.a[zy * z.w + zx] : 0;
+                    if (v > zone) zone = v;
+                    s[i] = sources[i][p] * v / 255;
+                    total += s[i];
+                }
+                if (!zone || !total) continue;
+                let sum = 0, top = 0;
+                for (let i = 0; i < n; i++) {
+                    s[i] = sharpen(s[i] / total);
+                    sum += s[i];
+                    if (s[i] > s[top]) top = i;
+                }
+                if (!sum) continue;
+                any = true;
+                if (geo.blocky) {
+                    const pick = BAYER[(py % 4) * 4 + (px % 4)] * sum;
+                    let run = 0, chosen = top;
+                    for (let i = 0; i < n; i++) {
+                        run += s[i];
+                        if (run >= pick) { chosen = i; break; }
+                    }
+                    colour[chosen][o] = zone;
+                    continue;
+                }
+                /* Rounded so they still add up to exactly the zone. */
+                let left = zone;
+                for (let i = 0; i < n; i++) {
+                    const a = Math.round(zone * s[i] / sum);
+                    colour[i][o] = a;
+                    left -= a;
+                }
+                colour[top][o] = Math.max(0, colour[top][o] + left);
+            }
+        }
+        if (!any) continue;
+        const terrains = [t, ...list.map((l) => l.other)];
+        parts.push({
+            terrain: TERRAINS[t], region: geo.regions.get(t)!, box,
+            shares: terrains.map((i, k) => ({ terrain: TERRAINS[i], share: colour[k] })),
+        });
+    }
+    soft.layer = parts.length ? { x, y, w, h, mw, mh, parts, looks: new Map() } : null;
     return soft.layer;
+}
+
+/** A CSS colour as RGB. */
+function rgbOf(css: string): [number, number, number] {
+    const c = scratch(1, 1).getContext('2d', { willReadFrequently: true })!;
+    c.fillStyle = css;
+    c.fillRect(0, 0, 1, 1);
+    const d = c.getImageData(0, 0, 1, 1).data;
+    return [d[0], d[1], d[2]];
+}
+
+/** The parts in one style's colours. The land's shares are mixed into one
+    image here, once, so a frame draws one image per terrain however many
+    neighbours it blends with. Water stays a mask of its own: its depth
+    shading is drawn over it, and that is no single colour. */
+function partLooks(layer: SoftLayer, style: MapStyle): PartLook[] {
+    const had = layer.looks.get(style.id);
+    if (had) return had;
+    const looks = layer.parts.map((part): PartLook => {
+        const { x0, y0, x1, y1 } = part.box;
+        const bw = x1 - x0, bh = y1 - y0;
+        const rect = {
+            x: layer.x + x0 * layer.w / layer.mw, y: layer.y + y0 * layer.h / layer.mh,
+            w: bw * layer.w / layer.mw, h: bh * layer.h / layer.mh,
+        };
+        const land = part.shares.filter((x) => !x.terrain.water);
+        const water = part.shares.filter((x) => x.terrain.water)
+            .map((x) => ({ terrain: x.terrain, mask: maskCanvas(x.share, bw, bh) }));
+        if (!land.length) return { ground: null, water, rect };
+        const rgb = land.map((x) => rgbOf(style.terrain[x.terrain.slug]?.fill ?? '#888'));
+        const c = scratch(bw, bh);
+        const cx = c.getContext('2d')!;
+        const img = cx.createImageData(bw, bh);
+        const d = img.data;
+        for (let p = 0; p < bw * bh; p++) {
+            let a = 0, r = 0, g = 0, b = 0;
+            for (let i = 0; i < land.length; i++) {
+                const v = land[i].share[p];
+                if (!v) continue;
+                a += v; r += v * rgb[i][0]; g += v * rgb[i][1]; b += v * rgb[i][2];
+            }
+            if (!a) continue;
+            const o = p * 4;
+            d[o] = r / a; d[o + 1] = g / a; d[o + 2] = b / a; d[o + 3] = a;
+        }
+        cx.putImageData(img, 0, 0);
+        return { ground: c, water, rect };
+    });
+    layer.looks.set(style.id, looks);
+    return looks;
 }
 
 const DITHER = 4;
@@ -612,7 +759,7 @@ const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => 
 /** Lay the blend over what is already drawn, along the Soft edges only. */
 function drawSoft(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapDoc, style: MapStyle, textures: TextureSource): void {
     const layer = softLayer(geo, doc);
-    if (!layer || !layer.masks.length) return;
+    if (!layer) return;
     const depth = depthBands(geo, doc, style);
     const T = ctx.getTransform();
     const corners = [[layer.x, layer.y], [layer.x + layer.w, layer.y], [layer.x, layer.y + layer.h], [layer.x + layer.w, layer.y + layer.h]]
@@ -624,10 +771,11 @@ function drawSoft(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapD
     if (dx1 <= dx0 || dy1 <= dy0) return;
 
     const tw = Math.min(TILE, dx1 - dx0), th = Math.min(TILE, dy1 - dy0);
-    const [acc, tmp, cut] = tiles(tw, th);
-    const ac = acc.getContext('2d')!, tc = tmp.getContext('2d')!, cc = cut.getContext('2d')!;
+    const [acc, tmp, wet] = tiles(tw, th);
+    const ac = acc.getContext('2d')!, tc = tmp.getContext('2d')!, wc = wet.getContext('2d')!;
     const smooth = !style.pixelated;
-    const passes = layer.masks.map((m) => ({ m, paints: terrainPaints(tc, style, m.terrain, textures) }));
+    const looks = partLooks(layer, style);
+    const markers = layer.parts.map((part) => terrainPaints(tc, style, part.terrain, textures).slice(1));
     for (let ty = dy0; ty < dy1; ty += th) {
         for (let tx = dx0; tx < dx1; tx += tw) {
             const cw = Math.min(tw, dx1 - tx), ch = Math.min(th, dy1 - ty);
@@ -637,52 +785,85 @@ function drawSoft(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapD
                 c.clearRect(0, 0, tw, th);
                 c.setTransform(T.a, T.b, T.c, T.d, T.e - tx, T.f - ty);
             };
-            /* Water takes its depth shading with it, or a soft coast would
-               show a strip of unshaded sea along it. */
-            const shade = (water: boolean) => {
-                if (!water || !depth) return;
-                tc.globalCompositeOperation = 'source-atop';
-                paintDepth(tc, depth, doc, style, false);
-            };
-            start(ac);
-            /* The colours, through their blended masks, adding up. */
-            for (const { m, paints } of passes) {
-                start(tc);
-                tc.imageSmoothingEnabled = smooth;
-                tc.drawImage(m.colour, layer.x, layer.y, layer.w, layer.h);
-                tc.globalCompositeOperation = 'source-in';
-                tc.fillStyle = paints[0];
-                tc.fillRect(layer.x, layer.y, layer.w, layer.h);
-                shade(!!m.terrain.water);
-                ac.setTransform(1, 0, 0, 1, 0, 0);
-                ac.globalCompositeOperation = 'lighter';
-                ac.drawImage(tmp, 0, 0, cw, ch, 0, 0, cw, ch);
-            }
-            /* The markers over them, each terrain's in its own region,
-               exactly as the ordinary drawing has them. */
-            for (const { m, paints } of passes) {
-                if (paints.length < 2) continue;
-                start(tc);
-                tc.imageSmoothingEnabled = smooth;
-                for (const paint of paints.slice(1)) {
-                    tc.fillStyle = paint;
-                    tc.fill(m.region.path, m.region.rule);
+            const world = (c: CanvasRenderingContext2D) => c.setTransform(T.a, T.b, T.c, T.d, T.e - tx, T.f - ty);
+            /* A water's whole look over this tile, its colour and depth
+               shading, drawn once however many terrains blend into it. */
+            const wetDone = new Set<TerrainDef>();
+            const waterLook = (t: TerrainDef) => {
+                let c = wetTiles.get(t.slug);
+                if (!c) wetTiles.set(t.slug, c = scratch(tw, th));
+                if (c.width < tw) c.width = tw;
+                if (c.height < th) c.height = th;
+                if (!wetDone.has(t)) {
+                    wetDone.add(t);
+                    const x = c.getContext('2d')!;
+                    start(x);
+                    x.fillStyle = style.terrain[t.slug]?.fill ?? '#888';
+                    x.fillRect(layer.x, layer.y, layer.w, layer.h);
+                    if (depth) paintDepth(x, depth, doc, style, false);
                 }
-                shade(!!m.terrain.water);
+                return c;
+            };
+            /* The colours, each terrain's inside its own region. Its shares
+               add up to its zone, so what is drawn covers exactly the
+               stretch the blend replaces; the regions do not overlap. */
+            start(ac);
+            layer.parts.forEach((part, k) => {
+                const { ground, water, rect } = looks[k];
+                const a = T.transformPoint(new DOMPoint(rect.x, rect.y));
+                const b = T.transformPoint(new DOMPoint(rect.x + rect.w, rect.y + rect.h));
+                if (Math.max(a.x, b.x) < tx || Math.min(a.x, b.x) > tx + cw
+                    || Math.max(a.y, b.y) < ty || Math.min(a.y, b.y) > ty + ch) return;
+                start(tc);
+                tc.imageSmoothingEnabled = smooth;
+                if (ground) tc.drawImage(ground, rect.x, rect.y, rect.w, rect.h);
+                /* Water takes its depth shading with it, or a soft coast
+                   would show a strip of unshaded sea along it. */
+                for (const { terrain, mask } of water) {
+                    start(wc);
+                    wc.imageSmoothingEnabled = smooth;
+                    wc.drawImage(mask, rect.x, rect.y, rect.w, rect.h);
+                    wc.setTransform(1, 0, 0, 1, 0, 0);
+                    wc.globalCompositeOperation = 'source-in';
+                    wc.drawImage(waterLook(terrain), 0, 0);
+                    tc.setTransform(1, 0, 0, 1, 0, 0);
+                    tc.globalCompositeOperation = 'lighter';
+                    tc.drawImage(wet, 0, 0, cw, ch, 0, 0, cw, ch);
+                    world(tc);
+                }
+                /* Cut to the terrain's own region, water and all. */
+                tc.globalCompositeOperation = 'destination-in';
+                tc.fillStyle = '#fff';
+                tc.fill(part.region.path, part.region.rule);
+                ac.setTransform(1, 0, 0, 1, 0, 0);
+                ac.globalCompositeOperation = 'source-over';
+                ac.drawImage(tmp, 0, 0, cw, ch, 0, 0, cw, ch);
+            });
+            /* Each terrain's markers over them, exactly as the ordinary
+               drawing has them, cut to where the colour went. */
+            if (markers.some((m) => m.length)) {
+                start(tc);
+                tc.imageSmoothingEnabled = smooth;
+                layer.parts.forEach((part, k) => {
+                    for (const paint of markers[k]) {
+                        tc.fillStyle = paint;
+                        tc.fill(part.region.path, part.region.rule);
+                    }
+                    if (part.terrain.water && depth && markers[k].length) {
+                        tc.save();
+                        tc.clip(part.region.path, part.region.rule);
+                        tc.globalCompositeOperation = 'source-atop';
+                        paintDepth(tc, depth, doc, style, false);
+                        tc.restore();
+                    }
+                });
+                tc.setTransform(1, 0, 0, 1, 0, 0);
+                tc.globalCompositeOperation = 'destination-in';
+                tc.drawImage(acc, 0, 0);
                 ac.setTransform(1, 0, 0, 1, 0, 0);
                 ac.globalCompositeOperation = 'source-over';
                 ac.drawImage(tmp, 0, 0, cw, ch, 0, 0, cw, ch);
             }
-            /* Only over the soft terrains, and only along the Soft edges. */
-            start(cc);
-            cc.fillStyle = '#fff';
-            for (const { m } of passes) cc.fill(m.region.path, m.region.rule);
-            cc.globalCompositeOperation = 'destination-in';
-            cc.imageSmoothingEnabled = smooth;
-            cc.drawImage(layer.zone, layer.x, layer.y, layer.w, layer.h);
-            ac.setTransform(1, 0, 0, 1, 0, 0);
-            ac.globalCompositeOperation = 'destination-in';
-            ac.drawImage(cut, 0, 0, cw, ch, 0, 0, cw, ch);
             ctx.save();
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.globalCompositeOperation = 'source-over';
