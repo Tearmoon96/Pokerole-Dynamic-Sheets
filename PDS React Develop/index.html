@@ -21,9 +21,8 @@
         build, so it costs nothing and cannot break the real pages. Its only job
         is that the bare site URL answers with something instead of a 404.
 
-        It carries exactly one script, at the bottom: the rolling table is the
-        only page that cannot work from the disk, and its card is greyed out
-        when this file is opened over file://. Nothing else here needs one.
+        It carries no script. The rolling table is unlisted for now (see the
+        note where its card was), so nothing here needs deciding on load.
     -->
     <style>
         :root {
@@ -202,21 +201,12 @@
             <span class="title"><i class="fa-solid fa-map"></i> <span class="name">Map Maker</span></span>
             <p class="sub">Regions, towns and battle maps: paint terrain, place landmarks, routes and tokens.</p>
         </a>
-        <!-- Shipped greyed out and unclickable on purpose: the page exists but the
-             relay it needs is not deployed, so every join would fail. It gets its
-             href back in the same commit that turns the relay on. -->
-        <a class="card disabled" id="card-table" aria-disabled="true">
-            <span class="title">
-                <i class="fa-solid fa-dice"></i>
-                <span class="name">Rolling Table</span>
-                <span class="wip-tag">Work in progress</span>
-            </span>
-            <p class="sub">A shared dice table: join with a lobby id and a password, and
-                everyone sees every roll.
-                <span class="wip-note">Not live yet &mdash; still being built. It needs a
-                    server of its own, which is not running, so this one stays closed.</span>
-            </p>
-        </a>
+        <!-- The Rolling Table is unlisted while it is tested with a few players:
+             the page is published, but only someone given the link finds it.
+             When it goes public, its card comes
+             back here, linked, together with a small script that greys it out
+             over file:// — a shared table needs the network, and an offline
+             copy has no origin to reach the relay from. -->
     </nav>
 
     <footer>
@@ -225,12 +215,6 @@
         <p>A free, non-commercial fan tool.
             Pokerole is made by the <a href="https://www.pokeroleproject.com/">Pokerole Project</a>.</p>
     </footer>
-    <!-- The rolling-table card used to be greyed here, at runtime, for a page
-         opened off the disk. It now ships that way for everyone — it is not
-         finished — so there is nothing left to decide on load. Put the check
-         back alongside the href when the relay goes up: a shared lobby needs
-         the network by definition, and a file:// page has no origin a relay
-         would accept. -->
 </body>
 
 </html>
