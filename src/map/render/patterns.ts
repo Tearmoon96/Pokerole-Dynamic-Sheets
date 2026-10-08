@@ -28,7 +28,13 @@ function rng(seed: number): Rng {
     };
 }
 
-type Painter = (c: CanvasRenderingContext2D, S: number, ink: string, r: Rng) => void;
+/* A painter calls `mark()` as it starts each marker — a tree, a tuft, a
+   peak — and `mark(false)` to go back to plain ground texture. That is what
+   lets a marker that a neighbouring terrain would cut be left out whole
+   (see patternParts). Ground texture — sand, waves, snow — is never cut out. */
+type Mark = (on?: boolean) => void;
+type Painter = (c: CanvasRenderingContext2D, S: number, ink: string, r: Rng, mark: Mark) => void;
+const noMark: Mark = () => {};
 
 /* Every painter is drawn nine times, shifted by a tile each way, so a tree
    whose crown hangs past the tile's edge carries on in the next tile instead
@@ -36,7 +42,7 @@ type Painter = (c: CanvasRenderingContext2D, S: number, ink: string, r: Rng) => 
    layout. Painters that already tile by construction — full-width lines, or a
    wrap of their own — are left out, or their shapes would be drawn twice over
    and any translucent ink would darken. */
-const SELF_TILING = new Set(['bricks', 'clouds', 'puffs', 'px-tallgrass', 'px-bricks', 'px-clouds']);
+const SELF_TILING = new Set(['bricks', 'clouds', 'puffs', 'px-bricks', 'px-clouds']);
 
 /* The organic painters use a tile four cells wide rather than two, so their
    scatter repeats half as often and reads as random ground. Their counts are
@@ -138,7 +144,7 @@ function pineTree(c: CanvasRenderingContext2D, x: number, y: number, h: number, 
 
 /* Forest: the round trees in staggered rows, as before, and pines dropped
    at random into the gaps between them. */
-function forest(c: CanvasRenderingContext2D, S: number, ink: string, r: Rng, fill: boolean) {
+function forest(c: CanvasRenderingContext2D, S: number, ink: string, r: Rng, fill: boolean, mark: Mark) {
     const n = Math.round((fill ? 3 : 4) * Math.sqrt(area(S)));
     const things: { x: number; y: number; kind: 'round' | 'pine'; size: number }[] = [];
     for (let row = 0; row < n; row++) {
@@ -158,6 +164,7 @@ function forest(c: CanvasRenderingContext2D, S: number, ink: string, r: Rng, fil
     }
     things.sort((a, b) => a.y - b.y);
     for (const t of things) {
+        mark();
         if (t.kind === 'pine') pineTree(c, t.x, t.y, t.size, S, ink, fill);
         else roundTree(c, t.x, t.y, t.size, S, ink, fill);
     }
@@ -208,7 +215,7 @@ function broadleaf(c: CanvasRenderingContext2D, x: number, y: number, rad: numbe
     }
 }
 
-function jungle(c: CanvasRenderingContext2D, S: number, ink: string, r: Rng, fill: boolean) {
+function jungle(c: CanvasRenderingContext2D, S: number, ink: string, r: Rng, fill: boolean, mark: Mark) {
     const k = area(S);
     const things = [
         ...scatter(r, S, Math.round((fill ? 6 : 9) * k), S * (fill ? 0.16 : 0.12)).map((p) => ({ ...p, kind: 'leaf' as const })),
@@ -216,6 +223,7 @@ function jungle(c: CanvasRenderingContext2D, S: number, ink: string, r: Rng, fil
         ...scatter(r, S, Math.round(5 * k), S * 0.1).map((p) => ({ ...p, kind: 'fern' as const })),
     ].sort((a, b) => a.y - b.y);
     for (const t of things) {
+        mark();
         if (t.kind === 'palm') palm(c, t.x, t.y, S * (fill ? 0.2 : 0.15) * (0.85 + r() * 0.3), S, ink, fill, r);
         else if (t.kind === 'leaf') broadleaf(c, t.x, t.y, S * (fill ? 0.085 : 0.06) * (0.85 + r() * 0.3), S, ink, fill, r);
         else {
@@ -254,9 +262,10 @@ const SMOOTH: Record<string, Painter> = {
         c.fillStyle = ink;
         for (let i = 0; i < 26; i++) { c.beginPath(); c.arc(r() * S, r() * S, S / 220 + r() * S / 260, 0, 7); c.fill(); }
     },
-    dunes(c, S, ink, r) {
+    dunes(c, S, ink, r, mark) {
         c.strokeStyle = ink; line(c, S / 100);
         for (let i = 0; i < 5; i++) {
+            mark();
             const x = r() * S, y = r() * S, w = S * (0.1 + r() * 0.08);
             c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + w / 2, y - w * 0.35, x + w, y); c.stroke();
         }
@@ -272,9 +281,10 @@ const SMOOTH: Record<string, Painter> = {
             c.stroke();
         }
     },
-    peaks(c, S, ink, r) {
+    peaks(c, S, ink, r, mark) {
         c.strokeStyle = ink; line(c, S / 100);
         for (let i = 0; i < 5; i++) {
+            mark();
             const x = r() * S, y = r() * S, w = S * (0.08 + r() * 0.05);
             c.fillStyle = '#00000014';
             c.beginPath(); c.moveTo(x - w, y); c.lineTo(x, y - w * 1.1); c.lineTo(x + w, y); c.fill(); c.stroke();
@@ -284,9 +294,10 @@ const SMOOTH: Record<string, Painter> = {
     /* The Mountain's peaks with white caps: the shaded body, then the snow
        down to a ragged line, then the outline over both so the cap never
        eats the ink. */
-    'snow-peaks'(c, S, ink, r) {
+    'snow-peaks'(c, S, ink, r, mark) {
         c.strokeStyle = ink; line(c, S / 100);
         for (let i = 0; i < 5; i++) {
+            mark();
             const x = r() * S, y = r() * S, w = S * (0.08 + r() * 0.05), h = w * 1.2;
             c.fillStyle = '#00000014';
             c.beginPath(); c.moveTo(x - w, y); c.lineTo(x, y - h); c.lineTo(x + w, y); c.fill();
@@ -318,9 +329,10 @@ const SMOOTH: Record<string, Painter> = {
             c.beginPath(); c.ellipse(x, y, w, h, 0, 0, 7); c.fill();
         }
     },
-    blobs(c, S, ink, r) {
+    blobs(c, S, ink, r, mark) {
         c.fillStyle = ink;
         for (let i = 0; i < 5; i++) {
+            mark();
             c.beginPath(); c.ellipse(r() * S, r() * S, S * (0.04 + r() * 0.04), S * (0.025 + r() * 0.02), 0, 0, 7); c.fill();
         }
     },
@@ -360,10 +372,11 @@ const SMOOTH: Record<string, Painter> = {
     },
     /* ---- the ground each biome is told apart by ---- */
 
-    tussocks(c, S, ink, r) {
+    tussocks(c, S, ink, r, mark) {
         /* Grassland: low green tufts, a few blades fanned from one root. */
         c.strokeStyle = ink; line(c, S / 115);
         for (const p of scatter(r, S, Math.round(11 * area(S)), S * 0.07)) {
+            mark();
             const h = S * (0.028 + r() * 0.014), n = 4 + (r() * 2 | 0);
             for (let k = 0; k < n; k++) {
                 const a = (k / (n - 1) - 0.5) * 1.3 + (r() - 0.5) * 0.2;
@@ -375,11 +388,12 @@ const SMOOTH: Record<string, Painter> = {
             }
         }
     },
-    'tall-tussocks'(c, S, ink, r) {
+    'tall-tussocks'(c, S, ink, r, mark) {
         /* Tall grass: taller, stiffer clumps — straight blades in a narrow
            fan, packed closer, a darker one behind each. */
         line(c, S / 105);
         for (const p of scatter(r, S, Math.round(13 * area(S)), S * 0.065)) {
+            mark();
             const h = S * (0.06 + r() * 0.025), n = 6 + (r() * 3 | 0);
             for (let k = 0; k < n; k++) {
                 const a = (k / (n - 1) - 0.5) * 0.7 + (r() - 0.5) * 0.12;
@@ -393,20 +407,20 @@ const SMOOTH: Record<string, Painter> = {
             }
         }
     },
-    flowers(c, S, ink, r) {
-        /* A flower field: little five-petalled flowers in every colour, over
-           a few leaves. */
+    flowers(c, S, ink, r, mark) {
+        /* A flower field: little five-petalled flowers in every colour, each
+           over its two leaves. The leaves' angles are all drawn first, as
+           they always were, so the layout is the same. */
         const pts = scatter(r, S, Math.round(18 * area(S)), S * 0.055);
-        c.fillStyle = ink;
-        for (const p of pts) {
-            for (let k = 0; k < 2; k++) {
-                const a = (r() - 0.5) * 2.4 + (k ? Math.PI : 0);
+        const leaves = pts.map(() => [0, 1].map((k) => (r() - 0.5) * 2.4 + (k ? Math.PI : 0)));
+        pts.forEach((p, i) => {
+            mark();
+            c.fillStyle = ink;
+            for (const a of leaves[i]) {
                 c.beginPath();
                 c.ellipse(p.x + Math.cos(a) * S * 0.014, p.y + S * 0.01 + Math.sin(a) * S * 0.006, S * 0.012, S * 0.005, a, 0, 7);
                 c.fill();
             }
-        }
-        for (const p of pts) {
             const col = FLOWER_COLORS[(r() * FLOWER_COLORS.length) | 0];
             const pr = S * (0.009 + r() * 0.005), turn = r() * Math.PI;
             c.fillStyle = col;
@@ -418,9 +432,9 @@ const SMOOTH: Record<string, Painter> = {
             }
             c.fillStyle = col === '#f6c945' ? '#a0521e' : '#f8d64a';
             c.beginPath(); c.arc(p.x, p.y, pr * 0.55, 0, 7); c.fill();
-        }
+        });
     },
-    swamp(c, S, ink, r) {
+    swamp(c, S, ink, r, mark) {
         /* Green water-waves, clumps of reeds, and mangroves standing on
            their arched roots. */
         const k = area(S);
@@ -439,6 +453,7 @@ const SMOOTH: Record<string, Painter> = {
             ...scatter(r, S, Math.round(2 * k), S * 0.2).map((p) => ({ ...p, kind: 'mangrove' })),
         ].sort((a, b) => a.y - b.y);
         for (const t of things) {
+            mark();
             if (t.kind === 'reed') {
                 c.strokeStyle = reed; line(c, S / 110);
                 const h = S * 0.06;
@@ -476,15 +491,16 @@ const SMOOTH: Record<string, Painter> = {
             c.beginPath(); c.moveTo(t.x - h * 0.45, t.y + S * 0.004); c.lineTo(t.x + h * 0.45, t.y + S * 0.004); c.stroke();
         }
     },
-    'forest-line'(c, S, ink, r) { forest(c, S, ink, r, false); },
-    'forest-fill'(c, S, ink, r) { forest(c, S, ink, r, true); },
-    'jungle-line'(c, S, ink, r) { jungle(c, S, ink, r, false); },
-    'jungle-fill'(c, S, ink, r) { jungle(c, S, ink, r, true); },
-    shrubs(c, S, ink, r) {
+    'forest-line'(c, S, ink, r, mark) { forest(c, S, ink, r, false, mark); },
+    'forest-fill'(c, S, ink, r, mark) { forest(c, S, ink, r, true, mark); },
+    'jungle-line'(c, S, ink, r, mark) { jungle(c, S, ink, r, false, mark); },
+    'jungle-fill'(c, S, ink, r, mark) { jungle(c, S, ink, r, true, mark); },
+    shrubs(c, S, ink, r, mark) {
         /* Badlands: dry, twiggy shrubs in a darker tint of the ground, and a
            few pebbles between them. */
         c.strokeStyle = ink; c.fillStyle = ink;
         for (const p of scatter(r, S, Math.round(7 * area(S)), S * 0.11)) {
+            mark();
             const h = S * (0.045 + r() * 0.025), n = 6 + (r() * 3 | 0);
             for (let k = 0; k < n; k++) {
                 const a = (k / (n - 1) - 0.5) * 2.2 + (r() - 0.5) * 0.3;
@@ -504,12 +520,14 @@ const SMOOTH: Record<string, Painter> = {
             }
             c.beginPath(); c.ellipse(p.x, p.y + S * 0.002, h * 0.4, h * 0.1, 0, 0, 7); c.fill();
         }
+        mark(false);
         for (let i = 0; i < 8 * area(S); i++) { c.beginPath(); c.arc(r() * S, r() * S, S * (0.003 + r() * 0.003), 0, 7); c.fill(); }
     },
-    'bare-trees'(c, S, ink, r) {
+    'bare-trees'(c, S, ink, r, mark) {
         /* Tundra: tall, leafless trees, a few to a cell, with a streak of
            frost at the foot of each. */
         for (const p of scatter(r, S, Math.round(5 * area(S)), S * 0.14)) {
+            mark();
             const h = S * (0.17 + r() * 0.07);
             c.strokeStyle = '#ffffffaa'; line(c, S / 110);
             c.beginPath(); c.moveTo(p.x - h * 0.16, p.y + S * 0.003); c.lineTo(p.x + h * 0.16, p.y + S * 0.003); c.stroke();
@@ -533,7 +551,7 @@ const SMOOTH: Record<string, Painter> = {
             }
         }
     },
-    volcanoes(c, S, ink, r) {
+    volcanoes(c, S, ink, r, mark) {
         /* Volcanic ground: red scorch patches, glowing cracks of lava, and
            cones with molten tops and a flow down one flank. */
         const k = area(S);
@@ -560,6 +578,7 @@ const SMOOTH: Record<string, Painter> = {
             }
         }
         for (const p of scatter(r, S, Math.round(3 * k), S * 0.2)) {
+            mark();
             const w = S * (0.07 + r() * 0.03), h = w * (1 + r() * 0.3);
             const top = w * 0.22;
             c.fillStyle = '#00000024'; c.strokeStyle = ink; line(c, S / 100);
@@ -579,11 +598,12 @@ const SMOOTH: Record<string, Painter> = {
             c.stroke();
         }
     },
-    rocks(c, S, ink, r) {
+    rocks(c, S, ink, r, mark) {
         /* Cave floor: every kind of stone — boulders, sharp shards, flat
            slabs, pebble scatters and stubby stalagmites. */
         c.strokeStyle = ink; line(c, S / 120);
         for (const p of scatter(r, S, Math.round(10 * area(S)), S * 0.085)) {
+            mark();
             const kind = (r() * 5) | 0, s = S * (0.022 + r() * 0.016);
             c.fillStyle = '#ffffff1c';
             c.beginPath();
@@ -668,14 +688,15 @@ const PIXEL: Record<string, Painter> = {
         c.fillStyle = ink;
         for (let i = 0; i < 14; i++) px(c, r() * S, r() * S);
     },
-    'px-grass'(c, S, ink, r) {
+    'px-grass'(c, S, ink, r, mark) {
         c.fillStyle = ink;
-        for (let i = 0; i < 8; i++) { const x = r() * S, y = r() * S; px(c, x, y, 1, 2); px(c, x + 2, y, 1, 2); px(c, x + 1, y + 1); }
+        for (let i = 0; i < 8; i++) { mark(); const x = r() * S, y = r() * S; px(c, x, y, 1, 2); px(c, x + 2, y, 1, 2); px(c, x + 1, y + 1); }
     },
-    'px-tallgrass'(c, S, ink) {
+    'px-tallgrass'(c, S, ink, _r, mark) {
         /* The classic encounter grass: a tuft per quarter-cell. */
         for (let ty = 0; ty < S; ty += 8) {
             for (let tx = 0; tx < S; tx += 8) {
+                mark();
                 c.fillStyle = ink;
                 px(c, tx + 1, ty + 3, 1, 4); px(c, tx + 3, ty + 1, 1, 6); px(c, tx + 5, ty + 2, 1, 5);
                 c.fillStyle = '#98e070';
@@ -683,16 +704,18 @@ const PIXEL: Record<string, Painter> = {
             }
         }
     },
-    'px-rock'(c, S, ink, r) {
+    'px-rock'(c, S, ink, r, mark) {
         c.fillStyle = ink;
-        for (let i = 0; i < 6; i++) { const x = r() * S, y = r() * S; px(c, x, y, 3, 1); px(c, x + 2, y + 1, 1, 2); }
+        for (let i = 0; i < 6; i++) { mark(); const x = r() * S, y = r() * S; px(c, x, y, 3, 1); px(c, x + 2, y + 1, 1, 2); }
+        mark(false);
         c.fillStyle = '#ffffff30';
         for (let i = 0; i < 5; i++) { const x = r() * S, y = r() * S; px(c, x, y, 2, 1); }
     },
-    'px-snow-peaks'(c, S, ink, r) {
+    'px-snow-peaks'(c, S, ink, r, mark) {
         /* A few small peaks a tile, rock in the ink and the top two rows
            white, with a lit left flank. */
         for (let i = 0; i < 3; i++) {
+            mark();
             const x = r() * S, y = r() * S;
             for (let row = 0; row < 6; row++) {
                 c.fillStyle = row < 2 ? '#ffffff' : ink;
@@ -723,11 +746,12 @@ const PIXEL: Record<string, Painter> = {
 
     /* ---- the pixel biomes; S is 64 texels, a four-cell tile ---- */
 
-    'px-flowers'(c, S, ink, r) {
+    'px-flowers'(c, S, ink, r, mark) {
         const k = area(S, true);
         c.fillStyle = ink;
         for (let i = 0; i < 10 * k; i++) { const x = r() * S, y = r() * S; px(c, x, y, 1, 2); px(c, x + 1, y + 1); }
         for (let i = 0; i < 9 * k; i++) {
+            mark();
             const x = r() * (S - 3), y = r() * (S - 3);
             const col = FLOWER_COLORS[(r() * FLOWER_COLORS.length) | 0];
             c.fillStyle = col;
@@ -736,7 +760,7 @@ const PIXEL: Record<string, Painter> = {
             px(c, x + 1, y + 1);
         }
     },
-    'px-swamp'(c, S, ink, r) {
+    'px-swamp'(c, S, ink, r, mark) {
         /* Green waves, reeds, and a mangrove or two on arched roots. */
         const k = area(S, true);
         c.fillStyle = ink;
@@ -745,8 +769,9 @@ const PIXEL: Record<string, Painter> = {
             px(c, x, y, 2, 1); px(c, x + 2, y - 1, 2, 1); px(c, x + 4, y, 2, 1);
         }
         c.fillStyle = '#90a868';
-        for (let i = 0; i < 6 * k; i++) { const x = r() * S, y = r() * S; px(c, x, y, 1, 3); px(c, x + 2, y + 1, 1, 2); }
+        for (let i = 0; i < 6 * k; i++) { mark(); const x = r() * S, y = r() * S; px(c, x, y, 1, 3); px(c, x + 2, y + 1, 1, 2); }
         for (let i = 0; i < 2 * k; i++) {
+            mark();
             const x = r() * S, y = r() * S;
             c.fillStyle = '#5a4428';
             px(c, x + 1, y + 7, 1, 2); px(c, x, y + 9); px(c, x + 3, y + 7, 1, 3); px(c, x + 5, y + 7, 1, 2); px(c, x + 6, y + 9);
@@ -757,21 +782,23 @@ const PIXEL: Record<string, Painter> = {
             px(c, x + 1, y + 1, 2, 1); px(c, x + 2, y + 2);
         }
     },
-    'px-forest'(c, S, ink, r) {
+    'px-forest'(c, S, ink, r, mark) {
         /* The round overworld trees, with a pine in about one cell in three. */
         const cells = S / PX_PER_CELL;
         for (let cy = 0; cy < cells; cy++) {
             for (let cx = 0; cx < cells; cx++) {
                 const ox = cx * PX_PER_CELL, oy = cy * PX_PER_CELL;
+                mark();
                 if (r() < 0.33) { pxPine(c, ox, oy, ink); continue; }
                 pxRoundTree(c, ox, oy, ink);
             }
         }
     },
-    'px-jungle'(c, S, ink, r) {
+    'px-jungle'(c, S, ink, r, mark) {
         /* Palms over a dense canopy of big-leafed bushes. */
         const k = area(S, true);
         for (let i = 0; i < 8 * k; i++) {
+            mark();
             const x = r() * S, y = r() * S;
             c.fillStyle = '#183818';
             px(c, x, y + 1, 8, 5); px(c, x + 1, y, 6, 7);
@@ -781,6 +808,7 @@ const PIXEL: Record<string, Painter> = {
             px(c, x + 2, y + 1, 2, 1); px(c, x + 1, y + 2);
         }
         for (let i = 0; i < 4 * k; i++) {
+            mark();
             const x = r() * S, y = r() * S;
             c.fillStyle = '#806030';
             px(c, x + 4, y + 4, 1, 8); px(c, x + 5, y + 7, 1, 5);
@@ -791,19 +819,22 @@ const PIXEL: Record<string, Painter> = {
             px(c, x + 1, y + 4, 2, 1); px(c, x + 6, y + 4, 2, 1);
         }
     },
-    'px-shrubs'(c, S, ink, r) {
+    'px-shrubs'(c, S, ink, r, mark) {
         const k = area(S, true);
         c.fillStyle = ink;
         for (let i = 0; i < 9 * k; i++) {
+            mark();
             const x = r() * S, y = r() * S;
             px(c, x + 2, y + 3, 1, 2); px(c, x + 1, y + 2); px(c, x + 3, y + 2); px(c, x, y + 1);
             px(c, x + 4, y + 1); px(c, x + 2, y + 1); px(c, x + 1, y + 5, 3, 1);
         }
+        mark(false);
         for (let i = 0; i < 8 * k; i++) px(c, r() * S, r() * S);
     },
-    'px-bare-trees'(c, S, ink, r) {
+    'px-bare-trees'(c, S, ink, r, mark) {
         const k = area(S, true);
         for (let i = 0; i < 4 * k; i++) {
+            mark();
             const x = r() * S, y = r() * S;
             c.fillStyle = '#f8f8f8';
             px(c, x - 2, y + 12, 6, 1);
@@ -815,7 +846,7 @@ const PIXEL: Record<string, Painter> = {
             px(c, x + 2, y + 9); px(c, x + 3, y + 8);
         }
     },
-    'px-volcanic'(c, S, ink, r) {
+    'px-volcanic'(c, S, ink, r, mark) {
         const k = area(S, true);
         c.fillStyle = '#a0301c';
         for (let i = 0; i < 4 * k; i++) { const x = r() * S, y = r() * S; px(c, x, y, 5, 2); px(c, x + 1, y - 1, 3, 1); px(c, x + 1, y + 2, 4, 1); }
@@ -825,6 +856,7 @@ const PIXEL: Record<string, Painter> = {
             for (let j = 0; j < 4; j++) { px(c, x, y, 2, 1); x += 2; y += (r() * 3 | 0) - 1; }
         }
         for (let i = 0; i < 2 * k; i++) {
+            mark();
             const x = r() * S, y = r() * S;
             c.fillStyle = '#382828';
             for (let row = 0; row < 7; row++) px(c, x + 6 - row, y + row + 1, 4 + row * 2, 1);
@@ -836,9 +868,10 @@ const PIXEL: Record<string, Painter> = {
             px(c, x + 7, y, 2, 1);
         }
     },
-    'px-rocks'(c, S, ink, r) {
+    'px-rocks'(c, S, ink, r, mark) {
         const k = area(S, true);
         for (let i = 0; i < 9 * k; i++) {
+            mark();
             const x = r() * S, y = r() * S, kind = (r() * 4) | 0;
             c.fillStyle = ink;
             if (kind === 0) { px(c, x + 1, y, 3, 1); px(c, x, y + 1, 5, 2); px(c, x + 1, y + 3, 3, 1); c.fillStyle = '#ffffff40'; px(c, x + 1, y + 1, 2, 1); }
@@ -855,6 +888,13 @@ export function isPixelPattern(name: string): boolean {
 
 const cache = new Map<string, HTMLCanvasElement>();
 
+/* Seeded by name, so each texture has its own layout but always the same one. */
+function seedOf(name: string): number {
+    let seed = 7;
+    for (let i = 0; i < name.length; i++) seed = (seed * 31 + name.charCodeAt(i)) | 0;
+    return seed;
+}
+
 /** The tile canvas for a painter, or null for an unknown name. */
 export function patternTile(name: string, ink: string): HTMLCanvasElement | null {
     const key = name + '|' + ink;
@@ -867,11 +907,9 @@ export function patternTile(name: string, ink: string): HTMLCanvasElement | null
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = S;
     const c = canvas.getContext('2d')!;
-    /* Seeded by name, so each texture has its own layout but always the same one. */
-    let seed = 7;
-    for (let i = 0; i < name.length; i++) seed = (seed * 31 + name.charCodeAt(i)) | 0;
+    const seed = seedOf(name);
     if (SELF_TILING.has(name)) {
-        painter(c, S, ink, rng(seed));
+        painter(c, S, ink, rng(seed), noMark);
     } else {
         /* Top row of copies first, so something lower down the tile is
            always drawn over something higher up, across the seam too. */
@@ -879,7 +917,7 @@ export function patternTile(name: string, ink: string): HTMLCanvasElement | null
             for (const ox of [-1, 0, 1]) {
                 c.save();
                 c.translate(ox * S, oy * S);
-                painter(c, S, ink, rng(seed));
+                painter(c, S, ink, rng(seed), noMark);
                 c.restore();
             }
         }
@@ -906,4 +944,135 @@ export function patternDataUrl(name: string, ink: string): string | null {
     const url = tile.toDataURL();
     urls.set(key, url);
     return url;
+}
+
+/* ------------------------------------------------------------ split tiles
+
+   The same tile taken apart, so a marker a neighbouring terrain would cut
+   can be left out whole rather than drawn sliced (see render/markers.ts):
+   the ground texture as a tile of its own, the markers as a tile of their
+   own, and each marker as a sprite with where it sits in the tile. Drawing
+   the two tiles one over the other gives the original tile, except that
+   ground drawn after a marker now lies under it. */
+
+export interface MarkerSprite {
+    canvas: HTMLCanvasElement;
+    /** Its top-left in tile texels; past the tile's edge for an overhang. */
+    x: number; y: number; w: number; h: number;
+    /** Summed-area table of its inked texels, (w + 1) x (h + 1). */
+    ink: Int32Array;
+}
+
+export interface PatternParts {
+    /** Tile size, texels. */
+    S: number;
+    ground: HTMLCanvasElement | null;
+    markers: HTMLCanvasElement | null;
+    sprites: MarkerSprite[];
+}
+
+const STATE = ['fillStyle', 'strokeStyle', 'lineWidth', 'lineCap', 'lineJoin', 'globalAlpha'] as const;
+const DRAWS = new Set(['fill', 'stroke', 'fillRect', 'strokeRect', 'fillText', 'strokeText', 'drawImage']);
+const parts = new Map<string, PatternParts | null>();
+
+function tileCanvas(S: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = S;
+    return [canvas, canvas.getContext('2d', { willReadFrequently: true })!];
+}
+
+/** A painter's tile taken apart, or null for an unknown name. */
+export function patternParts(name: string, ink: string): PatternParts | null {
+    const key = name + '|' + ink;
+    if (parts.has(key)) return parts.get(key)!;
+    const pixel = isPixelPattern(name);
+    const painter = pixel ? PIXEL[name] : SMOOTH[name];
+    if (!painter) { parts.set(key, null); return null; }
+    const S = (pixel ? PX_PER_CELL : CELL * SMOOTH_RES) * tileCells(name);
+    if (SELF_TILING.has(name)) {
+        const out = { S, ground: patternTile(name, ink), markers: null, sprites: [] };
+        parts.set(key, out);
+        return out;
+    }
+    /* The painter runs once, on canvases twice the tile's size with the
+       tile in the middle, so overhangs are kept. Every draw goes to the
+       ground or to the marker under way, through a stand-in context. */
+    const pad = S / 2, W = 2 * S;
+    const [groundC, gx] = tileCanvas(W);
+    const [markC, mx] = tileCanvas(W);
+    gx.translate(pad, pad);
+    mx.translate(pad, pad);
+    let cur = gx, inMarker = false, groundInk = false;
+    const sprites: MarkerSprite[] = [];
+    const flush = () => {
+        if (!inMarker) return;
+        const a = mx.getImageData(0, 0, W, W).data;
+        let x0 = W, y0 = W, x1 = -1, y1 = -1;
+        for (let y = 0; y < W; y++) {
+            for (let x = 0; x < W; x++) {
+                if (!a[(y * W + x) * 4 + 3]) continue;
+                if (x < x0) x0 = x; if (x > x1) x1 = x;
+                if (y < y0) y0 = y; if (y > y1) y1 = y;
+            }
+        }
+        if (x1 < 0) return;
+        const w = x1 - x0 + 1, h = y1 - y0 + 1;
+        const [canvas, cx] = tileCanvas(1);
+        canvas.width = w; canvas.height = h;
+        cx.drawImage(markC, x0, y0, w, h, 0, 0, w, h);
+        const ink = new Int32Array((w + 1) * (h + 1));
+        for (let y = 0; y < h; y++) {
+            let row = 0;
+            for (let x = 0; x < w; x++) {
+                if (a[((y0 + y) * W + x0 + x) * 4 + 3]) row++;
+                ink[(y + 1) * (w + 1) + x + 1] = ink[y * (w + 1) + x + 1] + row;
+            }
+        }
+        sprites.push({ canvas, x: x0 - pad, y: y0 - pad, w, h, ink });
+    };
+    const mark: Mark = (on = true) => {
+        flush();
+        const next = on ? mx : gx;
+        if (on) {
+            mx.save(); mx.setTransform(1, 0, 0, 1, 0, 0); mx.clearRect(0, 0, W, W); mx.restore();
+        }
+        for (const k of STATE) (next as unknown as Record<string, unknown>)[k] = cur[k];
+        cur = next;
+        inMarker = on;
+    };
+    const stand = new Proxy({}, {
+        get(_, prop: string) {
+            const v = (cur as unknown as Record<string, unknown>)[prop];
+            if (typeof v !== 'function') return v;
+            return (...args: unknown[]) => {
+                if (!inMarker && DRAWS.has(prop)) groundInk = true;
+                return (v as (...a: unknown[]) => unknown).apply(cur, args);
+            };
+        },
+        set(_, prop: string, v) {
+            (cur as unknown as Record<string, unknown>)[prop] = v;
+            return true;
+        },
+    }) as CanvasRenderingContext2D;
+    painter(stand, S, ink, rng(seedOf(name)), mark);
+    flush();
+
+    /* Each half as a tile, drawn again across each edge like patternTile:
+       top row of copies first, so lower things lie over higher ones. */
+    let ground: HTMLCanvasElement | null = null, markers: HTMLCanvasElement | null = null;
+    if (groundInk) {
+        const [canvas, c] = tileCanvas(S);
+        for (const oy of [-1, 0, 1]) for (const ox of [-1, 0, 1]) c.drawImage(groundC, ox * S - pad, oy * S - pad);
+        ground = canvas;
+    }
+    if (sprites.length) {
+        const [canvas, c] = tileCanvas(S);
+        for (const oy of [-1, 0, 1]) {
+            for (const ox of [-1, 0, 1]) for (const sp of sprites) c.drawImage(sp.canvas, ox * S + sp.x, oy * S + sp.y);
+        }
+        markers = canvas;
+    }
+    const out = { S, ground, markers, sprites };
+    parts.set(key, out);
+    return out;
 }

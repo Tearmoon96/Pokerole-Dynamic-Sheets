@@ -7,7 +7,9 @@ import type { EdgeKind, MapDoc } from '../types';
 import { resolvedOf } from '../raster';
 import { edgeResolver, edgesOf } from '../edges';
 import { probeImage, terrainTextureUrl } from '../sprites';
-import { CELL, patternTile, tileScale } from './patterns';
+import { CELL, patternParts, tileScale } from './patterns';
+import { drawMarkers, markerPlan } from './markers';
+import type { MarkerPlan } from './markers';
 
 /* The ground, drawn into a canvas.
 
@@ -87,6 +89,8 @@ export interface TerrainGeometry {
     depthField?: DepthField | null;
     /** The depth bands drawn from it, per style. */
     depth?: Map<string, DepthBands | null>;
+    /** Which markers each terrain keeps, by style and terrain; see markers.ts. */
+    marks?: Map<string, MarkerPlan>;
 }
 
 /* A stretch's tag while building: which of the looks it is drawn in. 0 is
@@ -359,41 +363,57 @@ const probeTexture: TextureSource = (style, slug) => {
     return img && img.naturalWidth > 0 ? { img, w: img.naturalWidth, h: img.naturalHeight } : null;
 };
 
-/** The fills that make a terrain's ground, bottom first: its colour, then
-    the owner's tile for it or the style's procedural pattern. */
-function terrainPaints(ctx: CanvasRenderingContext2D, style: MapStyle, t: TerrainDef, textures: TextureSource): (string | CanvasPattern)[] {
-    const look: TerrainLook | undefined = style.terrain[t.slug];
-    /* The terrain's own colour first, always: a texture with transparent
-       parts would otherwise show whatever lies underneath — the sea. */
-    const out: (string | CanvasPattern)[] = [look?.fill ?? '#888'];
+/** Whether a terrain draws anything over its colour. */
+function hasMarks(style: MapStyle, t: TerrainDef, textures: TextureSource): boolean {
+    return !!(textures(style, t.slug) || style.terrain[t.slug]?.pattern);
+}
+
+/** What a terrain draws over its colour, inside `area`: the owner's tile for
+    it, or the style's procedural pattern — its ground texture through the
+    area, and only the markers no other terrain would cut (markers.ts). */
+function drawMarks(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapDoc, style: MapStyle, t: TerrainDef,
+    area: Path2D, rule: CanvasFillRule, textures: TextureSource): void {
     /* The owner's own tile for this terrain, one cell per repeat, replaces
-       the procedural pattern. */
+       the procedural pattern. It has no markers to tell apart. */
     const tex = textures(style, t.slug);
     if (tex) {
         const pat = ctx.createPattern(tex.img, 'repeat');
         if (pat) {
             pat.setTransform(new DOMMatrix([CELL / tex.w, 0, 0, CELL / tex.h, 0, 0]));
-            out.push(pat);
-            return out;
+            ctx.fillStyle = pat;
+            ctx.fill(area, rule);
         }
+        return;
     }
-    if (look?.pattern) {
-        const tile = patternTile(look.pattern, look.ink ?? '#0003');
-        const pat = tile && ctx.createPattern(tile, 'repeat');
-        if (pat) {
-            const s = tileScale(look.pattern);
-            pat.setTransform(new DOMMatrix([s, 0, 0, s, 0, 0]));
-            out.push(pat);
-        }
+    const look: TerrainLook | undefined = style.terrain[t.slug];
+    if (!look?.pattern) return;
+    const parts = patternParts(look.pattern, look.ink ?? '#0003');
+    if (!parts) return;
+    const s = tileScale(look.pattern);
+    const pattern = (tile: HTMLCanvasElement) => {
+        const pat = ctx.createPattern(tile, 'repeat');
+        pat?.setTransform(new DOMMatrix([s, 0, 0, s, 0, 0]));
+        return pat;
+    };
+    if (parts.ground) {
+        const pat = pattern(parts.ground);
+        if (pat) { ctx.fillStyle = pat; ctx.fill(area, rule); }
     }
-    return out;
+    if (!parts.sprites.length) return;
+    if (!geo.marks) geo.marks = new Map();
+    const key = style.id + '|' + t.slug;
+    let plan = geo.marks.get(key);
+    if (!plan) geo.marks.set(key, plan = markerPlan(doc, TERRAINS.indexOf(t), parts, s, geo.blocky ? 0 : 1));
+    drawMarkers(ctx, plan, parts.markers && pattern(parts.markers), area, rule);
 }
 
-function fillLayer(ctx: CanvasRenderingContext2D, style: MapStyle, t: TerrainDef, area: Path2D, textures: TextureSource): void {
-    for (const paint of terrainPaints(ctx, style, t, textures)) {
-        ctx.fillStyle = paint;
-        ctx.fill(area, 'evenodd');
-    }
+function fillLayer(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapDoc, style: MapStyle, t: TerrainDef,
+    area: Path2D, textures: TextureSource): void {
+    /* The terrain's own colour first, always: a texture with transparent
+       parts would otherwise show whatever lies underneath — the sea. */
+    ctx.fillStyle = style.terrain[t.slug]?.fill ?? '#888';
+    ctx.fill(area, 'evenodd');
+    drawMarks(ctx, geo, doc, style, t, area, 'evenodd', textures);
 }
 
 /* ------------------------------------------------------------------ Soft edges
@@ -775,7 +795,7 @@ function drawSoft(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapD
     const ac = acc.getContext('2d')!, tc = tmp.getContext('2d')!, wc = wet.getContext('2d')!;
     const smooth = !style.pixelated;
     const looks = partLooks(layer, style);
-    const markers = layer.parts.map((part) => terrainPaints(tc, style, part.terrain, textures).slice(1));
+    const marked = layer.parts.map((part) => hasMarks(style, part.terrain, textures));
     for (let ty = dy0; ty < dy1; ty += th) {
         for (let tx = dx0; tx < dx1; tx += tw) {
             const cw = Math.min(tw, dx1 - tx), ch = Math.min(th, dy1 - ty);
@@ -841,15 +861,13 @@ function drawSoft(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapD
             });
             /* Each terrain's markers over them, exactly as the ordinary
                drawing has them, cut to where the colour went. */
-            if (markers.some((m) => m.length)) {
+            if (marked.some(Boolean)) {
                 start(tc);
                 tc.imageSmoothingEnabled = smooth;
                 layer.parts.forEach((part, k) => {
-                    for (const paint of markers[k]) {
-                        tc.fillStyle = paint;
-                        tc.fill(part.region.path, part.region.rule);
-                    }
-                    if (part.terrain.water && depth && markers[k].length) {
+                    if (!marked[k]) return;
+                    drawMarks(tc, geo, doc, style, part.terrain, part.region.path, part.region.rule, textures);
+                    if (part.terrain.water && depth) {
                         tc.save();
                         tc.clip(part.region.path, part.region.rule);
                         tc.globalCompositeOperation = 'source-atop';
@@ -1091,7 +1109,7 @@ export function drawTerrain(ctx: CanvasRenderingContext2D, geo: TerrainGeometry,
                 ctx.restore();
             }
         }
-        fillLayer(ctx, style, layer.terrain, layer.area, textures);
+        fillLayer(ctx, geo, doc, style, layer.terrain, layer.area, textures);
     });
     /* A map that is all water has no land layer to come after it. */
     if (geo.waterLayers >= geo.layers.length) drawDepth(ctx, geo, doc, style);
