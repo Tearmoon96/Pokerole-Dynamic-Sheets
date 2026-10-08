@@ -368,28 +368,41 @@ function fillLayer(ctx: CanvasRenderingContext2D, style: MapStyle, t: TerrainDef
 
 /* ------------------------------------------------------------------ Soft edges
 
-   A Soft edge is two terrains fading into each other, textures and all. The
-   way to get that with no smear: blur where each terrain IS — a mask per
-   terrain, 1 inside its region and 0 outside — and paint each terrain's
-   ground through its blurred mask, adding them up. The masks of all the
-   terrains add to exactly 1 everywhere before blurring, and a blur keeps a
-   sum, so they still add to 1 after: across the band each terrain gives way
-   to the other in proportion, and neither texture is ever blurred itself.
+   A Soft edge is two terrains shading into each other across a band B cells
+   wide, centred on the edge and no wider. Two things fade differently:
 
-   That blend is then laid over the ordinary drawing only along the Soft
-   edges, through a zone mask — a wide blurred stroke of those edges — so
-   every other edge stays exactly as sharp as it was.
+   - the ground's COLOUR blends smoothly, in proportion;
+   - the DETAILS — trees, tufts, stones, the owner's tiles — never fade. Each
+     spot of the band shows one terrain's details, whole and opaque, and the
+     share of spots going to each terrain follows the colour's proportion. So
+     a forest thins out into the grass in clumps instead of a field of half-
+     transparent trees drawn over half-transparent grass.
+
+   The proportions come from a mask per terrain, 1 inside its region and 0
+   outside, blurred: the masks add to 1 before blurring and still do after.
+   Each spot's shares are then sharpened so they reach 0 and 1 exactly at the
+   band's ends — a Gaussian's tails otherwise sprinkle stray trees cells away
+   from the edge — and the spot's details go to whichever terrain a fixed
+   noise field (clumps about a cell across, flattened to an even spread)
+   falls on among them. The pixel styles use an ordered dither for the same
+   pick, a quarter cell at a time, and take colour and details together,
+   since pixel art mixes whole pixels rather than fading.
+
+   All of it is laid over the ordinary drawing only along the Soft edges (a
+   wide stroke of them, dithered where a soft stretch ends) and only over the
+   soft terrains themselves, so a third terrain beside the band keeps its own
+   sharp edge.
 
    The masks are small: world space at a few px a cell, over only the box
    the Soft edges cover, built once per change of the terrain. Every frame
-   after that scales them up (smoothly, which is the blur's own job) in
-   tiles of the viewport, so a big export needs no canvas the size of it. */
+   after that scales them up in tiles of the viewport, so a big export needs
+   no canvas the size of it. */
 
 interface SoftLayer {
     /** World px the masks cover. */
     x: number; y: number; w: number; h: number;
-    masks: { terrain: TerrainDef; canvas: HTMLCanvasElement }[];
-    zone: HTMLCanvasElement;
+    /** `colour` is null in the pixel styles, where `detail` carries it all. */
+    masks: { terrain: TerrainDef; colour: HTMLCanvasElement | null; detail: HTMLCanvasElement }[];
 }
 
 const MASK_BUDGET = 2_500_000;
@@ -463,12 +476,86 @@ function blurInto(dst: HTMLCanvasElement, src: HTMLCanvasElement, sigma: number)
     c.putImageData(img, 0, 0);
 }
 
+/* The noise that decides whose details a spot gets: smooth value noise,
+   lattice every cell plus a finer grain, on a tile NOISE_CELLS square
+   that repeats (eight cells is too long a period to see in a ragged edge).
+   Fixed by position, so repainting elsewhere never reshuffles the clumps.
+   It is then flattened by rank to an even spread over 0..1, or a share of
+   0.2 would win far less than a fifth of the spots: value noise bunches up
+   round the middle. */
+const NOISE_CELLS = 8;
+const NOISE_RES = 16;                 // tile px per cell
+const NT = NOISE_CELLS * NOISE_RES;
+let noiseTileCache: Float32Array | null = null;
+
+function noiseTile(): Float32Array {
+    if (noiseTileCache) return noiseTileCache;
+    let seed = 0x9e3779b9;
+    const rand = () => {
+        seed = (seed + 0x6D2B79F5) >>> 0;
+        let t = Math.imul(seed ^ (seed >>> 15), seed | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const octave = (per: number) => {
+        const L = NOISE_CELLS * per;
+        const lat = Float32Array.from({ length: L * L }, rand);
+        const out = new Float32Array(NT * NT);
+        for (let y = 0; y < NT; y++) {
+            const fy = (y + 0.5) / NOISE_RES * per, y0 = Math.floor(fy), ty = fy - y0, sy = ty * ty * (3 - 2 * ty);
+            const r0 = (y0 % L) * L, r1 = ((y0 + 1) % L) * L;
+            for (let x = 0; x < NT; x++) {
+                const fx = (x + 0.5) / NOISE_RES * per, x0 = Math.floor(fx), tx = fx - x0, sx = tx * tx * (3 - 2 * tx);
+                const c0 = x0 % L, c1 = (x0 + 1) % L;
+                const a = lat[r0 + c0], b = lat[r0 + c1], c = lat[r1 + c0], d = lat[r1 + c1];
+                out[y * NT + x] = a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+            }
+        }
+        return out;
+    };
+    const broad = octave(1), grain = octave(3);
+    const raw = broad.map((v, i) => v + 0.3 * grain[i]);
+    const order = Array.from(raw.keys()).sort((a, b) => raw[a] - raw[b]);
+    const even = new Float32Array(NT * NT);
+    order.forEach((i, rank) => { even[i] = (rank + 0.5) / order.length; });
+    noiseTileCache = even;
+    return even;
+}
+
+/** 0 below 0.1, 1 above 0.9, smooth between: a blurred edge's 10%-90%
+    stretch is the band, and the tails past it go. */
+function sharpen(s: number): number {
+    const t = Math.min(1, Math.max(0, (s - 0.1) / 0.8));
+    return t * t * (3 - 2 * t);
+}
+
+function alphaOf(c: HTMLCanvasElement): Uint8ClampedArray {
+    const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+    const a = new Uint8ClampedArray(c.width * c.height);
+    for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3];
+    return a;
+}
+
+function maskCanvas(a: Uint8ClampedArray, w: number, h: number): HTMLCanvasElement {
+    const c = scratch(w, h);
+    const cx = c.getContext('2d')!;
+    const img = cx.createImageData(w, h);
+    for (let i = 0; i < a.length; i++) {
+        const o = i * 4;
+        img.data[o] = img.data[o + 1] = img.data[o + 2] = 255;
+        img.data[o + 3] = a[i];
+    }
+    cx.putImageData(img, 0, 0);
+    return c;
+}
+
 function softLayer(geo: TerrainGeometry, doc: MapDoc): SoftLayer | null {
     const soft = geo.soft;
     if (!soft) return null;
     if (soft.layer !== undefined) return soft.layer;
     const B = geo.softWidth;
-    /* The blend's standard deviation: 10% to 90% across B cells. */
+    /* The blur's standard deviation: 10% to 90% across B cells, which the
+       sharpening then turns into 0 to 1. */
     const sigma = B / 2.56;
     const reach = (B * 1.6 + 0.5) * CELL;
     const W = doc.cols * CELL, H = doc.rows * CELL;
@@ -478,87 +565,130 @@ function softLayer(geo: TerrainGeometry, doc: MapDoc): SoftLayer | null {
     const x1 = Math.min(W, Math.ceil((soft.box.x1 + reach) / q) * q), y1 = Math.min(H, Math.ceil((soft.box.y1 + reach) / q) * q);
     if (x1 <= x || y1 <= y) { soft.layer = null; return null; }
     const w = x1 - x, h = y1 - y;
-    /* Mask px per world px: enough for the blur to be smooth, within a
-       budget. Blocky styles work in quarter cells, one mask px each. */
-    let k = geo.blocky ? DITHER / CELL : Math.min(16, Math.max(2, 6 / B)) / CELL;
+    /* Mask px per world px: fine enough for the clumps of details to have
+       a shape (8 a cell at least), within a budget. Blocky styles work in
+       quarter cells, one mask px each. */
+    let k = geo.blocky ? DITHER / CELL : Math.min(16, Math.max(8, 12 / B)) / CELL;
     if (!geo.blocky) k = Math.min(k, Math.sqrt(MASK_BUDGET / (w * h)), 4096 / w, 4096 / h);
     const mw = Math.max(1, Math.round(w * k)), mh = Math.max(1, Math.round(h * k));
     const sx = mw / w, sy = mh / h;
     const hard = scratch(mw, mh);
-    const hc = hard.getContext('2d')!;
-    const place = (c: CanvasRenderingContext2D) => {
+    const hc = hard.getContext('2d', { willReadFrequently: true })!;
+    const union = scratch(mw, mh);
+    const uc = union.getContext('2d', { willReadFrequently: true })!;
+    const clip = new Path2D();
+    clip.rect(0, 0, W, H);
+    const reset = (c: CanvasRenderingContext2D) => {
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.clearRect(0, 0, mw, mh);
         c.setTransform(sx, 0, 0, sy, -x * sx, -y * sy);
     };
     const blurPx = sigma * CELL * sx;
 
-    const masks: SoftLayer['masks'] = [];
+    const terrains: TerrainDef[] = [];
+    const blurred: Uint8ClampedArray[] = [];
+    reset(uc);
+    uc.save();
+    uc.clip(clip);
+    uc.fillStyle = '#fff';
     for (const i of soft.terrains) {
         const region = geo.regions.get(i);
         if (!region) continue;
-        hc.setTransform(1, 0, 0, 1, 0, 0);
-        hc.clearRect(0, 0, mw, mh);
-        place(hc);
+        reset(hc);
         hc.save();
-        const clip = new Path2D();
-        clip.rect(0, 0, W, H);
         hc.clip(clip);
         hc.fillStyle = '#fff';
         hc.fill(region.path, region.rule);
         hc.restore();
+        uc.fill(region.path, region.rule);
         const canvas = scratch(mw, mh);
         blurInto(canvas, hard, blurPx);
-        masks.push({ terrain: TERRAINS[i], canvas });
+        terrains.push(TERRAINS[i]);
+        blurred.push(alphaOf(canvas));
     }
+    uc.restore();
+    if (!terrains.length) { soft.layer = null; return null; }
 
-    hc.setTransform(1, 0, 0, 1, 0, 0);
-    hc.clearRect(0, 0, mw, mh);
-    place(hc);
+    /* Where the blend may go at all: a wide stroke of the Soft edges —
+       wider than the band, so the band never meets its side — blurred so
+       a soft stretch's END fades out through the dither below. */
+    reset(hc);
     hc.strokeStyle = '#fff';
     hc.lineCap = 'round';
     hc.lineJoin = 'round';
-    hc.lineWidth = B * 1.8 * CELL;
+    hc.lineWidth = B * 2.2 * CELL;
     hc.stroke(soft.path);
-    const zone = scratch(mw, mh);
-    blurInto(zone, hard, (B / 5) * CELL * sx);
-    if (geo.blocky) dither(masks.map((m) => m.canvas), zone);
+    const zoneBlur = scratch(mw, mh);
+    blurInto(zoneBlur, hard, (B / 5) * CELL * sx);
+    const zone = alphaOf(zoneBlur);
+    const over = alphaOf(union);
 
-    soft.layer = { x, y, w, h, masks, zone };
+    /* The thresholds each mask px is judged by: the noise tile, read at the
+       px's place in the world, or the 4x4 ordered dither. The zone reads
+       its own, offset, so whether a spot is in the band and whose details
+       it gets do not go together. */
+    const tile = geo.blocky ? null : noiseTile();
+    const col = new Int32Array(mw), row = new Int32Array(mh);
+    for (let px = 0; px < mw; px++) col[px] = Math.floor((x + (px + 0.5) / sx) / CELL * NOISE_RES);
+    for (let py = 0; py < mh; py++) row[py] = Math.floor((y + (py + 0.5) / sy) / CELL * NOISE_RES);
+    const wrap = (v: number) => ((v % NT) + NT) % NT;
+    const threshold = (px: number, py: number, alt: boolean): number => {
+        if (!tile) return BAYER[(((py + (alt ? 2 : 0)) % 4) * 4) + (px + (alt ? 1 : 0)) % 4];
+        return tile[wrap(row[py] + (alt ? NT / 2 + 5 : 0)) * NT + wrap(col[px] + (alt ? NT / 2 + 3 : 0))];
+    };
+
+    const n = terrains.length;
+    const detail = terrains.map(() => new Uint8ClampedArray(mw * mh));
+    const colour = geo.blocky ? null : terrains.map(() => new Uint8ClampedArray(mw * mh));
+    const share = new Float32Array(n);
+    for (let py = 0; py < mh; py++) {
+        for (let px = 0; px < mw; px++) {
+            const p = py * mw + px;
+            const u = over[p];
+            if (!u || zone[p] / 255 <= threshold(px, py, true)) continue;
+            let total = 0;
+            for (let i = 0; i < n; i++) total += blurred[i][p];
+            if (!total) continue;
+            let sum = 0;
+            for (let i = 0; i < n; i++) { share[i] = sharpen(blurred[i][p] / total); sum += share[i]; }
+            if (!sum) continue;
+            const pick = threshold(px, py, false) * sum;
+            let run = 0, chosen = n - 1;
+            for (let i = 0; i < n; i++) {
+                run += share[i];
+                if (run >= pick) { chosen = i; break; }
+            }
+            detail[chosen][p] = u;
+            if (!colour) continue;
+            /* The colour's shares, rounded so they still add up to u. */
+            let left = u, top = 0;
+            for (let i = 0; i < n; i++) {
+                const a = Math.round(u * share[i] / sum);
+                colour[i][p] = a;
+                left -= a;
+                if (share[i] > share[top]) top = i;
+            }
+            colour[top][p] = Math.max(0, colour[top][p] + left);
+        }
+    }
+
+    soft.layer = {
+        x, y, w, h,
+        masks: terrains.map((terrain, i) => ({
+            terrain,
+            colour: colour ? maskCanvas(colour[i], mw, mh) : null,
+            detail: maskCanvas(detail[i], mw, mh),
+        })),
+    };
     return soft.layer;
 }
 
 /* Pixel art does not blend two tiles by fading one over the other: it mixes
    whole pixels of each, more of one the further in you go. So the blocky
-   styles turn the blend into an ordered dither: each quarter cell is wholly
-   ONE terrain, picked by where a fixed 4x4 threshold pattern falls among the
-   blend's proportions there. The zone becomes all or nothing the same way. */
+   styles pick each quarter cell wholly for ONE terrain, by where a fixed 4x4
+   threshold pattern falls among the shares there. */
 const DITHER = 4;
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
-
-function dither(masks: HTMLCanvasElement[], zone: HTMLCanvasElement): void {
-    const w = zone.width, h = zone.height;
-    const read = (c: HTMLCanvasElement) => c.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, w, h);
-    const z = read(zone);
-    const ms = masks.map(read);
-    for (let p = 0; p < w * h; p++) {
-        const a = p * 4 + 3;
-        const inZone = z.data[a] >= 128;
-        z.data[a] = inZone ? 255 : 0;
-        let total = 0;
-        for (const m of ms) total += m.data[a];
-        /* Too little of the blended terrains here to decide: leave it to
-           the plain drawing underneath. */
-        const pick = inZone && total >= 96 ? BAYER[((p / w | 0) % 4) * 4 + (p % w) % 4] * total : -1;
-        let run = 0;
-        let chosen = -1;
-        for (let k = 0; k < ms.length && pick >= 0; k++) {
-            run += ms[k].data[a];
-            if (run >= pick) { chosen = k; break; }
-        }
-        ms.forEach((m, k) => { m.data[a] = k === chosen ? 255 : 0; });
-    }
-    masks.forEach((c, k) => c.getContext('2d')!.putImageData(ms[k], 0, 0));
-    zone.getContext('2d')!.putImageData(z, 0, 0);
-}
 
 /** Lay the blend over what is already drawn, along the Soft edges only. */
 function drawSoft(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapDoc, style: MapStyle, textures: TextureSource): void {
@@ -578,40 +708,44 @@ function drawSoft(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapD
     const [acc, tmp] = tiles(tw, th);
     const ac = acc.getContext('2d')!, tc = tmp.getContext('2d')!;
     const smooth = !style.pixelated;
+    /* Colour first, every terrain's adding up; then the details over it,
+       each spot one terrain's. The pixel styles have no colour pass: their
+       one mask takes the whole ground. */
+    const passes = layer.masks.map((m) => {
+        const paints = terrainPaints(tc, style, m.terrain, textures);
+        return { m, colour: m.colour ? paints.slice(0, 1) : [], detail: m.colour ? paints.slice(1) : paints };
+    });
     for (let ty = dy0; ty < dy1; ty += th) {
         for (let tx = dx0; tx < dx1; tx += tw) {
             const cw = Math.min(tw, dx1 - tx), ch = Math.min(th, dy1 - ty);
-            const world = (c: CanvasRenderingContext2D) => c.setTransform(T.a, T.b, T.c, T.d, T.e - tx, T.f - ty);
-            ac.setTransform(1, 0, 0, 1, 0, 0);
-            ac.globalCompositeOperation = 'source-over';
-            ac.clearRect(0, 0, tw, th);
-            for (const m of layer.masks) {
+            const through = (mask: HTMLCanvasElement, paints: (string | CanvasPattern)[], water: boolean, op: GlobalCompositeOperation) => {
                 tc.setTransform(1, 0, 0, 1, 0, 0);
                 tc.globalCompositeOperation = 'source-over';
                 tc.clearRect(0, 0, tw, th);
-                world(tc);
+                tc.setTransform(T.a, T.b, T.c, T.d, T.e - tx, T.f - ty);
                 tc.imageSmoothingEnabled = smooth;
-                tc.drawImage(m.canvas, layer.x, layer.y, layer.w, layer.h);
-                tc.imageSmoothingEnabled = !style.pixelated;
-                terrainPaints(tc, style, m.terrain, textures).forEach((paint, n) => {
+                tc.drawImage(mask, layer.x, layer.y, layer.w, layer.h);
+                paints.forEach((paint, n) => {
                     tc.globalCompositeOperation = n === 0 ? 'source-in' : 'source-atop';
                     tc.fillStyle = paint;
                     tc.fillRect(layer.x, layer.y, layer.w, layer.h);
                 });
                 /* Water blends in WITH its depth shading, or a soft coast
                    would show a strip of unshaded sea along it. */
-                if (m.terrain.water && depth) {
+                if (water && depth) {
                     tc.globalCompositeOperation = 'source-atop';
                     paintDepth(tc, depth, doc, style, false);
                 }
-                ac.globalCompositeOperation = 'lighter';
+                ac.globalCompositeOperation = op;
                 ac.drawImage(tmp, 0, 0, cw, ch, 0, 0, cw, ch);
+            };
+            ac.setTransform(1, 0, 0, 1, 0, 0);
+            ac.globalCompositeOperation = 'source-over';
+            ac.clearRect(0, 0, tw, th);
+            for (const p of passes) if (p.m.colour && p.colour.length) through(p.m.colour, p.colour, !!p.m.terrain.water, 'lighter');
+            for (const p of passes) {
+                if (p.detail.length) through(p.m.detail, p.detail, !!p.m.terrain.water, p.m.colour ? 'source-over' : 'lighter');
             }
-            /* Only along the Soft edges. */
-            world(ac);
-            ac.globalCompositeOperation = 'destination-in';
-            ac.imageSmoothingEnabled = smooth;
-            ac.drawImage(layer.zone, layer.x, layer.y, layer.w, layer.h);
             ctx.save();
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.globalCompositeOperation = 'source-over';
