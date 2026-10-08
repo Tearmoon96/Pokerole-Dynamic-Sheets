@@ -174,6 +174,11 @@ zoom or grid setting ever moves anything.
   with the ones it has a Soft edge to. Soft never joins land and water, nor
   anything and the background: those edges are drawn as None. The pixel
   styles dither the same blend instead of fading it.
+- **Inland water** — Lake and River (`inland` in
+  [`src/map/terrain.ts`](src/map/terrain.ts)) — gets none of the sea's
+  shallows: the depth field counts it as neither water nor land, and the
+  coastal wash is clipped out of it. Where the edge to land is left to the
+  style it is drawn as a shoreline instead, in the style's `shore` look.
 - **Markers** — trees, tufts, peaks, stones — are drawn whole or not at all
   ([`render/markers.ts`](src/map/render/markers.ts)). Each painter in
   [`render/patterns.ts`](src/map/render/patterns.ts) marks where a marker

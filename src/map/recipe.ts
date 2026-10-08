@@ -175,7 +175,7 @@ const TERRAIN_SLUGS = TERRAINS.map((t) => t.slug);
 /* Words an assistant reaches for that are not terrains — only ever offered
    as the suggestion in an error, never used in their place. */
 const TERRAIN_SYNONYMS: Record<string, string> = {
-    ocean: 'sea', water: 'sea', bay: 'sea', coast: 'shallows', reef: 'shallows', river: 'lake', pond: 'lake',
+    ocean: 'sea', water: 'sea', bay: 'sea', coast: 'shallows', reef: 'shallows', pond: 'lake', stream: 'river', creek: 'river',
     marsh: 'swamp', bog: 'swamp', wetland: 'swamp', sand: 'beach', grass: 'grassland', plains: 'grassland',
     meadow: 'grassland', field: 'grassland', woods: 'forest', trees: 'forest', rainforest: 'jungle',
     dunes: 'desert', canyon: 'badlands', mesa: 'badlands', ice: 'snow', glacier: 'snow', mountains: 'mountain',

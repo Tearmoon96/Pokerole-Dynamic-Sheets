@@ -155,9 +155,11 @@ one would orphan both its picture and every stamp of it on every map.
 | Sea | `sea.png` |
 | Shallows | `shallows.png` |
 | Lake | `lake.png` |
+| River | `river.png` |
 | Swamp | `swamp.png` |
 | Beach | `beach.png` |
 | Grassland | `grassland.png` |
+| Flower field | `flower-field.png` |
 | Tall grass | `tall-grass.png` |
 | Forest | `forest.png` |
 | Jungle | `jungle.png` |

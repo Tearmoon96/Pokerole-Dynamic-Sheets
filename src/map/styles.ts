@@ -68,6 +68,10 @@ export interface MapStyle {
         `line` inks the edge between bands. See depthBands in
         render/terrain.ts. */
     depth?: { steps: number[]; colors: string[]; line?: { color: string; width: number } };
+    /** The shoreline of inland water — a lake or river against land, where
+        the edge is left to the style. Lakes and rivers get no shallows, so
+        this is what tells them from the land; the sea keeps its own look. */
+    shore: { color: string; width: number };
     pixelated: boolean;
     grid: string;
     paths: Record<PathKind, PathLook>;
@@ -96,6 +100,7 @@ const handdrawn: MapStyle = {
         line: { color: '#4f6f6a55', width: 1 },
     },
     line: { color: HAND_INK, width: 1.6 },
+    shore: { color: '#3f5d58d9', width: 2.2 },
     pixelated: false,
     grid: '#3b2f2455',
     terrain: {
@@ -104,6 +109,7 @@ const handdrawn: MapStyle = {
         'sea': { fill: '#b6c8bd', pattern: 'waves', ink: '#7d968c' },
         'shallows': { fill: '#cbd8c6', pattern: 'ripples', ink: '#8fa89a' },
         'lake': { fill: '#b6c8bd', pattern: 'ripples', ink: '#7d968c', edge: { color: '#5d7a7466', width: 1 } },
+        'river': { fill: '#b6c8bd', pattern: 'ripples', ink: '#7d968c', edge: { color: '#5d7a7466', width: 1 } },
         'swamp': { fill: '#b3b58c', pattern: 'swamp', ink: '#5f7a3c', edge: { color: '#6b6a4588', width: 1 } },
         'beach': { fill: '#ecdfb2', pattern: 'sand', ink: '#b8a472', edge: { color: '#b8a47299', width: 1 } },
         'grassland': { fill: '#e2dcae', pattern: 'tussocks', ink: '#7f9a4a' },
@@ -152,6 +158,7 @@ const anime: MapStyle = {
         line: { color: '#ffffff40', width: 1.5 },
     },
     line: { color: ANIME_LINE, width: 2.5 },
+    shore: { color: '#1f6fb8', width: 3 },
     pixelated: false,
     grid: '#ffffff40',
     terrain: {
@@ -160,6 +167,7 @@ const anime: MapStyle = {
         'sea': { fill: '#48a6f2', pattern: 'sparkle', ink: '#8ccaf8' },
         'shallows': { fill: '#82d3f6', edge: { color: '#ffffffaa', width: 3 } },
         'lake': { fill: '#5cbaf2', pattern: 'sparkle', ink: '#a8dcfa', edge: { color: '#3a94dc', width: 2 } },
+        'river': { fill: '#5cbaf2', pattern: 'sparkle', ink: '#a8dcfa', edge: { color: '#3a94dc', width: 2 } },
         'swamp': { fill: '#78a05e', pattern: 'swamp', ink: '#4e8a3c', edge: { color: '#4e7a3c', width: 2 } },
         'beach': { fill: '#f7e4a4', edge: { color: '#d9b862', width: 2 } },
         'grassland': { fill: '#86d66f', pattern: 'tussocks', ink: '#56a848', edge: { color: '#4f9a4a', width: 2 } },
@@ -203,6 +211,7 @@ const townmap: MapStyle = {
     cellBorder: '#20402888',
     depth: { steps: [0.5, 1, 1.75], colors: ['#a8d4ffb0', '#8cc0f878', '#8cc0f838', '#00000000'] },
     line: { color: '#203028', width: 2 },
+    shore: { color: '#284880', width: 2 },
     grid: '#ffffff30',
     terrain: {
         'clouds': { fill: '#c8dcf0', pattern: 'px-clouds', ink: '#f0f8ff' },
@@ -210,6 +219,7 @@ const townmap: MapStyle = {
         'sea': { fill: '#5890e0', pattern: 'px-waves', ink: '#70a8f0' },
         'shallows': { fill: '#78b0f0' },
         'lake': { fill: '#5890e0', pattern: 'px-waves', ink: '#70a8f0' },
+        'river': { fill: '#5890e0', pattern: 'px-waves', ink: '#70a8f0' },
         'swamp': { fill: '#709860' },
         'beach': { fill: '#e8d890' },
         'grassland': { fill: '#88c870' },
@@ -252,6 +262,7 @@ const overworld: MapStyle = {
     pixelated: true,
     depth: { steps: [0.5, 1, 1.75], colors: ['#b8e4ffb0', '#98cff878', '#98cff838', '#00000000'] },
     line: { color: '#202020', width: 2 },
+    shore: { color: '#1c4890', width: 2 },
     grid: '#00000030',
     terrain: {
         'clouds': { fill: '#d8e8f8', pattern: 'px-clouds', ink: '#ffffff' },
@@ -259,6 +270,7 @@ const overworld: MapStyle = {
         'sea': { fill: '#4890f0', pattern: 'px-water', ink: '#88c0f8' },
         'shallows': { fill: '#70b8f8', pattern: 'px-water', ink: '#a8d8f8' },
         'lake': { fill: '#4890f0', pattern: 'px-water', ink: '#88c0f8' },
+        'river': { fill: '#4890f0', pattern: 'px-water', ink: '#88c0f8' },
         'swamp': { fill: '#607848', pattern: 'px-swamp', ink: '#78a048' },
         'beach': { fill: '#f0d898', pattern: 'px-sand', ink: '#d8b870' },
         'grassland': { fill: '#78c850', pattern: 'px-grass', ink: '#58a838' },

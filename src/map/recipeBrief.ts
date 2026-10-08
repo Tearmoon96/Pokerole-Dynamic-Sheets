@@ -33,7 +33,8 @@ const TERRAIN_USE: Record<string, string> = {
     'deep-sea': 'dark open ocean, far from any shore',
     'sea': 'ocean, bays and straits',
     'shallows': 'pale coastal water: a band along coasts, reefs, sandbars',
-    'lake': 'inland fresh water: lakes, ponds, wide rivers painted as areas',
+    'lake': 'inland fresh water: lakes and ponds',
+    'river': 'a river painted as an area, with a clear bank (for a thin river that tapers from its source use a path instead)',
     'swamp': 'marsh, bog, wetland',
     'beach': 'sand along a coast or lake shore',
     'grassland': 'plain open land, meadows, fields: the usual land',
@@ -182,7 +183,7 @@ export function recipeBrief(o: BriefOptions): string {
         '- "ellipse": "center": [x, y], "radiusX" and "radiusY": numbers of cells, and optional "rotation" in degrees clockwise (default 0).',
         '- "rect": "from": [x, y] one corner, "to": [x, y] the opposite corner.',
         '- "line": "points": at least 2 points, "width": a number of cells. A band of terrain along a smooth curve through the points, '
-        + '"width" cells across: a mountain ridge, a strip of beach, a canyon, a wide river painted as "lake".',
+        + '"width" cells across: a mountain ridge, a strip of beach, a canyon, a wide river painted as "river".',
         '- "fill": "at": [x, y]. A paint bucket: repaints the whole connected patch that looks the same as the ground at that point, '
         + 'as painted so far. Only use it on a patch that is fully enclosed, or it spreads everywhere that terrain touches.',
         '',

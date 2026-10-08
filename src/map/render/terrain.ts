@@ -79,6 +79,12 @@ export interface TerrainGeometry {
     styleBorders: Path2D | null;
     /** Edges asked to be a Line. */
     lines: Path2D | null;
+    /** The shoreline of lakes and rivers against land, where the edge is
+        left to the style: drawn in the style's `shore` look. */
+    shore: Path2D | null;
+    /** Smooth styles: where lakes and rivers lie, even-odd — kept out of
+        the coastal wash. */
+    inland: Path2D | null;
     soft: SoftEdges | null;
     /** Each soft terrain's own region, to blend with. */
     regions: Map<number, { path: Path2D; rule: CanvasFillRule }>;
@@ -96,6 +102,14 @@ export interface TerrainGeometry {
 /* A stretch's tag while building: which of the looks it is drawn in. 0 is
    not this layer's to draw. */
 const TAG: Record<EdgeKind, number> = { plain: 1, line: 2, style: 3, soft: 4 };
+
+/* A Style edge between inland water and land is a shoreline instead. */
+const SHORE = 5;
+function isShore(a: number, b: number): boolean {
+    const ta = TERRAINS[a], tb = TERRAINS[b];
+    const land = (t: TerrainDef | undefined) => !!t && !t.water && !t.sky;
+    return !!ta && !!tb && ((!!ta.inland && land(tb)) || (!!tb.inland && land(ta)));
+}
 
 /* A Soft stretch's tag also says which terrain lies on its other side, so a
    run stops where that changes: SOFT_BASE + the terrain's index. The layer's
@@ -183,6 +197,7 @@ export function buildGeometry(doc: MapDoc, style: MapStyle): TerrainGeometry {
            and the map's own border is not an edge. */
         if (upper !== levels[k] || lower < 0) return 0;
         const tag = TAG[resolve(upper, lower, painted && iu >= 0 ? painted[iu] : 0, painted && il >= 0 ? painted[il] : 0)];
+        if (tag === TAG.style && isShore(upper, lower)) return SHORE;
         if (tag !== TAG.soft) return tag;
         softTerrains.add(upper); softTerrains.add(lower);
         return SOFT_BASE + lower;
@@ -192,6 +207,8 @@ export function buildGeometry(doc: MapDoc, style: MapStyle): TerrainGeometry {
     const pairs = new Map<string, SoftPair>();
     const box = emptyBox();
     let anyLine = false;
+    const shore = new Path2D();
+    let anyShore = false;
 
     const layers: TerrainLayer[] = [];
     let coast: Path2D | null = null;
@@ -222,6 +239,7 @@ export function buildGeometry(doc: MapDoc, style: MapStyle): TerrainGeometry {
                 addRuns(loop, cur.tags, scale, (tag) => {
                     if (tag === TAG.style) { anyOwn = true; return own; }
                     if (tag === TAG.line) { anyLine = true; return lines; }
+                    if (tag === SHORE) { anyShore = true; return shore; }
                     if (isSoft(tag)) return pairOf(pairs, level, tag - SOFT_BASE).path;
                     return null;
                 }, grow);
@@ -248,9 +266,22 @@ export function buildGeometry(doc: MapDoc, style: MapStyle): TerrainGeometry {
         });
     }
 
+    /* Lakes and rivers sit next to each other in z order, so where they lie
+       is one layer less the first layer above them. */
+    let inland: Path2D | null = null;
+    const first = order.findIndex((x) => x.t.inland);
+    if (first >= 0) {
+        let end = first;
+        while (end + 1 < order.length && order[end + 1].t.inland) end++;
+        inland = new Path2D();
+        inland.addPath(layers[first].area);
+        if (end + 1 < layers.length) inland.addPath(layers[end + 1].area);
+    }
+
     return {
         key, layers, coast, waterLayers, styleBorders: null,
         lines: anyLine ? lines : null,
+        shore: anyShore ? shore : null, inland,
         soft: softTerrains.size ? { pairs: [...pairs.values()], terrains: softTerrains, box } : null,
         regions, blocky: false, softWidth: doc.borders.soft,
     };
@@ -284,12 +315,14 @@ function buildBlocky(doc: MapDoc, order: { t: TerrainDef; i: number }[], key: st
     const pairs = new Map<string, SoftPair>();
     const softTerrains = new Set<number>();
     const box = emptyBox();
-    let anyStyle = false, anyLine = false;
+    const shore = new Path2D();
+    let anyStyle = false, anyLine = false, anyShore = false;
     const kindAt = (a: number, b: number): number => {
         const va = data[a], vb = data[b];
         if (va === vb) return 0;
         const [iu, il] = va > vb ? [a, b] : [b, a];
         const kind = TAG[resolve(data[iu], data[il], painted ? painted[iu] : 0, painted ? painted[il] : 0)];
+        if (kind === TAG.style && isShore(va, vb)) return SHORE;
         if (kind !== TAG.soft) return kind;
         softTerrains.add(va); softTerrains.add(vb);
         /* Both sides in the tag: the lower and the upper terrain. */
@@ -298,6 +331,7 @@ function buildBlocky(doc: MapDoc, order: { t: TerrainDef; i: number }[], key: st
     const sinkOf = (tag: number): Path2D | null => {
         if (tag === TAG.style) { anyStyle = true; return styleBorders; }
         if (tag === TAG.line) { anyLine = true; return lines; }
+        if (tag === SHORE) { anyShore = true; return shore; }
         if (isSoft(tag)) return pairOf(pairs, (tag - SOFT_BASE) >> 8, (tag - SOFT_BASE) & 255).path;
         return null;
     };
@@ -347,6 +381,7 @@ function buildBlocky(doc: MapDoc, order: { t: TerrainDef; i: number }[], key: st
         key, layers, coast: null, waterLayers,
         styleBorders: anyStyle ? styleBorders : null,
         lines: anyLine ? lines : null,
+        shore: anyShore ? shore : null, inland: null,
         soft: softTerrains.size ? { pairs: [...pairs.values()], terrains: softTerrains, box } : null,
         regions, blocky: true, softWidth: doc.borders.soft,
     };
@@ -936,7 +971,8 @@ function depthField(geo: TerrainGeometry, doc: MapDoc): DepthField | null {
         const row = (y * step + half) * r.w;
         for (let x = 0; x < w; x++) {
             const t = TERRAINS[r.data[row + x * step + half]];
-            const k = !t ? 2 : t.sky ? 0 : t.water ? 1 : 2;
+            /* Lakes and rivers count as neither: no shallows in them. */
+            const k = !t ? 2 : t.sky || t.inland ? 0 : t.water ? 1 : 2;
             kind[y * w + x] = k;
             if (k === 1) anyWater = true;
         }
@@ -1100,6 +1136,13 @@ export function drawTerrain(ctx: CanvasRenderingContext2D, geo: TerrainGeometry,
                     sky.addPath(geo.layers[1].area);
                     ctx.clip(sky, 'evenodd');
                 }
+                if (geo.inland) {
+                    /* Never inside a lake or river. */
+                    const dry = new Path2D();
+                    dry.rect(0, 0, W, H);
+                    dry.addPath(geo.inland);
+                    ctx.clip(dry, 'evenodd');
+                }
                 ctx.strokeStyle = style.coast.color;
                 ctx.lineJoin = 'round';
                 for (const w of style.coast.widths) {
@@ -1130,6 +1173,12 @@ export function drawTerrain(ctx: CanvasRenderingContext2D, geo: TerrainGeometry,
         ctx.strokeStyle = style.cellBorder;
         ctx.lineWidth = Math.min(2, CELL / doc.res);
         ctx.stroke(geo.styleBorders);
+    }
+    if (geo.shore) {
+        ctx.lineCap = geo.blocky ? 'square' : 'round';
+        ctx.strokeStyle = style.shore.color;
+        ctx.lineWidth = geo.blocky ? Math.min(style.shore.width, CELL / doc.res) : style.shore.width;
+        ctx.stroke(geo.shore);
     }
     if (geo.lines) {
         ctx.lineCap = geo.blocky ? 'square' : 'round';
