@@ -4,7 +4,7 @@ import { TERRAINS } from '../terrain';
 import type { TerrainDef } from '../terrain';
 import type { MapStyle, TerrainLook } from '../styles';
 import type { EdgeKind, MapDoc } from '../types';
-import { resolvedOf } from '../raster';
+import { codeIndex, resolvedOf } from '../raster';
 import { edgeResolver, edgesOf } from '../edges';
 import { probeImage, terrainTextureUrl } from '../sprites';
 import { CELL, patternParts, tileScale } from './patterns';
@@ -164,7 +164,7 @@ export function buildGeometry(doc: MapDoc, style: MapStyle): TerrainGeometry {
     const key = geometryKey(doc, style);
     const r = resolvedOf(doc);
     const painted = edgesOf(doc);
-    const resolve = edgeResolver(doc.borders);
+    const resolve = edgeResolver(doc.borders, codeIndex(doc.background));
     /* A raster holds indices into TERRAINS, which is in z order — so the
        index IS the level the contours are traced at. */
     const present = new Uint8Array(TERRAINS.length);

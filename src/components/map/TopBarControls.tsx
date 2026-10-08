@@ -161,6 +161,7 @@ export function BordersControl() {
                         onChange={(e) => { const v = Number(e.currentTarget.value); setBorders({ soft: v }, 'soft-width'); }}
                     />
                 </label>
+                <p className="map-hint">Soft never blends land with water, nor anything with the background: those edges show no line.</p>
                 <details className="map-borders-terrains" open={overrides > 0}>
                     <summary>By terrain{overrides ? ' (' + overrides + ')' : ''}</summary>
                     <p className="map-hint">A terrain's own edges, over the setting above. Where two terrains that both have one meet, the one stacked on top decides.</p>

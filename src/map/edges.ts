@@ -20,13 +20,17 @@ import type { EdgeKind, MapBorders } from './types';
 
    An edge has a terrain on each side. Where the two sides disagree, the one
    that SAID something beats the one that did not, and between two that both
-   said something the terrain stacked higher wins — the one drawn on top. */
+   said something the terrain stacked higher wins — the one drawn on top.
+
+   Whoever asked for it, a Soft edge never blends land with water, nor
+   anything with the map's background terrain: those come out as None, the
+   two colours meeting with no line. */
 
 export const EDGE_KINDS: { kind: EdgeKind; name: string; icon: string; hint: string }[] = [
     { kind: 'style', name: 'Style', icon: 'fa-palette', hint: 'Whatever the map style does for that terrain' },
     { kind: 'line', name: 'Line', icon: 'fa-pen', hint: 'A clear dark line' },
     { kind: 'plain', name: 'None', icon: 'fa-square', hint: 'The colours just meet, with no line' },
-    { kind: 'soft', name: 'Soft', icon: 'fa-cloud', hint: 'The two terrains blend into each other' },
+    { kind: 'soft', name: 'Soft', icon: 'fa-cloud', hint: 'The two terrains blend into each other — never land with water, nor anything with the background' },
 ];
 
 export const EDGE_NAME: Record<EdgeKind, string> = { style: 'Style', line: 'Line', plain: 'None', soft: 'Soft' };
@@ -88,14 +92,21 @@ export const MIN_SOFT = 0.25;
 export const MAX_SOFT = 6;
 
 /** A resolver for one map: terrain indices (upper, lower) and the painted
-    values on each side, to the kind that edge is drawn as. Built once per
-    geometry; called for every stretch of edge. */
-export function edgeResolver(borders: MapBorders): (upper: number, lower: number, pUpper: number, pLower: number) => EdgeKind {
+    values on each side, to the kind that edge is drawn as. `background` is
+    the index of the map's background terrain. Built once per geometry;
+    called for every stretch of edge. */
+export function edgeResolver(borders: MapBorders, background: number): (upper: number, lower: number, pUpper: number, pLower: number) => EdgeKind {
     const byIndex: (EdgeKind | undefined)[] = TERRAINS.map((t) => borders.terrain[t.slug]);
-    return (upper, lower, pUpper, pLower) => {
+    const asked = (upper: number, lower: number, pUpper: number, pLower: number): EdgeKind => {
         if (pUpper) return PAINT_KINDS[pUpper - 1] ?? borders.kind;
         if (pLower) return PAINT_KINDS[pLower - 1] ?? borders.kind;
         return byIndex[upper] ?? (lower >= 0 ? byIndex[lower] : undefined) ?? borders.kind;
+    };
+    return (upper, lower, pUpper, pLower) => {
+        const kind = asked(upper, lower, pUpper, pLower);
+        if (kind !== 'soft' || lower < 0) return kind;
+        if (upper === background || lower === background || !!TERRAINS[upper]?.water !== !!TERRAINS[lower]?.water) return 'plain';
+        return kind;
     };
 }
 

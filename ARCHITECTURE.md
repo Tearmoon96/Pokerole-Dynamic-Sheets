@@ -170,8 +170,17 @@ zoom or grid setting ever moves anything.
   down by the terrain brush or the Borders brush) beats a terrain's own
   setting, which beats the map's. Soft edges are drawn by painting each
   terrain's ground through a blurred mask of where it lies; the masks add up
-  to one, so textures cross-fade without smearing. The pixel styles dither the
-  same blend instead of fading it.
+  to one, so the colours cross-fade without smearing; a terrain blends only
+  with the ones it has a Soft edge to. Soft never joins land and water, nor
+  anything and the background: those edges are drawn as None. The pixel
+  styles dither the same blend instead of fading it.
+- **Markers** — trees, tufts, peaks, stones — are drawn whole or not at all
+  ([`render/markers.ts`](src/map/render/markers.ts)). Each painter in
+  [`render/patterns.ts`](src/map/render/patterns.ts) marks where a marker
+  starts, so its tile can be split into ground texture and single markers;
+  a marker stays only if all its ink lands on its own terrain. The tile is
+  still used inside large areas, and only the markers near an edge are drawn
+  one by one.
 - **Styles** ([`src/map/styles.ts`](src/map/styles.ts)) are data: terrain
   colours and textures, edge treatment, path looks, label fonts. Hand-drawn and
   Anime trace the samples into smooth outlines (marching squares in
