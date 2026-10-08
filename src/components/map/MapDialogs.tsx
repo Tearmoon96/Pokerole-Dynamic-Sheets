@@ -8,6 +8,8 @@ import { LANDMARKS } from '../../map/landmarks';
 import { COMMON_FOLDER, MAP_SPRITE_BASE, imageExists, terrainTextureUrl } from '../../map/sprites';
 import { MAX_CELLS, MIN_CELLS, clampCells, createDoc, uid } from '../../map/doc';
 import type { MapDoc, StyleId } from '../../map/types';
+import { buildNewMap } from '../../map/recipeBuild';
+import { RecipeCheck, useParsedRecipe } from './RecipeCheck';
 
 /* ------------------------------------------------------------- new map */
 
@@ -20,7 +22,7 @@ export const PRESETS = [
     { name: 'Battle', cols: 20, rows: 14, background: 'grassland', scale: '1 cell = 1 m' },
 ];
 
-function NewMapForm({ onCreate }: { onCreate: (d: MapDoc) => void }) {
+function NewMapForm({ onCreate, onRecipe }: { onCreate: (d: MapDoc) => void; onRecipe: () => void }) {
     const { doc } = useMap();
     const [name, setName] = useState('');
     const [cols, setCols] = useState(40);
@@ -28,6 +30,23 @@ function NewMapForm({ onCreate }: { onCreate: (d: MapDoc) => void }) {
     const [background, setBackground] = useState('sea');
     const [styleId, setStyleId] = useState<StyleId>(doc.styleId);
     const [scale, setScale] = useState('');
+    /* A chat assistant's reply pasted straight in: the map is built from its
+       recipe, and the settings above fill in whatever the recipe leaves out. */
+    const [pasting, setPasting] = useState(false);
+    const [reply, setReply] = useState('');
+    const base = { name: name.trim() || 'New map', cols: clampCells(cols), rows: clampCells(rows), styleId, background, scale };
+    const { parsed, recipe, errors, empty } = useParsedRecipe(pasting ? reply : '', 'new', base);
+    const fromRecipe = pasting && !!reply.trim();
+
+    const create = () => {
+        if (!fromRecipe) {
+            onCreate(createDoc({ name, cols: clampCells(cols), rows: clampCells(rows), background, styleId, scaleLabel: scale }));
+            return;
+        }
+        if (!recipe || empty) return;
+        /* A name typed here beats the one the assistant chose. */
+        onCreate(buildNewMap(name.trim() ? { ...recipe, map: { ...recipe.map, name: name.trim() } } : recipe));
+    };
 
     return (
         <div className="map-new">
@@ -70,11 +89,40 @@ function NewMapForm({ onCreate }: { onCreate: (d: MapDoc) => void }) {
                 <span>Scale</span>
                 <input type="text" value={scale} placeholder="e.g. 1 cell = 5 km" onChange={(e) => setScale(e.currentTarget.value)} />
             </label>
-            <button
-                className="accent"
-                onClick={() => onCreate(createDoc({ name, cols: clampCells(cols), rows: clampCells(rows), background, styleId, scaleLabel: scale }))}
-            >
-                <i className="fa-solid fa-plus"></i> Create map
+            {pasting ? (
+                <div className="map-new-recipe">
+                    <label className="map-field">
+                        <span>A chat assistant's reply</span>
+                        <textarea
+                            rows={6}
+                            className="map-recipe-reply"
+                            value={reply}
+                            autoFocus
+                            placeholder="Paste the whole reply here. Text around the recipe is fine."
+                            spellCheck={false}
+                            onChange={(e) => setReply(e.currentTarget.value)}
+                        />
+                    </label>
+                    <p className="map-hint">
+                        The recipe's own size, style and background win; the settings above fill in what it leaves out.
+                        No recipe yet? <button className="map-link" onClick={onRecipe}>Get the instructions for the assistant</button>.
+                    </p>
+                    {parsed && <RecipeCheck parsed={parsed} errors={errors} />}
+                </div>
+            ) : (
+                <button className="map-new-paste" onClick={() => setPasting(true)}>
+                    <i className="fa-solid fa-paste"></i> Paste a recipe from a chat assistant
+                </button>
+            )}
+            <button className="accent" disabled={fromRecipe && (!recipe || empty)} onClick={create}>
+                {fromRecipe ? (
+                    <>
+                        <i className="fa-solid fa-hammer"></i> Build the map
+                        {errors ? ` without the ${errors} broken item${errors === 1 ? '' : 's'}` : ''}
+                    </>
+                ) : (
+                    <><i className="fa-solid fa-plus"></i> Create map</>
+                )}
             </button>
         </div>
     );
@@ -95,7 +143,7 @@ export function MapListDialog({ open, onClose, onRecipe }: { open: boolean; onCl
             <ModalClose onClick={onClose} />
             <div className="map-dialog-title"><i className="fa-solid fa-layer-group"></i> Your maps</div>
             {creating ? (
-                <NewMapForm onCreate={(d) => { store.addMap(d); onClose(); }} />
+                <NewMapForm onCreate={(d) => { store.addMap(d); onClose(); }} onRecipe={onRecipe} />
             ) : (
                 <div className="map-new-row">
                     <button className="accent map-new-btn" onClick={() => setCreating(true)}>

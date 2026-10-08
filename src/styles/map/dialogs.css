@@ -292,3 +292,18 @@
 .map-dialog button.map-recipe-build { margin-top: 0.5rem; }
 .map-dialog button.map-recipe-build:disabled { opacity: 0.45; cursor: default; }
 .map-recipe .map-hint { margin: 0 0 0.6rem; font-size: 0.78rem; color: var(--text-secondary); line-height: 1.45; }
+
+/* The New map form's own way in for a pasted recipe. */
+.map-new-paste { width: 100%; margin-top: 0.5rem; padding: 0.4rem; font-size: 0.8rem; }
+.map-new-recipe { margin-top: 0.5rem; }
+.map-new-recipe .map-hint { margin: 0.2rem 0 0.3rem; }
+.map-dialog button.accent:disabled { opacity: 0.45; cursor: default; }
+.map-link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--accent);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}

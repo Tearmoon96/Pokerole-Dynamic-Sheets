@@ -1,17 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMap } from '../../map/MapContext';
-import { useAppData } from '../../data/AppDataContext';
 import { useToast } from '../common/Toast';
 import { Modal, ModalClose } from '../common/Modal';
 import { copyText } from '../table/copy';
 import { MAP_STYLES } from '../../map/styles';
 import { TERRAINS } from '../../map/terrain';
 import { MAX_CELLS, MIN_CELLS, clampCells } from '../../map/doc';
-import { issuesForAssistant, parseRecipe, recipeSummary, speciesFinder } from '../../map/recipe';
 import type { RecipeMap } from '../../map/recipe';
 import { applyRecipe, buildNewMap } from '../../map/recipeBuild';
 import { recipeBrief, recipeMapOf } from '../../map/recipeBrief';
 import { PRESETS } from './MapDialogs';
+import { RecipeCheck, useParsedRecipe } from './RecipeCheck';
 import type { StyleId } from '../../map/types';
 
 /* A map from a written description, by way of any chat assistant.
@@ -58,14 +57,13 @@ function download(text: string, name: string): void {
 
 export function RecipeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
     const { store, doc } = useMap();
-    const { data } = useAppData();
     const toast = useToast();
     const [draft] = useState(readDraft);
     const [mode, setMode] = useState<'new' | 'add'>(draft.mode === 'add' ? 'add' : 'new');
     const [description, setDescription] = useState(draft.description ?? '');
     const [reply, setReply] = useState(draft.reply ?? '');
     const [settings, setSettings] = useState<RecipeMap>({ ...DEFAULT_SETTINGS, ...draft.settings });
-    const [copied, setCopied] = useState<'' | 'brief' | 'issues' | 'failed'>('');
+    const [copied, setCopied] = useState<'' | 'brief' | 'failed'>('');
 
     /* Kept between openings and reloads: a description takes a while to write. */
     useEffect(() => {
@@ -77,16 +75,7 @@ export function RecipeDialog({ open, onClose }: { open: boolean; onClose: () => 
     const set = (patch: Partial<RecipeMap>) => setSettings((s) => ({ ...s, ...patch }));
     const base: RecipeMap = mode === 'add' ? recipeMapOf(doc) : { ...settings, name: settings.name.trim() || 'New map' };
 
-    const finder = useMemo(() => (data.pokemon.length ? speciesFinder(data.pokemon) : undefined), [data.pokemon]);
-    const parsed = useMemo(
-        () => (reply.trim() ? parseRecipe(reply, { mode, base, species: finder }) : null),
-        /* `base` is rebuilt every render; its content is what matters. */
-        [reply, mode, finder, JSON.stringify(base)],
-    );
-    const errors = parsed?.issues.filter((i) => i.level === 'error').length ?? 0;
-    const recipe = parsed?.recipe ?? null;
-    const empty = !!recipe && !recipe.terrain.length && !recipe.paths.length && !recipe.landmarks.length
-        && !recipe.labels.length && !recipe.tokens.length;
+    const { parsed, recipe, errors, empty } = useParsedRecipe(reply, mode, base);
 
     const brief = () => recipeBrief({
         mode, description, map: base, nameOpen: mode === 'new' && !settings.name.trim(),
@@ -218,35 +207,7 @@ export function RecipeDialog({ open, onClose }: { open: boolean; onClose: () => 
                 />
             </label>
 
-            {parsed && (
-                <div className="map-recipe-check">
-                    {recipe && (
-                        <p className={'map-recipe-note ' + (errors ? 'warn' : 'ok')}>
-                            <i className={'fa-solid ' + (errors ? 'fa-triangle-exclamation' : 'fa-check')}></i>{' '}
-                            {recipe.map.cols}×{recipe.map.rows} · {recipeSummary(recipe)}
-                            {errors ? ` · ${errors} item${errors === 1 ? '' : 's'} cannot be used` : ''}
-                        </p>
-                    )}
-                    {parsed.issues.length > 0 && (
-                        <>
-                            <ul className="map-recipe-issues">
-                                {parsed.issues.map((i, k) => (
-                                    <li key={k} className={i.level}>
-                                        <code>{i.where}</code> {i.message}
-                                    </li>
-                                ))}
-                            </ul>
-                            <button
-                                className="map-recipe-copy-issues"
-                                onClick={async () => setCopied((await copyText(issuesForAssistant(parsed.issues))) ? 'issues' : 'failed')}
-                            >
-                                <i className="fa-solid fa-reply"></i> Copy these for the assistant
-                            </button>
-                            {copied === 'issues' && <span className="map-recipe-note ok inline"> Copied. Paste it into the same chat for a corrected recipe.</span>}
-                        </>
-                    )}
-                </div>
-            )}
+            {parsed && <RecipeCheck parsed={parsed} errors={errors} />}
 
             <button className="accent map-recipe-build" disabled={!recipe || empty} onClick={build}>
                 <i className="fa-solid fa-hammer"></i>{' '}
