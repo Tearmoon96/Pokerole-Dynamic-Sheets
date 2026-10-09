@@ -28,11 +28,14 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!--
-        No window.DATA_BASE here, unlike the other three pages: the rolling
-        table draws no sprites and reads no database, so it never touches
-        app-data/ at all. That is also why it boots instantly.
+        The table boots without the game database: a player's character panel
+        fetches it after joining (src/components/table/CharacterPanel.tsx), so
+        the join form never waits on it. Same folder as the other pages.
     -->
-  <script defer src="./assets/rolling-table-DRN_Qk5b.js"></script>
+    <script>
+        window.DATA_BASE = 'app-data/';
+    </script>
+  <script defer src="./assets/rolling-table-Bnh0dg3W.js"></script>
 <link rel="manifest" href="./manifest.webmanifest"></head>
 
 <body>
