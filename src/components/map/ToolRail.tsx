@@ -15,6 +15,7 @@ export const TOOLS: { tool: Tool; icon: string; name: string }[] = [
     { tool: 'stamp', icon: 'fa-mountain-city', name: 'Place a landmark' },
     { tool: 'token', icon: 'fa-chess-pawn', name: 'Place a token' },
     { tool: 'label', icon: 'fa-font', name: 'Add a label' },
+    { tool: 'sketch', icon: 'fa-pen-fancy', name: 'Sketch: draw freehand over the map' },
     { tool: 'erase', icon: 'fa-eraser', name: 'Eraser: rub out terrain, or remove objects' },
     { tool: 'edge', icon: 'fa-bezier-curve', name: 'Borders: choose how the edges between terrains look' },
     { tool: 'fog', icon: 'fa-smog', name: 'Fog of war: paint fog over the map' },

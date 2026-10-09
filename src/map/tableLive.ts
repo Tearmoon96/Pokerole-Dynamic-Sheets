@@ -25,7 +25,9 @@ import type { MapDoc } from './types';
      away;
    - live is bound to one map. Switching to another pauses it, and coming back
      does not resume it on its own;
-   - when the table goes quiet, or starts showing something else, live ends.
+   - when the table goes quiet, or the GM takes the map off it, live ends.
+     The table holds several maps and shows one: a live map that is not the
+     one on show keeps following, so it is up to date when the GM shows it.
 
    And the picture itself is the players' view (render/playerView.ts): fog
    always on and sealed, hidden objects not drawn, no map data sent. */
@@ -47,8 +49,10 @@ export interface LiveState {
     /** A table this browser is hosting is open in another tab. */
     connected: boolean;
     table: string;
-    /** The table has its map on show to the players. */
+    /** The table has a map on show to the players. */
     shown: boolean;
+    /** The Map Maker map on show at the table, or null. */
+    activeMap: string | null;
     mode: LiveMode;
     /** The map live follows. */
     mapId: string | null;
@@ -103,7 +107,7 @@ export class TableLiveLink {
     private listeners = new Set<() => void>();
     private version = 0;
     state: LiveState = {
-        connected: false, table: '', shown: false, mode: 'off', mapId: null, mapName: '', why: '', held: null,
+        connected: false, table: '', shown: false, activeMap: null, mode: 'off', mapId: null, mapName: '', why: '', held: null,
         dueAt: null, busy: false, lastUrl: null, lastAt: null, error: '', threshold: loadThreshold(),
         auto: loadAuto(), editHold: loadHold(EDIT_HOLD_KEY, DEFAULT_EDIT_HOLD_MS),
         revealHold: loadHold(REVEAL_HOLD_KEY, DEFAULT_REVEAL_HOLD_MS), pending: false,
@@ -175,14 +179,16 @@ export class TableLiveLink {
         if (!m) return;
         if (m.t === 'host') {
             this.lastHostAt = Date.now();
-            if (!this.state.connected || this.state.table !== m.table || this.state.shown !== m.shown) {
-                this.set({ connected: true, table: m.table, shown: m.shown });
+            if (!this.state.connected || this.state.table !== m.table || this.state.shown !== m.shown
+                || this.state.activeMap !== m.active) {
+                this.set({ connected: true, table: m.table, shown: m.shown, activeMap: m.active });
             }
-            /* The table moved on — another image, the map hidden, a snapshot
-               of something else. Live is over; following on regardless would
-               put this map back on screen at the next edit. */
-            if (this.state.mode !== 'off' && this.landed && !this.sending && m.live !== this.state.mapId) {
-                this.end('The table stopped showing this map, so live ended.');
+            /* The GM took this map off the table, or it stopped following.
+               Live is over; following on regardless would put the map back
+               on the table at the next edit. Another map going on show is
+               not that: this one stays held, and keeps up. */
+            if (this.state.mode !== 'off' && this.landed && !this.sending && !m.live.includes(this.state.mapId ?? '')) {
+                this.end('The map was taken off the table, so live ended.');
             }
         } else if (m.t === 'bye') {
             this.lost();
@@ -204,7 +210,7 @@ export class TableLiveLink {
 
     private lost(): void {
         if (this.state.mode !== 'off') this.end('The rolling table was closed, so live ended.');
-        this.set({ connected: false, table: '' });
+        this.set({ connected: false, table: '', shown: false, activeMap: null });
     }
 
     /** Live ends, with a reason the bar shows. */

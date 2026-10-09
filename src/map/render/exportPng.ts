@@ -8,6 +8,7 @@ import type { Pt } from '../geometry';
 import { typeColors, TYPE_ICONS } from '../../lib/themeTables';
 import { CELL } from './patterns';
 import { fogImage, fogSealImage } from './fog';
+import { drawSketch } from '../sketch';
 import { buildGeometry, drawGrid, drawTerrain } from './terrain';
 import type { TextureSource } from './terrain';
 import type { MapDoc, MapLabel, MapPath, MapStamp, MapToken } from '../types';
@@ -19,7 +20,8 @@ import {
 
    The page draws the ground on a canvas and everything else as elements, so
    an export redraws the lot onto one canvas, in the page's own order and with
-   its own measurements: terrain, grid, paths, landmarks, labels, tokens, fog.
+   its own measurements: terrain, grid, paths, landmarks, labels, sketches,
+   tokens, fog.
 
    Every picture goes through `load`, which the caller supplies, because where
    a picture may come from decides whether the canvas can be saved at all. A
@@ -440,6 +442,16 @@ export async function renderMapPng(doc: MapDoc, opts: ExportOptions, load: Image
     for (const p of doc.paths) drawPath(ctx, p, style);
     for (const s of doc.stamps) if (!(await drawStamp(ctx, s, style, load))) missing++;
     for (const l of doc.labels) drawLabel(ctx, l, style);
+    if (doc.sketches.length) {
+        /* Kept on the map: a fat line along the edge would otherwise spill
+           into the frame, where the fog does not reach. */
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, doc.cols * CELL, doc.rows * CELL);
+        ctx.clip();
+        for (const k of doc.sketches) drawSketch(ctx, k, CELL);
+        ctx.restore();
+    }
     if (opts.tokens) for (const t of doc.tokens) if (!(await drawToken(ctx, t, style, load))) missing++;
     const fog = opts.fog ? fogImage(doc) : null;
     if (fog) {

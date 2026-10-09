@@ -58,6 +58,25 @@ export interface MapToken {
     snap?: boolean;
 }
 
+/** How a freehand sketch's line looks — see sketch.ts. */
+export type SketchBrush = 'pen' | 'marker' | 'dashed' | 'dotted';
+
+/** A freehand line the GM drew over the map: a note, a circle round a
+    town, an arrow for where the party heads. Nothing to do with terrain. */
+export interface MapSketch {
+    id: string;
+    brush: SketchBrush;
+    /** The pointer's track, thinned; drawn as a smooth curve through it. */
+    points: [number, number][];
+    color: string;
+    /** Line width in cells. */
+    width: number;
+    /** 0..1 */
+    opacity: number;
+    /** An arrowhead at the end. */
+    arrow?: boolean;
+}
+
 export type LabelRole = 'region' | 'town' | 'route' | 'small';
 
 export type LabelAlign = 'left' | 'center' | 'right';
@@ -153,14 +172,16 @@ export interface MapDoc {
     stamps: MapStamp[];
     tokens: MapToken[];
     labels: MapLabel[];
+    /** Freehand sketches, drawn over the labels and under the tokens. */
+    sketches: MapSketch[];
     /** ISO time of the last change, for the map list. */
     updatedAt: string;
 }
 
 /** Which object is selected, if any. */
 export interface Selection {
-    kind: 'stamp' | 'token' | 'label' | 'path';
+    kind: 'stamp' | 'token' | 'label' | 'path' | 'sketch';
     id: string;
 }
 
-export type Tool = 'select' | 'paint' | 'fill' | 'erase' | 'edge' | 'fog' | 'unfog' | 'path' | 'stamp' | 'token' | 'label' | 'pan';
+export type Tool = 'select' | 'paint' | 'fill' | 'erase' | 'edge' | 'fog' | 'unfog' | 'path' | 'stamp' | 'token' | 'label' | 'sketch' | 'pan';

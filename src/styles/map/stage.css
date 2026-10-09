@@ -214,6 +214,9 @@ img.pixelated { image-rendering: pixelated; }
 
 .map-path-label, .map-route-no { pointer-events: none; user-select: none; }
 
+.map-stage[data-tool="sketch"] { cursor: crosshair; }
+.map-sketch-sel { stroke: var(--accent); stroke-dasharray: 6 5; opacity: 0.9; }
+
 .map-label { user-select: none; }
 .map-label.selected .map-label-hit {
     stroke: var(--accent);

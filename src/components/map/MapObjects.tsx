@@ -12,7 +12,8 @@ import {
     ANCHOR, fontOf, isPlain, labelTransform, labelType, layoutGlyphs, lineBaselines, measureWith,
     plainBox, plainLineX, shadowOf,
 } from '../../map/labelText';
-import type { MapDoc, MapLabel, MapPath, MapStamp, MapToken, Selection } from '../../map/types';
+import type { MapDoc, MapLabel, MapPath, MapSketch, MapStamp, MapToken, Selection } from '../../map/types';
+import { arrowInLine, sketchArrowD, sketchLineD, sketchLook } from '../../map/sketch';
 
 /* Everything placed ON the ground, in world px (the parent is scaled by the
    view). Each object carries data-obj="<kind>:<id>" — the eraser finds what is
@@ -286,6 +287,53 @@ export function LabelsLayer({ doc, style, selection, onDown }: {
             {doc.labels.map((l) => (
                 <LabelText key={l.id} label={l} style={style} selected={isSel(selection, 'label', l.id)} onDown={onDown} />
             ))}
+        </svg>
+    );
+}
+
+/* --------------------------------------------------------------- sketches */
+
+/** One sketch as the export draws it (map/sketch.ts): line and head in one
+    stroke where the brush is solid, and the opacity on the group, so a
+    translucent line never darkens where it overlaps itself. */
+export function SketchShape({ sketch }: { sketch: Pick<MapSketch, 'brush' | 'points' | 'color' | 'width' | 'opacity' | 'arrow'> }) {
+    const look = sketchLook(sketch, CELL);
+    const pts = sketch.points as Pt[];
+    const line = sketchLineD(pts, CELL);
+    const head = sketch.arrow ? sketchArrowD(pts, sketch.width, CELL) : '';
+    const joined = !!head && arrowInLine(sketch.brush);
+    const common = {
+        fill: 'none', stroke: sketch.color, strokeWidth: look.width,
+        strokeLinecap: look.cap, strokeLinejoin: 'round' as const,
+    };
+    return (
+        <g opacity={look.opacity < 1 ? look.opacity : undefined}>
+            <path d={joined ? line + head : line} strokeDasharray={joined ? undefined : look.dash?.join(' ')} {...common} />
+            {head && !joined && <path d={head} {...common} />}
+        </g>
+    );
+}
+
+export function SketchesLayer({ doc, selection, draft, onDown }: {
+    doc: MapDoc; selection: Selection[]; draft: MapSketch | null; onDown: ObjectDown;
+}) {
+    const W = doc.cols * CELL, H = doc.rows * CELL;
+    return (
+        <svg className="map-svg map-sketches" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+            {doc.sketches.map((k) => {
+                const d = sketchLineD(k.points as Pt[], CELL);
+                const selected = isSel(selection, 'sketch', k.id);
+                return (
+                    <g key={k.id}>
+                        <SketchShape sketch={k} />
+                        <path className="map-hit" data-obj={'sketch:' + k.id} d={d} fill="none" stroke="transparent"
+                            strokeWidth={Math.max(k.width * CELL, 12)} strokeLinecap="round"
+                            onPointerDown={(e) => onDown(e, { kind: 'sketch', id: k.id }, 'move')} />
+                        {selected && <path className="map-sketch-sel" d={d} fill="none" strokeWidth={2} />}
+                    </g>
+                );
+            })}
+            {draft && <SketchShape sketch={draft} />}
         </svg>
     );
 }

@@ -88,6 +88,7 @@ export function midpoint(pts: Pt[]): Pt {
 
 /** Distance from a point to the polyline — the hit test for selecting a path. */
 export function distToPolyline(p: Pt, pts: Pt[]): number {
+    if (pts.length === 1) return Math.hypot(p[0] - pts[0][0], p[1] - pts[0][1]);
     let best = Infinity;
     for (let i = 1; i < pts.length; i++) best = Math.min(best, perpDist(p, pts[i - 1], pts[i]));
     return best;

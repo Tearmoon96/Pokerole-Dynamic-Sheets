@@ -1,6 +1,8 @@
 import { createDoc, normalizeDoc } from './doc';
 import type { BrushId } from './brushes';
 import type { FogColor } from './fog';
+import { DEFAULT_SKETCH } from './sketch';
+import type { SketchSettings } from './sketch';
 import type { EdgeKind, LabelRole, MapDoc, PathKind, Selection, Tool } from './types';
 
 /* One mutable store behind the Map Maker, in the same shape as the GM screen's
@@ -75,6 +77,10 @@ export interface MapUi {
     eraseMode: 'terrain' | 'objects';
     landmark: string;
     pathKind: PathKind;
+    /** The look of the next freehand sketch. */
+    sketch: SketchSettings;
+    /** The sketch tool rubs out whole sketches instead of drawing. */
+    sketchErase: boolean;
     /** The role a newly placed label takes. */
     labelRole: LabelRole;
     token: PendingToken | null;
@@ -122,7 +128,7 @@ export class MapStore {
         paintEdge: 'map', edgeKind: 'soft', eraseMode: 'terrain',
         smartPaint: false, lockedTerrains: [], stayOnStart: false,
         fogColor: 'dark', fogStrength: 100, fogHidden: false,
-        landmark: 'mountain', pathKind: 'road', labelRole: 'town', token: null, selection: [],
+        landmark: 'mountain', pathKind: 'road', labelRole: 'town', sketch: DEFAULT_SKETCH, sketchErase: false, token: null, selection: [],
     };
 
     /** Change one brush's shape or size. */
@@ -399,6 +405,7 @@ export function findObject(doc: MapDoc, sel: Selection): { id: string } | undefi
         case 'token': return doc.tokens.find((o) => o.id === sel.id);
         case 'label': return doc.labels.find((o) => o.id === sel.id);
         case 'path': return doc.paths.find((o) => o.id === sel.id);
+        case 'sketch': return doc.sketches.find((o) => o.id === sel.id);
     }
 }
 
@@ -406,7 +413,7 @@ export function findObject(doc: MapDoc, sel: Selection): { id: string } | undefi
    are replaced, never mutated, so identity is enough. */
 function sameDoc(a: MapDoc, b: MapDoc): boolean {
     return a.terrain === b.terrain && a.edges === b.edges && a.fog === b.fog && a.stamps === b.stamps && a.tokens === b.tokens
-        && a.labels === b.labels && a.paths === b.paths;
+        && a.labels === b.labels && a.paths === b.paths && a.sketches === b.sketches;
 }
 
 function readIndex(): SavedIndex | null {

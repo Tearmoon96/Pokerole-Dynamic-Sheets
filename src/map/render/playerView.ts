@@ -48,8 +48,8 @@ function hiddenAt(doc: MapDoc, fog: Uint8Array | null, x: number, y: number): bo
     return !!look && look.alpha >= 1;
 }
 
-/** The map with everything under full fog taken out. A path is dropped only
-    when every point of it is hidden: a road running out of the fog is drawn,
+/** The map with everything under full fog taken out. A path or a sketch is
+    dropped only when every point of it is hidden: a road running out of the fog is drawn,
     and its hidden stretch is covered like the ground under it. */
 export function playerDoc(doc: MapDoc): MapDoc {
     const fog = fogOf(doc);
@@ -60,6 +60,7 @@ export function playerDoc(doc: MapDoc): MapDoc {
         labels: doc.labels.filter((l) => !hiddenAt(doc, fog, l.x, l.y)),
         tokens: doc.tokens.filter((t) => !hiddenAt(doc, fog, t.x, t.y)),
         paths: doc.paths.filter((p) => !p.points.every(([x, y]) => hiddenAt(doc, fog, x, y))),
+        sketches: doc.sketches.filter((k) => !k.points.every(([x, y]) => hiddenAt(doc, fog, x, y))),
     };
 }
 

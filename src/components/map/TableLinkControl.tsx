@@ -16,7 +16,7 @@ export function useTableLive(link: TableLiveLink): LiveState {
 
 const pct = (v: number) => Math.round(v * 100) + '%';
 
-export function TableLinkControl({ link }: { link: TableLiveLink }) {
+export function TableLinkControl({ link, currentId }: { link: TableLiveLink; currentId: string }) {
     const s = useTableLive(link);
     const confirm = useGmConfirm();
     const [open, setOpen] = useState(false);
@@ -95,10 +95,13 @@ export function TableLinkControl({ link }: { link: TableLiveLink }) {
                     </div>
                 )}
 
-                {s.connected && !s.shown && (
+                {s.connected && s.activeMap !== currentId && (
                     <p className="map-hint map-warn" data-table-hidden="">
-                        The map is hidden at the table: players see what you send once you press
-                        <strong> Show to players</strong> there.
+                        {s.shown
+                            ? 'Players are looking at another map. '
+                            : 'Nothing is on show at the table. '}
+                        The table can hold several maps: players see this one once you press
+                        <strong> Show</strong> beside it there.
                     </p>
                 )}
 

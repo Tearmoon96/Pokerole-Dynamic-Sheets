@@ -456,3 +456,31 @@
 .map-fog-actions { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.6rem; }
 .map-fog-actions button { font-size: 0.74rem; padding: 0.3rem 0.55rem; }
 .map-fog-hide { margin-top: 0.6rem; }
+
+/* ---------------- Sketches ---------------- */
+
+/* The preview sits on a light chip, so a white or black pen both read. */
+.map-sketch-preview {
+    flex: 0 0 auto;
+    width: 48px;
+    height: 21px;
+    border-radius: 4px;
+    background: repeating-conic-gradient(#9a9a9a 0 25%, #c8c8c8 0 50%) 0 0 / 8px 8px;
+}
+.map-sketch-brushes { margin-bottom: 0.5rem; }
+.map-sketch-colors { align-items: center; }
+.map-color-custom {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: conic-gradient(#e0302c, #f6d32d, #2fa84f, #1e88e5, #7c4dff, #ec4899, #e0302c);
+    cursor: pointer;
+    font-size: 0.55rem;
+    color: #fff;
+    text-shadow: 0 0 2px #000;
+}
+.map-color-custom.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+.map-color-custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; padding: 0; border: 0; }
+.map-sketch-panel .map-check { margin-top: 0.5rem; }
+.map-sketch-clear { margin-top: 0.6rem; width: 100%; }

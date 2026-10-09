@@ -31,15 +31,15 @@ export function MapStage() {
         setView({ k, x: (r.width - map.w * k) / 2, y: (r.height - map.h * k) / 2 });
     }, [map.w, map.h]);
 
-    /* A new picture of a different size starts fitted; a refresh of the same
-       one keeps the view. */
+    /* Another map, or a picture of a different size, starts fitted; a
+       refresh of the same one keeps the view. */
     useEffect(() => {
-        const key = map.w + 'x' + map.h;
+        const key = map.title + '|' + map.w + 'x' + map.h;
         if (map.url && fitted.current !== key) {
             fitted.current = key;
             fit();
         }
-    }, [map.url, map.w, map.h, fit]);
+    }, [map.url, map.w, map.h, map.title, fit]);
 
     useEffect(() => {
         const el = box.current;

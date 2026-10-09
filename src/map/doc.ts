@@ -6,6 +6,7 @@ import {
 import type { Raster } from './raster';
 import { DEFAULT_BORDERS, MAX_SOFT, MIN_SOFT, decodeEdges, edgesOf, encodeEdges, isEdgeKind, rememberEdges } from './edges';
 import { decodeFog, encodeFog, fogOf, rememberFog } from './fog';
+import { normalizeSketch } from './sketch';
 import type { EdgeKind, LabelRole, MapBorders, MapDoc, MapLabel, MapPath, MapStamp, MapToken, StyleId } from './types';
 
 /* Pure operations on a MapDoc. Nothing here touches the DOM or storage, so the
@@ -48,6 +49,7 @@ export function createDoc(opts: {
         stamps: [],
         tokens: [],
         labels: [],
+        sketches: [],
         updatedAt: new Date().toISOString(),
     };
 }
@@ -144,6 +146,7 @@ export function normalizeDoc(raw: unknown): MapDoc | null {
                 scale: num(l.scale, 1), rotation: num(l.rotation, 0),
                 ...labelTypeFields(l),
             })),
+        sketches: arr<unknown>(r.sketches).map(normalizeSketch).filter((k): k is NonNullable<typeof k> => !!k),
         updatedAt: str(r.updatedAt, new Date().toISOString()),
     };
 }
@@ -247,6 +250,7 @@ export function resizeDoc(doc: MapDoc, cols: number, rows: number): MapDoc {
         tokens: doc.tokens.map((t) => ({ ...t, x: cx(t.x), y: cy(t.y) })),
         labels: doc.labels.map((l) => ({ ...l, x: cx(l.x), y: cy(l.y) })),
         paths: doc.paths.map((p) => ({ ...p, points: p.points.map(([x, y]) => [cx(x), cy(y)] as [number, number]) })),
+        sketches: doc.sketches.map((k) => ({ ...k, points: k.points.map(([x, y]) => [cx(x), cy(y)] as [number, number]) })),
     };
 }
 

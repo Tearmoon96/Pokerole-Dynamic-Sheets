@@ -160,6 +160,14 @@ zoom or grid setting ever moves anything.
   terrain. [`render/fog.ts`](src/map/render/fog.ts) turns it into one
   blurred picture that the page lays over every object (`FogLayer` in
   `MapCanvas.tsx`) and the PNG export draws last.
+- **Sketches** ([`src/map/sketch.ts`](src/map/sketch.ts)): freehand lines
+  over the map — pen, marker, dashed, dotted, any colour, an optional
+  arrowhead — kept as point lists in cells (`MapDoc.sketches`), drawn over
+  the labels and under the tokens. The page's SVG and the export's canvas
+  draw them from the same helpers; a sketch is one stroke, so a translucent
+  marker never darkens where it crosses itself. They are objects like any
+  other — selectable, movable, erasable — and the sketch tool has its own
+  "rub out" mode that removes whole lines.
 - **The background** is a layer under the painting: a bare sample (stored as
   `_`) shows the map's `background` terrain, whatever it is at the time. The
   eraser paints bare samples, so rubbing out uncovers it, and swapping the
@@ -253,12 +261,16 @@ reference — id, size and SHA-256 — travels on the socket, signed by the GM. 
 store is still blind. Only the GM writes to it: the host's page claims the room
 with a random upload key on connect, and the relay keeps only that key's hash.
 
-**The map** ([`mapShare.ts`](src/table/mapShare.ts)) is a picture the GM's
-browser uploads and then shows or hides. A hidden map is never announced, so no
-player can fetch it early. The picture comes from an image file or from the Map
+**The maps** ([`mapShare.ts`](src/table/mapShare.ts)) are pictures the GM's
+browser uploads as they arrive. The GM can hold up to twelve and shows at most
+one — the active map; switching is instant, since every picture is already on
+the relay. Only the active map is ever announced, so no player can fetch one
+early, or learn that the others exist. The picture comes from an image file or from the Map
 Maker in another tab of the same browser, over a same-origin `BroadcastChannel`
 ([`src/lib/tableLink.ts`](src/lib/tableLink.ts)): a one-off snapshot, or **live**,
 where every finished edit is sent on its own ([`src/map/tableLive.ts`](src/map/tableLive.ts)).
+A Map Maker map is one entry at the table however often it is sent; a live one
+keeps up while another map is on show.
 The fog of war is enforced by what is drawn
 ([`playerView.ts`](src/map/render/playerView.ts)): the map data never leaves
 the GM's browser, the fog is always drawn and sealed back to full strength

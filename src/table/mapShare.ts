@@ -1,13 +1,16 @@
-/* The map in the middle of the table.
+/* The maps in the middle of the table.
 
-   The GM's browser holds the picture: from an image file, or rendered for the
-   players by the Map Maker in another tab (src/lib/tableLink.ts). It uploads
-   it to the relay's file store sealed with the room key, and only when the GM
-   SHOWS it does a reference go out on the socket — so a player cannot fetch a
-   map before it is on screen, and hiding it sends no picture at all.
+   The GM's browser holds the pictures: from image files, or rendered for the
+   players by the Map Maker in another tab (src/lib/tableLink.ts). It can hold
+   several at once and shows at most ONE — the active map. Every picture is
+   uploaded to the relay's file store sealed with the room key as soon as it
+   arrives, so switching is instant, but only the active one is ever named on
+   the socket: a player cannot fetch a map before it is on screen, and an
+   inactive or hidden map sends no reference at all.
 
    A player downloads what the reference names, checks it against the hash the
-   GM signed (blobs.ts), and shows it. */
+   GM signed (blobs.ts), and shows it. Players never learn that the GM holds
+   other maps. */
 
 import { MissingFileError } from './blobs';
 import type { BlobChannel } from './blobs';
@@ -26,6 +29,22 @@ const MAX_SIDE = 4096;
     player halfway through downloading it is not cut off. */
 const RETIRE_MS = 90_000;
 const SAVED_PREFIX = 'pokeroleTable:map:';
+/** How many maps the GM can hold on one table. */
+export const MAX_TABLE_MAPS = 12;
+
+/** One map the GM holds, as the GM's own panel lists it. */
+export interface MapEntry {
+    key: string;
+    title: string;
+    live: boolean;
+    /** From the Map Maker rather than an image file. */
+    fromMaker: boolean;
+    url: string;
+    w: number;
+    h: number;
+    /** The one on show to the players. */
+    active: boolean;
+}
 
 export interface MapView {
     /** On screen for the players. */
@@ -39,15 +58,20 @@ export interface MapView {
     /** 0..1 while a picture is uploading (GM) or downloading (player). */
     loading: number | null;
     error: string;
-    /** GM: a picture is ready, shown or not. */
+    /** GM: at least one map is ready, shown or not. */
     ready: boolean;
+    /** GM: every map held, in the order they arrived. Empty for a player. */
+    entries: MapEntry[];
 }
 
 export function emptyMapView(): MapView {
-    return { show: false, title: '', live: false, url: null, w: 0, h: 0, loading: null, error: '', ready: false };
+    return { show: false, title: '', live: false, url: null, w: 0, h: 0, loading: null, error: '', ready: false, entries: [] };
 }
 
 interface Staged {
+    /** The entry's own id at this table: `mm:<mapId>` for a Map Maker map,
+        so a new picture of it replaces the old one, random for an image. */
+    key: string;
     file: WireFile;
     w: number;
     h: number;
@@ -59,9 +83,27 @@ interface Staged {
 }
 
 interface Saved {
-    staged: Staged | null;
-    shown: boolean;
+    entries: Staged[];
+    /** The key of the map on show, or null. */
+    active: string | null;
 }
+
+/** What IndexedDB held, from this version or the one-map one before it. */
+function readSaved(raw: unknown): Saved | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const r = raw as { entries?: unknown; active?: unknown; staged?: Staged | null; shown?: unknown };
+    if (Array.isArray(r.entries)) {
+        const entries = (r.entries as Staged[]).filter((e) => e && e.blob instanceof Blob && typeof e.key === 'string');
+        const active = typeof r.active === 'string' && entries.some((e) => e.key === r.active) ? r.active : null;
+        return { entries, active };
+    }
+    const s = r.staged;
+    if (!s || !(s.blob instanceof Blob)) return null;
+    const key = s.mapId ? 'mm:' + s.mapId : 'img:old';
+    return { entries: [{ ...s, key }], active: r.shown ? key : null };
+}
+
+const randomKey = (): string => 'img:' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
 /** Decodes any image the browser can read and re-encodes it as WebP no
     larger than MAX_SIDE, which also strips whatever metadata the file
@@ -94,16 +136,24 @@ export class MapShare {
     private host = false;
     private lobby = '';
     private rev = 0;
-    private staged: Staged | null = null;
-    private shown = false;
+    /** GM: every map held, and the key of the one on show. */
+    private entries: Staged[] = [];
+    private active: string | null = null;
+    /** GM: object URLs of the held pictures, by file id. */
+    private urls = new Map<string, string>();
     /** Player: the file on screen, and the one being fetched. */
     private currentFile = '';
     private fetching = '';
     private abort: AbortController | null = null;
     private retry: number | null = null;
-    /** GM: a newer picture arrived while one was uploading. */
-    private queued: { run: () => Promise<void>; skip: () => void } | null = null;
+    /** GM: pictures waiting while another uploads, by entry key — a newer
+        picture of the same map overtakes one still waiting. */
+    private queued = new Map<string, { run: () => Promise<void>; skip: () => void }>();
     private uploading = false;
+    /** GM: the entry whose picture is uploading, and whether the GM removed
+        it meanwhile — then the upload is thrown away rather than filed. */
+    private uploadingKey = '';
+    private droppedWhileUploading = false;
 
     private channel: BroadcastChannel | null = null;
     private beat: number | null = null;
@@ -132,11 +182,11 @@ export class MapShare {
         if (!isHost) return;
 
         const gen = this.generation;
-        const saved = await idbGet<Saved>(SAVED_PREFIX + lobbyId);
+        const saved = readSaved(await idbGet<unknown>(SAVED_PREFIX + lobbyId));
         if (gen !== this.generation) return;
-        if (saved?.staged?.blob instanceof Blob) {
-            this.staged = saved.staged;
-            this.shown = !!saved.shown;
+        if (saved?.entries.length) {
+            this.entries = saved.entries;
+            this.active = saved.active;
             this.showLocal();
         }
         this.openLink();
@@ -155,45 +205,78 @@ export class MapShare {
         }
         if (this.beat !== null) clearInterval(this.beat);
         this.beat = null;
-        if (this.view.url) URL.revokeObjectURL(this.view.url);
+        if (this.view.url && !this.host) URL.revokeObjectURL(this.view.url);
+        for (const url of this.urls.values()) URL.revokeObjectURL(url);
+        this.urls.clear();
+        for (const q of this.queued.values()) q.skip();
+        this.queued.clear();
         this.view = emptyMapView();
-        this.staged = null;
-        this.shown = false;
+        this.entries = [];
+        this.active = null;
         this.currentFile = '';
         this.fetching = '';
         this.rev = 0;
     }
 
-    /** Forget this lobby's map for good — leaving the table. */
+    /** Forget this lobby's maps for good — leaving the table. */
     async forget(lobbyId: string): Promise<void> {
         await idbDel(SAVED_PREFIX + lobbyId);
     }
 
     /* ---------------------------------------------------------------- GM */
 
-    /** The GM's own screen shows exactly the picture players get. */
+    /** The map on show, or else the newest one held — what the harnesses
+        in .verify/ read through `window.__pdsTable` (localhost only). */
+    get staged(): Staged | null {
+        return this.activeEntry() ?? this.entries[this.entries.length - 1] ?? null;
+    }
+
+    private activeEntry(): Staged | null {
+        return this.entries.find((e) => e.key === this.active) ?? null;
+    }
+
+    private urlOf(s: Staged): string {
+        let url = this.urls.get(s.file.id);
+        if (!url) {
+            url = URL.createObjectURL(s.blob);
+            this.urls.set(s.file.id, url);
+        }
+        return url;
+    }
+
+    /** The GM's own screen shows exactly the picture players get, and the
+        panel lists every map held. */
     private showLocal(): void {
-        const s = this.staged;
-        if (this.view.url) URL.revokeObjectURL(this.view.url);
+        const s = this.activeEntry();
+        const entries: MapEntry[] = this.entries.map((e) => ({
+            key: e.key, title: e.title, live: e.live, fromMaker: !!e.mapId, url: this.urlOf(e),
+            w: e.w, h: e.h, active: e.key === this.active,
+        }));
+        /* Pictures no entry holds any more. */
+        const held = new Set(this.entries.map((e) => e.file.id));
+        for (const [id, url] of this.urls) {
+            if (!held.has(id)) { URL.revokeObjectURL(url); this.urls.delete(id); }
+        }
         this.set({
-            ready: !!s,
-            show: this.shown && !!s,
+            ready: this.entries.length > 0,
+            entries,
+            show: !!s,
             title: s?.title ?? '',
             live: !!s?.live,
-            url: s ? URL.createObjectURL(s.blob) : null,
+            url: s ? this.urlOf(s) : null,
             w: s?.w ?? 0,
             h: s?.h ?? 0,
         });
     }
 
     private save(): void {
-        const saved: Saved = { staged: this.staged, shown: this.shown };
+        const saved: Saved = { entries: this.entries, active: this.active };
         void idbSet(SAVED_PREFIX + this.lobby, saved);
     }
 
     private body(): Body {
-        const s = this.staged;
-        if (this.shown && s) {
+        const s = this.activeEntry();
+        if (s) {
             return { k: 'map', rev: this.rev, show: true, title: s.title, live: s.live, image: { file: s.file, w: s.w, h: s.h } };
         }
         return { k: 'map', rev: this.rev, show: false, title: '', live: false, image: null };
@@ -212,92 +295,130 @@ export class MapShare {
         void this.api.publish(this.body());
     }
 
-    setShown(show: boolean): void {
-        if (!this.host || (show && !this.staged)) return;
-        this.shown = show;
-        this.save();
-        this.showLocal();
-        this.announce();
-    }
-
-    /** Takes the picture off the table and out of the relay. */
-    clear(): void {
+    /** Puts one map on show — the others stay with the GM — or, with null,
+        takes the map off the players' screens. */
+    activate(key: string | null): void {
         if (!this.host) return;
-        const old = this.staged;
-        this.staged = null;
-        this.shown = false;
+        if (key !== null && !this.entries.some((e) => e.key === key)) return;
+        if (key === this.active) return;
+        this.active = key;
         this.save();
         this.showLocal();
         this.announce();
-        if (old) void this.files()?.remove(old.file.id);
     }
 
-    /** An image file the GM chose. */
+    /** Takes one map off the table and out of the relay. */
+    remove(key: string): void {
+        if (!this.host) return;
+        if (key === this.uploadingKey) this.droppedWhileUploading = true;
+        const old = this.entries.find((e) => e.key === key);
+        if (!old) return;
+        this.entries = this.entries.filter((e) => e.key !== key);
+        this.queued.get(key)?.skip();
+        this.queued.delete(key);
+        const wasActive = this.active === key;
+        if (wasActive) this.active = null;
+        this.save();
+        this.showLocal();
+        if (wasActive) this.announce();
+        else this.beatNow();
+        void this.files()?.remove(old.file.id);
+    }
+
+    /** Every map off the table. */
+    clear(): void {
+        for (const e of [...this.entries]) this.remove(e.key);
+    }
+
+    /** Image files the GM chose, each a map of its own. */
+    async useImages(files: File[]): Promise<void> {
+        for (const f of files) await this.useImage(f);
+    }
+
+    /** An image file the GM chose: a new map, not on show yet. */
     async useImage(file: File): Promise<void> {
         if (!this.host) return;
         try {
+            if (this.entries.length >= MAX_TABLE_MAPS) throw new Error('The table holds ' + MAX_TABLE_MAPS + ' maps at most: remove one first.');
             const img = await prepareImage(file);
             const title = cleanText(file.name.replace(/\.[^.]+$/, ''), LIMITS.MAX_TITLE) || 'Map';
-            await this.stage(img.blob, img.w, img.h, title, false, null);
+            await this.stage(randomKey(), img.blob, img.w, img.h, title, false, null);
         } catch (e) {
             this.set({ error: e instanceof Error ? e.message : 'Could not use that image.' });
         }
     }
 
-    /** Uploads a picture and makes it the table's map. Pictures that arrive
-        while one is uploading replace each other: only the newest goes next. */
-    private stage(blob: Blob, w: number, h: number, title: string, live: boolean, mapId: string | null): Promise<void> {
+    /** Uploads a picture and files it under `key`: a new map, or a new
+        picture of one already held, which keeps its place and, if it is on
+        show, goes straight to the players. Pictures that arrive while one is
+        uploading wait their turn; a newer picture of the same map replaces
+        one still waiting. */
+    private stage(key: string, blob: Blob, w: number, h: number, title: string, live: boolean, mapId: string | null): Promise<void> {
         const run = async () => {
             const files = this.files();
             if (!files) throw new Error('Not connected to a table.');
+            if (!this.entries.some((e) => e.key === key) && this.entries.length >= MAX_TABLE_MAPS) {
+                throw new Error('The table holds ' + MAX_TABLE_MAPS + ' maps at most: remove one first.');
+            }
             this.uploading = true;
+            this.uploadingKey = key;
+            this.droppedWhileUploading = false;
             this.set({ loading: 0, error: '' });
             try {
                 const file = await files.upload(blob, (f) => this.set({ loading: f }));
-                const old = this.staged;
-                this.staged = { file, w, h, title, live, mapId, blob };
+                if (this.droppedWhileUploading) { void files.remove(file.id); return; }
+                const old = this.entries.find((e) => e.key === key);
+                const next: Staged = { key, file, w, h, title, live, mapId, blob };
+                this.entries = old ? this.entries.map((e) => (e.key === key ? next : e)) : [...this.entries, next];
                 this.save();
                 this.showLocal();
-                if (this.shown) this.announce();
+                if (this.active === key) this.announce();
                 else this.beatNow();
                 if (old && old.file.id !== file.id) {
                     window.setTimeout(() => { void files.remove(old.file.id); }, RETIRE_MS);
                 }
             } finally {
                 this.uploading = false;
+                this.uploadingKey = '';
                 this.set({ loading: null });
             }
         };
         if (this.uploading) {
             return new Promise<void>((resolve, reject) => {
-                /* A picture still waiting is overtaken: it never needs sending. */
-                this.queued?.skip();
-                this.queued = { run: () => run().then(resolve, reject), skip: resolve };
+                /* A picture of this map still waiting is overtaken: it never needs sending. */
+                this.queued.get(key)?.skip();
+                this.queued.delete(key);
+                this.queued.set(key, { run: () => run().then(resolve, reject), skip: resolve });
             });
         }
         return run().finally(() => this.drain());
     }
 
     private drain(): void {
-        const next = this.queued;
-        this.queued = null;
-        if (next) void next.run().finally(() => this.drain());
+        const first = this.queued.entries().next();
+        if (first.done) return;
+        const [key, next] = first.value;
+        this.queued.delete(key);
+        void next.run().catch(() => { /* reported by its own caller */ }).finally(() => this.drain());
     }
 
-    /** The relay may have dropped the picture — an idle wipe, or the room's
-        space filling up. Puts it back under a new id. */
+    /** The relay may have dropped a picture — an idle wipe, or the room's
+        space filling up. Puts each missing one back under a new id. */
     async verify(): Promise<void> {
-        const s = this.staged, files = this.files();
-        if (!this.host || !s || !files || this.uploading) return;
-        if (await files.present(s.file)) return;
-        try {
-            await this.stage(s.blob, s.w, s.h, s.title, s.live, s.mapId);
-        } catch { /* tried again at the next check */ }
+        const files = this.files();
+        if (!this.host || !files || this.uploading) return;
+        for (const s of [...this.entries]) {
+            if (await files.present(s.file)) continue;
+            if (!this.entries.some((e) => e.key === s.key && e.file.id === s.file.id)) continue;
+            try {
+                await this.stage(s.key, s.blob, s.w, s.h, s.title, s.live, s.mapId);
+            } catch { /* tried again at the next check */ }
+        }
     }
 
     /** A player could not fetch this file. */
     missing(fileId: string): boolean {
-        return !!this.staged && this.staged.file.id === fileId;
+        return this.entries.some((e) => e.file.id === fileId);
     }
 
     /* ------------------------------------------------ the Map Maker's line */
@@ -316,10 +437,12 @@ export class MapShare {
 
     private beatNow(): void {
         if (!this.channel) return;
-        const s = this.staged;
+        const s = this.activeEntry();
         this.post({
             t: 'host', table: formatLobbyId(this.lobby),
-            live: s?.live && s.mapId ? s.mapId : null, shown: this.shown && !!s,
+            live: this.entries.filter((e) => e.live && e.mapId).map((e) => e.mapId!),
+            active: s?.mapId ?? null,
+            shown: !!s,
         });
     }
 
@@ -327,12 +450,13 @@ export class MapShare {
         if (!m || !this.host) return;
         if (m.t === 'ping') { this.beatNow(); return; }
         if (m.t === 'unlive') {
-            const s = this.staged;
-            if (s && s.live && s.mapId === m.mapId) {
-                this.staged = { ...s, live: false };
+            const key = 'mm:' + m.mapId;
+            const s = this.entries.find((e) => e.key === key);
+            if (s && s.live) {
+                this.entries = this.entries.map((e) => (e.key === key ? { ...e, live: false } : e));
                 this.save();
                 this.showLocal();
-                if (this.shown) this.announce();
+                if (this.active === key) this.announce();
                 else this.beatNow();
             }
             return;
@@ -345,7 +469,7 @@ export class MapShare {
             const title = cleanText(m.title, LIMITS.MAX_TITLE) || 'Map';
             const w = Math.round(m.w), h = Math.round(m.h);
             if (!(w > 0 && h > 0 && w <= LIMITS.MAX_MAP_SIDE && h <= LIMITS.MAX_MAP_SIDE)) throw new Error('That picture is too big.');
-            await this.stage(m.image, w, h, title, m.live, m.mapId);
+            await this.stage('mm:' + m.mapId, m.image, w, h, title, m.live, m.mapId);
         } catch (e) {
             error = e instanceof Error ? e.message : 'The table could not take the map.';
             this.set({ error });
@@ -386,8 +510,10 @@ export class MapShare {
         this.fetching = file.id;
         if (this.retry !== null) { clearTimeout(this.retry); this.retry = null; }
         /* While a live map refreshes, the old picture stays up: a blank flash
-           at every edit would be worse than a second of the old one. */
-        this.set({ loading: 0, error: '', title, live });
+           at every edit would be worse than a second of the old one. It
+           keeps its own title until the new picture lands, since the GM may
+           have switched to another map altogether. */
+        this.set(this.view.url ? { loading: 0, error: '' } : { loading: 0, error: '', title, live });
         try {
             const blob = await files.download(file, (f) => this.set({ loading: f }), abort.signal);
             if (abort.signal.aborted || this.fetching !== file.id) return;

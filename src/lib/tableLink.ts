@@ -19,9 +19,11 @@ export const HOST_BEAT_MS = 2000;
 export const HOST_LOST_MS = 6000;
 
 export type LinkMessage =
-    /** Table → Map Maker: a hosted table is open. `live` names the map the
-        table is following, if any. */
-    | { t: 'host'; table: string; live: string | null; shown: boolean }
+    /** Table → Map Maker: a hosted table is open. The table holds several
+        maps and shows at most one: `live` names the Map Maker maps it is
+        following, `active` the Map Maker map on show (null when the one on
+        show is an image file, or nothing is), `shown` whether anything is. */
+    | { t: 'host'; table: string; live: string[]; active: string | null; shown: boolean }
     /** Table → Map Maker: the table was closed or left. */
     | { t: 'bye' }
     /** Map Maker → table: say you are there, now. */
@@ -44,9 +46,12 @@ export function parseLink(raw: unknown): LinkMessage | null {
     switch (raw.t) {
         case 'host': {
             const table = str(raw.table, 80);
-            const live = raw.live === null ? null : str(raw.live, 80);
-            if (table === null || (raw.live !== null && live === null) || typeof raw.shown !== 'boolean') return null;
-            return { t: 'host', table, live, shown: raw.shown };
+            const active = raw.active === null ? null : str(raw.active, 80);
+            if (table === null || (raw.active !== null && active === null) || typeof raw.shown !== 'boolean') return null;
+            if (!Array.isArray(raw.live) || raw.live.length > 200) return null;
+            const live = raw.live.map((v) => str(v, 80));
+            if (live.some((v) => v === null)) return null;
+            return { t: 'host', table, live: live as string[], active, shown: raw.shown };
         }
         case 'bye': return { t: 'bye' };
         case 'ping': return { t: 'ping' };

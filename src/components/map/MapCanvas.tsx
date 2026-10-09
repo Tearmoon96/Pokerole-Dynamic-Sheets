@@ -19,10 +19,11 @@ import { CELL } from '../../map/render/patterns';
 import { buildGeometry, drawEdgeTint, drawGrid, drawTerrain, geometryKey } from '../../map/render/terrain';
 import type { TerrainGeometry } from '../../map/render/terrain';
 import { onImageArrived } from '../../map/sprites';
-import { LabelsLayer, PathsLayer, StampsLayer, TokensLayer } from './MapObjects';
+import { LabelsLayer, PathsLayer, SketchesLayer, StampsLayer, TokensLayer } from './MapObjects';
+import { cleanSketchWidth, finishTrack } from '../../map/sketch';
 import type { Grab, ObjectDown } from './MapObjects';
 import { useToast } from '../common/Toast';
-import type { MapDoc, Selection, Tool } from '../../map/types';
+import type { MapDoc, MapSketch, Selection, Tool } from '../../map/types';
 import { sameSel } from '../../map/store';
 
 /* The map itself: a canvas for the ground, and the world layer on top of it
@@ -50,6 +51,10 @@ type Gesture =
        reports far more often than the screen redraws. */
     | ({ kind: 'paint' } & Stroking)
     | { kind: 'path'; pts: Pt[] }
+    /* A freehand sketch: the pointer's track, and the zoom it is drawn at,
+       which decides how closely the track is kept. */
+    | { kind: 'sketch'; pts: Pt[]; pxPerCell: number }
+    | { kind: 'sketchErase' }
     | { kind: 'erase' }
     /* Everything selected moves together; `anchor` is the one under the
        pointer, the one whose snapping decides the step for all of them. */
@@ -142,12 +147,14 @@ function capture(el: HTMLElement, pointerId: number): void {
 /** Remove whatever `data-obj` names from the doc. */
 function removeObject(d: MapDoc, tag: string): boolean {
     const [kind, id] = tag.split(':');
-    const before = d.stamps.length + d.tokens.length + d.labels.length + d.paths.length;
+    const count = () => d.stamps.length + d.tokens.length + d.labels.length + d.paths.length + d.sketches.length;
+    const before = count();
     if (kind === 'stamp') d.stamps = d.stamps.filter((o) => o.id !== id);
     if (kind === 'token') d.tokens = d.tokens.filter((o) => o.id !== id);
     if (kind === 'label') d.labels = d.labels.filter((o) => o.id !== id);
     if (kind === 'path') d.paths = d.paths.filter((o) => o.id !== id);
-    return d.stamps.length + d.tokens.length + d.labels.length + d.paths.length !== before;
+    if (kind === 'sketch') d.sketches = d.sketches.filter((o) => o.id !== id);
+    return count() !== before;
 }
 
 /** Everything whose position (or, for a path, any of whose points) lies in
@@ -158,6 +165,7 @@ function objectsInBox(d: MapDoc, a: Pt, b: Pt): Selection[] {
     const inBox = (x: number, y: number) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
     return [
         ...d.paths.filter((p) => p.points.some(([x, y]) => inBox(x, y))).map((p) => ({ kind: 'path' as const, id: p.id })),
+        ...d.sketches.filter((k) => k.points.some(([x, y]) => inBox(x, y))).map((k) => ({ kind: 'sketch' as const, id: k.id })),
         ...d.stamps.filter((o) => inBox(o.x, o.y)).map((o) => ({ kind: 'stamp' as const, id: o.id })),
         ...d.labels.filter((o) => inBox(o.x, o.y)).map((o) => ({ kind: 'label' as const, id: o.id })),
         ...d.tokens.filter((o) => inBox(o.x, o.y)).map((o) => ({ kind: 'token' as const, id: o.id })),
@@ -167,6 +175,7 @@ function objectsInBox(d: MapDoc, a: Pt, b: Pt): Selection[] {
 /** The position (or, for a path, all the points) of a selected object. */
 function positionsOf(d: MapDoc, sel: Selection): Pt[] {
     if (sel.kind === 'path') return (d.paths.find((p) => p.id === sel.id)?.points ?? []).map((p) => [p[0], p[1]] as Pt);
+    if (sel.kind === 'sketch') return (d.sketches.find((k) => k.id === sel.id)?.points ?? []).map((p) => [p[0], p[1]] as Pt);
     const list = sel.kind === 'stamp' ? d.stamps : sel.kind === 'token' ? d.tokens : d.labels;
     const o = (list as { id: string; x: number; y: number }[]).find((x) => x.id === sel.id);
     return o ? [[o.x, o.y]] : [];
@@ -187,6 +196,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     const [texTick, setTexTick] = useState(0);
     const [hover, setHover] = useState<Pt | null>(null);
     const [draft, setDraft] = useState<Pt[] | null>(null);
+    const [sketchDraft, setSketchDraft] = useState<MapSketch | null>(null);
     /* The drag box of a Select drag on empty ground, corners in cell units. */
     const [box, setBox] = useState<[Pt, Pt] | null>(null);
     const gesture = useRef<Gesture | null>(null);
@@ -279,6 +289,11 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                arrives as deltaX. A tool with no brush zooms as usual. */
             if (e.shiftKey && !e.ctrlKey) {
                 const ui = store.ui;
+                if (ui.tool === 'sketch' && !ui.sketchErase) {
+                    const d = (e.deltaY || e.deltaX) * lines;
+                    if (d) store.setUi({ sketch: { ...ui.sketch, width: cleanSketchWidth(ui.sketch.width * Math.exp(-d * 0.0015)) } });
+                    return;
+                }
                 const slot = brushTool(ui.tool, ui.eraseMode) ? slotOf(ui.tool) : null;
                 const d = (e.deltaY || e.deltaX) * lines;
                 if (slot) {
@@ -332,6 +347,15 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         if (tag) store.live((m) => { removeObject(m, tag); });
     };
 
+    /* Rubs out every sketch the pointer touches, whole. */
+    const eraseSketchesAt = (at: Pt) => {
+        const tol = 6 / (viewRef.current.zoom * CELL);
+        const hit = store.doc.sketches.filter((k) => distToPolyline(at, k.points as Pt[]) < Math.max(tol, k.width / 2));
+        if (!hit.length) return;
+        const gone = new Set(hit.map((k) => k.id));
+        store.live((m) => { m.sketches = m.sketches.filter((k) => !gone.has(k.id)); });
+    };
+
     const place = (at: Pt, size: number): Pt => (store.doc.grid.snap ? snapPoint(at[0], at[1], size) : at);
 
     const beginPinch = () => {
@@ -342,6 +366,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         if (was?.kind === 'paint' && was.frame != null) cancelAnimationFrame(was.frame);
         if (was && was.kind !== 'pan' && was.kind !== 'pinch') store.cancel();
         setDraft(null);
+        setSketchDraft(null);
         gesture.current = {
             kind: 'pinch', dist: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1,
             mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], view: viewRef.current,
@@ -416,6 +441,17 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 gesture.current = { kind: 'path', pts: [at] };
                 setDraft([at]);
                 return;
+            case 'sketch':
+                if (store.ui.sketchErase) {
+                    store.checkpoint();
+                    gesture.current = { kind: 'sketchErase' };
+                    eraseSketchesAt(at);
+                    return;
+                }
+                if (!inside(at)) return;
+                gesture.current = { kind: 'sketch', pts: [at], pxPerCell: viewRef.current.zoom * CELL };
+                setSketchDraft({ id: '', ...store.ui.sketch, points: [[at[0], at[1]]] });
+                return;
             case 'stamp': {
                 if (!inside(at)) return;
                 const def = landmarkOf(store.ui.landmark);
@@ -450,6 +486,10 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 /* Nothing took the press: paths are hit on their stroke only, so
                    try a looser distance test before calling it empty ground. */
                 const hitTol = 0.5;
+                const tol = 6 / (viewRef.current.zoom * CELL);
+                const sketch = [...store.doc.sketches].reverse()
+                    .find((k) => distToPolyline(at, k.points as Pt[]) < Math.max(tol, k.width / 2));
+                if (sketch) { startObjectGesture(e, { kind: 'sketch', id: sketch.id }, 'move'); return; }
                 const hit = [...store.doc.paths].reverse().find((p) => distToPolyline(at, p.points as Pt[]) < Math.max(hitTol, p.width / 2));
                 if (hit) { startObjectGesture(e, { kind: 'path', id: hit.id }, 'move'); return; }
                 /* Empty ground: a drag box. With Ctrl or Cmd it adds to what is
@@ -542,6 +582,17 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 setDraft(g.pts.slice());
                 return;
             }
+            case 'sketch': {
+                const last = g.pts[g.pts.length - 1];
+                /* About a screen pixel apart: closer adds nothing to see. */
+                if (Math.hypot(at[0] - last[0], at[1] - last[1]) * g.pxPerCell < 1.5) return;
+                g.pts.push(at);
+                setSketchDraft((k) => (k ? { ...k, points: g.pts.map(([x, y]) => [x, y] as [number, number]) } : k));
+                return;
+            }
+            case 'sketchErase':
+                eraseSketchesAt(at);
+                return;
             case 'erase':
                 eraseAt(e);
                 return;
@@ -614,6 +665,10 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 const pts = shift('path', p.id);
                 return pts ? { ...p, points: pts.map(([x, y]) => [x, y] as [number, number]) } : p;
             });
+            d.sketches = d.sketches.map((k) => {
+                const pts = shift('sketch', k.id);
+                return pts ? { ...k, points: pts.map(([x, y]) => [x, y] as [number, number]) } : k;
+            });
         });
     };
 
@@ -631,6 +686,14 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             setBox(null);
             /* A press that never became a drag: an ordinary click on nothing. */
             if (!box && !g.add) store.setUi({ selection: [] });
+            return;
+        }
+        if (g.kind === 'sketch') {
+            setSketchDraft(null);
+            const d = store.doc;
+            const points = finishTrack(g.pts, g.pxPerCell, d.cols, d.rows);
+            const id = uid();
+            store.edit((m) => { m.sketches = [...m.sketches, { id, ...store.ui.sketch, points }]; });
             return;
         }
         if (g.kind === 'path') {
@@ -679,6 +742,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 <PathsLayer doc={doc} style={style} selection={ui.selection} draft={draft} onDown={onObjectDown} />
                 <StampsLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} />
                 <LabelsLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} />
+                <SketchesLayer doc={doc} selection={ui.selection} draft={sketchDraft} onDown={onObjectDown} />
                 <TokensLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} />
                 {(!ui.fogHidden || ui.tool === 'fog' || ui.tool === 'unfog') && <FogLayer doc={doc} />}
                 {box && (

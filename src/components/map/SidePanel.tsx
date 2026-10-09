@@ -17,7 +17,8 @@ import { LabelTypeEditor } from './LabelTypeEditor';
 import { EDGE_KINDS, EDGE_NAME, paintValue } from '../../map/edges';
 import { FOG_COLORS, fogValue, fullFog } from '../../map/fog';
 import { EDGE_TINT } from '../../map/render/terrain';
-import type { EdgeKind, MapDoc, MapLabel, MapPath, MapStamp, MapToken, Selection } from '../../map/types';
+import type { EdgeKind, MapDoc, MapLabel, MapPath, MapSketch, MapStamp, MapToken, Selection } from '../../map/types';
+import { SketchFields, SketchPalette } from './SketchPanel';
 import type { MapStore } from '../../map/store';
 import { brushSizeHint, panHint, useHotkeys } from '../../map/hotkeys';
 
@@ -517,12 +518,15 @@ function patchObject(store: MapStore, sel: Selection, patch: Record<string, unkn
         if (sel.kind === 'token') d.tokens = d.tokens.map((o) => (o.id === sel.id ? { ...o, ...patch } as MapToken : o));
         if (sel.kind === 'label') d.labels = d.labels.map((o) => (o.id === sel.id ? { ...o, ...patch } as MapLabel : o));
         if (sel.kind === 'path') d.paths = d.paths.map((o) => (o.id === sel.id ? { ...o, ...patch } as MapPath : o));
+        if (sel.kind === 'sketch') d.sketches = d.sketches.map((o) => (o.id === sel.id ? { ...o, ...patch } as MapSketch : o));
     }, sel.id + ':' + Object.keys(patch).join(','));
 }
 
 /** The ids of the selection, by kind — what every group action filters on. */
 function selectedIds(store: MapStore): Record<Selection['kind'], Set<string>> {
-    const out = { stamp: new Set<string>(), token: new Set<string>(), label: new Set<string>(), path: new Set<string>() };
+    const out = {
+        stamp: new Set<string>(), token: new Set<string>(), label: new Set<string>(), path: new Set<string>(), sketch: new Set<string>(),
+    };
     for (const sel of store.ui.selection) out[sel.kind].add(sel.id);
     return out;
 }
@@ -535,6 +539,7 @@ export function deleteSelection(store: MapStore): void {
         d.tokens = d.tokens.filter((o) => !ids.token.has(o.id));
         d.labels = d.labels.filter((o) => !ids.label.has(o.id));
         d.paths = d.paths.filter((o) => !ids.path.has(o.id));
+        d.sketches = d.sketches.filter((o) => !ids.sketch.has(o.id));
     });
     store.setUi({ selection: [] });
 }
@@ -565,6 +570,14 @@ export function duplicateSelection(store: MapStore): void {
                 return { ...o, id, points: o.points.map(([x, y]) => [x + off, y + off] as [number, number]) };
             }),
         ];
+        d.sketches = [
+            ...d.sketches,
+            ...d.sketches.filter((o) => ids.sketch.has(o.id)).map((o) => {
+                const id = uid();
+                made.push({ kind: 'sketch', id });
+                return { ...o, id, points: o.points.map(([x, y]) => [x + off, y + off] as [number, number]) };
+            }),
+        ];
     });
     store.setUi({ selection: made });
 }
@@ -584,6 +597,7 @@ function restack(store: MapStore, top: boolean): void {
         d.tokens = move(d.tokens, ids.token);
         d.labels = move(d.labels, ids.label);
         d.paths = move(d.paths, ids.path);
+        d.sketches = move(d.sketches, ids.sketch);
     });
 }
 
@@ -602,6 +616,7 @@ function GroupActions() {
 
 const KIND_NAMES: Record<Selection['kind'], [string, string]> = {
     stamp: ['landmark', 'landmarks'], token: ['token', 'tokens'], label: ['label', 'labels'], path: ['path', 'paths'],
+    sketch: ['sketch', 'sketches'],
 };
 
 /** Several things selected: what they are, and what can be done to all of them. */
@@ -713,6 +728,11 @@ function Inspector({ doc, sel }: { doc: MapDoc; sel: Selection }) {
                 <LabelTypeEditor label={l} set={set} />
             </>
         );
+    } else if (sel.kind === 'sketch') {
+        const k = doc.sketches.find((o) => o.id === sel.id);
+        if (!k) return null;
+        title = 'Sketch';
+        body = <SketchFields value={{ ...k, arrow: !!k.arrow }} onChange={(patch) => set(patch)} />;
     } else {
         const p = doc.paths.find((o) => o.id === sel.id);
         if (!p) return null;
@@ -760,6 +780,7 @@ export function SidePanel() {
         case 'path': palette = <PathPalette style={style} />; break;
         case 'token': palette = <TokenPalette style={style} />; break;
         case 'label': palette = <LabelPalette />; break;
+        case 'sketch': palette = <SketchPalette />; break;
         case 'select': palette = !ui.selection.length ? <p className="map-hint map-section">Click something on the map to select it. Drag to move; drag a landmark's corner to resize it or its knob to turn it. Ctrl-click to select several, or drag a box round them.</p> : null; break;
         case 'erase': palette = <ErasePalette />; break;
         case 'edge': palette = <EdgePalette />; break;

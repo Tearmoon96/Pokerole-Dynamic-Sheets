@@ -154,7 +154,7 @@ export function MapTopBar({ onMaps, onSprites, onHotkeys, onRecipe, tableLink }:
             <span className="spacer"></span>
             <span className={'session-status' + (status.warn ? ' warn' : '')}>{status.text}</span>
             <div className="session-actions">
-                <TableLinkControl link={tableLink} />
+                <TableLinkControl link={tableLink} currentId={doc.id} />
                 <button className="icon-btn" onClick={onRecipe} title="Map from a description: a chat assistant draws it from your words">
                     <i className="fa-solid fa-scroll"></i>
                 </button>

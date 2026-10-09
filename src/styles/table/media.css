@@ -70,6 +70,32 @@
 .map-buttons { display: flex; gap: 0.4rem; }
 .map-buttons > button:first-child { flex: 1; }
 
+/* Every map the GM holds; the one on show is ringed in the accent. */
+.map-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 22rem;
+    overflow-y: auto;
+}
+.map-entry {
+    display: flex;
+    gap: 0.55rem;
+    align-items: flex-start;
+    min-width: 0;
+    padding: 0.4rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+.map-entry.active { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, transparent); }
+.map-entry-body { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; flex: 1; font-size: 0.8rem; }
+.map-entry-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-entry-on { color: var(--ok); font-weight: 700; }
+.map-entry .map-buttons > button { font-size: 0.74rem; padding-top: 0.2rem; padding-bottom: 0.2rem; }
+
 /* ---------------- The map in the middle ---------------- */
 
 .table-stage {
