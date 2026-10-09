@@ -18,7 +18,11 @@ import {
     adjustPool, entityPool, entityRef, participantToken as sharedParticipantToken, resolveToken, writeStatus,
 } from '../../gm/entities';
 import { PoolBar } from './RosterBits';
-import type { GmCombat, GmCombatant } from '../../gm/types';
+import { canActIn } from '../../gm/tableCombat';
+import { parsePcToken, pruneTablePcs } from '../../gm/tablePcs';
+import { passTurn, pidOf, roundTurns, settleTurn, startTurns, stopTurns } from '../../gm/turns';
+import { useTablePresence } from '../../gm/useCombatLink';
+import type { GmCombat, GmCombatant, GmState } from '../../gm/types';
 import type { PokedexEntry } from '../../data/types';
 
 /* The combat tracker: initiative, five actions each, the status strip and the
@@ -55,6 +59,9 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
     const round = combat.round;
     const many = state.combats.length > 1;
     const focused = state.combatFocus === gid;
+    const table = useTablePresence();
+    const onTable = state.tableCombat === gid;
+    const current = combat.turn ? parts.find((p) => pidOf(p) === combat.turn) || null : null;
 
     /* Every write this panel makes lands on ITS fight and no other. The gid is
        looked up again inside the update rather than closed over as an index,
@@ -62,6 +69,15 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
        write to its neighbour. */
     const mutate = (fn: (c: GmCombat) => GmCombat) => store.update((s) => {
         s.combats = s.combats.map((c) => (c.gid === gid ? fn(c) : c));
+    });
+
+    /* The same, for a change that may take the current turn's combatant away
+       or leave a player's copied character unused: the turn moves on, and a
+       copy no combatant names any more is dropped. */
+    const mutateTurns = (fn: (c: GmCombat, s: GmState) => GmCombat) => store.update((s) => {
+        const canAct = canActIn(s, dexById);
+        s.combats = s.combats.map((c) => (c.gid === gid ? settleTurn(fn(c, s), canAct) : c));
+        pruneTablePcs(s);
     });
 
     const participantToken = (p: GmCombatant): string => sharedParticipantToken(state, dexById, p);
@@ -180,6 +196,8 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
             if (s.combats.length < 2) return;
             const key = combatPanelKey(gid);
             s.combats = s.combats.filter((c) => c.gid !== gid);
+            if (s.tableCombat === gid) s.tableCombat = null;
+            pruneTablePcs(s);
             if (!s.combats.some((c) => c.gid === s.combatFocus)) s.combatFocus = s.combats[0].gid;
             const widths = { ...s.layout.widths };
             delete widths[key];
@@ -266,13 +284,13 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
                                Round boundary is what clears their marks — the
                                same boundary and the same gesture as the action
                                pips going back to zero. */
-                            mutate((c) => ({
+                            mutateTurns((c, s) => roundTurns({
                                 ...c,
                                 round: next,
                                 participants: c.participants.map((p) => ({
                                     ...p, acted: 0, usedClash: false, usedEva: false,
                                 })),
-                            }));
+                            }, canActIn(s, dexById)));
                         }}
                     >
                         <i className="fa-solid fa-forward-step"></i>
@@ -288,11 +306,27 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
                                 text: 'Every combatant is cleared and the round counter goes back to 1.',
                             });
                             if (!go) return;
-                            mutate((c) => ({ ...c, round: 1, participants: [] }));
+                            mutateTurns((c) => stopTurns({ ...c, round: 1, participants: [] }));
                         }}
                     >
                         <i className="fa-solid fa-flag-checkered"></i>
                     </button>
+                    {/* Shown to the players on the rolling table open in this
+                        browser. Offered only while one is there to show it on —
+                        or while this fight is the one on it, so it can be taken
+                        off again. */}
+                    {(table.present || onTable) && (
+                        <button
+                            className={'icon-btn' + (onTable ? ' accent' : '')}
+                            aria-pressed={onTable}
+                            title={onTable
+                                ? 'On the rolling table — click to take it off'
+                                : 'Show this fight on the rolling table'}
+                            onClick={() => store.update((s) => { s.tableCombat = onTable ? null : gid; })}
+                        >
+                            <i className="fa-solid fa-tower-broadcast"></i>
+                        </button>
+                    )}
                     {/* Which fight the roster's join buttons drop into. Only
                         worth a control once there are two of them to choose
                         between — with one, every addition can only go here. */}
@@ -332,6 +366,46 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
                     Each combatant has <strong>{MAX_ACTIONS} actions</strong> per round — click the pips
                     to track them. Enter each one's initiative roll by hand.
                 </div>
+                <div className={'turn-bar' + (combat.turnsOn ? ' running' : '')}>
+                    {combat.turnsOn ? (
+                        <>
+                            <span className="turn-now">
+                                <i className="fa-solid fa-play"></i>
+                                <span className="name-text">{current
+                                    ? String((current as unknown as Record<string, unknown>).label || '?')
+                                    : 'Every action spent — advance the round'}</span>
+                            </span>
+                            <span className="turn-pass">Pass {combat.pass}</span>
+                            <button
+                                className="accent"
+                                disabled={!current}
+                                title="End this turn and hand it to the next in the order"
+                                onClick={() => mutateTurns((c, s) => passTurn(c, canActIn(s, dexById)))}
+                            >
+                                <i className="fa-solid fa-forward"></i> Next turn
+                            </button>
+                            <button
+                                className="icon-btn"
+                                aria-label="Stop keeping turns"
+                                title="Stop keeping turns (the actions stay as they are)"
+                                onClick={() => mutate(stopTurns)}
+                            >
+                                <i className="fa-solid fa-stop"></i>
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <span className="muted">Turns are not being kept.</span>
+                            <button
+                                disabled={!parts.length}
+                                title="Give the first turn to the top of the order. Each turn costs one action."
+                                onClick={() => mutateTurns((c, s) => startTurns(c, canActIn(s, dexById)))}
+                            >
+                                <i className="fa-solid fa-play"></i> Start turns
+                            </button>
+                        </>
+                    )}
+                </div>
                 <div id="combat-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                     {!parts.length ? (
                         <div className="empty-note">
@@ -370,7 +444,8 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
                                     return { ...c, participants: list };
                                 });
                             }}
-                            onRemove={() => mutate((c) => ({
+                            current={combat.turn === (p as unknown as Record<string, string>).pid}
+                            onRemove={() => mutateTurns((c) => ({
                                 ...c,
                                 participants: c.participants.filter(
                                     (x) => (x as unknown as Record<string, string>).pid
@@ -427,8 +502,10 @@ const USED_MARKS: { key: 'usedClash' | 'usedEva'; label: string; icon: string; t
     },
 ];
 
-function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit, onUsed, onRollInit, onMove, onRemove, onOpenTip, cycleStatus, onDeal, onPool }: {
+function CombatRow({ p, moved, current, idx, total, round, token, dexById, onPip, onInit, onUsed, onRollInit, onMove, onRemove, onOpenTip, cycleStatus, onDeal, onPool }: {
     p: GmCombatant;
+    /** Whose turn it is. */
+    current: boolean;
     /** True for the moment after an up/down press landed on this row. */
     moved: boolean;
     idx: number;
@@ -471,10 +548,16 @@ function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit,
     const flags = ref ? roundFlags(ref, p, round) : [];
     const kindIcon = rec.kind === 'trainer' ? 'fa-user'
         : rec.kind === 'custom' ? 'fa-masks-theater' : null;
+    /* A player's character from the rolling table: a temporary copy, marked
+       apart from the roster's own sheets so the same trainer loaded in both
+       places is never mistaken for one. */
+    const pc = parsePcToken(String(rec.src || ''));
+    const pcPlayer = pc ? (state.tablePcs[pc.member]?.player || 'Player') : '';
 
     return (
         <div
-            className={'combat-row ' + (acted >= MAX_ACTIONS ? 'spent' : '') + (moved ? ' just-moved' : '')}
+            className={'combat-row ' + (acted >= MAX_ACTIONS ? 'spent' : '') + (moved ? ' just-moved' : '')
+                + (current ? ' c-turn' : '') + (pcPlayer ? ' c-pc' : '')}
             data-tip={rec.kind !== 'trainer' && ref ? token : undefined}
         >
             {dexId
@@ -567,6 +650,13 @@ function CombatRow({ p, moved, idx, total, round, token, dexById, onPip, onInit,
                             );
                         })}
                     </div>
+                    {/* On the strip, which wraps, rather than on the name's
+                        line, which a phone has no room on for both. */}
+                    {pcPlayer && (
+                        <span className="c-pc-tag" title={'Played by ' + pcPlayer + ' at the rolling table'}>
+                            <i className="fa-solid fa-dice"></i> {pcPlayer}
+                        </span>
+                    )}
                 </div>
                 {/* A grid area of its own, so the stylesheet can put it beside
                     the strip on a mouse-sized row and up beside the name on a

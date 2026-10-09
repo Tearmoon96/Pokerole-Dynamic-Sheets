@@ -265,3 +265,79 @@
 .c-pools .pool-track {
     min-width: 18px;
 }
+
+/* ---------------- Turns ---------------- */
+
+/* Whose turn it is, and the button that hands it on. Inside the panel body
+   rather than in its head, which is already a row of icons. */
+.turn-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    padding: 0.35rem 0.5rem;
+    border: 1px dashed var(--border-color);
+    border-radius: 10px;
+    font-size: 0.8rem;
+}
+
+.turn-bar.running {
+    border-style: solid;
+    border-color: var(--accent-border);
+    background: var(--accent-faint);
+}
+
+.turn-bar .turn-now {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 1 1 8rem;
+    min-width: 0;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.turn-bar .turn-now .name-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.turn-bar .turn-pass {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+.turn-bar > .muted { flex: 1 1 8rem; }
+
+.combat-row.c-turn {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 0 12px var(--accent-glow);
+}
+
+/* A copy of a player's character, from the rolling table. */
+.combat-row.c-pc {
+    border-color: var(--pc-border);
+    background: var(--pc-faint);
+}
+
+.combat-row.c-pc.c-turn {
+    border-color: var(--accent);
+}
+
+.combat-row .c-pc-tag {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.66rem;
+    font-weight: 700;
+    color: var(--pc-color);
+    border: 1px solid var(--pc-border);
+    border-radius: 999px;
+    padding: 0.05rem 0.45rem;
+}

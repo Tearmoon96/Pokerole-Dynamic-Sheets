@@ -7,6 +7,7 @@ import { STATUS_ICONS, normalizeStatus } from './ailments';
 import type { GmStatus } from './ailments';
 import { monPoolCur, monPoolMax, resolvePoolValue, trainerPoolMax, trainerPoolValue } from './pools';
 import { mutateWorkingTrainer, workingTrainerData } from './workingSet';
+import { emitPcEdit, parsePcToken } from './tablePcs';
 
 /* One way to reach any subject on the screen.
 
@@ -19,6 +20,8 @@ import { mutateWorkingTrainer, workingTrainerData } from './workingSet';
      m:<trainerIndex>:<slot>   a team Pokémon, status in its card sheet
      w:<wildGid>               a wild, status in its wild sheet
      c:<participantId>         a name typed into the combat list
+     p:<memberId>:<key>        a player's character copied in from the
+                               rolling table, status in its copy (tablePcs.ts)
 
    Two spellings of the same address. A token built during a render may name its
    trainer by index — the markup is rebuilt anyway. A token STORED on a combat
@@ -113,6 +116,29 @@ export function entityRef(
         const sheet = (slot.sheet || {}) as Partial<CardSheet>;
         return {
             kind: 'mon', token: token!, name: monShownName(dexById, slot.dexId, sheet), dex, sheet,
+            status: normalizeStatus(sheet.status), rank: sheet.rank || '',
+            value: (n) => resolvePoolValue(dex, sheet, n) || 0,
+        };
+    }
+    if (p[0] === 'p') {
+        const pc = parsePcToken(token!);
+        const copy = pc ? state.tablePcs[pc.member] : null;
+        if (!pc || !copy) return null;
+        if (pc.key === 't') {
+            if (!copy.trainer) return null;
+            const data = copy.trainer as unknown as TrainerState;
+            return {
+                kind: 'trainer', token: token!, name: copy.trainer.name || 'Trainer', data,
+                status: normalizeStatus(copy.trainer.status), rank: copy.trainer.rank || '',
+                value: (n) => trainerPoolValue(data, n),
+            };
+        }
+        const mon = copy.mons[pc.key];
+        if (!mon) return null;
+        const dex = dexById(mon.dexId);
+        const sheet = mon.sheet as unknown as Partial<CardSheet>;
+        return {
+            kind: 'mon', token: token!, name: monShownName(dexById, mon.dexId, sheet), dex, sheet,
             status: normalizeStatus(sheet.status), rank: sheet.rank || '',
             value: (n) => resolvePoolValue(dex, sheet, n) || 0,
         };
@@ -260,7 +286,51 @@ export function writeStatus(
         rec.status = normalizeStatus(rec.status);
         mutate(rec.status as GmStatus);
         onWildChanged();
+    } else if (p[0] === 'p') {
+        /* A player's character: the copy changes here, and the player's own
+           sheet is told the status it now has. */
+        const pc = parsePcToken(p.join(':'));
+        const copy = pc ? state.tablePcs[pc.member] : null;
+        const holder = !pc || !copy ? null
+            : pc.key === 't' ? copy.trainer : (copy.mons[pc.key] ? copy.mons[pc.key].sheet : null);
+        if (!pc || !holder) return;
+        holder.status = normalizeStatus(holder.status);
+        mutate(holder.status);
+        emitPcEdit(pc.member, pc.key, { status: { ...holder.status } });
+        onWildChanged();
     }
+}
+
+/** A status chip clicked: the card's own cycle. An exclusive status with
+    stages steps through them and then off (burn 1st → 2nd → 3rd → none, poison
+    → badly poisoned → none); the others simply toggle. A chip locked out by
+    another major status does nothing. */
+export function cycleStatus(
+    state: GmState,
+    dexById: (id: string) => PokedexEntry | null,
+    token: string,
+    key: string,
+    onWildChanged: () => void,
+): void {
+    const icon = STATUS_ICONS.find((i) => i.key === key);
+    if (!icon) return;
+    const before = entityRef(state, dexById, token);
+    if (!before) return;
+    if (icon.exclusive && before.status.major && before.status.major !== key) return;  // locked
+
+    writeStatus(state, token, (st: GmStatus) => {
+        if (!icon.exclusive) {
+            const rec = st as unknown as Record<string, boolean>;
+            rec[key] = !rec[key];
+            return;
+        }
+        if (icon.stageField) {
+            st[icon.stageField] = (st[icon.stageField] + 1) % (icon.stages.length + 1);
+            st.major = st[icon.stageField] > 0 ? key : null;
+        } else {
+            st.major = st.major === key ? null : key;
+        }
+    }, onWildChanged);
 }
 
 /* Take an ailment off a subject, whichever chip owns it. A staged one goes to
@@ -342,5 +412,28 @@ export function adjustPool(
             w.sheet = sheet as unknown as CardSheet;
             onWildChanged();
         }
+    } else if (parts[0] === 'p') {
+        /* A player's character: the copy moves at once, and the player's own
+           sheet is sent where it landed, after the clamp. */
+        const pc = parsePcToken(target);
+        const copy = pc ? state.tablePcs[pc.member] : null;
+        if (!pc || !copy) return;
+        let before = 0, after = 0;
+        if (pc.key === 't') {
+            const t = copy.trainer;
+            if (!t) return;
+            before = t[key];
+            after = t[key] = clamp(before + delta, trainerPoolMax(t as unknown as TrainerState, key));
+        } else {
+            const mon = copy.mons[pc.key];
+            if (!mon) return;
+            const dex = dexById(mon.dexId);
+            const sheet = mon.sheet as unknown as Partial<CardSheet>;
+            before = monPoolCur(dex, sheet, key);
+            after = mon.sheet[key] = clamp(before + delta, monPoolMax(dex, sheet, key));
+        }
+        /* The value it now has, not the step: sent twice, it changes nothing. */
+        if (after !== before) emitPcEdit(pc.member, pc.key, key === 'hp' ? { hp: after } : { will: after });
+        onWildChanged();
     }
 }

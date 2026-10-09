@@ -10,14 +10,13 @@ import { NotesPanel } from './NotesPanel';
 import { GeneratorPanel } from './GeneratorPanel';
 import { MovePanel } from './MovePanel';
 import { AilmentPopover } from './AilmentPopover';
-import { STATUS_ICONS } from '../../gm/ailments';
-import { entityRef, writeStatus } from '../../gm/entities';
+import { cycleStatus } from '../../gm/entities';
+import { useCombatLink } from '../../gm/useCombatLink';
 import { WORKING_KEY } from '../../state/constants';
 import { ActivePanelCtx, panelTabs } from '../../gm/phoneBoard';
 import { combatGidOf, isCombatPanelKey } from '../../gm/constants';
 import { useDeviceClass } from '../../lib/device';
 import type { PokedexEntry } from '../../data/types';
-import type { GmStatus } from '../../gm/ailments';
 
 /* The board: six panels side by side, in whatever order and at whatever widths
    the GM has left them. */
@@ -36,6 +35,9 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
 
     const dexById = useCallback((id: string): PokedexEntry | null =>
         data.pokemon.find((p) => p._id === id) || null, [data.pokemon]);
+
+    /* The fight on the rolling table, when one is hosted in this browser. */
+    useCombatLink(store, dexById);
 
     /* Keeping the roster in step with the trainer sheet.
 
@@ -69,30 +71,10 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
         };
     }, [store]);
 
-    /* Click a chip: the card's own cycle. An exclusive status with stages steps
-       through them and then off (burn 1st → 2nd → 3rd → none, poison → badly
-       poisoned → none); the others simply toggle. */
-    const cycleStatus = useCallback((token: string, key: string, ev: React.MouseEvent) => {
+    /* Click a chip: the card's own cycle (see cycleStatus). */
+    const onCycleStatus = useCallback((token: string, key: string, ev: React.MouseEvent) => {
         if (ev) ev.stopPropagation();
-        const icon = STATUS_ICONS.find((i) => i.key === key);
-        if (!icon) return;
-        const before = entityRef(state, dexById, token);
-        if (!before) return;
-        if (icon.exclusive && before.status.major && before.status.major !== key) return;  // locked
-
-        writeStatus(state, token, (st: GmStatus) => {
-            if (!icon.exclusive) {
-                const rec = st as unknown as Record<string, boolean>;
-                rec[key] = !rec[key];
-                return;
-            }
-            if (icon.stageField) {
-                st[icon.stageField] = (st[icon.stageField] + 1) % (icon.stages.length + 1);
-                st.major = st[icon.stageField] > 0 ? key : null;
-            } else {
-                st.major = st.major === key ? null : key;
-            }
-        }, () => store.save());
+        cycleStatus(state, dexById, token, key, () => store.save());
         store.refresh();
     }, [state, store, dexById]);
 
@@ -108,7 +90,7 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
 
     const PANELS: Record<string, React.ReactNode> = {
         roster: (
-            <RosterPanel key="roster" onReorder={reorder} onOpenTip={setTipToken} cycleStatus={cycleStatus} />
+            <RosterPanel key="roster" onReorder={reorder} onOpenTip={setTipToken} cycleStatus={onCycleStatus} />
         ),
         dice: (
             <DicePanel key="dice" onReorder={reorder} />
@@ -140,7 +122,7 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
                 combat={c}
                 onReorder={reorder}
                 onOpenTip={setTipToken}
-                cycleStatus={cycleStatus}
+                cycleStatus={onCycleStatus}
             />
         );
     };

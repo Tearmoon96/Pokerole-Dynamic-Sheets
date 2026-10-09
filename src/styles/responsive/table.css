@@ -67,3 +67,31 @@ html[data-pointer="coarse"] .map-stage-head .icon-btn {
 html[data-pointer="coarse"] .side-title .side-fold {
     min-height: 2.5rem;
 }
+
+/* The character panel is the GM roster's rows (gm/roster.css), whose finger
+   sizes live in responsive/gm.css — a sheet this page does not load. The
+   same sizes here, for the parts the panel uses: 26px status glyphs, and the
+   name kept clear of its two 30px corner buttons. */
+html[data-pointer="coarse"] .character-card .status-chip {
+    width: 26px;
+    height: 26px;
+    font-size: 12px;
+}
+
+html[data-pointer="coarse"] .character-card .status-chip .stage {
+    font-size: 9px;
+    padding: 1px 3px;
+}
+
+html[data-pointer="coarse"] .character-card .trainer-name {
+    padding-right: 4.6rem;
+    min-height: 30px;
+    align-items: center;
+}
+
+/* The turn strip's buttons and the delay menu's rows, finger-sized. */
+html[data-pointer="coarse"] .turn-head button,
+html[data-pointer="coarse"] .turn-delay button,
+html[data-pointer="coarse"] .combat-entry button {
+    min-height: 2.5rem;
+}

@@ -1,0 +1,183 @@
+/* The turn order above the map, Baldur's Gate 3 style: portraits left to
+   right, the current one raised and ringed. Players' characters wear the
+   allies' teal, everyone else the theme's red. */
+
+.turn-slot-narrow { display: none; }
+
+/* Narrow, the columns stack: the strip goes first, above the map or the
+   side panels, and the copies inside the columns stand down. */
+@media (max-width: 900px) {
+    .turn-slot-narrow { display: block; order: -2; flex: 0 0 auto; }
+    .turn-slot-narrow:empty { display: none; }
+    .table-stage > .turn-strip,
+    .table-center > .turn-strip { display: none; }
+}
+
+.turn-strip {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.5rem 0.6rem 0.4rem;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--card-bg);
+    min-width: 0;
+    position: relative;
+}
+
+.table-center > .turn-strip { margin-bottom: 0.6rem; }
+
+.turn-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    font-size: 0.8rem;
+}
+
+.turn-title {
+    font-weight: 700;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.turn-round {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.72rem;
+    color: var(--accent);
+    border: 1px solid var(--accent-border);
+    background: var(--accent-faint);
+    border-radius: 8px;
+    padding: 0.1rem 0.45rem;
+}
+
+.turn-warn { color: var(--crit); font-size: 0.74rem; }
+
+.turn-rail {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding: 0.45rem 0.2rem 0.35rem;
+    scroll-behavior: smooth;
+}
+
+.turn-entry {
+    flex: 0 0 auto;
+    width: 4.4rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.turn-face {
+    width: 3.4rem;
+    height: 3.4rem;
+    border-radius: 50%;
+    border: 2px solid var(--ghost-color);
+    background: var(--panel-solid);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.turn-entry.ally .turn-face { border-color: var(--pc-color); }
+
+.turn-face .turn-sprite {
+    width: 115%;
+    height: 115%;
+    object-fit: contain;
+}
+
+.turn-initials {
+    font-weight: 800;
+    font-size: 1rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
+}
+
+.turn-name {
+    max-width: 100%;
+    font-size: 0.68rem;
+    text-align: center;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.turn-entry.mine .turn-name { color: var(--pc-color); font-weight: 700; }
+
+.turn-entry.now { transform: translateY(-3px) scale(1.08); }
+
+.turn-entry.now .turn-face {
+    border-color: var(--crit);
+    box-shadow: 0 0 0 2px var(--crit-glow), 0 0 14px var(--crit-glow);
+}
+
+.turn-entry.now .turn-name { color: var(--text-primary); font-weight: 700; }
+
+.turn-entry.done:not(.now) { opacity: 0.5; }
+.turn-entry.out:not(.now) { opacity: 0.3; filter: grayscale(1); }
+
+.turn-pips { display: flex; gap: 2px; }
+
+.turn-pip {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    border: 1px solid var(--pc-border);
+}
+
+.turn-pip.used { background: var(--pc-color); border-color: var(--pc-color); }
+
+.turn-empty, .turn-wait { margin: 0; font-size: 0.74rem; }
+
+.turn-delay {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.45rem;
+    border: 1px dashed var(--accent-border);
+    border-radius: 9px;
+    font-size: 0.76rem;
+}
+
+.turn-delay button { font-size: 0.74rem; }
+
+@media (prefers-reduced-motion: reduce) {
+    .turn-entry { transition: none; }
+    .turn-rail { scroll-behavior: auto; }
+}
+
+/* ---------------- Into the fight, from the character panel ---------------- */
+
+.combat-entry > button { width: 100%; justify-content: center; }
+
+.combat-entry-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--pc-border);
+    border-radius: 10px;
+    background: var(--pc-faint);
+}
+
+.combat-entry-title { font-weight: 700; font-size: 0.8rem; color: var(--pc-color); }
+
+.combat-entry-form .check { display: flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; }
+
+.combat-entry-mod { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; }
+
+.combat-entry-mod input { width: 3.2rem; text-align: center; }
+
+.combat-entry-go { display: flex; justify-content: flex-end; gap: 0.4rem; }
+
+.combat-entry-note { margin: 0; font-size: 0.76rem; }

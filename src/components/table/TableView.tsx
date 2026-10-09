@@ -10,6 +10,8 @@ import { HomeButton } from '../common/HomeButton';
 import { MapStage } from './MapStage';
 import { MapControls } from './MapControls';
 import { MusicPanel } from './MusicPanel';
+import { CharacterPanel } from './CharacterPanel';
+import { TurnStrip } from './TurnStrip';
 import { CHANNELS } from '../../table/protocol';
 
 export function TableView() {
@@ -91,19 +93,30 @@ export function TableView() {
             )}
 
             <div className={'table-body' + (mapOn ? ' with-map show-' + phoneView : '')}>
+                {/* On a narrow screen the columns stack, and the strip at the
+                    head of the middle one would come after every side panel —
+                    or go with the map when the map and the rolls take turns.
+                    This copy is the one shown there instead, first of all
+                    (turns.css). */}
+                <div className="turn-slot-narrow"><TurnStrip /></div>
                 <aside className="table-side">
                     <Credentials />
                     <MemberList />
+                    {!isHost && <CharacterPanel />}
                     {isHost && <MapControls />}
                     <MusicPanel />
                 </aside>
 
                 {mapOn ? (
                     <section className="table-stage" aria-label="The shared map">
+                        <TurnStrip />
                         <MapStage />
                     </section>
                 ) : (
-                    <section className="table-center" aria-label="Rolls">{feed}</section>
+                    <section className="table-center" aria-label="Rolls">
+                        <TurnStrip />
+                        {feed}
+                    </section>
                 )}
 
                 <main className="table-main">

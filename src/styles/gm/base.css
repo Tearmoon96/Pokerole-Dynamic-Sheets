@@ -29,6 +29,11 @@
     --danger: #ef4444;
     /* The teal of the License combat pills */
     --ok: #3aa593;
+    /* A player's character from the rolling table: not the theme's red, so
+       a copy never reads as one of the roster's own sheets. */
+    --pc-color: #2dd4bf;
+    --pc-faint: #2dd4bf14;
+    --pc-border: #2dd4bf66;
     --crit: #f0b429;
     --crit-glow: #f0b42966;
 }

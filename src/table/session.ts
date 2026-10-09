@@ -27,7 +27,8 @@ import type { Bytes } from './encoding';
 import { createHostIdentity, loadHostIdentity, memberIdentity } from './identity';
 import type { Identity } from './identity';
 import { HEARTBEAT_MS, LIMITS, PRESENCE_TIMEOUT_MS, PROTOCOL_VERSION, randomId } from './protocol';
-import type { Body, Inner, WireMember, WireRoll } from './protocol';
+import type { Body, Inner, RollExtras, WireMember, WireRoll } from './protocol';
+import type { CharKey } from './slim';
 import { roomUrl } from './relay';
 import { fabricateD6, fabricateTotal } from './scripted';
 import { RelayTransport } from './transport';
@@ -36,6 +37,7 @@ import { ServerClock } from './clock';
 import { hostUploadKey } from './identity';
 import type { TableApi } from './link';
 import { MapShare } from './mapShare';
+import { CombatShare } from './combatShare';
 import { MusicController } from './music/music';
 import type { TransportStatus } from './transport';
 import { cleanText, parseInner, parseSigned, safeParse } from './validate';
@@ -199,6 +201,8 @@ const BUCKET_REFILL_MS = 2000;
    order: signing is asynchronous, and two messages overtaking each other on
    the way out would have the later one rejected as a replay. */
 const SEND_BURST = 12;
+/** The relay's own ceiling on a frame (worker/src/index.ts), less a margin. */
+const RELAY_FRAME_CHARS = 32 * 1024 - 512;
 const SEND_PER_SECOND = 2;
 
 export class TableSession {
@@ -257,6 +261,7 @@ export class TableSession {
     };
     readonly map = new MapShare(this.api);
     readonly music = new MusicController(this.api);
+    readonly combat = new CombatShare(this.api);
 
     /* ------------------------------------------------------------- joining */
 
@@ -356,6 +361,7 @@ export class TableSession {
             onClock: (text) => this.clock.onFrame(text),
         });
         this.transport.start();
+        this.combat.begin(isHost, lobbyId);
 
         this.heartbeat = window.setInterval(() => this.tick(), HEARTBEAT_MS);
 
@@ -380,6 +386,7 @@ export class TableSession {
         }
         this.map.end();
         this.music.end();
+        this.combat.end();
         this.clock.stop();
         this.transport?.stop();
         this.transport = null;
@@ -446,6 +453,14 @@ export class TableSession {
         }
         const g = await sign(this.identity.pair, utf8(p));
         const wire = await seal(this.room.key, this.room.addr, JSON.stringify({ p, g }));
+        /* The relay measures the SEALED frame, and closes the socket for good
+           past 32 KB (1009, which the transport does not reconnect from). JSON
+           escaped into the envelope, encrypted and base64'd, a dense `p` well
+           under its own limit can still cross it. */
+        if (wire.length > RELAY_FRAME_CHARS) {
+            this.notify('That message is too large to send.');
+            return false;
+        }
 
         return this.transport?.send(wire) ?? false;
     }
@@ -498,6 +513,7 @@ export class TableSession {
             /* Anyone whose socket dropped for a moment missed what changed. */
             this.map.greet();
             this.music.greet();
+            this.combat.greet();
         } else {
             const online = Date.now() - this.hostSeenAt < PRESENCE_TIMEOUT_MS;
             if (online !== this.store.state.hostOnline) {
@@ -580,6 +596,9 @@ export class TableSession {
                and this is it. */
             if (body.k === 'hello') this.onHello(inner.f, body.name, inner.sid);
             else if (body.k === 'request') this.onRequest(inner.f, body);
+            else if (body.k === 'pc' && this.names.has(inner.f)) this.combat.onPc(inner.f, this.names.get(inner.f)!, body);
+            else if (body.k === 'enter') this.onEnter(inner.f, body);
+            else if (body.k === 'turn' && this.names.has(inner.f)) this.combat.onTurn(inner.f, body);
             else if (body.k === 'mstat' && this.names.has(inner.f)) {
                 this.music.onStat(inner.f, body);
                 if (body.failed.some((id) => this.map.missing(id))) void this.map.verify();
@@ -641,6 +660,14 @@ export class TableSession {
                 this.map.onMap(body);
                 break;
 
+            case 'turns':
+                this.combat.onTurns(body.turns);
+                break;
+
+            case 'pcop':
+                this.combat.onPcop(body);
+                break;
+
             case 'kick':
                 if (body.id === this.store.state.myId) {
                     this.leave();
@@ -673,9 +700,16 @@ export class TableSession {
                 .filter((r) => !r.hidden)
                 .slice(0, LIMITS.MAX_SYNC)
                 .map(stripLocal);
-            if (rolls.length) void this.publish({ k: 'sync', rolls });
+            /* In two parts: a client from before rolls carried a bonus, pain
+               or target refuses a whole sync holding one, and would otherwise
+               lose every plain roll with it. Receivers merge by id and time. */
+            const plain = rolls.filter((r) => !hasExtras(r));
+            const extended = rolls.filter(hasExtras);
+            if (plain.length) void this.publish({ k: 'sync', rolls: plain });
+            if (extended.length) void this.publish({ k: 'sync', rolls: extended });
             this.map.greet();
             this.music.greet();
+            this.combat.greet();
         }
     }
 
@@ -703,7 +737,31 @@ export class TableSession {
             if (oldest !== undefined) this.handledRids.delete(oldest);
         }
 
-        this.execute(body.count, body.sides, who, body.note, body.rid, false, false);
+        this.execute(body.count, body.sides, who, body.note, body.rid, false, false, extrasOf(body));
+    }
+
+    /** A player brings characters into the fight: one initiative roll each,
+        1d6 + Dexterity + Alert + their modifier, rolled here like any other
+        die and published, then handed to the GM screen with the totals. */
+    private onEnter(id: string, body: Extract<Body, { k: 'enter' }>): void {
+        const who = this.names.get(id);
+        if (!who || this.handledRids.has(body.rid)) return;
+        const keys = body.chars.map((c) => c.key);
+        if (!this.combat.canEnter(id, keys)) {
+            this.notify(who + ' tried to join a fight, but none is open on the table.');
+            return;
+        }
+        if (!this.allow(id)) {
+            this.notify(who + ' is rolling faster than the table can follow.');
+            return;
+        }
+        this.handledRids.add(body.rid);
+        const chars = body.chars.map((c) => {
+            const name = this.combat.charName(id, c.key) || 'Character';
+            const roll = this.execute(1, 6, who, name + ' · Initiative', body.rid, false, false, { bonus: c.bonus });
+            return { key: c.key, init: roll.total };
+        });
+        this.combat.entered(id, who, chars);
     }
 
     private allow(id: string): boolean {
@@ -750,10 +808,11 @@ export class TableSession {
         `request` to itself. */
     private execute(
         count: number, sides: number, who: string, note: string | undefined,
-        rid: string | undefined, hidden: boolean, scripted: boolean,
-    ): void {
+        rid: string | undefined, hidden: boolean, scripted: boolean, extras: RollExtras = {},
+    ): LocalRoll {
         let vals: number[];
-        if (scripted) {
+        /* A sum roll has no successes to script; it is rolled straight. */
+        if (scripted && extras.bonus === undefined) {
             const s = this.store.state;
             vals = sides === 6
                 ? fabricateD6(count, s.scriptSuccesses)
@@ -764,8 +823,9 @@ export class TableSession {
             vals = roll(count, sides, {}, CRIT_MARGIN).vals;
         }
 
-        const total = vals.reduce((a, b) => a + b, 0);
-        const succ = sides === 6 ? vals.filter((v) => v >= 4).length : null;
+        /* The same arithmetic every receiver redoes in parseRoll. */
+        const total = vals.reduce((a, b) => a + b, 0) + (extras.bonus ?? 0);
+        const succ = sides === 6 && extras.bonus === undefined ? vals.filter((v) => v >= 4).length : null;
 
         const entry: LocalRoll = {
             id: randomId(),
@@ -773,10 +833,11 @@ export class TableSession {
             vals,
             total,
             succ,
-            net: succ,
+            net: succ === null ? null : Math.max(0, succ - (extras.pain ?? 0)),
             t: Date.now(),
             who,
             note: note || undefined,
+            ...extras,
         };
 
         this.store.update((s) => {
@@ -787,6 +848,7 @@ export class TableSession {
            flag telling clients to look away. Nothing leaves this browser, so
            there is nothing for a patched client at the table to reveal. */
         if (!hidden) void this.publish({ k: 'result', rid, roll: stripLocal(entry) });
+        return entry;
     }
 
     /* ------------------------------------------------------- player actions */
@@ -815,6 +877,41 @@ export class TableSession {
         });
     }
 
+    /** A roll off a character sheet — a move's accuracy, an evasion, the
+        initiative — rather than off the dice controls. Always a request to the
+        GM, published for the whole table: a player's character panel is never
+        on the host's page. `who` is still the player's own name; the note says
+        which character and what for. */
+    rollFor(count: number, sides: number, note: string, extras: RollExtras = {}): void {
+        const s = this.store.state;
+        if (s.isHost) return;
+        count = clamp(count, LIMITS.MIN_COUNT, LIMITS.MAX_COUNT);
+        sides = clamp(sides, LIMITS.MIN_SIDES, LIMITS.MAX_SIDES);
+        const rid = randomId(8);
+        const body: Body = {
+            k: 'request', rid, count, sides,
+            note: cleanText(note, LIMITS.MAX_NOTE) || undefined,
+            ...cleanExtras(extras),
+        };
+        const label = count + 'd' + sides + (extras.bonus !== undefined ? signed(extras.bonus) : '');
+        this.store.update((st) => {
+            st.pending = [...st.pending, { rid, label, at: Date.now() }];
+        });
+        void this.publish(body).then((sent) => {
+            if (!sent) this.queue.push(body);
+        });
+    }
+
+    /** Brings characters into the fight on the table (combatShare.ts); the
+        initiative rolls come back like any other. */
+    enterCombat(trainerId: string, chars: { key: CharKey; bonus: number; slot: number | null }[]): void {
+        const rid = this.combat.enter(trainerId, chars);
+        if (!rid) return;
+        this.store.update((st) => {
+            st.pending = [...st.pending, { rid, label: 'Initiative', at: Date.now() }];
+        });
+    }
+
     cancelPending(rid: string): void {
         this.queue = this.queue.filter((b) => b.k !== 'request' || b.rid !== rid);
         this.store.update((s) => { s.pending = s.pending.filter((p) => p.rid !== rid); });
@@ -835,6 +932,7 @@ export class TableSession {
         this.greeted.delete(id);
         this.buckets.delete(id);
         this.music.forget(id);
+        this.combat.forget(id);
         void this.publish({ k: 'kick', id });
         void this.publishRoster();
     }
@@ -875,7 +973,36 @@ function stripLocal(r: LocalRoll): WireRoll {
     return {
         id: r.id, label: r.label, vals: r.vals, total: r.total,
         succ: r.succ, net: r.net, t: r.t, who: r.who, note: r.note,
+        ...extrasOf(r),
     };
+}
+
+/** Only the extras a message actually carries: an absent field stays absent,
+    because the validator reads `undefined` and a missing key alike but an
+    older peer's `exactly()` does not. */
+function extrasOf(r: RollExtras): RollExtras {
+    const out: RollExtras = {};
+    if (r.bonus !== undefined) out.bonus = r.bonus;
+    if (r.pain !== undefined) out.pain = r.pain;
+    if (r.need !== undefined) out.need = r.need;
+    return out;
+}
+
+/** Clamped to what the validator accepts; a zero pain is left off the wire. */
+function cleanExtras(e: RollExtras): RollExtras {
+    if (e.bonus !== undefined) return { bonus: clamp(e.bonus, LIMITS.MIN_BONUS, LIMITS.MAX_BONUS) };
+    const out: RollExtras = {};
+    if (e.pain) out.pain = clamp(e.pain, 0, LIMITS.MAX_PAIN);
+    if (e.need !== undefined) out.need = clamp(e.need, 1, LIMITS.MAX_NEED);
+    return out;
+}
+
+function hasExtras(r: WireRoll): boolean {
+    return r.bonus !== undefined || r.pain !== undefined || r.need !== undefined;
+}
+
+function signed(n: number): string {
+    return n < 0 ? ' − ' + Math.abs(n) : ' + ' + n;
 }
 
 function describe(e: unknown): string {

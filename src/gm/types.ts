@@ -1,6 +1,7 @@
 import type { CardSheet } from '../card/types';
 import type { GmFolder } from './folders';
 import type { GmGenOpts } from './generator';
+import type { SlimMon, SlimTrainer } from '../table/slim';
 
 /* The GM screen's own saved state.
 
@@ -64,6 +65,30 @@ export interface GmCombat {
     name: string;
     round: number;
     participants: GmCombatant[];
+    /** Turns are being kept: the GM started them, and has not stopped them. */
+    turnsOn: boolean;
+    /** The turn tracker: the pid whose turn it is, or null — turns not kept,
+        or everyone's actions spent for the Round. A turn costs its combatant one action, filled the moment
+        the turn starts — see src/gm/turns.ts. */
+    turn: string | null;
+    /** Who has had their turn in this pass. Everyone passing starts the next
+        pass, a new action for each; only the GM starts a new Round. */
+    passed: string[];
+    /** This pass's order when somebody delayed, else null for the initiative
+        order. Gone at the next pass. */
+    passOrder: string[] | null;
+    /** Which pass of the Round, from 1. */
+    pass: number;
+}
+
+/** A player's character copied in from the rolling table: what they sent of
+    their trainer and the Pokémon they put on the field, by character key
+    (`t`, or the team slot). Temporary — dropped once no combatant names it. */
+export interface GmTablePc {
+    /** The player's display name at the table. */
+    player: string;
+    trainer: SlimTrainer | null;
+    mons: Record<string, SlimMon>;
 }
 
 export interface GmDice {
@@ -115,6 +140,10 @@ export interface GmState {
     combats: GmCombat[];
     /** Which of them the roster's "add to combat" buttons drop into. */
     combatFocus: string;
+    /** The fight shown on the rolling table open in this browser, or null. */
+    tableCombat: string | null;
+    /** Players' characters in a fight, by table member id. */
+    tablePcs: Record<string, GmTablePc>;
     /** legacy single note; migrated into noteSheets */
     notes: string;
     noteSheets: GmNoteSheet[];

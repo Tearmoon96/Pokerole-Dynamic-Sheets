@@ -11,8 +11,12 @@
    to try. */
 
 import { LIMITS } from './protocol';
+import { UNSAFE_TEXT } from './text';
+import { IMAGE_RE, isCharKey, parseSlimMon, parseSlimTrainer, parseStatus } from './slim';
+import type { CharKey } from './slim';
 import type {
-    Body, ChannelId, ChannelState, Fade, Inner, TrackLoad, WireFile, WireMapImage, WireMember, WireRoll, WireTrack,
+    Body, ChannelId, ChannelState, Fade, Inner, RollExtras, TrackLoad, WireFile, WireMapImage, WireMember, WireRoll,
+    WireTrack, WireTurnEntry, WireTurns,
 } from './protocol';
 
 /* Keys that must never survive a parse. `__proto__` in a JSON object literal is
@@ -44,11 +48,6 @@ function int(v: unknown, min: number, max: number): number | null {
     return v;
 }
 
-/* C0/C1 controls, zero-width characters, line separators, the byte-order mark
-   and the bidirectional overrides. The last group is the interesting one:
-   U+202E flips the rendering direction of everything after it, which is the
-   classic way to make one display name look like another on screen. */
-const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u2029\u202a-\u202e\u2066-\u2069\ufeff]/g;
 
 /** Display text, normalised and stripped. Returns '' for anything unusable,
     which every caller treats as a missing field rather than an empty one. */
@@ -86,9 +85,35 @@ const LABEL_RE = /^(\d{1,2})d(\d{1,4})$/;
     It is also what keeps a scripted roll honest. The GM's predetermined result
     has to be real faces that genuinely produce the outcome, not a claimed
     total, which is exactly why scripting fabricates faces rather than numbers. */
+/** The optional bonus / pain / need of a roll or a request. `undefined` means
+    the field was malformed, which drops the whole message; an absent field is
+    simply not in the result. */
+function parseExtras(raw: Record<string, unknown>): RollExtras | undefined {
+    const out: RollExtras = {};
+    if (raw.bonus !== undefined) {
+        const b = int(raw.bonus, LIMITS.MIN_BONUS, LIMITS.MAX_BONUS);
+        if (b === null) return undefined;
+        out.bonus = b;
+    }
+    if (raw.pain !== undefined) {
+        const p = int(raw.pain, 0, LIMITS.MAX_PAIN);
+        if (p === null) return undefined;
+        out.pain = p;
+    }
+    if (raw.need !== undefined) {
+        const n = int(raw.need, 1, LIMITS.MAX_NEED);
+        if (n === null) return undefined;
+        out.need = n;
+    }
+    /* A sum roll counts no successes, so there is nothing for pain to strike
+       or a target to be measured against. */
+    if (out.bonus !== undefined && (out.pain !== undefined || out.need !== undefined)) return undefined;
+    return out;
+}
+
 export function parseRoll(raw: unknown): WireRoll | null {
     if (!isRecord(raw)) return null;
-    if (!exactly(raw, ['id', 'label', 'vals', 'total', 'succ', 'net', 't', 'who', 'note'])) return null;
+    if (!exactly(raw, ['id', 'label', 'vals', 'total', 'succ', 'net', 't', 'who', 'note', 'bonus', 'pain', 'need'])) return null;
 
     const id = idText(raw.id);
     if (!id) return null;
@@ -118,12 +143,17 @@ export function parseRoll(raw: unknown): WireRoll | null {
         ? undefined
         : cleanText(raw.note, LIMITS.MAX_NOTE) || undefined;
 
-    /* Pokerole counts 4, 5 and 6 as successes; other dice only have a total.
-       The same rule as src/gm/dice.ts, applied to the faces we were handed. */
-    const total = vals.reduce((a, b) => a + b, 0);
-    const succ = sides === 6 ? vals.filter((v) => v >= 4).length : null;
+    const extras = parseExtras(raw);
+    if (!extras) return null;
 
-    return { id, label: raw.label, vals, total, succ, net: succ, t, who, note };
+    /* Pokerole counts 4, 5 and 6 as successes; other dice only have a total.
+       The same rule as src/gm/dice.ts, applied to the faces we were handed:
+       a bonus makes it a sum, and pain comes off the successes. */
+    const total = vals.reduce((a, b) => a + b, 0) + (extras.bonus ?? 0);
+    const succ = sides === 6 && extras.bonus === undefined ? vals.filter((v) => v >= 4).length : null;
+    const net = succ === null ? null : Math.max(0, succ - (extras.pain ?? 0));
+
+    return { id, label: raw.label, vals, total, succ, net, t, who, note, ...extras };
 }
 
 function parseMember(raw: unknown): WireMember | null {
@@ -205,6 +235,49 @@ function parseMapImage(raw: unknown): WireMapImage | null {
     return { file, w, h };
 }
 
+function parseTurnEntry(raw: unknown): WireTurnEntry | null {
+    if (!isRecord(raw) || !exactly(raw, ['id', 'name', 'img', 'own', 'ck', 'done', 'out', 'acted', 'eva', 'clash'])) return null;
+    const id = idText(raw.id);
+    const name = cleanText(raw.name, LIMITS.MAX_NAME * 2);
+    if (!id || !name) return null;
+    if (typeof raw.img !== 'string' || (raw.img !== '' && !IMAGE_RE.test(raw.img))) return null;
+    if (typeof raw.done !== 'boolean' || typeof raw.out !== 'boolean') return null;
+    const entry: WireTurnEntry = { id, name, img: raw.img, own: '', ck: '', done: raw.done, out: raw.out };
+    if (raw.own === '') {
+        /* The GM's own combatants carry nothing more. */
+        if (raw.ck !== '' || raw.acted !== undefined || raw.eva !== undefined || raw.clash !== undefined) return null;
+        return entry;
+    }
+    const own = fingerprintText(raw.own);
+    const acted = int(raw.acted, 0, 5);
+    if (!own || !isCharKey(raw.ck) || acted === null) return null;
+    if (typeof raw.eva !== 'boolean' || typeof raw.clash !== 'boolean') return null;
+    return { ...entry, own, ck: raw.ck, acted, eva: raw.eva, clash: raw.clash };
+}
+
+function parseTurns(raw: unknown): WireTurns | null {
+    if (!isRecord(raw) || !exactly(raw, ['name', 'round', 'pass', 'run', 'cur', 'order'])) return null;
+    if (typeof raw.run !== 'boolean') return null;
+    const name = cleanText(raw.name, LIMITS.MAX_TITLE);
+    const round = int(raw.round, 1, LIMITS.MAX_ROUND);
+    const pass = int(raw.pass, 1, LIMITS.MAX_ROUND);
+    if (typeof raw.name !== 'string' || round === null || pass === null) return null;
+    if (!Array.isArray(raw.order) || raw.order.length > LIMITS.MAX_TURNS) return null;
+    const order: WireTurnEntry[] = [];
+    for (const e of raw.order) {
+        const parsed = parseTurnEntry(e);
+        if (!parsed || order.some((x) => x.id === parsed.id)) return null;
+        order.push(parsed);
+    }
+    const cur = raw.cur === null ? null : idText(raw.cur);
+    if (raw.cur !== null && (!cur || !order.some((e) => e.id === cur))) return null;
+    return { name, round, pass, run: raw.run, cur, order };
+}
+
+/** A pool's new value, when one is sent. */
+const poolValue = (v: unknown): number | null | undefined =>
+    (v === undefined ? undefined : int(v, 0, 999));
+
 function idList(raw: unknown, max: number): string[] | null {
     if (!Array.isArray(raw) || raw.length > max) return null;
     const out: string[] = [];
@@ -243,7 +316,7 @@ export function parseBody(raw: unknown): Body | null {
             return { k: 'roster', members };
         }
         case 'request': {
-            if (!exactly(raw, ['k', 'rid', 'count', 'sides', 'note'])) return null;
+            if (!exactly(raw, ['k', 'rid', 'count', 'sides', 'note', 'bonus', 'pain', 'need'])) return null;
             const rid = idText(raw.rid);
             const count = int(raw.count, LIMITS.MIN_COUNT, LIMITS.MAX_COUNT);
             const sides = int(raw.sides, LIMITS.MIN_SIDES, LIMITS.MAX_SIDES);
@@ -251,7 +324,9 @@ export function parseBody(raw: unknown): Body | null {
             const note = raw.note === undefined
                 ? undefined
                 : cleanText(raw.note, LIMITS.MAX_NOTE) || undefined;
-            return { k: 'request', rid, count, sides, note };
+            const extras = parseExtras(raw);
+            if (!extras) return null;
+            return { k: 'request', rid, count, sides, note, ...extras };
         }
         case 'result': {
             if (!exactly(raw, ['k', 'rid', 'roll'])) return null;
@@ -338,6 +413,65 @@ export function parseBody(raw: unknown): Body | null {
                the wire at all — a hidden map is not sent and then masked. */
             if (raw.show !== (image !== null)) return null;
             return { k: 'map', rev, show: raw.show, title, live: raw.live, image };
+        }
+        case 'turns': {
+            if (!exactly(raw, ['k', 'rev', 'turns'])) return null;
+            const rev = int(raw.rev, 0, Number.MAX_SAFE_INTEGER);
+            const turns = raw.turns === null ? null : parseTurns(raw.turns);
+            if (rev === null || (raw.turns !== null && !turns)) return null;
+            return { k: 'turns', rev, turns };
+        }
+        case 'pcop': {
+            if (!exactly(raw, ['k', 'to', 'key', 'oid', 'hp', 'will', 'status'])) return null;
+            const to = fingerprintText(raw.to);
+            const oid = idText(raw.oid);
+            if (!to || !oid || !isCharKey(raw.key)) return null;
+            const hp = poolValue(raw.hp), will = poolValue(raw.will);
+            const status = raw.status === undefined ? undefined : parseStatus(raw.status);
+            if (hp === null || will === null || status === null) return null;
+            if (hp === undefined && will === undefined && status === undefined) return null;
+            return {
+                k: 'pcop', to, key: raw.key, oid,
+                ...(hp !== undefined ? { hp } : {}),
+                ...(will !== undefined ? { will } : {}),
+                ...(status !== undefined ? { status } : {}),
+            };
+        }
+        case 'pc': {
+            if (!exactly(raw, ['k', 'key', 'ack', 'trainer', 'mon'])) return null;
+            if (!isCharKey(raw.key)) return null;
+            const ack = raw.ack === undefined ? undefined : idText(raw.ack);
+            if (ack === null) return null;
+            const acked = ack ? { ack } : {};
+            /* The trainer under `t`, a Pokémon under a slot, never both. */
+            if (raw.key === 't') {
+                if (raw.mon !== undefined) return null;
+                const trainer = parseSlimTrainer(raw.trainer);
+                return trainer ? { k: 'pc', key: 't', ...acked, trainer } : null;
+            }
+            if (raw.trainer !== undefined) return null;
+            const mon = parseSlimMon(raw.mon);
+            return mon ? { k: 'pc', key: raw.key, ...acked, mon } : null;
+        }
+        case 'enter': {
+            if (!exactly(raw, ['k', 'rid', 'chars'])) return null;
+            const rid = idText(raw.rid);
+            if (!rid || !Array.isArray(raw.chars) || !raw.chars.length || raw.chars.length > 7) return null;
+            const chars: { key: CharKey; bonus: number }[] = [];
+            for (const c of raw.chars) {
+                if (!isRecord(c) || !exactly(c, ['key', 'bonus']) || !isCharKey(c.key)) return null;
+                const bonus = int(c.bonus, LIMITS.MIN_BONUS, LIMITS.MAX_BONUS);
+                if (bonus === null || chars.some((x) => x.key === c.key)) return null;
+                chars.push({ key: c.key, bonus });
+            }
+            return { k: 'enter', rid, chars };
+        }
+        case 'turn': {
+            if (!exactly(raw, ['k', 'op', 'id', 'after'])) return null;
+            const id = idText(raw.id);
+            if (!id || !(raw.op === 'pass' || raw.op === 'delay' || raw.op === 'eva' || raw.op === 'clash')) return null;
+            if (raw.after !== undefined && (raw.op !== 'delay' || !idText(raw.after))) return null;
+            return { k: 'turn', op: raw.op, id, ...(raw.after !== undefined ? { after: raw.after as string } : {}) };
         }
         default:
             return null;

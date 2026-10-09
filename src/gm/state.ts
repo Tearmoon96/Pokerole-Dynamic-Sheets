@@ -13,7 +13,9 @@ export function uid(): string {
 
 /** A fresh, empty fight. The name is what the panel's head is titled. */
 export function newCombat(name: string): GmCombat {
-    return { gid: uid(), name, round: 1, participants: [] };
+    return {
+        gid: uid(), name, round: 1, participants: [], turnsOn: false, turn: null, passed: [], passOrder: null, pass: 1,
+    };
 }
 
 export function defaultGmState(): GmState {
@@ -23,6 +25,8 @@ export function defaultGmState(): GmState {
         wilds: [],
         combats: [first],
         combatFocus: first.gid,
+        tableCombat: null,
+        tablePcs: {},
         notes: '',
         noteSheets: [],
         noteFolders: [],
@@ -89,11 +93,19 @@ export function normalizeLayout(raw: unknown, combatKeys: string[]): GmLayout {
 function normalizeCombat(raw: unknown, fallbackName: string): GmCombat {
     const r = (raw && typeof raw === 'object') ? raw as Partial<GmCombat> : {};
     const round = Number(r.round);
+    const pass = Number(r.pass);
+    const ids = (v: unknown) => (Array.isArray(v) ? v : []).filter((x): x is string => typeof x === 'string');
     return {
         gid: typeof r.gid === 'string' && r.gid ? r.gid : uid(),
         name: typeof r.name === 'string' && r.name.trim() ? r.name : fallbackName,
         round: round > 0 ? Math.floor(round) : 1,
         participants: (Array.isArray(r.participants) ? r.participants : []) as GmCombatant[],
+        /* A fight saved before the turn tracker keeps no turns until started. */
+        turnsOn: r.turnsOn === true,
+        turn: typeof r.turn === 'string' ? r.turn : null,
+        passed: ids(r.passed),
+        passOrder: Array.isArray(r.passOrder) ? ids(r.passOrder) : null,
+        pass: pass > 0 ? Math.floor(pass) : 1,
     };
 }
 
@@ -161,6 +173,8 @@ export function normalizeGmState(raw: unknown): GmState {
     delete (s as unknown as Record<string, unknown>).combat;
     s.combatFocus = s.combats.some((c) => c.gid === r.combatFocus)
         ? r.combatFocus! : s.combats[0].gid;
+    s.tableCombat = s.combats.some((c) => c.gid === r.tableCombat) ? r.tableCombat! : null;
+    s.tablePcs = r.tablePcs && typeof r.tablePcs === 'object' && !Array.isArray(r.tablePcs) ? r.tablePcs : {};
     s.dice = Object.assign({ count: 2, sides: 6, history: [] }, r.dice);
     s.nameOpts = Object.assign({}, DEFAULT_NAME_OPTS, r.nameOpts);
     s.genOpts = normalizeGenOpts(r.genOpts);

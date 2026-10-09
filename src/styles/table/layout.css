@@ -175,7 +175,8 @@
 /* ---------------- Side panels ---------------- */
 
 .credentials,
-.member-list {
+.member-list,
+.character-panel {
     border: 1px solid var(--border-color);
     border-radius: 12px;
     background: var(--card-bg);

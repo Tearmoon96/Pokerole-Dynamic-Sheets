@@ -1,0 +1,35 @@
+/* The player's own character in the side column. The rows are the GM
+   roster's (gm/roster.css, gm/status-chips.css); this only fits them to a
+   19rem column with nothing to expand or rearrange. */
+
+.character-card .trainer-head { cursor: default; }
+
+.character-pick {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.character-pick select {
+    flex: 1;
+    min-width: 0;
+    background: var(--panel-solid);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.3rem 0.45rem;
+    font: inherit;
+    font-size: 0.8rem;
+}
+
+.character-pick select option { background: var(--panel-solid); color: var(--text-primary); }
+
+.character-empty { display: flex; flex-direction: column; gap: 0.45rem; }
+
+/* A once-a-round roll already made this round: the number stays, the button
+   goes. */
+.tip-quick .tip-used { opacity: 0.45; text-decoration: line-through; }
+
+/* Two buttons in the corner rather than the roster's four, so the name keeps
+   the room the other two would have taken. */
+.character-card .trainer-name { padding-right: 4rem; }

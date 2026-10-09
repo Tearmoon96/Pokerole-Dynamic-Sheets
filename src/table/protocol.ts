@@ -16,6 +16,9 @@
    `k`. For anything the host publishes, it additionally checks that `f` equals
    the lobby id, which is the host key's fingerprint. */
 
+import type { GmStatus } from '../gm/ailments';
+import type { CharKey, SlimMon, SlimTrainer } from './slim';
+
 export const PROTOCOL_VERSION = 1;
 
 /** A roll as it travels. Deliberately smaller than the GM screen's RollEntry:
@@ -35,6 +38,21 @@ export interface WireRoll {
     who: string;
     /** Optional free-text label — "Insight", "Clash". */
     note?: string;
+    /** A flat number added to the faces. Its presence makes this a SUM roll —
+        Initiative, 1d6 + Dexterity + Alert — with no successes counted, the
+        same rule as the GM screen's RollEntry.bonus. */
+    bonus?: number;
+    /** Successes the pain penalty strikes off; `net` is what is left. */
+    pain?: number;
+    /** The successes an accuracy roll needed: its action number this round. */
+    need?: number;
+}
+
+/** The optional extras a roll request can carry, as they travel. */
+export interface RollExtras {
+    bonus?: number;
+    pain?: number;
+    need?: number;
 }
 
 export interface WireMember {
@@ -109,6 +127,39 @@ export interface WireMapImage {
     h: number;
 }
 
+/** One combatant on the turn strip. Players see who and in what order, and
+    whose turn it is; the counts ride only on the entries that are a player's
+    own character, which is the one thing about the fight they track. */
+export interface WireTurnEntry {
+    /** The combatant's id in the GM's tracker. */
+    id: string;
+    name: string;
+    /** A Pokédex image file name for a Pokémon, '' for a trainer or a name. */
+    img: string;
+    /** The member whose character this is, '' for the GM's own. */
+    own: string;
+    /** Which of their characters (CharKey), '' when `own` is ''. */
+    ck: string;
+    /** Has had its turn in this pass. */
+    done: boolean;
+    /** Has no action left this Round, or is out of the fight. */
+    out: boolean;
+    acted?: number;
+    eva?: boolean;
+    clash?: boolean;
+}
+
+export interface WireTurns {
+    name: string;
+    round: number;
+    pass: number;
+    /** Turns are being kept (the GM pressed Start). */
+    run: boolean;
+    /** Whose turn it is, or null before the start and once a Round is spent. */
+    cur: string | null;
+    order: WireTurnEntry[];
+}
+
 /** What a player reports about their music, to the GM only. */
 export interface TrackLoad {
     id: string;
@@ -122,7 +173,7 @@ export type Body =
     /** Host only. Also the liveness signal players watch for. */
     | { k: 'roster'; members: WireMember[] }
     /** Player to host: please roll this. */
-    | { k: 'request'; rid: string; count: number; sides: number; note?: string }
+    | ({ k: 'request'; rid: string; count: number; sides: number; note?: string } & RollExtras)
     /** Host only. The result, for everyone. */
     | { k: 'result'; rid?: string; roll: WireRoll }
     /** Host only. Recent public rolls, sent to someone who just joined. */
@@ -148,7 +199,24 @@ export type Body =
         failed: string[];
     }
     /** Host only. The shared map, or that there is none on show. */
-    | { k: 'map'; rev: number; show: boolean; title: string; live: boolean; image: WireMapImage | null };
+    | { k: 'map'; rev: number; show: boolean; title: string; live: boolean; image: WireMapImage | null }
+    /** Host only. The turn strip, or null when no fight is on the table. */
+    | { k: 'turns'; rev: number; turns: WireTurns | null }
+    /** Host only. The GM changed one of `to`'s characters in the fight: the
+        HP, Will or status it now has. Values, not steps, so a resend is
+        harmless. */
+    | { k: 'pcop'; to: string; key: CharKey; oid: string; hp?: number; will?: number; status?: GmStatus }
+    /** Player to host: one of my characters as the GM's copy should have it.
+        `ack` is the last `pcop` applied to it, so the host stops resending. */
+    | { k: 'pc'; key: CharKey; ack?: string; trainer?: SlimTrainer; mon?: SlimMon }
+    /** Player to host: put these characters into the fight; roll each one's
+        initiative, 1d6 + bonus. */
+    | { k: 'enter'; rid: string; chars: { key: CharKey; bonus: number }[] }
+    /** Player to host: my turn is over, I delay it, or I spent an action on an
+        Evasion or a Clash. */
+    | { k: 'turn'; op: TurnOp; id: string; after?: string };
+
+export type TurnOp = 'pass' | 'delay' | 'eva' | 'clash';
 
 export interface Inner {
     v: number;
@@ -182,6 +250,11 @@ export const LIMITS = {
     MAX_NOTE: 60,
     MAX_MEMBERS: 16,
     MAX_SYNC: 30,
+    /** Initiative's flat bonus: Dexterity + Alert plus a hand modifier. */
+    MIN_BONUS: -99,
+    MAX_BONUS: 99,
+    MAX_PAIN: 5,
+    MAX_NEED: 5,
 
     /** Kept below the relay's own 32 KB ceiling. */
     MAX_WIRE_CHARS: 24 * 1024,
@@ -203,6 +276,9 @@ export const LIMITS = {
     MAX_FADE_MS: 10_000,
     /** The largest map image side, in pixels. */
     MAX_MAP_SIDE: 8192,
+    /** Combatants on the turn strip. */
+    MAX_TURNS: 60,
+    MAX_ROUND: 999,
 } as const;
 
 /** How often everyone announces themselves, and how long the host waits before

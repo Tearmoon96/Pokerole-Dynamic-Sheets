@@ -301,6 +301,33 @@ goes out empty. A deck can fade: the fade travels in the deck's state as a
 start time on the table clock and a length, so every browser sweeps its own
 volume in step, and a fade-out ends in the pause or stop it was for.
 
+### Characters and the fight
+
+**A player's own character** sits in the side column
+([`CharacterPanel.tsx`](src/components/table/CharacterPanel.tsx)): a trainer
+from this browser's working set — the same `pokerole_working` the License and
+the cards use on this origin — drawn with the GM roster's rows and the move
+panel ([`MoveTip.tsx`](src/components/gm/MoveTip.tsx), shared with the GM
+screen's `MovePanel`). Its quick rolls are ordinary requests to the GM, now
+able to carry a `bonus` (initiative), `pain` and a target `need`; every
+receiver still recomputes total, successes and net from the faces. The game
+database is loaded only for this panel, after joining.
+
+**The fight** is run in the GM screen's combat tracker, which keeps turns
+([`src/gm/turns.ts`](src/gm/turns.ts)): five actions a Round, taken one turn
+at a time in passes, a delay reordering one pass only. The GM puts one fight
+on the table; the GM screen and the hosting table tab talk over a second
+same-origin channel ([`src/lib/combatLink.ts`](src/lib/combatLink.ts)), and
+the table ([`combatShare.ts`](src/table/combatShare.ts)) shows players a turn
+strip — names, faces, order, whose turn, and counts only on their own
+characters. Players enter with an initiative the host rolls; their characters
+reach the GM screen as cut-down copies ([`slim.ts`](src/table/slim.ts),
+`GmState.tablePcs`, the `p:<member>:<key>` token), kept in step both ways:
+the player's sheet whenever it changes, the GM's edits as values with an id
+the player acknowledges. A player may pass, delay or spend actions only for
+combatants the strip marks as theirs, checked on the host and again in the
+GM screen. The relay is unchanged.
+
 ## Phones and tablets
 
 The three original pages were built for a window that could spare 60px of
