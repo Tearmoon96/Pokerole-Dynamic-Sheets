@@ -10,6 +10,7 @@ import { EDGE_KINDS, MAX_SOFT, MIN_SOFT } from '../../map/edges';
 import { swatchBackground } from './SidePanel';
 import type { EdgeKind } from '../../map/types';
 import { exportSize, renderMapPng } from '../../map/render/exportPng';
+import type { ExportResult } from '../../map/render/exportPng';
 import { exportLoader, folderReadable, pickAppFolder, readAppFolder, readsFromDisk } from '../../map/render/exportImages';
 
 /* The map's own settings, each on the top bar with a small window of its own
@@ -363,56 +364,106 @@ export function ExportControl() {
     }, [pop.open]);
 
     const size = exportSize(doc, px);
+    /* A picture drawn and waiting for its click: see `save`. */
+    const [ready, setReady] = useState<ExportResult | null>(null);
+    useEffect(() => { setReady(null); }, [px, grid, tokens, fog, doc, folder, pop.open]);
+
+    const name = (doc.name.trim().replace(/[\\/:*?"<>|]+/g, '') || 'map') + '.png';
+
+    /** Puts a finished picture in a file. The save dialog opens only now:
+        the browser makes the file the moment a place is chosen, so a dialog
+        opened before drawing left an EMPTY file there for as long as the
+        drawing took — tokens fetch their pictures, fog is blurred — and for
+        good if it failed. An image viewer opening it meanwhile reported a
+        broken file. False if the dialog was cancelled. */
+    const write = async (out: ExportResult): Promise<boolean> => {
+        let where = name;
+        if (window.showSaveFilePicker) {
+            let handle: FileSystemFileHandle;
+            try {
+                handle = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: 'PNG image', accept: { 'image/png': ['.png'] } }] });
+            } catch (e) {
+                if (e && (e as DOMException).name === 'AbortError') return false;
+                throw e;
+            }
+            const w = await handle.createWritable();
+            try {
+                await w.write(out.blob);
+                await w.close();
+            } catch (e) {
+                await w.abort().catch(() => { /* already gone */ });
+                throw e;
+            }
+            where = handle.name;
+        } else {
+            const url = URL.createObjectURL(out.blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }
+        setReady(null);
+        setNote({
+            text: 'Saved ' + where + ' — ' + out.width + '×' + out.height + ' px.'
+                + (out.missing ? ' ' + out.missing + ' picture' + (out.missing === 1 ? '' : 's') + ' drawn as placeholders.' : ''),
+            warn: false,
+        });
+        toast('<i class="fa-solid fa-image"></i> Map saved as a PNG.');
+        return true;
+    };
+
+    const failNote = (e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        setNote({
+            text: /tainted|insecure|SecurityError/i.test(msg)
+                ? 'The browser would not let the page read one of its pictures back. Choose the app\'s folder below and try again.'
+                : msg,
+            warn: true,
+        });
+    };
+
+    /** The picture waits for a second click when the drawing outlasted the
+        first one: a save dialog may only open straight after a click. */
+    const hold = (out: ExportResult) => {
+        setReady(out);
+        setNote({ text: 'Drawn. Click Save to choose where it goes.', warn: false });
+    };
 
     const save = async () => {
         setBusy(true);
         setNote(null);
+        setReady(null);
         try {
             /* Ask for read access first, while the click still counts as a
-               gesture — the rendering below takes long enough for it not to. */
+               gesture. */
             let dir = folder;
             if (disk && dir && !(await folderReadable(dir))) dir = null;
-            /* The save dialog also needs the gesture: open it before drawing. */
-            const name = (doc.name.trim().replace(/[\\/:*?"<>|]+/g, '') || 'map') + '.png';
-            let handle: FileSystemFileHandle | null = null;
-            if (window.showSaveFilePicker) {
-                try {
-                    handle = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: 'PNG image', accept: { 'image/png': ['.png'] } }] });
-                } catch (e) {
-                    if (e && (e as DOMException).name === 'AbortError') { setBusy(false); return; }
-                    throw e;
-                }
-            }
             const out = await renderMapPng(doc, { pxPerCell: px, grid, tokens, fog }, exportLoader(dir));
-            if (handle) {
-                const w = await handle.createWritable();
-                await w.write(out.blob);
-                await w.close();
-            } else {
-                const url = URL.createObjectURL(out.blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = name;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                setTimeout(() => URL.revokeObjectURL(url), 5000);
+            const act = (navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation;
+            if (window.showSaveFilePicker && act && !act.isActive) { hold(out); return; }
+            try {
+                await write(out);
+            } catch (e) {
+                if (window.showSaveFilePicker && e && (e as DOMException).name === 'SecurityError') { hold(out); return; }
+                throw e;
             }
-            const where = handle ? handle.name : name;
-            setNote({
-                text: 'Saved ' + where + ' — ' + out.width + '×' + out.height + ' px.'
-                    + (out.missing ? ' ' + out.missing + ' picture' + (out.missing === 1 ? '' : 's') + ' drawn as placeholders.' : ''),
-                warn: false,
-            });
-            toast('<i class="fa-solid fa-image"></i> Map saved as a PNG.');
         } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e);
-            setNote({
-                text: /tainted|insecure|SecurityError/i.test(msg)
-                    ? 'The browser would not let the page read one of its pictures back. Choose the app\'s folder below and try again.'
-                    : msg,
-                warn: true,
-            });
+            failNote(e);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const saveReady = async () => {
+        if (!ready) return;
+        setBusy(true);
+        try {
+            await write(ready);
+        } catch (e) {
+            failNote(e);
         } finally {
             setBusy(false);
         }
@@ -472,7 +523,7 @@ export function ExportControl() {
                         </button>
                     </div>
                 )}
-                <button className="accent map-popover-go" disabled={busy || !size.ok} onClick={() => { void save(); }}>
+                <button className="accent map-popover-go" disabled={busy || !size.ok} onClick={() => { void (ready ? saveReady() : save()); }}>
                     {busy ? <><i className="fa-solid fa-circle-notch fa-spin"></i> Drawing…</> : <><i className="fa-solid fa-download"></i> Save {size.w}×{size.h} PNG</>}
                 </button>
                 {note && <p className={'map-hint' + (note.warn ? ' map-warn' : '')}>{note.text}</p>}
