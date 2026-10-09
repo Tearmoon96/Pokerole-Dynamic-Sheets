@@ -95,3 +95,10 @@ html[data-pointer="coarse"] .turn-delay button,
 html[data-pointer="coarse"] .combat-entry button {
     min-height: 2.5rem;
 }
+
+/* The live map's hide list, rows a fingertip can pick out of. */
+html[data-pointer="coarse"] .map-object,
+html[data-pointer="coarse"] .map-objects-head button,
+html[data-pointer="coarse"] .map-objects-toggle {
+    min-height: 2.25rem;
+}

@@ -2,6 +2,9 @@ import { fogLook, fogOf } from '../fog';
 import { exportSize, renderMapPng } from './exportPng';
 import type { ImageLoader } from './exportPng';
 import type { MapDoc } from '../types';
+import { isHidden } from '../../lib/tableLink';
+import type { MapObjectInfo, PlayerHide } from '../../lib/tableLink';
+import { LANDMARK_BY_SLUG } from '../landmarks';
 
 /* The map as the players at the shared table see it.
 
@@ -17,6 +20,8 @@ import type { MapDoc } from '../types';
      all. Fog covers the map's own area; a label hidden near the edge can
      stick out past the fog, or past the map into the frame, and would be
      read there;
+   - a landmark, token or label the GM chose to keep off the table (from the
+     table's own map list) is not drawn either, wherever it stands;
    - and the MapDoc itself — terrain, everything under the fog, the GM's
      notes in a label — is never sent. Players get pixels.
 
@@ -48,20 +53,39 @@ function hiddenAt(doc: MapDoc, fog: Uint8Array | null, x: number, y: number): bo
     return !!look && look.alpha >= 1;
 }
 
-/** The map with everything under full fog taken out. A path or a sketch is
-    dropped only when every point of it is hidden: a road running out of the fog is drawn,
-    and its hidden stretch is covered like the ground under it. */
-export function playerDoc(doc: MapDoc): MapDoc {
+/** The map with everything under full fog taken out, and whatever the GM
+    keeps off the table. A path or a sketch is dropped only when every point
+    of it is hidden: a road running out of the fog is drawn, and its hidden
+    stretch is covered like the ground under it. */
+export function playerDoc(doc: MapDoc, hide: PlayerHide | null = null): MapDoc {
     const fog = fogOf(doc);
-    if (!fog) return doc;
+    if (!fog && !hide) return doc;
     return {
         ...doc,
-        stamps: doc.stamps.filter((s) => !hiddenAt(doc, fog, s.x, s.y)),
-        labels: doc.labels.filter((l) => !hiddenAt(doc, fog, l.x, l.y)),
-        tokens: doc.tokens.filter((t) => !hiddenAt(doc, fog, t.x, t.y)),
+        stamps: doc.stamps.filter((s) => !hiddenAt(doc, fog, s.x, s.y) && !isHidden(hide, 'stamp', s.id)),
+        labels: doc.labels.filter((l) => !hiddenAt(doc, fog, l.x, l.y) && !isHidden(hide, 'label', l.id)),
+        tokens: doc.tokens.filter((t) => !hiddenAt(doc, fog, t.x, t.y) && !isHidden(hide, 'token', t.id)),
         paths: doc.paths.filter((p) => !p.points.every(([x, y]) => hiddenAt(doc, fog, x, y))),
         sketches: doc.sketches.filter((k) => !k.points.every(([x, y]) => hiddenAt(doc, fog, x, y))),
     };
+}
+
+/** The landmarks, tokens and labels on a map, for the table's GM to choose
+    from. Names only: the table never gets the map itself. */
+export function mapObjects(doc: MapDoc): MapObjectInfo[] {
+    const fog = fogOf(doc);
+    const out: MapObjectInfo[] = [];
+    for (const s of doc.stamps) {
+        const name = (s.label || '').trim() || LANDMARK_BY_SLUG.get(s.landmark)?.name || s.landmark;
+        out.push({ id: s.id, kind: 'stamp', name, fogged: hiddenAt(doc, fog, s.x, s.y) });
+    }
+    for (const t of doc.tokens) {
+        out.push({ id: t.id, kind: 'token', name: t.name.trim() || 'Token', fogged: hiddenAt(doc, fog, t.x, t.y) });
+    }
+    for (const l of doc.labels) {
+        out.push({ id: l.id, kind: 'label', name: l.text.trim().replace(/\s+/g, ' ') || 'Label', fogged: hiddenAt(doc, fog, l.x, l.y) });
+    }
+    return out.slice(0, 600).map((o) => ({ ...o, name: o.name.slice(0, 80) }));
 }
 
 export interface PlayerView {
@@ -70,8 +94,8 @@ export interface PlayerView {
     height: number;
 }
 
-export async function renderPlayerView(doc: MapDoc, load: ImageLoader): Promise<PlayerView> {
-    const shown = playerDoc(doc);
+export async function renderPlayerView(doc: MapDoc, load: ImageLoader, hide: PlayerHide | null = null): Promise<PlayerView> {
+    const shown = playerDoc(doc, hide);
     const res = await renderMapPng(shown, {
         pxPerCell: playerPxPerCell(doc),
         grid: doc.grid.show,

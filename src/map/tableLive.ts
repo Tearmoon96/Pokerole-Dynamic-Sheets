@@ -1,7 +1,7 @@
 import { HOST_BEAT_MS, HOST_LOST_MS, openLink, parseLink } from '../lib/tableLink';
-import type { LinkMessage } from '../lib/tableLink';
+import type { LinkMessage, PlayerHide } from '../lib/tableLink';
 import { exportLoader } from './render/exportImages';
-import { fogSnapshot, renderPlayerView, revealStats } from './render/playerView';
+import { fogSnapshot, mapObjects, renderPlayerView, revealStats } from './render/playerView';
 import type { FogSnapshot, RevealStats } from './render/playerView';
 import type { MapStore } from './store';
 import type { MapDoc } from './types';
@@ -30,7 +30,12 @@ import type { MapDoc } from './types';
      one on show keeps following, so it is up to date when the GM shows it.
 
    And the picture itself is the players' view (render/playerView.ts): fog
-   always on and sealed, hidden objects not drawn, no map data sent. */
+   always on and sealed, hidden objects not drawn, no map data sent.
+
+   The table's GM can keep landmarks, tokens and labels off that picture. The
+   choice lives at the table and arrives here in its beat; when it changes,
+   the picture players ALREADY have is drawn again without them — never the
+   map as it is now, which may hold edits or uncovered fog not yet synced. */
 
 export const MIN_HOLD_MS = 500;
 export const MAX_HOLD_MS = 10_000;
@@ -79,6 +84,8 @@ export interface LiveState {
     revealHold: number;
     /** Live, with changes on the map that the players have not been sent. */
     pending: boolean;
+    /** What the table keeps off the live map's players' picture. */
+    hide: PlayerHide | null;
 }
 
 function loadHold(key: string, fallback: number): number {
@@ -110,8 +117,12 @@ export class TableLiveLink {
         connected: false, table: '', shown: false, activeMap: null, mode: 'off', mapId: null, mapName: '', why: '', held: null,
         dueAt: null, busy: false, lastUrl: null, lastAt: null, error: '', threshold: loadThreshold(),
         auto: loadAuto(), editHold: loadHold(EDIT_HOLD_KEY, DEFAULT_EDIT_HOLD_MS),
-        revealHold: loadHold(REVEAL_HOLD_KEY, DEFAULT_REVEAL_HOLD_MS), pending: false,
+        revealHold: loadHold(REVEAL_HOLD_KEY, DEFAULT_REVEAL_HOLD_MS), pending: false, hide: null,
     };
+    /** The table's hide choices, by map id, from its last beat. */
+    private hides: Record<string, PlayerHide> = {};
+    /** The hide choice changed while a picture was on its way. */
+    private rehideAfter = false;
 
     private channel: BroadcastChannel | null = null;
     private lastHostAt = 0;
@@ -183,6 +194,12 @@ export class TableLiveLink {
                 || this.state.activeMap !== m.active) {
                 this.set({ connected: true, table: m.table, shown: m.shown, activeMap: m.active });
             }
+            this.hides = m.hide;
+            const hide = (this.state.mapId && m.hide[this.state.mapId]) || null;
+            if (JSON.stringify(hide) !== JSON.stringify(this.state.hide)) {
+                this.set({ hide });
+                this.rehide();
+            }
             /* The GM took this map off the table, or it stopped following.
                Live is over; following on regardless would put the map back
                on the table at the next edit. Another map going on show is
@@ -220,6 +237,14 @@ export class TableLiveLink {
         this.published = null;
         this.publishedDoc = null;
         this.set({ mode: 'off', mapId: null, mapName: '', held: null, dueAt: null, why: '', error: why, pending: false });
+    }
+
+    /** The table changed what it keeps off the live map: the picture players
+        have, drawn again. */
+    private rehide(): void {
+        if (this.state.mode === 'off' || !this.landed || !this.publishedDoc) return;
+        if (this.sending) { this.rehideAfter = true; return; }
+        void this.send(this.publishedDoc, true);
     }
 
     /* --------------------------------------------------------- the map side */
@@ -293,7 +318,7 @@ export class TableLiveLink {
         this.sending = true;
         this.set({ busy: true, error: '' });
         try {
-            const view = await renderPlayerView(doc, this.loader);
+            const view = await renderPlayerView(doc, this.loader, this.hides[doc.id] ?? null);
             const seq = ++this.seq;
             const ack = new Promise<Extract<LinkMessage, { t: 'ack' }>>((resolve) => {
                 this.acks.set(seq, resolve);
@@ -303,7 +328,7 @@ export class TableLiveLink {
             });
             this.post({
                 t: 'image', seq, mapId: doc.id, title: doc.name || 'Map', live,
-                image: view.blob, w: view.width, h: view.height,
+                image: view.blob, w: view.width, h: view.height, objects: mapObjects(doc),
             });
             const reply = await ack;
             if (!reply.ok) {
@@ -330,6 +355,8 @@ export class TableLiveLink {
             return false;
         } finally {
             this.sending = false;
+            /* First, so a change made meanwhile waits behind it as usual. */
+            if (this.rehideAfter) { this.rehideAfter = false; this.rehide(); }
             /* Changed while it was being sent: that change waits its own turn. */
             if (this.state.mode === 'live' && this.store.doc !== doc && this.store.activeId === this.state.mapId) {
                 this.seenDoc = this.store.doc;
@@ -356,7 +383,7 @@ export class TableLiveLink {
         this.published = null;
         this.publishedDoc = null;
         this.seenDoc = doc;
-        this.set({ mode: 'live', mapId: doc.id, mapName: doc.name, why: '', held: null, error: '' });
+        this.set({ mode: 'live', mapId: doc.id, mapName: doc.name, why: '', held: null, error: '', hide: this.hides[doc.id] ?? null });
         const ok = await this.send(doc, true);
         if (!ok && this.state.mode === 'live') this.set({ mode: 'off', mapId: null });
     }

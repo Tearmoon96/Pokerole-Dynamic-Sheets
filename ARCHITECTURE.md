@@ -280,7 +280,11 @@ turned on automatic sync, which waits for the map to be still for their own
 two waits — after any change, and after one that uncovers fog; an undo inside
 the wait sends nothing — and an
 update that uncovers more than a set share of the map, or clears it, is held
-until the GM says yes.
+until the GM says yes. The GM can also keep a live map's landmarks, tokens and
+labels off the players' picture, one by one or a whole kind, from the table's
+map list: the choice rides the table's beat to the Map Maker, which draws the
+picture players already have again without them — never the map as it is now,
+which may hold edits not yet synced.
 
 **The music** ([`src/table/music/`](src/table/music/)) is never streamed. Every
 browser holds its own copy of each track — files downloaded ahead of time,

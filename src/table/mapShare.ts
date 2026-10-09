@@ -16,7 +16,8 @@ import { MissingFileError } from './blobs';
 import type { BlobChannel } from './blobs';
 import { formatLobbyId } from './encoding';
 import { HOST_BEAT_MS, openLink, parseLink } from '../lib/tableLink';
-import type { LinkMessage } from '../lib/tableLink';
+import { parseHide, parseObjects } from '../lib/tableLink';
+import type { HideKind, LinkMessage, MapObjectInfo, PlayerHide } from '../lib/tableLink';
 import { idbDel, idbGet, idbSet } from '../state/idb';
 import { LIMITS } from './protocol';
 import type { Body, WireFile } from './protocol';
@@ -44,6 +45,10 @@ export interface MapEntry {
     h: number;
     /** The one on show to the players. */
     active: boolean;
+    /** A live map's landmarks, tokens and labels, as its last picture had them. */
+    objects: MapObjectInfo[];
+    /** What of them the GM keeps off the players' picture. */
+    hide: PlayerHide;
 }
 
 export interface MapView {
@@ -80,12 +85,16 @@ interface Staged {
     /** The Map Maker map it came from, or null for an image file. */
     mapId: string | null;
     blob: Blob;
+    /** A Map Maker map's objects, as the picture was drawn. */
+    objects?: MapObjectInfo[];
 }
 
 interface Saved {
     entries: Staged[];
     /** The key of the map on show, or null. */
     active: string | null;
+    /** What the GM keeps off the players' picture, by Map Maker map id. */
+    hide?: Record<string, PlayerHide>;
 }
 
 /** What IndexedDB held, from this version or the one-map one before it. */
@@ -95,7 +104,16 @@ function readSaved(raw: unknown): Saved | null {
     if (Array.isArray(r.entries)) {
         const entries = (r.entries as Staged[]).filter((e) => e && e.blob instanceof Blob && typeof e.key === 'string');
         const active = typeof r.active === 'string' && entries.some((e) => e.key === r.active) ? r.active : null;
-        return { entries, active };
+        const hide: Record<string, PlayerHide> = {};
+        const rawHide = (raw as { hide?: unknown }).hide;
+        if (rawHide && typeof rawHide === 'object') {
+            for (const [k, v] of Object.entries(rawHide)) {
+                const h = parseHide(v);
+                if (h) hide[k] = h;
+            }
+        }
+        for (const e of entries) e.objects = e.objects ? parseObjects(e.objects) ?? [] : [];
+        return { entries, active, hide };
     }
     const s = r.staged;
     if (!s || !(s.blob instanceof Blob)) return null;
@@ -139,6 +157,9 @@ export class MapShare {
     /** GM: every map held, and the key of the one on show. */
     private entries: Staged[] = [];
     private active: string | null = null;
+    /** GM: what each Map Maker map keeps off the players' picture. The Map
+        Maker draws that picture, so it reads this from the beat. */
+    private hides: Record<string, PlayerHide> = {};
     /** GM: object URLs of the held pictures, by file id. */
     private urls = new Map<string, string>();
     /** Player: the file on screen, and the one being fetched. */
@@ -187,6 +208,7 @@ export class MapShare {
         if (saved?.entries.length) {
             this.entries = saved.entries;
             this.active = saved.active;
+            this.hides = saved.hide ?? {};
             this.showLocal();
         }
         this.openLink();
@@ -213,6 +235,7 @@ export class MapShare {
         this.view = emptyMapView();
         this.entries = [];
         this.active = null;
+        this.hides = {};
         this.currentFile = '';
         this.fetching = '';
         this.rev = 0;
@@ -251,6 +274,8 @@ export class MapShare {
         const entries: MapEntry[] = this.entries.map((e) => ({
             key: e.key, title: e.title, live: e.live, fromMaker: !!e.mapId, url: this.urlOf(e),
             w: e.w, h: e.h, active: e.key === this.active,
+            objects: e.objects ?? [],
+            hide: (e.mapId && this.hides[e.mapId]) || { kinds: [], ids: [] },
         }));
         /* Pictures no entry holds any more. */
         const held = new Set(this.entries.map((e) => e.file.id));
@@ -270,7 +295,7 @@ export class MapShare {
     }
 
     private save(): void {
-        const saved: Saved = { entries: this.entries, active: this.active };
+        const saved: Saved = { entries: this.entries, active: this.active, hide: this.hides };
         void idbSet(SAVED_PREFIX + this.lobby, saved);
     }
 
@@ -314,6 +339,7 @@ export class MapShare {
         const old = this.entries.find((e) => e.key === key);
         if (!old) return;
         this.entries = this.entries.filter((e) => e.key !== key);
+        if (old.mapId) delete this.hides[old.mapId];
         this.queued.get(key)?.skip();
         this.queued.delete(key);
         const wasActive = this.active === key;
@@ -323,6 +349,28 @@ export class MapShare {
         if (wasActive) this.announce();
         else this.beatNow();
         void this.files()?.remove(old.file.id);
+    }
+
+    /** Keeps a live map's landmark, token or label off the players' picture,
+        or puts it back — one object by `id`, or with no id every object of
+        `kind`, ones placed later included. The Map Maker redraws the picture
+        players already have without it, and the table shows that. */
+    setHidden(key: string, kind: HideKind, id: string | null, hidden: boolean): void {
+        if (!this.host) return;
+        const e = this.entries.find((x) => x.key === key);
+        if (!e || !e.mapId) return;
+        const was = this.hides[e.mapId] ?? { kinds: [], ids: [] };
+        const next: PlayerHide = id === null
+            ? { kinds: hidden ? [...new Set([...was.kinds, kind])] : was.kinds.filter((k) => k !== kind), ids: was.ids }
+            : { kinds: was.kinds, ids: hidden ? [...new Set([...was.ids, id])] : was.ids.filter((x) => x !== id) };
+        /* Ids of objects no longer on the map are dropped as they go. */
+        const onMap = new Set((e.objects ?? []).map((o) => o.id));
+        next.ids = next.ids.filter((x) => onMap.has(x) || x === id);
+        if (next.kinds.length || next.ids.length) this.hides[e.mapId] = next;
+        else delete this.hides[e.mapId];
+        this.save();
+        this.showLocal();
+        this.beatNow();
     }
 
     /** Every map off the table. */
@@ -353,7 +401,10 @@ export class MapShare {
         show, goes straight to the players. Pictures that arrive while one is
         uploading wait their turn; a newer picture of the same map replaces
         one still waiting. */
-    private stage(key: string, blob: Blob, w: number, h: number, title: string, live: boolean, mapId: string | null): Promise<void> {
+    private stage(
+        key: string, blob: Blob, w: number, h: number, title: string, live: boolean, mapId: string | null,
+        objects: MapObjectInfo[] = [],
+    ): Promise<void> {
         const run = async () => {
             const files = this.files();
             if (!files) throw new Error('Not connected to a table.');
@@ -368,7 +419,7 @@ export class MapShare {
                 const file = await files.upload(blob, (f) => this.set({ loading: f }));
                 if (this.droppedWhileUploading) { void files.remove(file.id); return; }
                 const old = this.entries.find((e) => e.key === key);
-                const next: Staged = { key, file, w, h, title, live, mapId, blob };
+                const next: Staged = { key, file, w, h, title, live, mapId, blob, objects };
                 this.entries = old ? this.entries.map((e) => (e.key === key ? next : e)) : [...this.entries, next];
                 this.save();
                 this.showLocal();
@@ -411,7 +462,7 @@ export class MapShare {
             if (await files.present(s.file)) continue;
             if (!this.entries.some((e) => e.key === s.key && e.file.id === s.file.id)) continue;
             try {
-                await this.stage(s.key, s.blob, s.w, s.h, s.title, s.live, s.mapId);
+                await this.stage(s.key, s.blob, s.w, s.h, s.title, s.live, s.mapId, s.objects);
             } catch { /* tried again at the next check */ }
         }
     }
@@ -443,6 +494,7 @@ export class MapShare {
             live: this.entries.filter((e) => e.live && e.mapId).map((e) => e.mapId!),
             active: s?.mapId ?? null,
             shown: !!s,
+            hide: this.hides,
         });
     }
 
@@ -469,7 +521,7 @@ export class MapShare {
             const title = cleanText(m.title, LIMITS.MAX_TITLE) || 'Map';
             const w = Math.round(m.w), h = Math.round(m.h);
             if (!(w > 0 && h > 0 && w <= LIMITS.MAX_MAP_SIDE && h <= LIMITS.MAX_MAP_SIDE)) throw new Error('That picture is too big.');
-            await this.stage('mm:' + m.mapId, m.image, w, h, title, m.live, m.mapId);
+            await this.stage('mm:' + m.mapId, m.image, w, h, title, m.live, m.mapId, m.objects);
         } catch (e) {
             error = e instanceof Error ? e.message : 'The table could not take the map.';
             this.set({ error });

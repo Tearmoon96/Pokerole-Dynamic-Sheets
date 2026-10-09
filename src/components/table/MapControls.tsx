@@ -1,9 +1,12 @@
 /* The GM's side of the shared maps: every map held, which one is on show,
    and where they come from. Only the active map reaches the players. */
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useTable } from '../../table/TableContext';
 import { MAX_TABLE_MAPS } from '../../table/mapShare';
+import type { MapEntry } from '../../table/mapShare';
+import { isHidden } from '../../lib/tableLink';
+import type { HideKind } from '../../lib/tableLink';
 import { FoldTitle, useFold } from './Fold';
 
 export function MapControls() {
@@ -52,6 +55,7 @@ export function MapControls() {
                                     </button>
                                 </div>
                             </div>
+                            {e.live && e.fromMaker && <MapObjects entry={e} />}
                         </li>
                     ))}
                 </ul>
@@ -91,6 +95,83 @@ export function MapControls() {
                 picture with the fog drawn in.
             </p>
             </>}
+        </div>
+    );
+}
+
+const KINDS: { kind: HideKind; label: string; icon: string }[] = [
+    { kind: 'stamp', label: 'Landmarks', icon: 'fa-location-dot' },
+    { kind: 'token', label: 'Tokens', icon: 'fa-chess-pawn' },
+    { kind: 'label', label: 'Labels', icon: 'fa-font' },
+];
+
+/* What of a live map players see: its landmarks, tokens and labels, each one
+   or a whole kind kept off their picture. The Map Maker draws that picture,
+   so a change here has it draw the one players already have again — edits
+   not yet synced stay unsent. */
+function MapObjects({ entry }: { entry: MapEntry }) {
+    const { session } = useTable();
+    const [open, setOpen] = useState(false);
+    const hide = entry.hide;
+    const hiddenCount = entry.objects.filter((o) => isHidden(hide, o.kind, o.id)).length;
+
+    return (
+        <div className="map-objects">
+            <button
+                className="map-objects-toggle" aria-expanded={open} data-map-objects=""
+                onClick={() => setOpen((o) => !o)}
+            >
+                <i className={'fa-solid fa-caret-' + (open ? 'down' : 'right')}></i>
+                <i className="fa-solid fa-eye-slash"></i> What players see
+                {hiddenCount > 0 && <span className="map-objects-count">{hiddenCount} hidden</span>}
+            </button>
+            {open && (
+                <div className="map-objects-body">
+                    {KINDS.map(({ kind, label, icon }) => {
+                        const list = entry.objects.filter((o) => o.kind === kind);
+                        const all = hide.kinds.includes(kind);
+                        return (
+                            <div key={kind} className="map-objects-group" data-hide-kind={kind}>
+                                <div className="map-objects-head">
+                                    <span><i className={'fa-solid ' + icon}></i> {label} <span className="muted">({list.length})</span></span>
+                                    <button
+                                        className={all ? 'accent' : ''}
+                                        aria-pressed={all}
+                                        title={all ? 'Players see them again' : 'Keep every one off the players\u2019 picture, ones added later too'}
+                                        onClick={() => session.map.setHidden(entry.key, kind, null, !all)}
+                                    >
+                                        <i className={'fa-solid ' + (all ? 'fa-eye' : 'fa-eye-slash')}></i> {all ? 'Show all' : 'Hide all'}
+                                    </button>
+                                </div>
+                                {list.length > 0 && (
+                                    <ul>
+                                        {list.map((o) => {
+                                            const off = isHidden(hide, kind, o.id);
+                                            return (
+                                                <li key={o.id} className={off ? 'off' : ''}>
+                                                    <button
+                                                        className="map-object" aria-pressed={off} disabled={all}
+                                                        data-hide-object={o.id}
+                                                        onClick={() => session.map.setHidden(entry.key, kind, o.id, !off)}
+                                                    >
+                                                        <i className={'fa-solid ' + (off ? 'fa-eye-slash' : 'fa-eye')}></i>
+                                                        <span className="map-object-name">{o.name}</span>
+                                                        {o.fogged && <span className="muted map-object-fog">under fog</span>}
+                                                    </button>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                )}
+                            </div>
+                        );
+                    })}
+                    <p className="muted">
+                        Hidden ones are left out of the picture players get, at once. Anything under full fog
+                        is left out anyway. The list follows the map as you sync it.
+                    </p>
+                </div>
+            )}
         </div>
     );
 }

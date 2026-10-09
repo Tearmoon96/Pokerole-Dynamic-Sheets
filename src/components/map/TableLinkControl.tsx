@@ -4,6 +4,9 @@ import { useGmConfirm } from '../gm/ConfirmDialog';
 import { keyHint } from '../../map/hotkeys';
 import { MAX_HOLD_MS, MIN_HOLD_MS } from '../../map/tableLive';
 import type { LiveState, TableLiveLink } from '../../map/tableLive';
+import type { HideKind } from '../../lib/tableLink';
+
+const HIDE_NAMES: Record<HideKind, string> = { stamp: 'every landmark', token: 'every token', label: 'every label' };
 
 /* The Map Maker's button for the rolling table, and the bar that says what
    live is doing. Both only appear while a table this browser hosts is open —
@@ -111,6 +114,16 @@ export function TableLinkControl({ link, currentId }: { link: TableLiveLink; cur
                         {s.auto
                             ? 'Your changes go to the table by themselves once the map has been still for the wait below; undo before then and nothing is sent.'
                             : 'Make your changes, then press Sync to send them all at once.'}
+                    </p>
+                )}
+
+                {s.mode !== 'off' && s.hide && (s.hide.kinds.length > 0 || s.hide.ids.length > 0) && (
+                    <p className="map-hint" data-table-hide="">
+                        <i className="fa-solid fa-eye-slash"></i> Kept off the players' picture at the table:{' '}
+                        {[
+                            ...s.hide.kinds.map((k) => HIDE_NAMES[k]),
+                            ...(s.hide.ids.length ? [s.hide.ids.length + (s.hide.ids.length === 1 ? ' object' : ' objects')] : []),
+                        ].join(', ')}. Change it in the table's map list.
                     </p>
                 )}
 
