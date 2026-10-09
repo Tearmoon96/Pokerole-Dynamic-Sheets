@@ -215,9 +215,9 @@ function TrackRow({ t }: { t: GmTrack }) {
                     </button>
                 )}
                 <span className="bar-spacer"></span>
-                <button className="mini-btn" data-assign="bg" title="Mark as the Background track" aria-pressed={decks.bg.track === t.id}
+                <button className="mini-btn" data-assign="bg" title={decks.bg.track === t.id ? 'The Background track. Click to take it off' : 'Mark as the Background track'} aria-pressed={decks.bg.track === t.id}
                     onClick={() => music.assign('bg', t.id)}>BG</button>
-                <button className="mini-btn" data-assign="scene" title="Mark as the Scene track" aria-pressed={decks.scene.track === t.id}
+                <button className="mini-btn" data-assign="scene" title={decks.scene.track === t.id ? 'The Scene track. Click to take it off' : 'Mark as the Scene track'} aria-pressed={decks.scene.track === t.id}
                     onClick={() => music.assign('scene', t.id)}>Scene</button>
                 <button className="icon-btn" aria-label={'Rename ' + t.title} onClick={() => { setTitle(t.title); setEditing(true); }}>
                     <i className="fa-solid fa-pen"></i>

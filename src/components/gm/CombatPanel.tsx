@@ -405,6 +405,17 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
                             </button>
                         </>
                     )}
+                    {/* The same switch as the header's tower, in words: until a
+                        fight is on the table its players cannot roll into it. */}
+                    {table.present && !onTable && (
+                        <button
+                            data-share-table=""
+                            title="Show this fight on the rolling table: the players see the turn order and can roll initiative into it"
+                            onClick={() => store.update((s) => { s.tableCombat = gid; })}
+                        >
+                            <i className="fa-solid fa-tower-broadcast"></i> Show on table
+                        </button>
+                    )}
                 </div>
                 <div id="combat-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                     {!parts.length ? (

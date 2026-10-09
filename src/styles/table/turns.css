@@ -158,6 +158,8 @@
 
 /* ---------------- Into the fight, from the character panel ---------------- */
 
+.combat-entry { display: flex; flex-direction: column; gap: 0.3rem; }
+
 .combat-entry > button { width: 100%; justify-content: center; }
 
 .combat-entry-form {
@@ -181,3 +183,9 @@
 .combat-entry-go { display: flex; justify-content: flex-end; gap: 0.4rem; }
 
 .combat-entry-note { margin: 0; font-size: 0.76rem; }
+
+.combat-entry [data-no-fight] { text-align: center; }
+
+/* The GM's reminder that no fight is shared: one quiet line. */
+.turn-strip-idle { padding: 0.4rem 0.6rem; font-size: 0.8rem; }
+.turn-strip-idle .fa-tower-broadcast { color: var(--accent); }

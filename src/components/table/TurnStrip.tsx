@@ -53,7 +53,20 @@ export function TurnStrip() {
 
     useEffect(() => { if (!mineNow) setDelaying(false); }, [mineNow]);
 
-    if (!turns) return null;
+    if (!turns) {
+        /* The GM screen is there and has no fight on the table: say how to
+           put one on, since the players can roll no initiative until then. */
+        if (!state.isHost || !linked) return null;
+        return (
+            <section className="turn-strip turn-strip-idle" aria-label="Turn order" data-no-fight="">
+                <span className="muted">
+                    <i className="fa-solid fa-khanda"></i> No fight on the table. In the GM screen,
+                    press <i className="fa-solid fa-tower-broadcast" aria-label="Show on the table"></i> on
+                    a fight to show it here and let the players roll initiative.
+                </span>
+            </section>
+        );
+    }
 
     const curIndex = cur ? turns.order.indexOf(cur) : -1;
     /* Where a delay may go: later in this pass, behind somebody still to act. */

@@ -290,7 +290,8 @@ which may hold edits not yet synced.
 browser holds its own copy of each track — files downloaded ahead of time,
 YouTube links in each player's own YouTube player, kept on the page for its
 sound but never shown — and the GM publishes only
-what the two decks (Background and Scene) are doing: track, playing or not,
+what the two decks (Background and Scene) are doing — a track is on one deck
+at most, and its deck button pressed again takes it off: track, playing or not,
 and "`pos` seconds in at table-clock time `ref`". The table clock is the relay's
 ([`clock.ts`](src/table/clock.ts)): every browser pings it NTP-style over its
 socket, and the relay answers the sender alone. Each browser steers its own
@@ -330,7 +331,9 @@ reach the GM screen as cut-down copies ([`slim.ts`](src/table/slim.ts),
 the player's sheet whenever it changes, the GM's edits as values with an id
 the player acknowledges. A player may pass, delay or spend actions only for
 combatants the strip marks as theirs, checked on the host and again in the
-GM screen. The relay is unchanged.
+GM screen. One GM screen tab runs the link, under a Web Lock, and it is the
+tab in use: a tab that becomes visible or takes focus steals the lock. The
+relay is unchanged.
 
 ## Phones and tablets
 

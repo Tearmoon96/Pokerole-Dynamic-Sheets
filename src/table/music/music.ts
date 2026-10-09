@@ -340,7 +340,14 @@ export class MusicController {
             /* Forget decks that point at tracks no longer in the library. */
             const known = (d: ChannelState): ChannelState => (d.track && !this.entries.some((e) => e.id === d.track)
                 ? silentDeck() : { ...silentDeck(), ...d, fade: d.fade ?? null });
-            if (saved) this.view = { ...this.view, rev: saved.rev, decks: { bg: known(saved.bg), scene: known(saved.scene) } };
+            if (saved) {
+                /* One track on both decks, saved before a track could only be
+                   on one: it stays the Background. */
+                const bg = known(saved.bg);
+                const scene = saved.scene.track && saved.scene.track === bg.track
+                    ? { ...silentDeck(), loop: saved.scene.loop, vol: saved.scene.vol } : known(saved.scene);
+                this.view = { ...this.view, rev: saved.rev, decks: { bg, scene } };
+            }
             this.refreshGm();
             if (this.entries.some((e) => e.kind === 'yt')) void loadYouTube().catch(() => {});
             this.beat = window.setInterval(() => { if (this.hasMusic()) this.announceDecks(false); }, HEARTBEAT_MS);
@@ -1036,13 +1043,24 @@ export class MusicController {
         this.reconcileAll();
     }
 
-    /** Marks a track as this deck's: "this is the Background now". */
+    /** Marks a track as this deck's: "this is the Background now". Again on
+        the deck's own track takes it off; a track is on one deck at most, so
+        the other deck lets it go. */
     assign(ch: ChannelId, id: string): void {
         if (!this.host) return;
+        if (this.view.decks[ch].track === id) { this.clearDeck(ch); return; }
+        for (const c of CHANNELS) if (c !== ch && this.view.decks[c].track === id) this.clearDeck(c);
         const wasPlaying = this.view.decks[ch].playing;
         this.setWaiting(ch, false);
         this.setDeck(ch, { track: id, playing: false, pos: 0, ref: 0, fade: null });
         if (wasPlaying) this.play(ch);
+    }
+
+    /** Leaves a deck with no track, keeping its loop and volume. */
+    private clearDeck(ch: ChannelId): void {
+        const st = this.view.decks[ch];
+        this.setWaiting(ch, false);
+        this.setDeck(ch, { ...silentDeck(), loop: st.loop, vol: st.vol });
     }
 
     /** Who cannot play this track yet, and why. Empty means everyone can. */

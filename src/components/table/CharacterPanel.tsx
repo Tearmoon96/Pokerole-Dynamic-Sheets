@@ -233,6 +233,19 @@ function CharacterBody() {
             )}
             {loadNote && <p className="muted">{loadNote}</p>}
 
+            {/* At the top: below a full team it was off the screen. */}
+            <CombatEntry
+                trainerId={trainerId}
+                trainerName={t.name || 'Trainer'}
+                team={team.map((x) => ({
+                    idx: x.idx,
+                    name: monShownName(dexById, x.slot.dexId, x.slot.sheet as never),
+                }))}
+                solo={solo}
+                dexById={dexById}
+                seat={seat}
+            />
+
             <div className="roster-card character-card">
                 <div className="trainer-head" data-tip={TRAINER_TOKEN}>
                     {t.photo
@@ -306,20 +319,6 @@ function CharacterBody() {
                 </div>
             </div>
 
-            {turns && (
-                <CombatEntry
-                    trainerId={trainerId}
-                    trainerName={t.name || 'Trainer'}
-                    team={team.map((x) => ({
-                        idx: x.idx,
-                        name: monShownName(dexById, x.slot.dexId, x.slot.sheet as never),
-                    }))}
-                    solo={solo}
-                    dexById={dexById}
-                    seat={seat}
-                />
-            )}
-
             {tip && tipBody && (
                 <MoveTipShell token={tip} onClose={closeTip}>{tipBody}</MoveTipShell>
             )}
@@ -361,7 +360,8 @@ function CombatEntry({ trainerId, trainerName, team, solo, dexById, seat }: {
         .concat(team.map((m) => ({ token: monToken(m.idx), name: m.name, slot: m.idx })));
     const waiting = rows.filter((r) => !seat(r.token));
     const chosen = waiting.filter((r) => picked[r.token]);
-    const blocked = !state.hostOnline;
+    const noFight = !view.turns;
+    const blocked = !state.hostOnline || noFight;
 
     const roll = () => {
         const used: string[] = [];
@@ -390,10 +390,18 @@ function CombatEntry({ trainerId, trainerName, team, solo, dexById, seat }: {
     return (
         <div className="combat-entry">
             {!open ? (
-                <button className="accent" disabled={blocked} onClick={() => setOpen(true)}
-                    title={blocked ? 'The GM is not connected right now' : 'Choose who goes onto the field'}>
-                    <i className="fa-solid fa-dice-d6"></i> Roll initiative
-                </button>
+                <>
+                    <button className="accent" disabled={blocked} onClick={() => setOpen(true)}
+                        title={!state.hostOnline ? 'The GM is not connected right now'
+                            : noFight ? undefined : 'Choose who goes onto the field'}>
+                        <i className="fa-solid fa-dice-d6"></i> Roll initiative
+                    </button>
+                    {noFight && state.hostOnline && (
+                        <p className="muted combat-entry-note" data-no-fight="">
+                            Opens when the GM puts a fight on the table.
+                        </p>
+                    )}
+                </>
             ) : (
                 <div className="combat-entry-form">
                     <span className="combat-entry-title">

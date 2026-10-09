@@ -35,6 +35,8 @@ export function useTablePresence(): Presence {
 
 /* ------------------------------------------------------------ the link */
 
+const LINK_LOCK = 'pds-combat-link';
+
 export function useCombatLink(store: GmStore, dexById: (id: string) => PokedexEntry | null): void {
     const dexRef = useRef(dexById);
     dexRef.current = dexById;
@@ -42,21 +44,45 @@ export function useCombatLink(store: GmStore, dexById: (id: string) => PokedexEn
     useEffect(() => {
         const run = linkRun(store, dexRef);
         /* One GM screen tab runs the link: two would each apply every pass
-           a player sends. The others wait their turn on the lock. */
-        let stop: (() => void) | null = null;
-        let cancelled = false;
-        const ac = new AbortController();
-        const hold = (): Promise<void> => {
-            if (cancelled) return Promise.resolve();
-            const teardown = run();
-            return new Promise<void>((resolve) => { stop = () => { teardown(); resolve(); }; });
-        };
+           a player sends. It is the tab the GM is USING — focusing one takes
+           the link from the other, which waits its turn — or a second tab
+           opened on purpose would be the one that cannot see the table. */
         const locks = (navigator as Navigator & { locks?: LockManager }).locks;
-        if (locks) locks.request('pds-combat-link', { signal: ac.signal }, hold).catch(() => { /* unmounted */ });
-        else void hold();
+        if (!locks) return run();
+        let alive = true;
+        let stop: (() => void) | null = null;
+        let waiting: AbortController | null = null;
+        let gen = 0;
+        const ask = (steal: boolean): void => {
+            if (!alive || (steal && stop)) return;
+            const my = ++gen;
+            waiting?.abort();
+            const ac = new AbortController();
+            waiting = steal ? null : ac;
+            let mine: (() => void) | null = null;
+            locks.request(LINK_LOCK, steal ? { steal: true } : { signal: ac.signal }, () => {
+                if (!alive) return Promise.resolve();
+                const teardown = run();
+                return new Promise<void>((resolve) => {
+                    mine = () => { teardown(); resolve(); };
+                    stop = mine;
+                });
+            }).catch(() => {
+                /* Taken by another tab, or a wait this tab gave up: stand
+                   down and queue behind whoever has it. */
+                if (mine) { const m: () => void = mine; mine = null; if (stop === m) stop = null; m(); }
+                if (alive && my === gen) ask(false);
+            });
+        };
+        const take = () => { if (document.visibilityState === 'visible') ask(true); };
+        ask(document.visibilityState === 'visible');
+        window.addEventListener('focus', take);
+        document.addEventListener('visibilitychange', take);
         return () => {
-            cancelled = true;
-            ac.abort();
+            alive = false;
+            window.removeEventListener('focus', take);
+            document.removeEventListener('visibilitychange', take);
+            waiting?.abort();
             stop?.();
         };
     }, [store]);
