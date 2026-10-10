@@ -461,7 +461,11 @@ export async function renderMapPng(doc: MapDoc, opts: ExportOptions, load: Image
     }
     const seal = opts.fog && opts.sealFog ? fogSealImage(doc) : null;
     if (seal) {
-        ctx.imageSmoothingEnabled = false;
+        /* Smoothed, like the soft layer: its rim is soft already, and every
+           hidden sample is at 100% with its neighbours near it, so the
+           interpolation cannot thin what must stay covered. */
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(seal, 0, 0, doc.cols * CELL, doc.rows * CELL);
     }
 
