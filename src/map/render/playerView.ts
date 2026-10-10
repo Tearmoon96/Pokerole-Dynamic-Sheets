@@ -13,9 +13,9 @@ import { LANDMARK_BY_SLUG } from '../landmarks';
    never by what is hidden afterwards:
 
    - the fog is always drawn, whatever the editor's "hide the fog" toggle says
-     (that is the GM's view, and this is not);
-   - every sample under full-strength fog is painted back to 100% after the
-     blur (`sealFog`), so nothing shows faintly through the fog's rim;
+     (that is the GM's view, and this is not), and drawn exactly as the Map
+     Maker draws it — soft, so the ground just inside its rim shows faintly,
+     the owner's choice over a sealed but harder edge;
    - a landmark, label or token whose anchor is under full fog is not drawn at
      all. Fog covers the map's own area; a label hidden near the edge can
      stick out past the fog, or past the map into the frame, and would be
@@ -28,16 +28,22 @@ import { LANDMARK_BY_SLUG } from '../landmarks';
    The reveal guard below is the other half: the live link holds an update
    that uncovers a lot at once until the GM says yes. */
 
-/** A shared map is at most this many pixels on a side. */
-export const PLAYER_MAX_SIDE = 4096;
-const MAX_PX_PER_CELL = 48;
+/* How sharp the players' picture is. The Map Maker redraws at the screen's
+   resolution at any zoom; a picture cannot, so it is drawn dense enough to
+   match the editor at about 3x zoom (96 px a cell, three times the editor's
+   own 32): players zooming in on the table see what the GM sees. Measured on
+   a 64x44 map: 1.5 s to draw and ~0.8 MB, against 0.7 s and 0.3 MB at the
+   old 48. Capped by side and by area, so a phone can still hold it. */
+export const PLAYER_MAX_SIDE = 8192;
+const PLAYER_MAX_AREA = 36_000_000;
+const MAX_PX_PER_CELL = 96;
 const MIN_PX_PER_CELL = 4;
 
 export function playerPxPerCell(doc: MapDoc): number {
     let px = Math.max(MIN_PX_PER_CELL, Math.min(MAX_PX_PER_CELL, Math.floor(PLAYER_MAX_SIDE / Math.max(doc.cols, doc.rows))));
     while (px > MIN_PX_PER_CELL) {
         const s = exportSize(doc, px);
-        if (s.ok && s.w <= PLAYER_MAX_SIDE && s.h <= PLAYER_MAX_SIDE) break;
+        if (s.ok && s.w <= PLAYER_MAX_SIDE && s.h <= PLAYER_MAX_SIDE && s.w * s.h <= PLAYER_MAX_AREA) break;
         px--;
     }
     return px;
@@ -101,9 +107,8 @@ export async function renderPlayerView(doc: MapDoc, load: ImageLoader, hide: Pla
         grid: doc.grid.show,
         tokens: true,
         fog: true,
-        sealFog: true,
         type: 'image/webp',
-        quality: 0.86,
+        quality: 0.95,
     }, load);
     return { blob: res.blob, width: res.width, height: res.height };
 }
