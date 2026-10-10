@@ -424,7 +424,12 @@ export async function renderMapPng(doc: MapDoc, opts: ExportOptions, load: Image
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
-    const ctx = canvas.getContext('2d')!;
+    /* `willReadFrequently` puts the canvas in memory rather than on the GPU.
+       A GPU canvas draws the landmarks' icon glyphs, at this size and under
+       this transform, with a hairline along the edges of each glyph's box —
+       a square of thin lines round every landmark in the picture. The file
+       is read back off the canvas anyway, so nothing is lost. */
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
     ctx.fillStyle = style.backdrop;
     ctx.fillRect(0, 0, w, h);
     ctx.setTransform(k, 0, 0, k, m, m);
