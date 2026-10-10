@@ -245,6 +245,15 @@ client can make from the id it was given, with no trust-on-first-use step. A
 player who patches their client to publish a result produces a message every
 other browser drops.
 
+**A table exists when its GM answers.** Since the relay only ever sees an
+address, a wrong id or a wrong password is not refused — it is a different,
+empty room. So a player joining from the form is let in only once a message
+signed by the lobby id's key arrives (it decrypts, so the password is right
+too); after 15 s with none they are turned away and nothing is kept. The saved
+session then records that the GM answered, so a reload rejoins even while the
+GM is away. A GM rejoining is checked against the room address kept beside
+the host key.
+
 Dice come from [`src/gm/dice.ts`](src/gm/dice.ts), unchanged and unforked, so a
 shared table and the solo GM board cannot drift on what a die does. Receivers
 recompute a roll's total and successes from its faces rather than trusting the

@@ -25,7 +25,10 @@ import { deriveRoom, fingerprint, seal, sign, unseal, verify } from './crypto';
 import type { RoomSecrets } from './crypto';
 import { formatLobbyId, fromB64u, generatePassword, normaliseLobbyId, toB64u, utf8 } from './encoding';
 import type { Bytes } from './encoding';
-import { createHostIdentity, loadHostIdentity, memberIdentity } from './identity';
+import {
+    createHostIdentity, forgetMemberIdentity, hasMemberIdentity, hostRoomAddr, loadHostIdentity, memberIdentity,
+    rememberHostRoom,
+} from './identity';
 import type { Identity } from './identity';
 import { HEARTBEAT_MS, LIMITS, PRESENCE_TIMEOUT_MS, PROTOCOL_VERSION, randomId } from './protocol';
 import type { Body, Inner, RollExtras, WireMember, WireRoll } from './protocol';
@@ -93,6 +96,8 @@ export interface TableState {
     pending: PendingRoll[];
     /** False when the GM has gone quiet: the table waits rather than rolls. */
     hostOnline: boolean;
+    /** Joining: connected, and waiting for the GM's page to answer. */
+    joinWait: boolean;
 
     /* Roll controls. */
     count: number;
@@ -128,6 +133,7 @@ function initialState(): TableState {
         rolls: [],
         pending: [],
         hostOnline: false,
+        joinWait: false,
         count: 4,
         sides: 6,
         note: '',
@@ -151,10 +157,18 @@ function initialState(): TableState {
    "Leave table" clears it. */
 const SESSION_KEY = 'pokerole_table_session';
 
+/* How long a player's join waits for the GM's page to answer. The GM answers
+   a hello at once, from its message handler, so this only has to cover the
+   socket opening and a slow phone. */
+const JOIN_WAIT_MS = 15_000;
+
 interface SavedSession {
     lobbyId: string;
     password: string;
     name: string;
+    /** The GM answered on these credentials, so a reload may rejoin without
+        asking again — the GM may well be away when it does. */
+    ok?: boolean;
 }
 
 function saveSession(s: SavedSession): void {
@@ -169,7 +183,7 @@ function loadSession(): SavedSession | null {
         const password = String(raw.password || '');
         const name = cleanText(raw.name, LIMITS.MAX_NAME);
         if (lobbyId.length !== 16 || !password || !name) return null;
-        return { lobbyId, password, name };
+        return { lobbyId, password, name, ok: raw.ok === true };
     } catch {
         return null;
     }
@@ -264,6 +278,10 @@ export class TableSession {
     private heartbeat: number | null = null;
     private hostSeenAt = 0;
 
+    /* A player's join waits here until the lobby's GM answers. */
+    private verifying: { lobbyId: string; password: string; name: string; known: boolean } | null = null;
+    private verifyTimer: number | null = null;
+
     private outbox: Promise<unknown> = Promise.resolve();
     private sendTokens = SEND_BURST;
     private sendTokensAt = 0;
@@ -298,7 +316,7 @@ export class TableSession {
         try {
             const identity = await createHostIdentity();
             const password = generatePassword();
-            await this.begin(identity, identity.id, password, name, true);
+            await this.begin(identity, identity.id, password, name, true, true);
         } catch (e) {
             this.fail('Could not create the lobby: ' + describe(e));
         }
@@ -306,7 +324,7 @@ export class TableSession {
 
     /** Joins an existing lobby — or rejoins one this browser hosts, which is how
         a GM who reloaded gets their authority back without anyone re-pinning. */
-    async joinLobby(rawId: string, password: string, rawName: string): Promise<void> {
+    async joinLobby(rawId: string, password: string, rawName: string, saved: SavedSession | null = null): Promise<void> {
         const lobbyId = normaliseLobbyId(rawId);
         const name = cleanText(rawName, LIMITS.MAX_NAME);
 
@@ -317,8 +335,12 @@ export class TableSession {
         this.store.update((s) => { s.phase = 'joining'; s.error = ''; });
         try {
             const host = await loadHostIdentity(lobbyId);
+            const known = host !== null || await hasMemberIdentity(lobbyId);
             const identity = host ?? await memberIdentity(lobbyId);
-            await this.begin(identity, lobbyId, password, name, host !== null);
+            /* A GM's saved session holds the password the table was made
+               with; a player's is trusted once the GM has answered on it. */
+            const trusted = !!saved && (host !== null || saved.ok === true);
+            await this.begin(identity, lobbyId, password, name, host !== null, trusted, known);
         } catch (e) {
             this.fail('Could not join: ' + describe(e));
         }
@@ -335,18 +357,40 @@ export class TableSession {
             this.store.update((s) => { s.phase = 'setup'; });
             return false;
         }
-        await this.joinLobby(saved.lobbyId, saved.password, saved.name);
+        await this.joinLobby(saved.lobbyId, saved.password, saved.name, saved);
         return true;
     }
 
+    /** `trusted`: the credentials are known good (a table just made, a saved
+        session the GM answered on), so nothing waits for the GM. Otherwise
+        a player is let in only once the lobby's GM answers, and a GM only
+        with the password the table was made with.
+
+        The relay cannot check either: it sees a room address derived from
+        the id and the password together, and any address is a room. A
+        wrong id or a wrong password is simply an EMPTY room, so the only
+        proof a table exists is its GM's signed answer — the GM's key is
+        what the lobby id names, and the room key is what the password makes. */
     private async begin(
         identity: Identity, lobbyId: string, password: string, name: string, isHost: boolean,
+        trusted: boolean, known = true,
     ): Promise<void> {
         /* A rejoin, or StrictMode mounting the effect twice: never leave the
            previous socket and heartbeat running alongside the new ones. */
         this.teardown();
 
-        this.room = await deriveRoom(lobbyId, password);
+        const room = await deriveRoom(lobbyId, password);
+        if (isHost) {
+            const addr = await hostRoomAddr(lobbyId);
+            if (addr && addr !== room.addr) {
+                this.fail('That is not this table\u2019s password.');
+                return;
+            }
+            /* A table made before the address was kept learns it from its
+               saved session, never from a password typed into the form. */
+            if (!addr && trusted) await rememberHostRoom(lobbyId, room.addr);
+        }
+        this.room = room;
         this.identity = identity;
         this.files = new BlobChannel(this.room.key, this.room.addr, isHost ? await hostUploadKey(lobbyId) : null);
         this.sid = randomId(6);
@@ -366,10 +410,17 @@ export class TableSession {
             this.colors.set(identity.id, savedColor());
         }
 
-        saveSession({ lobbyId, password, name });
+        const wait = !isHost && !trusted;
+        if (wait) {
+            this.verifying = { lobbyId, password, name, known };
+            this.verifyTimer = window.setTimeout(() => this.noTable(), JOIN_WAIT_MS);
+        } else {
+            saveSession({ lobbyId, password, name, ok: true });
+        }
 
         this.store.update((s) => {
-            s.phase = 'live';
+            s.phase = wait ? 'joining' : 'live';
+            s.joinWait = wait;
             s.lobbyId = lobbyId;
             s.password = password;
             s.myId = identity.id;
@@ -406,7 +457,37 @@ export class TableSession {
         })();
     }
 
+    /** The lobby's GM answered: the id and the password are right. */
+    private joined(): void {
+        const v = this.verifying;
+        if (!v) return;
+        this.verifying = null;
+        if (this.verifyTimer !== null) { clearTimeout(this.verifyTimer); this.verifyTimer = null; }
+        saveSession({ lobbyId: v.lobbyId, password: v.password, name: v.name, ok: true });
+        this.store.update((s) => { s.phase = 'live'; s.joinWait = false; });
+    }
+
+    /** Nobody answered as the lobby's GM: no such table, a wrong password,
+        or a GM who is not there. Out, and nothing of it is kept. */
+    private noTable(): void {
+        const v = this.verifying;
+        if (!v) return;
+        const reached = this.store.state.status === 'online';
+        this.teardown();
+        clearSession();
+        if (!v.known) void forgetMemberIdentity(v.lobbyId).catch(() => { /* nothing to undo */ });
+        this.store.update((s) => { s.joinWait = false; s.status = 'offline'; });
+        this.fail(reached
+            ? 'No table answered with that lobby id and password. Check both, and that the GM has the table open.'
+            : 'Could not reach the table\u2019s relay. Check your connection and try again.');
+    }
+
     private teardown(): void {
+        this.verifying = null;
+        if (this.verifyTimer !== null) {
+            clearTimeout(this.verifyTimer);
+            this.verifyTimer = null;
+        }
         if (this.heartbeat !== null) {
             clearInterval(this.heartbeat);
             this.heartbeat = null;
@@ -639,6 +720,7 @@ export class TableSession {
         if (inner.f !== this.store.state.lobbyId) return;
 
         this.hostSeenAt = Date.now();
+        if (this.verifying) this.joined();
 
         switch (body.k) {
             case 'roster':

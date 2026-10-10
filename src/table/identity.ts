@@ -19,6 +19,7 @@ import type { Bytes } from './encoding';
 const HOST_PREFIX = 'pokeroleTable:host:';
 const MEMBER_PREFIX = 'pokeroleTable:member:';
 const UPLOAD_PREFIX = 'pokeroleTable:upload:';
+const ROOM_PREFIX = 'pokeroleTable:room:';
 
 export interface Identity {
     id: string;
@@ -80,6 +81,24 @@ export async function memberIdentity(lobbyId: string): Promise<Identity> {
     const identity = await fresh();
     await store(key, identity);
     return identity;
+}
+
+/** Whether this browser already has a key for that lobby — it has been
+    there before, so a GM who is away does not make it a stranger. */
+export async function hasMemberIdentity(lobbyId: string): Promise<boolean> {
+    return (await load(MEMBER_PREFIX + lobbyId)) !== null;
+}
+
+/** The room address the GM's own table lives at, which is the lobby id and
+    the password together. A GM coming back with a mistyped password would
+    otherwise open an empty room of their own that no player can reach. */
+export async function hostRoomAddr(lobbyId: string): Promise<string | null> {
+    const addr = await idbGet<string>(ROOM_PREFIX + lobbyId);
+    return typeof addr === 'string' ? addr : null;
+}
+
+export async function rememberHostRoom(lobbyId: string, addr: string): Promise<void> {
+    await idbSet(ROOM_PREFIX + lobbyId, addr);
 }
 
 /** Leaving a table for good. The host's key is deliberately kept: dropping it

@@ -202,7 +202,9 @@ export function JoinScreen() {
 
                 {busy && (
                     <p className="muted">
-                        Working out the room key — that takes a moment on purpose.
+                        {state.joinWait
+                            ? 'Looking for the table — the GM\u2019s page has to answer.'
+                            : 'Working out the room key — that takes a moment on purpose.'}
                     </p>
                 )}
             </div>
