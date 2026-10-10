@@ -95,11 +95,63 @@
 
 #roll-btn:hover { border-color: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
 
+/* A roll set up from a move panel and waiting: the button glows softly until
+   it is pressed, so it is plain the dice are ready (and still adjustable). */
+#roll-btn.primed {
+    border-color: var(--accent);
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    animation: roll-primed 1.8s ease-in-out infinite;
+}
+
+@keyframes roll-primed {
+    0%, 100% { box-shadow: 0 0 6px 0 var(--accent-glow); }
+    50% { box-shadow: 0 0 14px 2px var(--accent-glow); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #roll-btn.primed { animation: none; box-shadow: 0 0 10px 1px var(--accent-glow); }
+}
+
+/* What is set up, with a way to drop it. */
+.dice-prep {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.3rem 0.45rem;
+    border: 1px dashed var(--accent-border);
+    border-radius: 8px;
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+}
+
+.dice-prep > i { color: var(--accent); }
+
+.dice-prep-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .roll-result {
     border: 1px solid var(--border-color);
     border-radius: 10px;
     background: var(--primary-faint);
     padding: 0.5rem 0.6rem;
+}
+
+/* A roll that has just landed glows for a few seconds, so it is found at a
+   glance — on the GM screen and in the rolling table's feed alike. */
+.roll-result.fresh { animation: roll-fresh 3s ease-out; }
+
+@keyframes roll-fresh {
+    0%, 35% {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px var(--accent), 0 0 16px 2px var(--accent-glow);
+    }
+    100% { box-shadow: 0 0 0 0 transparent; }
 }
 
 .roll-result .roll-label {

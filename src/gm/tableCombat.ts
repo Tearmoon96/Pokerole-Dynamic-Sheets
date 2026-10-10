@@ -53,10 +53,13 @@ export function buildTurns(state: GmState, c: GmCombat, dexById: DexById): WireT
             own: '', ck: '',
             done: c.passed.includes(pid),
             out: !hasActions(p) || !canAct(p),
+            /* Everyone's action count is on the strip: which action the
+               fight is on is no secret at the table. */
+            acted: actedOf(p),
         };
         return pc ? {
             ...base, own: pc.member, ck: pc.key,
-            acted: actedOf(p), eva: !!r.usedEva, clash: !!r.usedClash,
+            eva: !!r.usedEva, clash: !!r.usedClash,
         } : base;
     });
     return {

@@ -59,6 +59,8 @@ export interface WireMember {
     id: string;
     name: string;
     host: boolean;
+    /** Index into PLAYER_COLORS (colors.ts); absent from an older client. */
+    color?: number;
 }
 
 /** A file on the relay's file store (blobs.ts). The receiver checks the
@@ -169,7 +171,7 @@ export interface TrackLoad {
 
 export type Body =
     /** Any member, on connect and every heartbeat. Doubles as presence. */
-    | { k: 'hello'; name: string }
+    | { k: 'hello'; name: string; color?: number }
     /** Host only. Also the liveness signal players watch for. */
     | { k: 'roster'; members: WireMember[] }
     /** Player to host: please roll this. */
@@ -216,7 +218,9 @@ export type Body =
         Evasion or a Clash. */
     | { k: 'turn'; op: TurnOp; id: string; after?: string };
 
-export type TurnOp = 'pass' | 'delay' | 'eva' | 'clash';
+/** `acc`: an attack rolled, which costs nothing here — the GM screen only
+    flags it, as a reminder to count the action. */
+export type TurnOp = 'pass' | 'delay' | 'eva' | 'clash' | 'acc';
 
 export interface Inner {
     v: number;

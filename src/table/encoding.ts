@@ -106,3 +106,9 @@ export function formatLobbyId(id: string): string {
 export function normaliseLobbyId(raw: string): string {
     return raw.toUpperCase().replace(/[^A-Z2-7]/g, '');
 }
+
+/** What the lobby field shows while it is typed or pasted into: the id's own
+    characters, grouped XXXX-XXXX-XXXX-XXXX, whatever separators came with it. */
+export function typedLobbyId(raw: string): string {
+    return formatLobbyId(normaliseLobbyId(raw).slice(0, 16));
+}

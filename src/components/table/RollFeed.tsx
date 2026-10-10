@@ -4,11 +4,24 @@
    roll looks the same whether it came from the solo board or the shared table —
    see src/styles/gm/dice.css, which this page imports rather than copies. */
 
+import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import type { LocalRoll } from '../../table/session';
+import type { WireMember } from '../../table/protocol';
 import { CRIT_MARGIN } from '../../gm/constants';
-import { VERDICTS, accuracyVerdict, painStruck } from '../../gm/dice';
+import { VERDICTS, accuracyVerdict, faceOrder, painStruck } from '../../gm/dice';
+import { colorVars } from '../../table/colors';
 
-export function RollFeed({ rolls, myName }: { rolls: LocalRoll[]; myName: string }) {
+/** How long a roll that just came in stays lit. */
+const FRESH_MS = 3000;
+
+export function RollFeed({ rolls, myName, members, sorted }: {
+    rolls: LocalRoll[];
+    myName: string;
+    members: WireMember[];
+    /** Successes before the other dice (the GM's choice). */
+    sorted: boolean;
+}) {
     if (!rolls.length) {
         return (
             <div className="empty-note">
@@ -19,12 +32,24 @@ export function RollFeed({ rolls, myName }: { rolls: LocalRoll[]; myName: string
 
     return (
         <div className="roll-feed">
-            {rolls.map((r) => <FeedRow key={r.id} roll={r} mine={r.who === myName} />)}
+            {rolls.map((r) => {
+                /* The roller's colour, by name: a roll carries who rolled it as
+                   the name the roster shows. */
+                const by = members.find((m) => m.name === r.who);
+                return <FeedRow key={r.id} roll={r} mine={r.who === myName} color={by ? by.color : undefined} sorted={sorted} />;
+            })}
         </div>
     );
 }
 
-function FeedRow({ roll, mine }: { roll: LocalRoll; mine: boolean }) {
+function FeedRow({ roll, mine, color, sorted }: {
+    roll: LocalRoll;
+    mine: boolean;
+    color: number | undefined;
+    sorted: boolean;
+}) {
+    /* Lit once, as it arrives; a roll from a history sync never is. */
+    const [fresh] = useState(() => !!roll.seenAt && Date.now() - roll.seenAt < FRESH_MS);
     const sides = parseInt(roll.label.split('d')[1], 10);
     const time = new Date(roll.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const struck = painStruck(roll.vals, roll.pain);
@@ -35,7 +60,11 @@ function FeedRow({ roll, mine }: { roll: LocalRoll; mine: boolean }) {
     const label = roll.label + (roll.bonus == null ? '' : (roll.bonus < 0 ? ' − ' : ' + ') + Math.abs(roll.bonus));
 
     return (
-        <div className={'roll-result feed-row' + (mine ? ' mine' : '') + (roll.hidden ? ' hidden-roll' : '')}>
+        <div
+            className={'roll-result feed-row' + (mine ? ' mine' : '') + (roll.hidden ? ' hidden-roll' : '')
+                + (color !== undefined ? ' by-color' : '') + (fresh ? ' fresh' : '')}
+            style={color !== undefined ? colorVars(color) as CSSProperties : undefined}
+        >
             <div className="roll-label">
                 <span className="feed-who">
                     {roll.who}
@@ -52,7 +81,8 @@ function FeedRow({ roll, mine }: { roll: LocalRoll; mine: boolean }) {
             </div>
 
             <div className="die-faces">
-                {roll.vals.map((val, i) => {
+                {faceOrder(roll.vals, roll.succ != null, sorted).map((i) => {
+                    const val = roll.vals[i];
                     const cls = roll.succ != null && val >= 4 ? 'success'
                         : val === sides ? 'max' : val === 1 ? 'one' : '';
                     const out = struck.has(i) ? ' struck' : '';

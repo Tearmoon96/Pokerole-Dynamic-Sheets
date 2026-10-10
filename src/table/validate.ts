@@ -12,6 +12,7 @@
 
 import { LIMITS } from './protocol';
 import { UNSAFE_TEXT } from './text';
+import { MAX_COLOR } from './colors';
 import { IMAGE_RE, isCharKey, parseSlimMon, parseSlimTrainer, parseStatus } from './slim';
 import type { CharKey } from './slim';
 import type {
@@ -158,11 +159,13 @@ export function parseRoll(raw: unknown): WireRoll | null {
 
 function parseMember(raw: unknown): WireMember | null {
     if (!isRecord(raw)) return null;
-    if (!exactly(raw, ['id', 'name', 'host'])) return null;
+    if (!exactly(raw, ['id', 'name', 'host', 'color'])) return null;
     const id = fingerprintText(raw.id);
     const name = cleanText(raw.name, LIMITS.MAX_NAME);
     if (!id || !name || typeof raw.host !== 'boolean') return null;
-    return { id, name, host: raw.host };
+    if (raw.color === undefined) return { id, name, host: raw.host };
+    const color = int(raw.color, 0, MAX_COLOR);
+    return color === null ? null : { id, name, host: raw.host, color };
 }
 
 export function parseFile(raw: unknown): WireFile | null {
@@ -243,14 +246,15 @@ function parseTurnEntry(raw: unknown): WireTurnEntry | null {
     if (typeof raw.img !== 'string' || (raw.img !== '' && !IMAGE_RE.test(raw.img))) return null;
     if (typeof raw.done !== 'boolean' || typeof raw.out !== 'boolean') return null;
     const entry: WireTurnEntry = { id, name, img: raw.img, own: '', ck: '', done: raw.done, out: raw.out };
+    const acted = raw.acted === undefined ? undefined : int(raw.acted, 0, 5);
+    if (acted === null) return null;
     if (raw.own === '') {
-        /* The GM's own combatants carry nothing more. */
-        if (raw.ck !== '' || raw.acted !== undefined || raw.eva !== undefined || raw.clash !== undefined) return null;
-        return entry;
+        /* The GM's own combatants carry their action count and nothing more. */
+        if (raw.ck !== '' || raw.eva !== undefined || raw.clash !== undefined) return null;
+        return acted === undefined ? entry : { ...entry, acted };
     }
     const own = fingerprintText(raw.own);
-    const acted = int(raw.acted, 0, 5);
-    if (!own || !isCharKey(raw.ck) || acted === null) return null;
+    if (!own || !isCharKey(raw.ck) || acted === undefined) return null;
     if (typeof raw.eva !== 'boolean' || typeof raw.clash !== 'boolean') return null;
     return { ...entry, own, ck: raw.ck, acted, eva: raw.eva, clash: raw.clash };
 }
@@ -300,9 +304,12 @@ export function parseBody(raw: unknown): Body | null {
 
     switch (raw.k) {
         case 'hello': {
-            if (!exactly(raw, ['k', 'name'])) return null;
+            if (!exactly(raw, ['k', 'name', 'color'])) return null;
             const name = cleanText(raw.name, LIMITS.MAX_NAME);
-            return name ? { k: 'hello', name } : null;
+            if (!name) return null;
+            if (raw.color === undefined) return { k: 'hello', name };
+            const color = int(raw.color, 0, MAX_COLOR);
+            return color === null ? null : { k: 'hello', name, color };
         }
         case 'roster': {
             if (!exactly(raw, ['k', 'members'])) return null;
@@ -469,7 +476,7 @@ export function parseBody(raw: unknown): Body | null {
         case 'turn': {
             if (!exactly(raw, ['k', 'op', 'id', 'after'])) return null;
             const id = idText(raw.id);
-            if (!id || !(raw.op === 'pass' || raw.op === 'delay' || raw.op === 'eva' || raw.op === 'clash')) return null;
+            if (!id || !(raw.op === 'pass' || raw.op === 'delay' || raw.op === 'eva' || raw.op === 'clash' || raw.op === 'acc')) return null;
             if (raw.after !== undefined && (raw.op !== 'delay' || !idText(raw.after))) return null;
             return { k: 'turn', op: raw.op, id, ...(raw.after !== undefined ? { after: raw.after as string } : {}) };
         }

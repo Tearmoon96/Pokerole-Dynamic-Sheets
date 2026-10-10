@@ -128,13 +128,23 @@
 .turn-pips { display: flex; gap: 2px; }
 
 .turn-pip {
-    width: 6px;
-    height: 6px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     border: 1px solid var(--pc-border);
 }
 
 .turn-pip.used { background: var(--pc-color); border-color: var(--pc-color); }
+
+/* Everyone's actions are on show: the GM's side in the neutral grey. */
+.turn-entry.foe .turn-pip { border-color: var(--ghost-color); }
+.turn-entry.foe .turn-pip.used { background: var(--ghost-color); border-color: var(--ghost-color); }
+
+/* A player's character in the colour that player chose (colors.ts). */
+.turn-entry.by-color .turn-face { border-color: var(--who); }
+.turn-entry.by-color .turn-pip { border-color: var(--who-border); }
+.turn-entry.by-color .turn-pip.used { background: var(--who); border-color: var(--who); }
+.turn-entry.mine.by-color .turn-name { color: var(--who); }
 
 .turn-empty, .turn-wait { margin: 0; font-size: 0.74rem; }
 

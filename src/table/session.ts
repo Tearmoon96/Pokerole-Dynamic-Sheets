@@ -18,6 +18,7 @@
      - The store follows the same pattern as the GM screen's: a mutable state
        object plus a version counter, read through useSyncExternalStore. */
 
+import { savedColor } from './colors';
 import { CRIT_MARGIN } from '../gm/constants';
 import { roll } from '../gm/dice';
 import { deriveRoom, fingerprint, seal, sign, unseal, verify } from './crypto';
@@ -47,6 +48,9 @@ import { cleanText, parseInner, parseSigned, safeParse } from './validate';
     there is nothing for a patched client elsewhere to reveal. */
 export interface LocalRoll extends WireRoll {
     hidden?: boolean;
+    /** When this browser got it live (not from a history sync): the feed
+        lights a fresh roll up for a moment. Local time, never sent. */
+    seenAt?: number;
 }
 
 export interface PendingRoll {
@@ -56,6 +60,17 @@ export interface PendingRoll {
 }
 
 export type Phase = 'setup' | 'joining' | 'live';
+
+/** A roll set up from a character sheet and waiting for the Roll button. The
+    player may still change the dice (or the bonus) for a modifier first. */
+export interface PreparedRoll {
+    extras: RollExtras;
+    /** Reported to the GM screen's tracker when it is rolled: an attack, or
+        an Evasion or Clash, which also spends an action. */
+    quick: { op: 'acc' | 'eva' | 'clash'; id: string } | null;
+    /** Initiative into the fight on the table: the GM rolls 1d6 + the bonus. */
+    enter: { trainerId: string; key: CharKey; slot: number | null } | null;
+}
 
 export interface TableState {
     phase: Phase;
@@ -83,12 +98,16 @@ export interface TableState {
     count: number;
     sides: number;
     note: string;
+    prep: PreparedRoll | null;
 
     /* Host-only controls. Meaningless for a player and never sent. */
     hideMyRolls: boolean;
     scripted: boolean;
     scriptSuccesses: number;
     scriptTotal: number;
+    /** The GM's feed shows a pool's successes before its other dice, as the
+        GM screen's Dice panel can. Display only, this browser only. */
+    successesFirst: boolean;
 }
 
 function initialState(): TableState {
@@ -115,8 +134,10 @@ function initialState(): TableState {
         /* GMs hide their rolls far more often than not, so that is the state the
            checkbox starts in. Making it opt-in would mean the first roll of
            every session leaks by accident. */
+        prep: null,
         hideMyRolls: true,
         scripted: false,
+        successesFirst: readFlag(SORT_KEY),
         scriptSuccesses: 2,
         scriptTotal: 10,
     };
@@ -224,6 +245,8 @@ export class TableSession {
 
     /* Host-side bookkeeping. Empty on a player. */
     private names = new Map<string, string>();
+    /** member -> their colour (colors.ts), as their hello said. */
+    private colors = new Map<string, number>();
     private lastSeenAt = new Map<string, number>();
     /* memberId -> the page-load id we last sent history to. Keyed by session
        rather than by member so a player who reloads gets the feed back, while
@@ -337,7 +360,11 @@ export class TableSession {
         this.greeted.clear();
         this.handledRids.clear();
         this.buckets.clear();
-        if (isHost) this.names.set(identity.id, name);
+        this.colors.clear();
+        if (isHost) {
+            this.names.set(identity.id, name);
+            this.colors.set(identity.id, savedColor());
+        }
 
         saveSession({ lobbyId, password, name });
 
@@ -488,7 +515,7 @@ export class TableSession {
     }
 
     private announce(): Promise<boolean> {
-        return this.publish({ k: 'hello', name: this.store.state.myName });
+        return this.publish({ k: 'hello', name: this.store.state.myName, color: savedColor() });
     }
 
     private flushQueue(): void {
@@ -594,7 +621,7 @@ export class TableSession {
             /* The host acts only on what a player is allowed to say. Anything
                claiming authority is ignored outright: there is only one host,
                and this is it. */
-            if (body.k === 'hello') this.onHello(inner.f, body.name, inner.sid);
+            if (body.k === 'hello') this.onHello(inner.f, body.name, inner.sid, body.color);
             else if (body.k === 'request') this.onRequest(inner.f, body);
             else if (body.k === 'pc' && this.names.has(inner.f)) this.combat.onPc(inner.f, this.names.get(inner.f)!, body);
             else if (body.k === 'enter') this.onEnter(inner.f, body);
@@ -624,7 +651,7 @@ export class TableSession {
             case 'result':
                 this.store.update((s) => {
                     if (s.rolls.some((r) => r.id === body.roll.id)) return;
-                    s.rolls = [body.roll, ...s.rolls].slice(0, LIMITS.HISTORY);
+                    s.rolls = [{ ...body.roll, seenAt: Date.now() }, ...s.rolls].slice(0, LIMITS.HISTORY);
                     if (body.rid) s.pending = s.pending.filter((p) => p.rid !== body.rid);
                     s.hostOnline = true;
                 });
@@ -683,9 +710,11 @@ export class TableSession {
 
     /* -------------------------------------------------------- host duties */
 
-    private onHello(id: string, name: string, sid: string): void {
+    private onHello(id: string, name: string, sid: string, color: number | undefined): void {
         this.lastSeenAt.set(id, Date.now());
         this.names.set(id, name);
+        if (color === undefined) this.colors.delete(id);
+        else this.colors.set(id, color);
 
         /* Answered every time, not only on a change. A player who reconnects is
            already known to us, and waiting for the next heartbeat to tell them
@@ -796,9 +825,10 @@ export class TableSession {
 
     private publishRoster(): Promise<boolean> {
         const me = this.store.state.myId;
-        const members: WireMember[] = [...this.names].map(([id, name]) => ({
-            id, name, host: id === me,
-        }));
+        const members: WireMember[] = [...this.names].map(([id, name]) => {
+            const color = this.colors.get(id);
+            return color === undefined ? { id, name, host: id === me } : { id, name, host: id === me, color };
+        });
         this.store.update((s) => { s.members = members; });
         return this.publish({ k: 'roster', members });
     }
@@ -841,7 +871,7 @@ export class TableSession {
         };
 
         this.store.update((s) => {
-            s.rolls = [{ ...entry, hidden }, ...s.rolls].slice(0, LIMITS.HISTORY);
+            s.rolls = [{ ...entry, hidden, seenAt: Date.now() }, ...s.rolls].slice(0, LIMITS.HISTORY);
         });
 
         /* A hidden roll is not published at all, rather than published with a
@@ -860,6 +890,22 @@ export class TableSession {
         const count = clamp(s.count, LIMITS.MIN_COUNT, LIMITS.MAX_COUNT);
         const sides = clamp(s.sides, LIMITS.MIN_SIDES, LIMITS.MAX_SIDES);
         const note = cleanText(s.note, LIMITS.MAX_NOTE) || undefined;
+
+        const prep = s.prep;
+        if (prep && !s.isHost) {
+            this.store.update((st) => { st.prep = null; });
+            if (prep.enter) {
+                const e = prep.enter;
+                this.enterCombat(e.trainerId, [{ key: e.key, bonus: prep.extras.bonus ?? 0, slot: e.slot }]);
+                return;
+            }
+            /* Pain and a target number are about successes, which only d6 have. */
+            const extras: RollExtras = sides === 6 ? prep.extras
+                : prep.extras.bonus !== undefined ? { bonus: prep.extras.bonus } : {};
+            this.rollFor(count, sides, note || '', extras);
+            if (prep.quick) this.combat.act(prep.quick.op, prep.quick.id);
+            return;
+        }
 
         if (s.isHost) {
             this.execute(count, sides, s.myName, note, undefined, s.hideMyRolls, s.scripted);
@@ -899,6 +945,17 @@ export class TableSession {
         });
         void this.publish(body).then((sent) => {
             if (!sent) this.queue.push(body);
+        });
+    }
+
+    /** Sets a roll up from a character sheet: the dice, what it is for, and
+        what goes with it. Nothing is sent until Roll. */
+    prepare(count: number, sides: number, note: string, prep: PreparedRoll): void {
+        this.store.update((s) => {
+            s.count = clamp(count, LIMITS.MIN_COUNT, LIMITS.MAX_COUNT);
+            s.sides = clamp(sides, LIMITS.MIN_SIDES, LIMITS.MAX_SIDES);
+            s.note = cleanText(note, LIMITS.MAX_NOTE);
+            s.prep = prep;
         });
     }
 
@@ -969,6 +1026,17 @@ function clamp(v: number, min: number, max: number): number {
 }
 
 /** Drops the host-only fields before a roll goes on the wire. */
+const SORT_KEY = 'pokerole_table_sorted';
+
+function readFlag(key: string): boolean {
+    try { return localStorage.getItem(key) === '1'; } catch { return false; }
+}
+
+/** Successes first in the feed — the GM's own preference, kept in this browser. */
+export function saveSuccessesFirst(on: boolean): void {
+    try { localStorage.setItem(SORT_KEY, on ? '1' : '0'); } catch { /* private mode */ }
+}
+
 function stripLocal(r: LocalRoll): WireRoll {
     return {
         id: r.id, label: r.label, vals: r.vals, total: r.total,

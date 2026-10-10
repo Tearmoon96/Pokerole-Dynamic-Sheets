@@ -9,6 +9,7 @@ import type { PokedexEntry } from '../data/types';
 import type { GmStore } from './store';
 import { buildTurns, canActIn, enterFight, ownedBy, tableCombatOf } from './tableCombat';
 import { onPcEdit } from './tablePcs';
+import { addPing } from './rollPings';
 import { delayTurn, passTurn, spendQuick } from './turns';
 import type { GmCombat, GmState } from './types';
 
@@ -138,6 +139,17 @@ function linkRun(store: GmStore, dexRef: { current: (id: string) => PokedexEntry
                     lastBeat = Date.now();
                     setPresence({ present: true, table: m.table, members: m.members });
                     if (fresh) sendTurns(true);
+                    /* A player who came back in another colour. */
+                    if (m.members.some((x) => x.color !== undefined && store.state.tablePcs[x.id]
+                        && store.state.tablePcs[x.id].color !== x.color)) {
+                        store.update((s) => {
+                            const pcs = { ...s.tablePcs };
+                            for (const x of m.members) {
+                                if (x.color !== undefined && pcs[x.id]) pcs[x.id] = { ...pcs[x.id], color: x.color };
+                            }
+                            s.tablePcs = pcs;
+                        });
+                    }
                     break;
                 }
                 case 'bye':
@@ -149,18 +161,25 @@ function linkRun(store: GmStore, dexRef: { current: (id: string) => PokedexEntry
                 case 'pc':
                     store.update((s) => {
                         const was = s.tablePcs[m.member] || { player: m.player, trainer: null, mons: {} };
-                        s.tablePcs = {
-                            ...s.tablePcs,
-                            [m.member]: m.key === 't'
-                                ? { ...was, player: m.player, trainer: m.trainer! }
-                                : { ...was, player: m.player, mons: { ...was.mons, [m.key]: m.mon! } },
-                        };
+                        /* Their colour, as the table's roster has it. */
+                        const color = presence.members.find((x) => x.id === m.member)?.color ?? was.color;
+                        const next = m.key === 't'
+                            ? { ...was, player: m.player, trainer: m.trainer! }
+                            : { ...was, player: m.player, mons: { ...was.mons, [m.key]: m.mon! } };
+                        s.tablePcs = { ...s.tablePcs, [m.member]: color === undefined ? next : { ...next, color } };
                     });
                     break;
                 case 'enter':
                     onTable((c, s) => enterFight(s, c, dexById, m.member, m.chars));
                     break;
-                case 'act':
+                case 'act': {
+                    /* An attack, an Evasion or a Clash: a light on the row, so
+                       the GM remembers the action. An attack changes nothing
+                       else. */
+                    const fight = tableCombatOf(store.state);
+                    if ((m.op === 'acc' || m.op === 'eva' || m.op === 'clash')
+                        && fight && ownedBy(fight, m.member, m.pid)) addPing(m.pid, m.op);
+                    if (m.op === 'acc') break;
                     onTable((c, s) => {
                         if (!ownedBy(c, m.member, m.pid)) return c;
                         const canAct = canActIn(s, dexById);
@@ -169,6 +188,7 @@ function linkRun(store: GmStore, dexRef: { current: (id: string) => PokedexEntry
                         return m.op === 'pass' ? passTurn(c, canAct) : delayTurn(c, m.after, canAct);
                     });
                     break;
+                }
                 case 'next':
                     onTable((c, s) => passTurn(c, canActIn(s, dexById)));
                     break;

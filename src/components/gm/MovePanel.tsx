@@ -1,7 +1,5 @@
 import { useGm } from '../../gm/GmContext';
 import { useAppData } from '../../data/AppDataContext';
-import { CRIT_MARGIN } from '../../gm/constants';
-import { HISTORY_LIMIT, roll } from '../../gm/dice';
 import type { RollMeta } from '../../gm/dice';
 import { painFromHp, painPenalty } from '../../gm/moves';
 import { resolvePoolValue } from '../../gm/pools';
@@ -63,13 +61,14 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
         return null;
     })();
 
+    /* Sets the roll up in the Dice panel rather than throwing it: the GM may
+       still add or take away dice for a modifier, and then presses Roll. An
+       empty pool is not a roll of one die — the same rule the ailment rolls
+       follow. */
     const doRoll = (dice: number, meta: RollMeta) => {
-        /* An empty pool is not a roll of one die — the same rule the ailment
-           rolls follow. */
         if (!(dice > 0)) return;
         store.update((s) => {
-            const entry = roll(dice, 6, meta, CRIT_MARGIN);
-            s.dice = { ...s.dice, count: dice, sides: 6, history: [entry, ...s.dice.history].slice(0, HISTORY_LIMIT) };
+            s.dice = { ...s.dice, count: dice, sides: 6, prep: { ...meta } };
         });
     };
 

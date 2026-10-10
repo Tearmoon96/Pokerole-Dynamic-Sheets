@@ -22,6 +22,8 @@ import { canActIn } from '../../gm/tableCombat';
 import { parsePcToken, pruneTablePcs } from '../../gm/tablePcs';
 import { passTurn, pidOf, roundTurns, settleTurn, startTurns, stopTurns } from '../../gm/turns';
 import { useTablePresence } from '../../gm/useCombatLink';
+import { clearPing, usePings } from '../../gm/rollPings';
+import { pcColorVars } from '../../table/colors';
 import type { GmCombat, GmCombatant, GmState } from '../../gm/types';
 import type { PokedexEntry } from '../../data/types';
 
@@ -564,11 +566,16 @@ function CombatRow({ p, moved, current, idx, total, round, token, dexById, onPip
        places is never mistaken for one. */
     const pc = parsePcToken(String(rec.src || ''));
     const pcPlayer = pc ? (state.tablePcs[pc.member]?.player || 'Player') : '';
+    /* In the colour that player chose at the table. */
+    const pcStyle = pc ? pcColorVars(state.tablePcs[pc.member]?.color) as React.CSSProperties | undefined : undefined;
+    const pid = String(rec.pid || '');
+    const pings = usePings(pid);
 
     return (
         <div
             className={'combat-row ' + (acted >= MAX_ACTIONS ? 'spent' : '') + (moved ? ' just-moved' : '')
                 + (current ? ' c-turn' : '') + (pcPlayer ? ' c-pc' : '')}
+            style={pcStyle}
             data-tip={rec.kind !== 'trainer' && ref ? token : undefined}
         >
             {dexId
@@ -631,7 +638,13 @@ function CombatRow({ p, moved, current, idx, total, round, token, dexById, onPip
                             onCycle={(key, e) => cycleStatus(token, key, e)}
                         />
                     )}
-                    <div className="pips">
+                    {/* Lit when the player rolled an attack, an Evasion or a
+                        Clash for this one: count the action. Hover puts it out. */}
+                    <div
+                        className={'pips' + (pings.includes('row') ? ' pinged' : '')}
+                        data-ping={pings.includes('row') ? '' : undefined}
+                        onMouseEnter={() => clearPing(pid, 'row')}
+                    >
                         {Array.from({ length: MAX_ACTIONS }, (_, i) => (
                             <span
                                 key={i}
@@ -648,12 +661,15 @@ function CombatRow({ p, moved, current, idx, total, round, token, dexById, onPip
                     <div className="c-used">
                         {USED_MARKS.map((m) => {
                             const on = !!p[m.key];
+                            const kind = m.key === 'usedEva' ? 'eva' : 'clash';
+                            const lit = pings.includes(kind);
                             return (
                                 <button
                                     key={m.key}
-                                    className={'used-mark' + (on ? ' on' : '')}
+                                    className={'used-mark' + (on ? ' on' : '') + (lit ? ' pinged' : '')}
                                     aria-pressed={on}
                                     title={on ? 'Used this Round' : m.tip}
+                                    onMouseEnter={() => clearPing(pid, kind)}
                                     onClick={() => onUsed(m.key)}
                                 >
                                     <i className={'fa-solid ' + m.icon}></i>{m.label}

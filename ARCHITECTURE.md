@@ -332,8 +332,13 @@ the player's sheet whenever it changes, the GM's edits as values with an id
 the player acknowledges. A player may pass, delay or spend actions only for
 combatants the strip marks as theirs, checked on the host and again in the
 GM screen. One GM screen tab runs the link, under a Web Lock, and it is the
-tab in use: a tab that becomes visible or takes focus steals the lock. The
-relay is unchanged.
+tab in use: a tab that becomes visible or takes focus steals the lock. Each
+person picks a colour on joining ([`colors.ts`](src/table/colors.ts)) that
+their name, rolls, strip portraits and GM-screen copies wear. Rolls from a
+sheet are set up in the dice controls and thrown by Roll, on both pages, so a
+modifier can still change the dice; a player's attack, Evasion or Clash in
+the fight lights the GM's combat row ([`rollPings.ts`](src/gm/rollPings.ts)).
+The relay is unchanged.
 
 ## Phones and tablets
 

@@ -16,14 +16,22 @@ const CAT_COLORS: Record<string, string> = {
     Physical: '#f97316', Special: '#3b82f6', Support: '#10b981',
 };
 
-/** `quick` names a once-a-Round roll — an Evasion or a Clash — which in a
-    fight with turns costs its roller an action. */
-export type DoRoll = (dice: number, meta: RollMeta, quick?: 'eva' | 'clash') => void;
+/** `quick` says what kind of roll it is, where that matters: an Evasion or a
+    Clash (once a Round, and an action in a fight with turns), an attack's
+    accuracy (the GM screen flags the action), or the initiative (which the
+    rolling table turns into a way into the fight). */
+export type RollKind = 'eva' | 'clash' | 'acc' | 'init';
+export type DoRoll = (dice: number, meta: RollMeta, quick?: RollKind) => void;
 
 /** Which quick chips are spent for the round, and so drawn without a button:
     Clash and Evasion are once per Round each. Absent on the GM screen, where the
     combat row carries those marks and the GM rolls whatever they like. */
-export interface QuickSpent { eva?: boolean; clash?: boolean }
+export interface QuickSpent {
+    eva?: boolean;
+    clash?: boolean;
+    /** Already in the fight: no second initiative. */
+    init?: boolean;
+}
 
 /* Initiative, evasion and the two clashes: the pools that belong to the
    CHARACTER rather than to a move, which is why a trainer has them just as a
@@ -40,7 +48,7 @@ export function QuickRolls({ who, value, pain, doRoll, spent, noInit }: {
     pain: number;
     doRoll: DoRoll;
     spent?: QuickSpent;
-    /** The table rolls initiative from its own Enter-combat dialog. */
+    /** The table's trainer rolls initiative from the panel's own button. */
     noInit?: boolean;
 }) {
     const clash = value('Clash');
@@ -74,16 +82,20 @@ export function QuickRolls({ who, value, pain, doRoll, spent, noInit }: {
 
     return (
         <>
-            {!noInit && (
+            {!noInit && (spent?.init ? (
+                <span key="init" className="tip-used" title="Already in the fight">
+                    INIT <strong>1d6+{initBonus}</strong>
+                </span>
+            ) : (
                 <button
                     key="init"
                     className="tip-roll"
                     title="Dexterity + Alert"
-                    onClick={() => doRoll(1, { who, what: 'Initiative', bonus: initBonus })}
+                    onClick={() => doRoll(1, { who, what: 'Initiative', bonus: initBonus }, 'init')}
                 >
                     INIT <strong>1d6+{initBonus}</strong>
                 </button>
-            )}
+            ))}
             {chip('eva', 'EVA', value('Dexterity') + value('Evasion'),
                 'Dexterity + Evasion', 'Evasion', !!spent?.eva, 'eva')}
             {chip('clash-s', 'CLASH-S', value('Strength') + clash,
@@ -159,13 +171,14 @@ export function MoveTipShell({ token, onClose, children }: {
 
     /* Escape closes it, the same key that dismisses the confirm dialog; so does
        clicking away. Its own button is exempt, or the toggle would close and
-       reopen on the same click. */
+       reopen on the same click — and so are the dice controls, where a roll it
+       set up is adjusted and thrown with the panel still open for the next. */
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         const onClick = (e: MouseEvent) => {
             const el = e.target as HTMLElement;
             if (!el.closest) return;
-            if (el.closest('#mon-tooltip') || el.closest('.tip-btn')) return;
+            if (el.closest('#mon-tooltip') || el.closest('.tip-btn') || el.closest('[data-keeps-tip]')) return;
             onClose();
         };
         document.addEventListener('keydown', onKey);
@@ -301,7 +314,7 @@ export function MonTipBody({ token, dex, sheet, who, owner, value, pain, act, do
                                         dmg: (totals.powN ?? 0) > 0
                                             ? { token, mi, dice: totals.powN!, what: move.Name + ' damage' }
                                             : null,
-                                    })}
+                                    }, 'acc')}
                                 >
                                     ACC <strong>{accText}</strong>
                                 </button>

@@ -12,6 +12,8 @@ import { useTable } from '../../table/TableContext';
 import { FallbackImage } from '../common/FallbackImage';
 import { tileSpriteChain } from '../../lib/sprites';
 import type { WireTurnEntry } from '../../table/protocol';
+import { colorVars } from '../../table/colors';
+import type { CSSProperties } from 'react';
 
 const MAX_ACTIONS = 5;
 
@@ -130,17 +132,24 @@ export function TurnStrip() {
             <div className="turn-rail" ref={rail}>
                 {turns.order.map((e) => {
                     const mine = !!e.own && e.own === state.myId;
+                    /* A player's character wears that player's colour. */
+                    const owner = e.own ? state.members.find((m) => m.id === e.own) : null;
+                    const colored = !!owner && owner.color !== undefined;
                     const cls = 'turn-entry'
                         + (e.id === turns.cur ? ' now' : '')
                         + (e.done ? ' done' : '')
                         + (e.out ? ' out' : '')
                         + (e.own ? ' ally' : ' foe')
-                        + (mine ? ' mine' : '');
+                        + (mine ? ' mine' : '')
+                        + (colored ? ' by-color' : '');
                     return (
-                        <div key={e.id} className={cls} aria-current={e.id === turns.cur ? 'step' : undefined}>
+                        <div
+                            key={e.id} className={cls} aria-current={e.id === turns.cur ? 'step' : undefined}
+                            style={colored ? colorVars(owner!.color) as CSSProperties : undefined}
+                        >
                             <div className="turn-face"><Face e={e} /></div>
                             <span className="turn-name">{e.name}</span>
-                            {mine && e.acted !== undefined && (
+                            {e.acted !== undefined && (
                                 <span className="turn-pips" aria-label={e.acted + ' of ' + MAX_ACTIONS + ' actions used'}>
                                     {Array.from({ length: MAX_ACTIONS }, (_, i) => (
                                         <span key={i} className={'turn-pip' + (i < e.acted! ? ' used' : '')}></span>

@@ -20,8 +20,7 @@ import { StatusChips } from '../gm/StatusChips';
 import { MonTipBody, MoveTipShell, TrainerTipBody, useTipButtonState } from '../gm/MoveTip';
 import type { DoRoll, QuickSpent } from '../gm/MoveTip';
 import { normalizeStatus } from '../../gm/ailments';
-import { adjustPool, cycleStatus, entityPool, entityRef, monShownName } from '../../gm/entities';
-import type { GmState } from '../../gm/types';
+import { adjustPool, cycleStatus, entityPool, entityRef } from '../../gm/entities';
 import type { CharKey } from '../../table/slim';
 import { painFromHp, painPenalty } from '../../gm/moves';
 import { resolvePoolValue, trainerPoolMax } from '../../gm/pools';
@@ -167,19 +166,51 @@ function CharacterBody() {
         return { id: e.id, act: Math.max(1, acted), spent: { eva: !!e.eva || acted >= 5, clash: !!e.clash || acted >= 5 } };
     };
 
-    /* A roll from a sheet: the GM rolls it and the feed says whose and what
-       for. In the fight, an Evasion or a Clash also spends an action. */
+    /* Another trainer of this browser's already holds the seats in the fight. */
+    const boundElsewhere = !!session.combat.view.trainerId && session.combat.view.trainerId !== trainerId
+        && session.combat.mine().size > 0;
+
+    /* An initiative, set up: into the fight on the table when there is one
+       and this character is not in it yet, an ordinary 1d6 + bonus otherwise. */
+    const prepInit = (token: string, bonus: number, who: string) => {
+        const note = who + ' · Initiative';
+        if (turns && !seat(token)) {
+            if (boundElsewhere) {
+                session.notify('Another of your trainers is in this fight. Switch back to them to roll.');
+                return;
+            }
+            const slot = token === TRAINER_TOKEN ? null : +token.split(':')[2];
+            const key: CharKey = slot === null ? 't'
+                : session.combat.keyFor(trainerId, token) ?? session.combat.newKeyFor(trainerId, slot);
+            session.prepare(1, 6, note, { extras: { bonus }, quick: null, enter: { trainerId, key, slot } });
+            return;
+        }
+        session.prepare(1, 6, note, { extras: { bonus }, quick: null, enter: null });
+    };
+
+    /* A roll from a sheet is SET UP in the dice controls, not sent: the player
+       may still add or take away dice for a modifier, then presses Roll. The
+       GM rolls it and the feed says whose and what for. In the fight, an
+       Evasion or a Clash also spends an action, and an attack is flagged to
+       the GM screen so the action gets counted. */
     const rollFrom = (token: string): DoRoll => (dice, meta, quick) => {
         if (!(dice > 0)) return;
+        if (quick === 'init') { prepInit(token, meta.bonus ?? 0, meta.who || ''); return; }
         const note = [meta.who, meta.what].filter(Boolean).join(' · ');
-        session.rollFor(dice, 6, note, {
-            bonus: meta.bonus ?? undefined,
-            pain: meta.pain || undefined,
-            need: meta.need ?? undefined,
-        });
         const s = seat(token);
-        if (quick && s) session.combat.act(quick, s.id);
+        session.prepare(dice, 6, note, {
+            extras: {
+                ...(meta.bonus != null ? { bonus: meta.bonus } : {}),
+                ...(meta.pain ? { pain: meta.pain } : {}),
+                ...(meta.need != null ? { need: meta.need } : {}),
+            },
+            quick: quick && s ? { op: quick, id: s.id } : null,
+            enter: null,
+        });
     };
+
+    const trainerRef = entityRef(solo, dexById, TRAINER_TOKEN);
+    const trainerInitBonus = trainerRef ? trainerRef.value('Dexterity') + trainerRef.value('Alert') : 0;
 
     const team = (Array.isArray(t.team) ? t.team : [])
         .map((slot, idx) => ({ slot, idx }))
@@ -207,7 +238,7 @@ function CharacterBody() {
                 token={tip} dex={dex} sheet={sheet} who={ref.name} owner={t.name || ''}
                 value={(n) => resolvePoolValue(dex, sheet, n) || 0}
                 pain={painPenalty(dex, sheet)}
-                act={s ? s.act : null} spent={s?.spent} doRoll={rollFrom(tip)} noInit
+                act={s ? s.act : null} spent={s ? { ...s.spent, init: true } : undefined} doRoll={rollFrom(tip)}
             />
         );
     })();
@@ -234,16 +265,12 @@ function CharacterBody() {
             {loadNote && <p className="muted">{loadNote}</p>}
 
             {/* At the top: below a full team it was off the screen. */}
-            <CombatEntry
-                trainerId={trainerId}
-                trainerName={t.name || 'Trainer'}
-                team={team.map((x) => ({
-                    idx: x.idx,
-                    name: monShownName(dexById, x.slot.dexId, x.slot.sheet as never),
-                }))}
-                solo={solo}
-                dexById={dexById}
-                seat={seat}
+            <TrainerInit
+                name={t.name || 'Trainer'}
+                bonus={trainerInitBonus}
+                seated={!!seat(TRAINER_TOKEN)}
+                boundElsewhere={boundElsewhere && !!turns}
+                onPrepare={() => prepInit(TRAINER_TOKEN, trainerInitBonus, t.name || 'Trainer')}
             />
 
             <div className="roster-card character-card">
@@ -326,26 +353,21 @@ function CharacterBody() {
     );
 }
 
-/* Into the fight: which of my characters go onto the field, a modifier, and
-   the GM rolls each one's initiative — 1d6 + Dexterity + Alert + modifier —
-   in the feed for everyone. They join the GM's combat tracker as they land. */
-function CombatEntry({ trainerId, trainerName, team, solo, dexById, seat }: {
-    trainerId: string;
-    trainerName: string;
-    team: { idx: number; name: string }[];
-    solo: GmState;
-    dexById: (id: string) => PokedexEntry | null;
-    seat: (token: string) => Seat | null;
+/* The trainer's own initiative: the one button left at the top of the panel
+   (each Pokémon has its own INIT in its move list). Pressing it sets the roll
+   up in the dice controls — 1d6 + Dexterity + Alert, the bonus adjustable for
+   a modifier — and Roll sends it: into the fight on the table when there is
+   one, an ordinary roll otherwise. */
+function TrainerInit({ name, bonus, seated, boundElsewhere, onPrepare }: {
+    name: string;
+    bonus: number;
+    seated: boolean;
+    boundElsewhere: boolean;
+    onPrepare: () => void;
 }) {
     const { session, state } = useTable();
     const view = session.combat.view;
-    const [open, setOpen] = useState(false);
-    const [picked, setPicked] = useState<Record<string, boolean>>({});
-    const [mod, setMod] = useState(0);
 
-    /* One trainer per fight from each browser: the characters already in it
-       follow the trainer they came from. */
-    const boundElsewhere = view.trainerId && view.trainerId !== trainerId && session.combat.mine().size > 0;
     if (boundElsewhere) {
         const other = workingTrainerData(view.trainerId!);
         return (
@@ -355,96 +377,27 @@ function CombatEntry({ trainerId, trainerName, team, solo, dexById, seat }: {
             </p>
         );
     }
-
-    const rows = [{ token: TRAINER_TOKEN, name: trainerName, slot: null as number | null }]
-        .concat(team.map((m) => ({ token: monToken(m.idx), name: m.name, slot: m.idx })));
-    const waiting = rows.filter((r) => !seat(r.token));
-    const chosen = waiting.filter((r) => picked[r.token]);
-    const noFight = !view.turns;
-    const blocked = !state.hostOnline || noFight;
-
-    const roll = () => {
-        const used: string[] = [];
-        const chars = chosen.map((r) => {
-            const ref = entityRef(solo, dexById, r.token);
-            const bonus = ref ? ref.value('Dexterity') + ref.value('Alert') + mod : mod;
-            const key: CharKey = r.slot === null ? 't' : session.combat.newKeyFor(trainerId, r.slot, used);
-            used.push(key);
-            return { key, bonus, slot: r.slot };
-        });
-        if (!chars.length) return;
-        session.enterCombat(trainerId, chars);
-        setOpen(false);
-        setPicked({});
-        setMod(0);
-    };
-
-    if (!waiting.length) {
+    if (seated) {
         return (
-            <p className="muted combat-entry-note">
-                <i className="fa-solid fa-khanda"></i> All of your characters are in the fight.
+            <p className="muted combat-entry-note" data-in-fight="">
+                <i className="fa-solid fa-khanda"></i> {name} is in {view.turns?.name || 'the fight'}.
             </p>
         );
     }
-
     return (
         <div className="combat-entry">
-            {!open ? (
-                <>
-                    <button className="accent" disabled={blocked} onClick={() => setOpen(true)}
-                        title={!state.hostOnline ? 'The GM is not connected right now'
-                            : noFight ? undefined : 'Choose who goes onto the field'}>
-                        <i className="fa-solid fa-dice-d6"></i> Roll initiative
-                    </button>
-                    {noFight && state.hostOnline && (
-                        <p className="muted combat-entry-note" data-no-fight="">
-                            Opens when the GM puts a fight on the table.
-                        </p>
-                    )}
-                </>
-            ) : (
-                <div className="combat-entry-form">
-                    <span className="combat-entry-title">
-                        <i className="fa-solid fa-khanda"></i> Into {view.turns?.name || 'the fight'}
-                    </span>
-                    {waiting.map((r) => (
-                        <label key={r.token} className="check">
-                            <input
-                                type="checkbox"
-                                checked={!!picked[r.token]}
-                                onChange={(e) => {
-                                    const on = e.currentTarget.checked;
-                                    setPicked((p) => ({ ...p, [r.token]: on }));
-                                }}
-                            />
-                            <span>{r.name}</span>
-                        </label>
-                    ))}
-                    <div className="combat-entry-mod">
-                        <label htmlFor="init-mod">Modifier</label>
-                        <div className="stepper">
-                            <button className="icon-btn" aria-label="Modifier down" onClick={() => setMod((m) => Math.max(-10, m - 1))}>
-                                <i className="fa-solid fa-minus"></i>
-                            </button>
-                            <input
-                                id="init-mod" type="number" min={-10} max={10} value={mod}
-                                onChange={(e) => {
-                                    const v = parseInt(e.currentTarget.value, 10);
-                                    setMod(isNaN(v) ? 0 : Math.max(-10, Math.min(10, v)));
-                                }}
-                            />
-                            <button className="icon-btn" aria-label="Modifier up" onClick={() => setMod((m) => Math.min(10, m + 1))}>
-                                <i className="fa-solid fa-plus"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div className="combat-entry-go">
-                        <button onClick={() => setOpen(false)}>Cancel</button>
-                        <button className="accent" disabled={!chosen.length || blocked} onClick={roll}>
-                            <i className="fa-solid fa-dice-d6"></i> Roll{chosen.length > 1 ? ' ' + chosen.length : ''}
-                        </button>
-                    </div>
-                </div>
+            <button
+                className="accent" data-trainer-init=""
+                disabled={!state.hostOnline}
+                title={!state.hostOnline ? 'The GM is not connected right now' : 'Dexterity + Alert'}
+                onClick={onPrepare}
+            >
+                <i className="fa-solid fa-dice-d6"></i> Roll initiative · {name} <span className="muted">1d6+{bonus}</span>
+            </button>
+            {!view.turns && state.hostOnline && (
+                <p className="muted combat-entry-note" data-no-fight="">
+                    No fight on the table yet: an ordinary roll.
+                </p>
             )}
         </div>
     );

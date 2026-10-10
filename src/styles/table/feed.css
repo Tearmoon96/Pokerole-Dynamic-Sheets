@@ -40,6 +40,10 @@
 /* Your own rolls, so a busy feed still reads at a glance. */
 .feed-row.mine { border-color: var(--accent-border); }
 
+/* Whose roll, in the colour they chose on joining (colors.ts). */
+.feed-row.by-color { border-left: 4px solid var(--who); }
+.feed-row.by-color .feed-who { color: var(--who); }
+
 /* A roll only this browser can see: the GM's, with "hide my rolls" on. Dashed,
    because nothing about it was published. */
 .feed-row.hidden-roll {
@@ -105,6 +109,24 @@
     gap: 0.1rem;
 }
 
+/* The GM's three switches, one line each and side by side when they fit;
+   what each does is in its hint. */
+.host-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.9rem;
+}
+
+.host-toggles .check { align-items: center; }
+.host-toggles .check input { margin-top: 0; }
+
+.host-toggles .check span {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+}
+
 .check em {
     font-style: normal;
     font-size: 0.7rem;
@@ -152,4 +174,15 @@
 .clear-feed {
     flex: 0 0 auto;
     align-self: flex-start;
+}
+
+/* An initiative's bonus, set up and adjustable before it is rolled. */
+.prep-bonus { display: flex; align-items: center; gap: 0.15rem; flex: 0 0 auto; }
+
+.prep-bonus-value {
+    min-width: 2.2rem;
+    text-align: center;
+    font-family: 'Fira Code', monospace;
+    font-weight: 700;
+    color: var(--text-primary);
 }

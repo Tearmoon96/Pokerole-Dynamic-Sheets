@@ -87,6 +87,8 @@ export interface GmCombat {
 export interface GmTablePc {
     /** The player's display name at the table. */
     player: string;
+    /** The colour they chose at the table (src/table/colors.ts). */
+    color?: number;
     trainer: SlimTrainer | null;
     mons: Record<string, SlimMon>;
 }
@@ -98,6 +100,10 @@ export interface GmDice {
     /** Show a pool's successes first and the rest after them. Display only:
         the stored faces keep the order they were rolled in. */
     sortResults?: boolean;
+    /** A roll set up from the move panel and waiting for the Roll button:
+        who, what for, the pain and the target number. The dice count is
+        already in `count`, where the GM can still change it for a modifier. */
+    prep?: Record<string, unknown> | null;
 }
 
 export interface GmNameOpts {

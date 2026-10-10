@@ -9,8 +9,9 @@ import { useEffect, useState } from 'react';
 import { useTable } from '../../table/TableContext';
 import { HomeButton } from '../common/HomeButton';
 import { LIMITS } from '../../table/protocol';
-import { formatLobbyId, normaliseLobbyId } from '../../table/encoding';
+import { formatLobbyId, normaliseLobbyId, typedLobbyId } from '../../table/encoding';
 import { relayConfigured, relayReachable, usingLocalRelay } from '../../table/relay';
+import { PLAYER_COLORS, saveColor, savedColor } from '../../table/colors';
 
 export function JoinScreen() {
     const { session, state } = useTable();
@@ -19,6 +20,7 @@ export function JoinScreen() {
     const [lobby, setLobby] = useState('');
     const [password, setPassword] = useState('');
     const [reachable, setReachable] = useState<boolean | null>(null);
+    const [color, setColor] = useState(savedColor);
 
     /* A link may name the table. It never carries the password. */
     useEffect(() => {
@@ -111,6 +113,27 @@ export function JoinScreen() {
                     <em>Use your in-game name — it is what the table sees on every roll.</em>
                 </label>
 
+                <div className="field">
+                    <span id="join-color-label">Your colour</span>
+                    <div className="color-swatches" role="radiogroup" aria-labelledby="join-color-label">
+                        {PLAYER_COLORS.map((c, i) => (
+                            <button
+                                key={c.hex}
+                                type="button"
+                                role="radio"
+                                aria-checked={color === i}
+                                aria-label={c.name}
+                                title={c.name}
+                                className={'color-swatch' + (color === i ? ' on' : '')}
+                                style={{ background: c.hex }}
+                                data-color={i}
+                                onClick={() => { setColor(i); saveColor(i); }}
+                            />
+                        ))}
+                    </div>
+                    <em>Your rolls, your name and your characters wear it, so everyone sees who did what.</em>
+                </div>
+
                 {mode === 'join' ? (
                     <>
                         <label className="field">
@@ -120,7 +143,17 @@ export function JoinScreen() {
                                 type="text"
                                 placeholder="K7QM-3XTB-R5WE-2GHD"
                                 value={lobby}
-                                onChange={(e) => setLobby(e.currentTarget.value)}
+                                onChange={(e) => setLobby(typedLobbyId(e.currentTarget.value))}
+                                onPaste={(e) => {
+                                    /* The whole invite pasted here fills both fields. */
+                                    const text = e.clipboardData.getData('text');
+                                    const id = /Lobby id:\s*([A-Za-z2-7 -]+)/.exec(text);
+                                    const pw = /Password:\s*(\S+)/.exec(text);
+                                    if (!id) return;
+                                    e.preventDefault();
+                                    setLobby(typedLobbyId(id[1]));
+                                    if (pw) setPassword(pw[1]);
+                                }}
                             />
                         </label>
                         <label className="field">

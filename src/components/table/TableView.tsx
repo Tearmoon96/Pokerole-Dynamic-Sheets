@@ -32,7 +32,7 @@ export function TableView() {
        while a map takes the middle, and has the middle to itself otherwise. */
     const feed = (
         <div className="feed-scroll">
-            <RollFeed rolls={state.rolls} myName={state.myName} />
+            <RollFeed rolls={state.rolls} myName={state.myName} members={state.members} sorted={state.isHost && state.successesFirst} />
         </div>
     );
 

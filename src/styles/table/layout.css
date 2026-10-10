@@ -303,6 +303,21 @@ button.wide {
 
 .member-list .host-mark { color: var(--crit); font-size: 0.75rem; }
 
+/* Each person's colour (colors.ts): the ring round their initial. */
+.member-list .member-avatar {
+    flex: 0 0 auto;
+    display: inline-grid;
+    place-items: center;
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 50%;
+    border: 2px solid var(--who, var(--border-color));
+    background: var(--who-faint, transparent);
+    color: var(--who, var(--text-secondary));
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+
 .member-list .you {
     font-size: 0.62rem;
     text-transform: uppercase;
