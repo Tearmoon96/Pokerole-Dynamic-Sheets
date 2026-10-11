@@ -21,8 +21,9 @@
         build, so it costs nothing and cannot break the real pages. Its only job
         is that the bare site URL answers with something instead of a 404.
 
-        It carries no script. The rolling table is unlisted for now (see the
-        note where its card was), so nothing here needs deciding on load.
+        It carries exactly one script, at the bottom: the rolling table is the
+        only page that cannot work from the disk, and its card is greyed out
+        when this file is opened over file://. Nothing else here needs one.
     -->
     <style>
         :root {
@@ -122,9 +123,8 @@
             line-height: 1.45;
         }
 
-        /* Greyed out and inert rather than pretending it will work. Two things
-           reach this: the rolling table, which is not finished, and (once it is)
-           an offline copy of it, which has no origin a relay would accept. */
+        /* Greyed out and inert rather than pretending it will work: the rolling
+           table opened from the disk, which has no origin the relay accepts. */
         a.card.disabled {
             opacity: 0.5;
             cursor: not-allowed;
@@ -201,12 +201,11 @@
             <span class="title"><i class="fa-solid fa-map"></i> <span class="name">Map Maker</span></span>
             <p class="sub">Regions, towns and battle maps: paint terrain, place landmarks, routes and tokens.</p>
         </a>
-        <!-- The Rolling Table is unlisted while it is tested with a few players:
-             the page is published, but only someone given the link finds it.
-             When it goes public, its card comes
-             back here, linked, together with a small script that greys it out
-             over file:// — a shared table needs the network, and an offline
-             copy has no origin to reach the relay from. -->
+        <a class="card" id="card-table" href="rolling-table.html">
+            <span class="title"><i class="fa-solid fa-dice"></i> <span class="name">Rolling Table</span></span>
+            <p class="sub">Play together online: a shared dice feed, the GM's map and music, and the
+                turns of a fight.</p>
+        </a>
     </nav>
 
     <footer>
@@ -215,6 +214,21 @@
         <p>A free, non-commercial fan tool.
             Pokerole is made by the <a href="https://www.pokeroleproject.com/">Pokerole Project</a>.</p>
     </footer>
+    <!-- A shared table needs the network: a copy opened from the disk has no
+         origin the relay accepts, so there the card is greyed out and says
+         where the table lives instead. -->
+    <script>
+        if (location.protocol === 'file:') {
+            var card = document.getElementById('card-table');
+            card.classList.add('disabled');
+            card.setAttribute('aria-disabled', 'true');
+            card.removeAttribute('href');
+            var note = document.createElement('span');
+            note.className = 'wip-note';
+            note.textContent = 'Online only — open it from the website.';
+            card.querySelector('.sub').appendChild(note);
+        }
+    </script>
 </body>
 
 </html>
