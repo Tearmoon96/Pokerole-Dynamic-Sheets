@@ -189,8 +189,34 @@ function loadSession(): SavedSession | null {
     }
 }
 
+/** The table an invite link names (`?lobby=`), if any. */
+function linkedLobby(): string | null {
+    try {
+        const id = normaliseLobbyId(new URLSearchParams(location.search).get('lobby') || '');
+        return id.length === 16 ? id : null;
+    } catch {
+        return null;
+    }
+}
+
+/** The saved session to rejoin on load — unless the page was opened from an
+    invite to a DIFFERENT table. Yesterday's session would otherwise win over
+    today's link and drop the player into an empty old room; the link's table
+    gets the join form instead (the password is never in a link). */
+function sessionToRestore(): SavedSession | null {
+    const saved = loadSession();
+    if (!saved) return null;
+    const linked = linkedLobby();
+    return linked && linked !== saved.lobbyId ? null : saved;
+}
+
 function hasSavedSession(): boolean {
-    return loadSession() !== null;
+    return sessionToRestore() !== null;
+}
+
+/** The name this browser last sat at a table with, to fill the join form. */
+export function lastTableName(): string {
+    return loadSession()?.name ?? '';
 }
 
 function clearSession(): void {
@@ -352,7 +378,7 @@ export class TableSession {
     async restore(): Promise<boolean> {
         if (this.restored) return true;
         this.restored = true;
-        const saved = loadSession();
+        const saved = sessionToRestore();
         if (!saved) {
             this.store.update((s) => { s.phase = 'setup'; });
             return false;

@@ -354,18 +354,36 @@ export class MapShare {
     /** Keeps a live map's landmark, token or label off the players' picture,
         or puts it back — one object by `id`, or with no id every object of
         `kind`, ones placed later included. The Map Maker redraws the picture
-        players already have without it, and the table shows that. */
+        players already have without it, and the table shows that.
+
+        Under a hidden kind, one object put back is an exception (`shown`),
+        so the GM can hide every landmark and still show the town. Hiding or
+        showing the whole kind again clears that kind's choices one by one. */
     setHidden(key: string, kind: HideKind, id: string | null, hidden: boolean): void {
         if (!this.host) return;
         const e = this.entries.find((x) => x.key === key);
         if (!e || !e.mapId) return;
         const was = this.hides[e.mapId] ?? { kinds: [], ids: [] };
-        const next: PlayerHide = id === null
-            ? { kinds: hidden ? [...new Set([...was.kinds, kind])] : was.kinds.filter((k) => k !== kind), ids: was.ids }
-            : { kinds: was.kinds, ids: hidden ? [...new Set([...was.ids, id])] : was.ids.filter((x) => x !== id) };
+        let kinds = was.kinds;
+        let ids = was.ids;
+        let shown = was.shown ?? [];
+        if (id === null) {
+            const ofKind = new Set((e.objects ?? []).filter((o) => o.kind === kind).map((o) => o.id));
+            kinds = hidden ? [...new Set([...kinds, kind])] : kinds.filter((k) => k !== kind);
+            ids = ids.filter((x) => !ofKind.has(x));
+            shown = shown.filter((x) => !ofKind.has(x));
+        } else if (kinds.includes(kind)) {
+            ids = ids.filter((x) => x !== id);
+            shown = hidden ? shown.filter((x) => x !== id) : [...new Set([...shown, id])];
+        } else {
+            ids = hidden ? [...new Set([...ids, id])] : ids.filter((x) => x !== id);
+        }
         /* Ids of objects no longer on the map are dropped as they go. */
         const onMap = new Set((e.objects ?? []).map((o) => o.id));
-        next.ids = next.ids.filter((x) => onMap.has(x) || x === id);
+        const keep = (x: string) => onMap.has(x) || x === id;
+        const next: PlayerHide = { kinds, ids: ids.filter(keep) };
+        shown = shown.filter(keep);
+        if (shown.length) next.shown = shown;
         if (next.kinds.length || next.ids.length) this.hides[e.mapId] = next;
         else delete this.hides[e.mapId];
         this.save();

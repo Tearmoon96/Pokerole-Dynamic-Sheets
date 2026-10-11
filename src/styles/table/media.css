@@ -398,6 +398,22 @@ button.link-btn {
 
 .map-objects-head button { font-size: 0.7rem; padding: 0.15rem 0.45rem; }
 
+/* The kind's name is the button that folds its list. */
+.map-objects-head .map-objects-fold {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    padding: 0.15rem 0.2rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+    background: none;
+    border-color: transparent;
+    color: inherit;
+}
+.map-objects-head .map-objects-fold:disabled { opacity: 1; cursor: default; }
+.map-objects-head .map-objects-fold .muted { font-weight: 400; }
+
 .map-objects-group ul {
     list-style: none;
     margin: 0.25rem 0 0;

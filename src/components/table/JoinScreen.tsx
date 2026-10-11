@@ -12,11 +12,12 @@ import { LIMITS } from '../../table/protocol';
 import { formatLobbyId, normaliseLobbyId, typedLobbyId } from '../../table/encoding';
 import { relayConfigured, relayReachable, usingLocalRelay } from '../../table/relay';
 import { PLAYER_COLORS, saveColor, savedColor } from '../../table/colors';
+import { lastTableName } from '../../table/session';
 
 export function JoinScreen() {
     const { session, state } = useTable();
     const [mode, setMode] = useState<'join' | 'create'>('join');
-    const [name, setName] = useState('');
+    const [name, setName] = useState(lastTableName);
     const [lobby, setLobby] = useState('');
     const [password, setPassword] = useState('');
     const [reachable, setReachable] = useState<boolean | null>(null);

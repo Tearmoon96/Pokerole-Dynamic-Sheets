@@ -23,8 +23,9 @@ export type HideKind = 'stamp' | 'token' | 'label';
 export const HIDE_KINDS: readonly HideKind[] = ['stamp', 'token', 'label'];
 
 /** What the GM keeps off one map's players' picture: whole kinds — new ones
-    included — and single objects by id. */
-export interface PlayerHide { kinds: HideKind[]; ids: string[] }
+    included — and single objects by id. `shown` are the exceptions to a
+    hidden kind: the few the GM put back after hiding them all. */
+export interface PlayerHide { kinds: HideKind[]; ids: string[]; shown?: string[] }
 
 /** One object on a map, as the table's GM picks from them. */
 export interface MapObjectInfo {
@@ -111,7 +112,13 @@ export function parseHide(raw: unknown): PlayerHide | null {
     if (raw.kinds.length > HIDE_KINDS.length || raw.ids.length > MAX_MAP_OBJECTS) return null;
     if (!raw.kinds.every(isHideKind)) return null;
     if (!raw.ids.every((v) => typeof v === 'string' && v.length <= 80)) return null;
-    return { kinds: [...new Set(raw.kinds as HideKind[])], ids: [...new Set(raw.ids as string[])] };
+    const out: PlayerHide = { kinds: [...new Set(raw.kinds as HideKind[])], ids: [...new Set(raw.ids as string[])] };
+    if (raw.shown !== undefined) {
+        if (!Array.isArray(raw.shown) || raw.shown.length > MAX_MAP_OBJECTS) return null;
+        if (!raw.shown.every((v) => typeof v === 'string' && v.length <= 80)) return null;
+        if (raw.shown.length) out.shown = [...new Set(raw.shown as string[])];
+    }
+    return out;
 }
 
 function parseHides(raw: unknown): Record<string, PlayerHide> | null {
@@ -140,7 +147,9 @@ export function parseObjects(raw: unknown): MapObjectInfo[] | null {
 
 /** Whether `hide` keeps this object off the players' picture. */
 export function isHidden(hide: PlayerHide | null | undefined, kind: HideKind, id: string): boolean {
-    return !!hide && (hide.kinds.includes(kind) || hide.ids.includes(id));
+    if (!hide) return false;
+    if (hide.ids.includes(id)) return true;
+    return hide.kinds.includes(kind) && !(hide.shown ?? []).includes(id);
 }
 
 export function openLink(): BroadcastChannel | null {
