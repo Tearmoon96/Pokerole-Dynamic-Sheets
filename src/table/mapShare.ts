@@ -32,6 +32,8 @@ const RETIRE_MS = 90_000;
 const SAVED_PREFIX = 'pokeroleTable:map:';
 /** How many maps the GM can hold on one table. */
 export const MAX_TABLE_MAPS = 12;
+/** The least time between two looks at the relay prompted by players. */
+const CHECK_GAP_MS = 15_000;
 
 /** One map the GM holds, as the GM's own panel lists it. */
 export interface MapEntry {
@@ -167,6 +169,9 @@ export class MapShare {
     private fetching = '';
     private abort: AbortController | null = null;
     private retry: number | null = null;
+    /** GM: the paced look at the relay (checkSoon). */
+    private checkTimer: number | null = null;
+    private checkAt = 0;
     /** GM: pictures waiting while another uploads, by entry key — a newer
         picture of the same map overtakes one still waiting. */
     private queued = new Map<string, { run: () => Promise<void>; skip: () => void }>();
@@ -220,6 +225,9 @@ export class MapShare {
         this.abort = null;
         if (this.retry !== null) clearTimeout(this.retry);
         this.retry = null;
+        if (this.checkTimer !== null) clearTimeout(this.checkTimer);
+        this.checkTimer = null;
+        this.checkAt = 0;
         if (this.channel) {
             this.post({ t: 'bye' });
             this.channel.close();
@@ -469,6 +477,21 @@ export class MapShare {
         const [key, next] = first.value;
         this.queued.delete(key);
         void next.run().catch(() => { /* reported by its own caller */ }).finally(() => this.drain());
+    }
+
+    /** A player could not fetch one of the maps: look at the relay soon. The
+        reports are the players' to send, and every look is a request to the
+        relay for each map held, so looks are paced — at once after a quiet
+        spell, then at most one every CHECK_GAP_MS, whatever arrives — or a
+        player could spend the relay's daily allowance from the GM's page. */
+    checkSoon(): void {
+        if (!this.host || this.checkTimer !== null) return;
+        const wait = Math.max(0, this.checkAt + CHECK_GAP_MS - Date.now());
+        this.checkTimer = window.setTimeout(() => {
+            this.checkTimer = null;
+            this.checkAt = Date.now();
+            void this.verify();
+        }, wait);
     }
 
     /** The relay may have dropped a picture — an idle wipe, or the room's

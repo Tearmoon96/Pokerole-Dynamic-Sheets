@@ -254,6 +254,27 @@ session then records that the GM answered, so a reload rejoins even while the
 GM is away. A GM rejoining is checked against the room address kept beside
 the host key.
 
+**A bad actor at the table is bounded, not trusted.** Anyone with the password
+reads the whole table, by design, and a kick is not a ban — a new table is.
+Within that, a patched page cannot: take someone's name (the host numbers a
+name already in use, its own above all, and rolls carry that name); push the
+roster past the 16 every page accepts, however many keys it makes; turn hellos
+into a flood of the host's replies (a roster at most once a second, a
+newcomer's welcome once every three); send sheets, turn moves and music
+reports past one shared allowance; make the GM's page ask the relay about
+"missing" files more than once every 15 s; or grow the GM screen's saved
+board — only a character in a fight has its copy there, a fight takes
+characters from at most 15 table members, and a combatant holds 16 used-move
+marks. The replay record never forgets the senders that matter (the GM on a
+player's page, the table's members on the GM's), and a player drops anyone
+else's message before checking it. From the GM, a shared picture is a raster
+type only: an SVG is a document, and opened in a tab of its own ("Open image
+in new tab") its scripts would run with this site's origin. The relay refuses
+sockets and requests from other websites' pages (a browser always names the
+page's origin), reads an upload to its end but keeps no more than a part of
+it, and moves its idle alarm at most every five minutes.
+`.verify/table-hostile.mjs` plays these bad actors against the real pages.
+
 Dice come from [`src/gm/dice.ts`](src/gm/dice.ts), unchanged and unforked, so a
 shared table and the solo GM board cannot drift on what a die does. Receivers
 recompute a roll's total and successes from its faces rather than trusting the

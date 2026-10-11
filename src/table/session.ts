@@ -252,6 +252,31 @@ interface Bucket { tokens: number; last: number }
 const BUCKET_MAX = 5;
 const BUCKET_REFILL_MS = 2000;
 
+/* Everything else players send that makes the GM's page work — sheets, turn
+   moves, music reports — shares one allowance on the host: far above what a
+   table of real people sends (a few a second at a fight's start), and low
+   enough that a flood, from any number of keys, leaves the GM's page usable
+   and the GM screen's saved board alone. */
+const OP_BURST = 80;
+const OP_PER_SECOND = 12;
+
+/* The host's replies that go to the whole table, paced: a roster at most once
+   a second, and the welcome a newcomer gets (history, map, music, the fight)
+   at most once every few seconds, covering everyone who arrived meanwhile.
+   A newcomer after a quiet spell still gets both at once. */
+const ROSTER_GAP_MS = 1000;
+const GREET_GAP_MS = 3000;
+
+/* The replay check remembers this many sessions per sender and this many
+   senders; see `fresh`. */
+const SEEN_SIDS = 8;
+const SEEN_SENDERS = 64;
+
+/** Two names that read the same are the same name at the table. */
+function nameKey(name: string): string {
+    return name.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
 /* What this browser itself may send. The relay closes a socket that sends
    more than 40 frames in 10 seconds — for good, since reconnecting into the
    same flood would only repeat it — and the clock pings come out of the same
@@ -281,7 +306,9 @@ export class TableSession {
        they saw the table but could not roll. */
     private sid = randomId(6);
     private seq = 0;
-    private seen = new Map<string, number>();
+    /** sender -> their session ids, least recently heard first -> the last
+        sequence number taken from each. */
+    private seen = new Map<string, Map<string, number>>();
 
     /* Host-side bookkeeping. Empty on a player. */
     private names = new Map<string, string>();
@@ -294,6 +321,12 @@ export class TableSession {
     private greeted = new Map<string, string>();
     private handledRids = new Set<string>();
     private buckets = new Map<string, Bucket>();
+    private ops: Bucket = { tokens: OP_BURST, last: 0 };
+    private rosterAt = 0;
+    private rosterTimer: number | null = null;
+    private greetAt = 0;
+    private greetTimer: number | null = null;
+    private fullNoticeAt = 0;
 
     /* Requests made while the socket was down. Held as bodies, not as sealed
        envelopes, because they are re-signed with a fresh sequence and timestamp
@@ -430,6 +463,8 @@ export class TableSession {
         this.greeted.clear();
         this.handledRids.clear();
         this.buckets.clear();
+        this.ops = { tokens: OP_BURST, last: Date.now() };
+        this.rosterAt = this.greetAt = 0;
         this.colors.clear();
         if (isHost) {
             this.names.set(identity.id, name);
@@ -518,6 +553,8 @@ export class TableSession {
             clearInterval(this.heartbeat);
             this.heartbeat = null;
         }
+        if (this.rosterTimer !== null) { clearTimeout(this.rosterTimer); this.rosterTimer = null; }
+        if (this.greetTimer !== null) { clearTimeout(this.greetTimer); this.greetTimer = null; }
         this.map.end();
         this.music.end();
         this.combat.end();
@@ -643,7 +680,7 @@ export class TableSession {
 
         if (this.store.state.isHost) {
             this.prunePresence();
-            void this.publishRoster();
+            this.publishRoster();
             /* Anyone whose socket dropped for a moment missed what changed. */
             this.map.greet();
             this.music.greet();
@@ -698,6 +735,9 @@ export class TableSession {
         if (!inner) return;
 
         if (inner.f === this.identity.id) return;
+        /* A player acts on the GM's key alone (dispatch), so anyone else's
+           message is dropped before the costly checks, not after. */
+        if (!this.store.state.isHost && inner.f !== this.store.state.lobbyId) return;
         if (Math.abs(Date.now() - inner.ts) > LIMITS.CLOCK_SKEW_MS) return;
 
         let publicRaw: Bytes;
@@ -707,18 +747,47 @@ export class TableSession {
 
         if (!await verify(publicRaw, signed.g, utf8(signed.p))) return;
 
-        const seenKey = inner.f + '|' + inner.sid;
-        const last = this.seen.get(seenKey);
-        if (last !== undefined && inner.s <= last) return;
-        this.seen.set(seenKey, inner.s);
-        /* Bounded: a long session with several reconnects would otherwise keep
-           one entry per sender per page load forever. */
-        if (this.seen.size > 256) {
-            const oldest = this.seen.keys().next().value;
-            if (oldest !== undefined) this.seen.delete(oldest);
-        }
+        if (!this.fresh(inner.f, inner.sid, inner.s)) return;
 
         this.dispatch(inner);
+    }
+
+    /** The replay check: true the first time a sender's session shows this
+        sequence number or a higher one, which it then records.
+
+        It has to forget — a long session with reconnects makes new session ids
+        — and what it forgets could be replayed within the clock window. So the
+        senders whose messages carry weight here are never the ones forgotten:
+        the GM on a player's page, the members at the table on the GM's. The
+        rest go least recently heard first, so a flood of made-up keys or
+        session ids only ever pushes out its own kind. It used to forget the
+        OLDEST entry, which was the GM's: 256 junk sessions, and a GM's kick or
+        clear from a minute before could be sent round again. */
+    private fresh(f: string, sid: string, s: number): boolean {
+        const sids = this.seen.get(f) ?? new Map<string, number>();
+        const last = sids.get(sid);
+        if (last !== undefined && s <= last) return false;
+        sids.delete(sid);
+        sids.set(sid, s);
+        while (sids.size > SEEN_SIDS) {
+            const oldest = sids.keys().next().value;
+            if (oldest === undefined) break;
+            sids.delete(oldest);
+        }
+        this.seen.delete(f);
+        this.seen.set(f, sids);
+        if (this.seen.size > SEEN_SENDERS) {
+            for (const k of this.seen.keys()) {
+                if (this.seen.size <= SEEN_SENDERS) break;
+                if (!this.weighs(k)) this.seen.delete(k);
+            }
+        }
+        return true;
+    }
+
+    /** A sender whose messages carry weight on this page. */
+    private weighs(f: string): boolean {
+        return this.store.state.isHost ? this.names.has(f) : f === this.store.state.lobbyId;
     }
 
     private dispatch(inner: Inner): void {
@@ -730,12 +799,13 @@ export class TableSession {
                and this is it. */
             if (body.k === 'hello') this.onHello(inner.f, body.name, inner.sid, body.color);
             else if (body.k === 'request') this.onRequest(inner.f, body);
-            else if (body.k === 'pc' && this.names.has(inner.f)) this.combat.onPc(inner.f, this.names.get(inner.f)!, body);
             else if (body.k === 'enter') this.onEnter(inner.f, body);
-            else if (body.k === 'turn' && this.names.has(inner.f)) this.combat.onTurn(inner.f, body);
-            else if (body.k === 'mstat' && this.names.has(inner.f)) {
+            else if (!this.names.has(inner.f) || !this.allowOp()) return;
+            else if (body.k === 'pc') this.combat.onPc(inner.f, this.names.get(inner.f)!, body);
+            else if (body.k === 'turn') this.combat.onTurn(inner.f, body);
+            else if (body.k === 'mstat') {
                 this.music.onStat(inner.f, body);
-                if (body.failed.some((id) => this.map.missing(id))) void this.map.verify();
+                if (body.failed.some((id) => this.map.missing(id))) this.map.checkSoon();
             }
             return;
         }
@@ -819,8 +889,18 @@ export class TableSession {
     /* -------------------------------------------------------- host duties */
 
     private onHello(id: string, name: string, sid: string, color: number | undefined): void {
+        /* The roster every player's page accepts holds 16 people. Past that a
+           newcomer stays outside, so a stream of made-up keys can neither
+           push the roster past what players take nor grow the GM's page. */
+        if (!this.names.has(id) && this.names.size >= LIMITS.MAX_MEMBERS) {
+            if (Date.now() - this.fullNoticeAt > 60_000) {
+                this.fullNoticeAt = Date.now();
+                this.notify('The table is full (' + LIMITS.MAX_MEMBERS + ' people): someone could not join.');
+            }
+            return;
+        }
         this.lastSeenAt.set(id, Date.now());
-        this.names.set(id, name);
+        this.names.set(id, this.uniqueName(id, name));
         if (color === undefined) this.colors.delete(id);
         else this.colors.set(id, color);
 
@@ -828,26 +908,58 @@ export class TableSession {
            already known to us, and waiting for the next heartbeat to tell them
            the table is alive would leave their Roll button greyed out for up to
            25 seconds for no reason. */
-        void this.publishRoster();
+        this.publishRoster();
 
         /* The public feed, once per page load of theirs. */
         if (this.greeted.get(id) !== sid) {
             this.greeted.set(id, sid);
-            const rolls = this.store.state.rolls
-                .filter((r) => !r.hidden)
-                .slice(0, LIMITS.MAX_SYNC)
-                .map(stripLocal);
-            /* In two parts: a client from before rolls carried a bonus, pain
-               or target refuses a whole sync holding one, and would otherwise
-               lose every plain roll with it. Receivers merge by id and time. */
-            const plain = rolls.filter((r) => !hasExtras(r));
-            const extended = rolls.filter(hasExtras);
-            if (plain.length) void this.publish({ k: 'sync', rolls: plain });
-            if (extended.length) void this.publish({ k: 'sync', rolls: extended });
-            this.map.greet();
-            this.music.greet();
-            this.combat.greet();
+            this.greetArrivals();
         }
+    }
+
+    /** The name a member goes by at this table: the one they asked for, unless
+        someone else already has it — the GM's own above all — and then with a
+        number after it. Rolls carry who rolled them as this name, so without
+        it a player could roll as the GM, or as another player, and have every
+        page show it so (their own as "mine"). */
+    private uniqueName(id: string, wanted: string): string {
+        const taken = new Set<string>();
+        for (const [other, n] of this.names) if (other !== id) taken.add(nameKey(n));
+        if (!taken.has(nameKey(wanted))) return wanted;
+        for (let i = 2; ; i++) {
+            const tag = ' (' + i + ')';
+            const candidate = wanted.slice(0, LIMITS.MAX_NAME - tag.length).trimEnd() + tag;
+            if (!taken.has(nameKey(candidate))) return candidate;
+        }
+    }
+
+    /** What a newcomer needs — the public feed, the map, the music, the
+        fight. All of it goes to the whole table, so arrivals close together
+        share one welcome; and however many hellos arrive, it goes out at most
+        once every GREET_GAP_MS. */
+    private greetArrivals(): void {
+        if (this.greetTimer !== null) return;
+        const wait = this.greetAt + GREET_GAP_MS - Date.now();
+        if (wait <= 0) { this.greetNow(); return; }
+        this.greetTimer = window.setTimeout(() => { this.greetTimer = null; this.greetNow(); }, wait);
+    }
+
+    private greetNow(): void {
+        this.greetAt = Date.now();
+        const rolls = this.store.state.rolls
+            .filter((r) => !r.hidden)
+            .slice(0, LIMITS.MAX_SYNC)
+            .map(stripLocal);
+        /* In two parts: a client from before rolls carried a bonus, pain
+           or target refuses a whole sync holding one, and would otherwise
+           lose every plain roll with it. Receivers merge by id and time. */
+        const plain = rolls.filter((r) => !hasExtras(r));
+        const extended = rolls.filter(hasExtras);
+        if (plain.length) void this.publish({ k: 'sync', rolls: plain });
+        if (extended.length) void this.publish({ k: 'sync', rolls: extended });
+        this.map.greet();
+        this.music.greet();
+        this.combat.greet();
     }
 
     private onRequest(
@@ -915,6 +1027,18 @@ export class TableSession {
         return true;
     }
 
+    /** The shared allowance for players' sheets, turn moves and music
+        reports (OP_BURST). Over it, a message is dropped. */
+    private allowOp(): boolean {
+        const now = Date.now();
+        const b = this.ops;
+        b.tokens = Math.min(OP_BURST, b.tokens + (now - b.last) / 1000 * OP_PER_SECOND);
+        b.last = now;
+        if (b.tokens < 1) return false;
+        b.tokens -= 1;
+        return true;
+    }
+
     private prunePresence(): void {
         const cutoff = Date.now() - PRESENCE_TIMEOUT_MS;
         let changed = false;
@@ -924,21 +1048,38 @@ export class TableSession {
                 this.lastSeenAt.delete(id);
                 this.names.delete(id);
                 this.greeted.delete(id);
+                this.buckets.delete(id);
                 this.music.forget(id);
+                /* The sheets they sent go too, unless a character of theirs is
+                   still in the fight: a key that comes and goes must not leave
+                   its sheets on the GM's page for good. */
+                if (!this.combat.onStrip(id)) this.combat.forget(id);
                 changed = true;
             }
         }
-        if (changed) void this.publishRoster();
+        if (changed) this.publishRoster();
     }
 
-    private publishRoster(): Promise<boolean> {
+    /** The roster on the GM's own screen at once, and to the table at once
+        too — unless one went out less than ROSTER_GAP_MS ago, and then once
+        at the end of that gap with whatever changed meanwhile. A flood of
+        hellos costs one roster a second, not one each. */
+    private publishRoster(): void {
         const me = this.store.state.myId;
         const members: WireMember[] = [...this.names].map(([id, name]) => {
             const color = this.colors.get(id);
             return color === undefined ? { id, name, host: id === me } : { id, name, host: id === me, color };
         });
         this.store.update((s) => { s.members = members; });
-        return this.publish({ k: 'roster', members });
+        if (this.rosterTimer !== null) return;
+        const wait = this.rosterAt + ROSTER_GAP_MS - Date.now();
+        if (wait <= 0) { this.sendRoster(); return; }
+        this.rosterTimer = window.setTimeout(() => { this.rosterTimer = null; this.sendRoster(); }, wait);
+    }
+
+    private sendRoster(): void {
+        this.rosterAt = Date.now();
+        void this.publish({ k: 'roster', members: this.store.state.members });
     }
 
     /** The only place dice are actually rolled. Host-only by construction: a
@@ -1099,7 +1240,7 @@ export class TableSession {
         this.music.forget(id);
         this.combat.forget(id);
         void this.publish({ k: 'kick', id });
-        void this.publishRoster();
+        this.publishRoster();
     }
 
     /* ------------------------------------------------------------ UI state */

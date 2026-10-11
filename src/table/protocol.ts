@@ -285,7 +285,17 @@ export const LIMITS = {
     /** Combatants on the turn strip. */
     MAX_TURNS: 60,
     MAX_ROUND: 999,
+    /** Moves marked used in a Round, per combatant: more than any Pokémon
+        knows (Insight + 2 tops out well under it). */
+    MAX_USED_MOVES: 16,
 } as const;
+
+/** The types a shared file may carry, and the only ones a downloaded file is
+    given in this browser. Pictures are raster only: an SVG is a document that
+    runs its scripts when it is opened in a tab of its own ("Open image in new
+    tab" on the map), and a blob made from it has this page's origin — so a
+    hostile GM could read everything the site keeps in a player's browser. */
+export const FILE_MIME_RE = /^(image\/(png|jpeg|webp|gif|avif)|(audio|video)\/[a-z0-9.+-]{1,40}|application\/octet-stream)$/;
 
 /** How often everyone announces themselves, and how long the host waits before
     treating a silent member as gone. Three missed beats, so one dropped packet

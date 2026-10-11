@@ -231,6 +231,11 @@ export class CombatShare {
         this.owed.delete(member);
     }
 
+    /** Whether a character of `member`'s is on the fight's strip. */
+    onStrip(member: string): boolean {
+        return !!this.view.turns?.order.some((e) => e.own === member);
+    }
+
     /** A player's sheet for one of their characters. */
     onPc(member: string, player: string, body: Extract<Body, { k: 'pc' }>): void {
         let mine = this.sheets.get(member);

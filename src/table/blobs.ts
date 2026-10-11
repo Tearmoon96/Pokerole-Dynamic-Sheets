@@ -13,6 +13,7 @@
 
 import { sealPart, sha256Hex, unsealPart } from './crypto';
 import type { Bytes } from './encoding';
+import { FILE_MIME_RE } from './protocol';
 import { relayBase } from './relay';
 
 /** Plaintext per part. With the IV and the tag it stays under the relay's
@@ -43,9 +44,10 @@ function randomHex(bytes: number): string {
     return s;
 }
 
-/** The MIME types a reference may carry. Anything else is filed as bytes. */
+/** The MIME types a reference may carry (protocol.ts). Anything else is
+    filed as bytes — an SVG among them. */
 export function cleanMime(raw: string): string {
-    return /^(audio|image|video)\/[a-z0-9.+-]{1,40}$/.test(raw) ? raw : 'application/octet-stream';
+    return FILE_MIME_RE.test(raw) ? raw : 'application/octet-stream';
 }
 
 export class BlobChannel {
@@ -165,7 +167,9 @@ export class BlobChannel {
         let at = 0;
         for (const c of chunks) { whole.set(c, at); at += c.length; }
         if (await sha256Hex(whole) !== ref.sha) throw new Error('the file does not match what the GM shared');
-        return new Blob([whole], { type: ref.mime });
+        /* The validator already refused any other type; this is the line that
+           decides what the blob URL opens as, so it checks again. */
+        return new Blob([whole], { type: cleanMime(ref.mime) });
     }
 }
 

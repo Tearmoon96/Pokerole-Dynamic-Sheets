@@ -22,6 +22,7 @@
    Everything here is pure: (combat, who can act) -> combat. */
 
 import { MAX_ACTIONS } from './combat';
+import { LIMITS } from '../table/protocol';
 import type { GmCombat, GmCombatant } from './types';
 
 export const pidOf = (p: GmCombatant): string => (p as unknown as { pid: string }).pid;
@@ -128,7 +129,10 @@ export function spendQuick(c: GmCombat, pid: string, what: 'eva' | 'clash'): GmC
     };
 }
 
-/** Marks a move used this Round, or clears the mark. */
+/** Marks a move used this Round, or clears the mark. A combatant holds at
+    most LIMITS.MAX_USED_MOVES marks: a player's attacks arrive with the move's
+    name from the table, and a page sending a new name each time must not grow
+    the GM's saved board without end. */
 export function markMove(c: GmCombat, pid: string, move: string, used: boolean): GmCombat {
     if (!c.participants.some((p) => pidOf(p) === pid)) return c;
     return {
@@ -136,7 +140,8 @@ export function markMove(c: GmCombat, pid: string, move: string, used: boolean):
         participants: c.participants.map((p) => {
             if (pidOf(p) !== pid) return p;
             const had = Array.isArray(p.usedMoves) ? p.usedMoves : [];
-            const next = used ? (had.includes(move) ? had : [...had, move]) : had.filter((m) => m !== move);
+            if (used && (had.includes(move) || had.length >= LIMITS.MAX_USED_MOVES)) return p;
+            const next = used ? [...had, move] : had.filter((m) => m !== move);
             return { ...p, usedMoves: next };
         }),
     };

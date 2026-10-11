@@ -79,8 +79,51 @@ const CORS: Record<string, string> = {
     'Access-Control-Max-Age': '86400',
 };
 
+/* The pages that may use the relay from a browser: the site, and a page
+   served from this machine while it is worked on. A browser always says
+   which page a socket or a cross-origin request comes from, and the page
+   cannot change it — so another website cannot have its visitors' browsers
+   spend this account's daily allowance through the relay. A program outside
+   a browser can claim anything, or nothing; for those the limits are what
+   count, so a request that names no origin is let through. */
+const SITE_ORIGINS = ['https://tearmoon96.github.io'];
+const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d{1,5})?$/;
+
+function originAllowed(req: Request): boolean {
+    const origin = req.headers.get('Origin');
+    return origin === null || SITE_ORIGINS.includes(origin) || LOCAL_ORIGIN.test(origin);
+}
+
+/* The idle alarm is a storage write. Moved on every message it would cost a
+   write per roll, so a busy table moves it at most this often; the idle wipe
+   comes at most this much sooner than IDLE_MS after the last message. */
+const REARM_MS = 5 * 60 * 1000;
+
 function text(body: string, status: number): Response {
     return new Response(body, { status, headers: CORS });
+}
+
+/** A request's body, or null when it is longer than `max` bytes — read to its
+    end either way, but never more than `max` of it held in memory (reading a
+    100 MB upload whole to find it too big held all of it first). Never
+    cancelled: a response sent over an unread or cancelled upload makes the
+    runtime fail reading it afterwards, and makes `wrangler dev` exit. */
+async function readCapped(req: Request, max: number): Promise<ArrayBuffer | null> {
+    if (!req.body) return new ArrayBuffer(0);
+    const reader = req.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size <= max) chunks.push(value);
+    }
+    if (size > max) return null;
+    const out = new Uint8Array(size);
+    let at = 0;
+    for (const c of chunks) { out.set(c, at); at += c.byteLength; }
+    return out.buffer;
 }
 
 export default {
@@ -99,6 +142,10 @@ export default {
         }
 
         if (!url.pathname.startsWith('/room/')) return text('not found', 404);
+        if (!originAllowed(req)) {
+            await readCapped(req, 0);
+            return text('not from this site', 403);
+        }
         const [addr, ...rest] = url.pathname.slice('/room/'.length).split('/');
         if (!ADDR_RE.test(addr)) return text('bad room address', 400);
 
@@ -113,19 +160,21 @@ export default {
         const okShape = (rest.length === 1 && rest[0] === 'claim')
             || (rest[0] === 'blob' && rest.length >= 2 && rest.length <= 3 && BLOB_ID_RE.test(rest[1])
                 && (rest.length === 2 || /^\d{1,2}$/.test(rest[2])));
-        /* A body is always read to the end, here, before anything answers:
+        /* A body is always read to the end here, before anything answers:
            a response sent over an unread upload makes the runtime fail
-           reading it afterwards (and `wrangler dev` exits outright). The
-           part limit keeps that read small. */
+           reading it afterwards (and `wrangler dev` exits outright). No more
+           than a part's worth of it is kept. */
         let body: ArrayBuffer | null = null;
         if (req.method === 'PUT' || req.method === 'POST') {
-            body = await req.arrayBuffer();
-            if (body.byteLength > MAX_PART_BYTES) return text('part too large', 413);
+            body = await readCapped(req, MAX_PART_BYTES);
+            if (body === null) return text('part too large', 413);
+        } else {
+            await readCapped(req, 0);
         }
         if (!okShape) return text('not found', 404);
 
         return env.TABLE_ROOM.get(env.TABLE_ROOM.idFromName(addr)).fetch(
-            body === null ? req : new Request(req.url, { method: req.method, headers: req.headers, body }));
+            new Request(req.url, { method: req.method, headers: req.headers, body }));
     },
 };
 
@@ -139,7 +188,20 @@ interface SocketMeta {
 }
 
 export class TableRoom implements DurableObject {
+    /** When this object last moved its idle alarm. Kept in memory only: an
+        object woken from hibernation starts at 0 and moves it on its first
+        message, which is all the bookkeeping needs. */
+    private armedAt = 0;
+
     constructor(private state: DurableObjectState) {}
+
+    /** Pushes the idle wipe IDLE_MS into the future — at most once every
+        REARM_MS, since each move is a storage write. */
+    private async rearm(now: number): Promise<void> {
+        if (now - this.armedAt < REARM_MS) return;
+        this.armedAt = now;
+        await this.state.storage.setAlarm(now + IDLE_MS);
+    }
 
     async fetch(req: Request): Promise<Response> {
         const rest = new URL(req.url).pathname.split('/').slice(3);
@@ -158,7 +220,7 @@ export class TableRoom implements DurableObject {
         this.state.acceptWebSocket(server);
         server.serializeAttachment({ n: 0, since: Date.now() } satisfies SocketMeta);
 
-        await this.state.storage.setAlarm(Date.now() + IDLE_MS);
+        await this.rearm(Date.now());
 
         return new Response(null, { status: 101, webSocket: pair[0] });
     }
@@ -208,7 +270,7 @@ export class TableRoom implements DurableObject {
             }
         }
 
-        await this.state.storage.setAlarm(now + IDLE_MS);
+        await this.rearm(now);
     }
 
     webSocketError(ws: WebSocket): void {
@@ -216,6 +278,8 @@ export class TableRoom implements DurableObject {
     }
 
     async alarm(): Promise<void> {
+        /* No alarm is set any more: the next activity must set one. */
+        this.armedAt = 0;
         for (const ws of this.state.getWebSockets()) {
             try { ws.close(1001, 'table idle'); } catch { /* already gone */ }
         }
@@ -337,7 +401,7 @@ export class TableRoom implements DurableObject {
 
     /** A file write is activity too: it keeps the room from its idle wipe. */
     private async touch(): Promise<void> {
-        await this.state.storage.setAlarm(Date.now() + IDLE_MS);
+        await this.rearm(Date.now());
     }
 }
 

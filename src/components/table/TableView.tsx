@@ -28,11 +28,15 @@ export function TableView() {
         ? (isHost || hostOnline ? 'live' : 'waiting')
         : status === 'connecting' ? 'connecting' : 'offline';
 
+    /* The name the GM's roster gives me: a name someone else already had
+       comes back with a number after it, and rolls carry that one. */
+    const shownName = state.members.find((m) => m.id === state.myId)?.name ?? state.myName;
+
     /* The dice always sit in the right-hand column. The feed joins them there
        while a map takes the middle, and has the middle to itself otherwise. */
     const feed = (
         <div className="feed-scroll">
-            <RollFeed rolls={state.rolls} myName={state.myName} members={state.members} sorted={state.isHost && state.successesFirst} />
+            <RollFeed rolls={state.rolls} myName={shownName} members={state.members} sorted={state.isHost && state.successesFirst} />
         </div>
     );
 

@@ -10,7 +10,7 @@
    reason for a nickname to contain a bidi override and every reason for someone
    to try. */
 
-import { LIMITS } from './protocol';
+import { FILE_MIME_RE, LIMITS } from './protocol';
 import { UNSAFE_TEXT } from './text';
 import { MAX_COLOR } from './colors';
 import { IMAGE_RE, isCharKey, parseSlimMon, parseSlimTrainer, parseStatus } from './slim';
@@ -58,9 +58,11 @@ export function cleanText(v: unknown, max: number): string {
     return v.normalize('NFC').replace(UNSAFE_TEXT, '').trim().slice(0, max);
 }
 
-/** A short opaque id — request ids, roll ids, session ids. */
+/** A short opaque id — request ids, roll ids, session ids. Never one of the
+    prototype names: ids end up as object keys here and there, and `__proto__`
+    as a key is a setter, not a field. Nothing this app makes is spelled so. */
 function idText(v: unknown): string | null {
-    return typeof v === 'string' && /^[A-Za-z0-9_-]{1,48}$/.test(v) ? v : null;
+    return typeof v === 'string' && /^[A-Za-z0-9_-]{1,48}$/.test(v) && !POISON_KEYS.has(v) ? v : null;
 }
 
 /** A finite number in range; fractions allowed. */
@@ -178,8 +180,7 @@ export function parseFile(raw: unknown): WireFile | null {
     /* The count must be the one the size implies, or a reference could ask
        for parts that do not exist, or stop short of the end. */
     if (parts !== Math.max(1, Math.ceil(size / 1_000_000))) return null;
-    if (typeof raw.mime !== 'string'
-        || !/^((audio|image|video)\/[a-z0-9.+-]{1,40}|application\/octet-stream)$/.test(raw.mime)) return null;
+    if (typeof raw.mime !== 'string' || !FILE_MIME_RE.test(raw.mime)) return null;
     return { id: raw.id, sha: raw.sha, size, parts, mime: raw.mime };
 }
 
@@ -238,9 +239,6 @@ function parseMapImage(raw: unknown): WireMapImage | null {
     return { file, w, h };
 }
 
-/* More than any Pokémon knows: Insight + 2 tops out well under it. */
-const MAX_USED_MOVES = 16;
-
 function parseTurnEntry(raw: unknown): WireTurnEntry | null {
     if (!isRecord(raw) || !exactly(raw, ['id', 'name', 'img', 'own', 'ck', 'done', 'out', 'acted', 'eva', 'clash', 'used'])) return null;
     const id = idText(raw.id);
@@ -261,7 +259,7 @@ function parseTurnEntry(raw: unknown): WireTurnEntry | null {
     if (typeof raw.eva !== 'boolean' || typeof raw.clash !== 'boolean') return null;
     const out: WireTurnEntry = { ...entry, own, ck: raw.ck, acted, eva: raw.eva, clash: raw.clash };
     if (raw.used !== undefined) {
-        if (!Array.isArray(raw.used) || raw.used.length > MAX_USED_MOVES) return null;
+        if (!Array.isArray(raw.used) || raw.used.length > LIMITS.MAX_USED_MOVES) return null;
         const used = raw.used.map((m) => cleanText(m, LIMITS.MAX_NOTE));
         if (used.some((m) => !m)) return null;
         out.used = used as string[];

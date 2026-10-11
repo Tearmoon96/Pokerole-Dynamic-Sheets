@@ -60,6 +60,8 @@ const STAT_STALE_MS = 20_000;
 /** A file the relay did not have is asked for again after this. */
 const RETRY_MS = 10_000;
 const VERIFY_MS = 10 * 60_000;
+/** The least time between two looks at the relay prompted by players. */
+const LOST_GAP_MS = 15_000;
 
 /* Fades: in a touch longer than out, so a scene settles in and an ambience
    slips away. The lead gives the message time to land before the volume
@@ -369,6 +371,10 @@ export class MusicController {
         this.libraryTimer = null;
         if (this.volumeTimer !== null) clearTimeout(this.volumeTimer);
         this.statTimer = this.volumeTimer = null;
+        if (this.lostTimer !== null) clearTimeout(this.lostTimer);
+        this.lostTimer = null;
+        this.lostAt = 0;
+        this.lost.clear();
         this.fetchAbort?.abort();
         this.fetchAbort = null;
         this.fetching = false;
@@ -809,8 +815,31 @@ export class MusicController {
         const { k: _k, ...rest } = body;
         this.set({ members: { ...this.view.members, [from]: { ...rest, at: Date.now() } } });
         /* A player could not fetch a track: the relay may have dropped it. */
-        const lost = body.failed.filter((id) => this.uploads[id]);
-        if (lost.length) void this.verifyUploads(lost);
+        const lost = body.failed.filter((id) => Object.hasOwn(this.uploads, id));
+        if (!lost.length) return;
+        for (const id of lost) this.lost.add(id);
+        this.checkLost();
+    }
+
+    /* A look at the relay for each reported track is a request to it, and the
+       reports are the players' to send: so looks are paced — at once after a
+       quiet spell, then at most one every LOST_GAP_MS covering every track
+       reported meanwhile — or a player could spend the relay's daily
+       allowance from the GM's page. */
+    private lost = new Set<string>();
+    private lostTimer: number | null = null;
+    private lostAt = 0;
+
+    private checkLost(): void {
+        if (this.lostTimer !== null) return;
+        const wait = Math.max(0, this.lostAt + LOST_GAP_MS - Date.now());
+        this.lostTimer = window.setTimeout(() => {
+            this.lostTimer = null;
+            this.lostAt = Date.now();
+            const ids = [...this.lost];
+            this.lost.clear();
+            void this.verifyUploads(ids);
+        }, wait);
     }
 
     forget(memberId: string): void {

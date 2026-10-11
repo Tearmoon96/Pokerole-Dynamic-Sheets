@@ -5,6 +5,7 @@
 import type { PokedexEntry } from '../data/types';
 import type { CharKey } from '../table/slim';
 import type { WireTurnEntry, WireTurns } from '../table/protocol';
+import { LIMITS } from '../table/protocol';
 import { IMAGE_RE } from '../table/slim';
 import { initOffset } from './combat';
 import { entityPool, entityRef, monShownName, participantToken } from './entities';
@@ -92,6 +93,17 @@ export function enterFight(
 ): GmCombat {
     const copy = state.tablePcs[member];
     if (!copy) return c;
+    /* Characters from as many table members as a table holds, and no more:
+       keys that come and go at the table must not fill the GM's fight — and
+       the saved board, which carries each one's sheet — without end. A member
+       already in keeps entering their own characters (seven at most: their
+       trainer and six team slots, each one combatant). */
+    const members = new Set<string>();
+    for (const p of c.participants) {
+        const pc = parsePcToken(String(rec(p).src || ''));
+        if (pc) members.add(pc.member);
+    }
+    if (!members.has(member) && members.size >= LIMITS.MAX_MEMBERS - 1) return c;
     let parts = c.participants.slice();
     for (const ch of chars) {
         const src = pcToken(member, ch.key);

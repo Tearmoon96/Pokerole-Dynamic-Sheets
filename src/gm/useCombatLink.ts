@@ -7,8 +7,9 @@ import { COMBAT_BEAT_MS, COMBAT_LOST_MS, openCombatLink, parseCombatLink } from 
 import type { CombatLinkMessage, LinkMember } from '../lib/combatLink';
 import type { PokedexEntry } from '../data/types';
 import type { GmStore } from './store';
+import type { CharKey } from '../table/slim';
 import { buildTurns, canActIn, enterFight, ownedBy, tableCombatOf } from './tableCombat';
-import { onPcEdit } from './tablePcs';
+import { onPcEdit, pcToken, pruneTablePcs } from './tablePcs';
 import { addPing } from './rollPings';
 import { delayTurn, markMove, passTurn, spendQuick } from './turns';
 import type { GmCombat, GmState } from './types';
@@ -32,6 +33,48 @@ export function useTablePresence(): Presence {
         (cb) => { watchers.add(cb); return () => { watchers.delete(cb); }; },
         () => presence, () => presence,
     );
+}
+
+/* ------------------------------------------ copies waiting to come in */
+
+/* Players' sheets reach this page whenever they change, for every character
+   the table holds a sheet of — not only the ones in a fight. The board is
+   saved in localStorage, which every page of the site shares (trainers,
+   maps), and a player could otherwise fill it with sheets of characters that
+   never come in. So only a character in a fight has its copy on the board;
+   the rest wait here, in memory, until they enter. After a reload the table
+   sends every sheet again. */
+type PcMessage = Extract<CombatLinkMessage, { t: 'pc' }>;
+const waiting = new Map<string, Map<CharKey, PcMessage>>();
+/** Members whose sheets wait here at once: a table holds 16 people. */
+const MAX_WAITING = 16;
+
+function waitIn(m: PcMessage): void {
+    const mine = waiting.get(m.member) ?? new Map<CharKey, PcMessage>();
+    mine.set(m.key, m);
+    waiting.delete(m.member);
+    waiting.set(m.member, mine);
+    while (waiting.size > MAX_WAITING) {
+        const oldest = waiting.keys().next().value;
+        if (oldest === undefined) break;
+        waiting.delete(oldest);
+    }
+}
+
+function inAFight(s: GmState, member: string, key: CharKey): boolean {
+    const src = pcToken(member, key);
+    return s.combats.some((c) => c.participants.some((p) => (p as unknown as { src?: string }).src === src));
+}
+
+/** A player's sheet onto the board's copy of their characters. */
+function keepCopy(s: GmState, m: PcMessage): void {
+    const was = s.tablePcs[m.member] || { player: m.player, trainer: null, mons: {} };
+    /* Their colour, as the table's roster has it. */
+    const color = presence.members.find((x) => x.id === m.member)?.color ?? was.color;
+    const next = m.key === 't'
+        ? { ...was, player: m.player, trainer: m.trainer! }
+        : { ...was, player: m.player, mons: { ...was.mons, [m.key]: m.mon! } };
+    s.tablePcs = { ...s.tablePcs, [m.member]: color === undefined ? next : { ...next, color } };
 }
 
 /* ------------------------------------------------------------ the link */
@@ -159,19 +202,29 @@ function linkRun(store: GmStore, dexRef: { current: (id: string) => PokedexEntry
                     sendTurns(true);
                     break;
                 case 'pc':
-                    store.update((s) => {
-                        const was = s.tablePcs[m.member] || { player: m.player, trainer: null, mons: {} };
-                        /* Their colour, as the table's roster has it. */
-                        const color = presence.members.find((x) => x.id === m.member)?.color ?? was.color;
-                        const next = m.key === 't'
-                            ? { ...was, player: m.player, trainer: m.trainer! }
-                            : { ...was, player: m.player, mons: { ...was.mons, [m.key]: m.mon! } };
-                        s.tablePcs = { ...s.tablePcs, [m.member]: color === undefined ? next : { ...next, color } };
+                    if (!inAFight(store.state, m.member, m.key)) { waitIn(m); break; }
+                    store.update((s) => keepCopy(s, m));
+                    break;
+                case 'enter': {
+                    const staged = waiting.get(m.member);
+                    onTable((c, s) => {
+                        /* The sheets of the characters coming in go onto the
+                           board, with the trainer's: a Pokémon's label carries
+                           its trainer's name. Whatever no combatant names after
+                           the entry — all of it, if the fight turned them away
+                           — comes off again. */
+                        if (staged) {
+                            for (const ch of m.chars) { const pc = staged.get(ch.key); if (pc) keepCopy(s, pc); }
+                            const trainer = staged.get('t');
+                            if (trainer) keepCopy(s, trainer);
+                        }
+                        const next = enterFight(s, c, dexById, m.member, m.chars);
+                        s.combats = s.combats.map((x) => (x.gid === c.gid ? next : x));
+                        pruneTablePcs(s);
+                        return next;
                     });
                     break;
-                case 'enter':
-                    onTable((c, s) => enterFight(s, c, dexById, m.member, m.chars));
-                    break;
+                }
                 case 'act': {
                     /* An attack, an Evasion or a Clash: a light on the row, so
                        the GM remembers the action. An attack changes nothing
