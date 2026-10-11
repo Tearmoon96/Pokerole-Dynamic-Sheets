@@ -10,7 +10,7 @@ import type { GmStore } from './store';
 import { buildTurns, canActIn, enterFight, ownedBy, tableCombatOf } from './tableCombat';
 import { onPcEdit } from './tablePcs';
 import { addPing } from './rollPings';
-import { delayTurn, passTurn, spendQuick } from './turns';
+import { delayTurn, markMove, passTurn, spendQuick } from './turns';
 import type { GmCombat, GmState } from './types';
 
 /* ------------------------------------------------- is a table listening */
@@ -179,7 +179,12 @@ function linkRun(store: GmStore, dexRef: { current: (id: string) => PokedexEntry
                     const fight = tableCombatOf(store.state);
                     if ((m.op === 'acc' || m.op === 'eva' || m.op === 'clash')
                         && fight && ownedBy(fight, m.member, m.pid)) addPing(m.pid, m.op);
-                    if (m.op === 'acc') break;
+                    if (m.op === 'acc') {
+                        /* The move is used for the Round. */
+                        const move = m.move;
+                        if (move) onTable((c) => (ownedBy(c, m.member, m.pid) ? markMove(c, m.pid, move, true) : c));
+                        break;
+                    }
                     onTable((c, s) => {
                         if (!ownedBy(c, m.member, m.pid)) return c;
                         const canAct = canActIn(s, dexById);

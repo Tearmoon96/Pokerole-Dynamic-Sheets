@@ -238,8 +238,11 @@ function parseMapImage(raw: unknown): WireMapImage | null {
     return { file, w, h };
 }
 
+/* More than any Pokémon knows: Insight + 2 tops out well under it. */
+const MAX_USED_MOVES = 16;
+
 function parseTurnEntry(raw: unknown): WireTurnEntry | null {
-    if (!isRecord(raw) || !exactly(raw, ['id', 'name', 'img', 'own', 'ck', 'done', 'out', 'acted', 'eva', 'clash'])) return null;
+    if (!isRecord(raw) || !exactly(raw, ['id', 'name', 'img', 'own', 'ck', 'done', 'out', 'acted', 'eva', 'clash', 'used'])) return null;
     const id = idText(raw.id);
     const name = cleanText(raw.name, LIMITS.MAX_NAME * 2);
     if (!id || !name) return null;
@@ -250,13 +253,20 @@ function parseTurnEntry(raw: unknown): WireTurnEntry | null {
     if (acted === null) return null;
     if (raw.own === '') {
         /* The GM's own combatants carry their action count and nothing more. */
-        if (raw.ck !== '' || raw.eva !== undefined || raw.clash !== undefined) return null;
+        if (raw.ck !== '' || raw.eva !== undefined || raw.clash !== undefined || raw.used !== undefined) return null;
         return acted === undefined ? entry : { ...entry, acted };
     }
     const own = fingerprintText(raw.own);
     if (!own || !isCharKey(raw.ck) || acted === undefined) return null;
     if (typeof raw.eva !== 'boolean' || typeof raw.clash !== 'boolean') return null;
-    return { ...entry, own, ck: raw.ck, acted, eva: raw.eva, clash: raw.clash };
+    const out: WireTurnEntry = { ...entry, own, ck: raw.ck, acted, eva: raw.eva, clash: raw.clash };
+    if (raw.used !== undefined) {
+        if (!Array.isArray(raw.used) || raw.used.length > MAX_USED_MOVES) return null;
+        const used = raw.used.map((m) => cleanText(m, LIMITS.MAX_NOTE));
+        if (used.some((m) => !m)) return null;
+        out.used = used as string[];
+    }
+    return out;
 }
 
 function parseTurns(raw: unknown): WireTurns | null {
@@ -474,11 +484,18 @@ export function parseBody(raw: unknown): Body | null {
             return { k: 'enter', rid, chars };
         }
         case 'turn': {
-            if (!exactly(raw, ['k', 'op', 'id', 'after'])) return null;
+            if (!exactly(raw, ['k', 'op', 'id', 'after', 'mv'])) return null;
             const id = idText(raw.id);
             if (!id || !(raw.op === 'pass' || raw.op === 'delay' || raw.op === 'eva' || raw.op === 'clash' || raw.op === 'acc')) return null;
             if (raw.after !== undefined && (raw.op !== 'delay' || !idText(raw.after))) return null;
-            return { k: 'turn', op: raw.op, id, ...(raw.after !== undefined ? { after: raw.after as string } : {}) };
+            /* The move an attack was for, so the GM's tracker marks it used. */
+            const mv = raw.mv === undefined ? undefined : cleanText(raw.mv, LIMITS.MAX_NOTE);
+            if (raw.mv !== undefined && (raw.op !== 'acc' || !mv)) return null;
+            return {
+                k: 'turn', op: raw.op, id,
+                ...(raw.after !== undefined ? { after: raw.after as string } : {}),
+                ...(mv ? { mv } : {}),
+            };
         }
         default:
             return null;

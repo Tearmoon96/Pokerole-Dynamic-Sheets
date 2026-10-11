@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useAppData } from '../../data/AppDataContext';
 import type { RollMeta } from '../../gm/dice';
+import { MAX_ACTIONS } from '../../gm/combat';
 import { ROLLABLE_QUICK, computeMoveTotals, pinnedMoveObjects } from '../../gm/moves';
 import { typeColors } from '../../lib/themeTables';
 import type { PokedexEntry, ItemEntry } from '../../data/types';
@@ -21,7 +22,8 @@ const CAT_COLORS: Record<string, string> = {
     accuracy (the GM screen flags the action), or the initiative (which the
     rolling table turns into a way into the fight). */
 export type RollKind = 'eva' | 'clash' | 'acc' | 'init';
-export type DoRoll = (dice: number, meta: RollMeta, quick?: RollKind) => void;
+/** `move`: the move an Accuracy is for, so the fight can mark it used. */
+export type DoRoll = (dice: number, meta: RollMeta, quick?: RollKind, move?: string) => void;
 
 /** Which quick chips are spent for the round, and so drawn without a button:
     Clash and Evasion are once per Round each. Absent on the GM screen, where the
@@ -121,8 +123,12 @@ export function PainChip({ pain }: { pain: number }) {
     );
 }
 
+/* `act` is the action being played, one past the pips already filled. */
 function ActionLine({ act }: { act: number | null }) {
     if (!act) return null;
+    if (act > MAX_ACTIONS) {
+        return <div className="tip-action">No actions left this Round</div>;
+    }
     return (
         <div className="tip-action">
             Action <strong>{act}</strong> · needs{' '}
@@ -240,7 +246,30 @@ export function TrainerTipBody({ name, rank, value, pain, act, doRoll, spent, no
     );
 }
 
-export function MonTipBody({ token, dex, sheet, who, owner, value, pain, act, doRoll, spent, noInit }: {
+/* A move used this Round. On the GM screen it is a button: a mark set by a
+   roll the GM threw away comes off, and one can be set by hand; on the table
+   it only shows. */
+function UsedMark({ used, onToggle }: { used: boolean; onToggle?: () => void }) {
+    if (onToggle) {
+        return (
+            <button
+                type="button" className={'tip-move-used' + (used ? ' on' : '')} aria-pressed={used} data-used-mark=""
+                title={used ? 'Used this Round — click to clear' : 'Mark as used this Round'}
+                onClick={onToggle}
+            >
+                <i className={'fa-solid ' + (used ? 'fa-circle-check' : 'fa-circle')}></i>{used && ' Used'}
+            </button>
+        );
+    }
+    if (!used) return null;
+    return (
+        <span className="tip-move-used on" data-used-mark="" title="Used this Round: a move is once a Round">
+            <i className="fa-solid fa-circle-check"></i> Used
+        </span>
+    );
+}
+
+export function MonTipBody({ token, dex, sheet, who, owner, value, pain, act, doRoll, spent, noInit, used, onToggleUsed }: {
     token: string;
     dex: PokedexEntry;
     sheet: Partial<CardSheet>;
@@ -253,6 +282,10 @@ export function MonTipBody({ token, dex, sheet, who, owner, value, pain, act, do
     doRoll: DoRoll;
     spent?: QuickSpent;
     noInit?: boolean;
+    /** Moves already used this Round (once each), by name. */
+    used?: string[];
+    /** The GM may clear a mark, or set one, by hand. */
+    onToggleUsed?: (move: string) => void;
 }) {
     const { data } = useAppData();
     const itemByName = (name: string): ItemEntry | null => {
@@ -260,7 +293,8 @@ export function MonTipBody({ token, dex, sheet, who, owner, value, pain, act, do
         if (!want) return null;
         return data.items.find((i) => String(i.Name || '').trim().toLowerCase() === want) || null;
     };
-    const need = act;
+    /* An Accuracy needs as many successes as the number of the action. */
+    const need = act && act <= MAX_ACTIONS ? act : null;
     const moves = pinnedMoveObjects(dex, sheet, data.moves);
     const types = [dex.Type1, dex.Type2].filter(Boolean).join(' / ');
 
@@ -294,6 +328,7 @@ export function MonTipBody({ token, dex, sheet, who, owner, value, pain, act, do
                     <div className="tip-move" key={move.Name + mi}>
                         <div className="tip-move-head">
                             <span className="tip-move-name">{move.Name}</span>
+                            <UsedMark used={!!used?.includes(move.Name)} onToggle={onToggleUsed ? () => onToggleUsed(move.Name) : undefined} />
                             <span className="tip-badge"
                                 style={{ color: tc, borderColor: tc + '66', background: tc + '1a' }}>
                                 {move.Type}
@@ -314,7 +349,7 @@ export function MonTipBody({ token, dex, sheet, who, owner, value, pain, act, do
                                         dmg: (totals.powN ?? 0) > 0
                                             ? { token, mi, dice: totals.powN!, what: move.Name + ' damage' }
                                             : null,
-                                    }, 'acc')}
+                                    }, 'acc', move.Name)}
                                 >
                                     ACC <strong>{accText}</strong>
                                 </button>

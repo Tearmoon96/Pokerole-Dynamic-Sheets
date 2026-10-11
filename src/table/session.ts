@@ -70,7 +70,7 @@ export interface PreparedRoll {
     extras: RollExtras;
     /** Reported to the GM screen's tracker when it is rolled: an attack, or
         an Evasion or Clash, which also spends an action. */
-    quick: { op: 'acc' | 'eva' | 'clash'; id: string } | null;
+    quick: { op: 'acc' | 'eva' | 'clash'; id: string; move?: string } | null;
     /** Initiative into the fight on the table: the GM rolls 1d6 + the bonus. */
     enter: { trainerId: string; key: CharKey; slot: number | null } | null;
 }
@@ -1011,7 +1011,7 @@ export class TableSession {
             const extras: RollExtras = sides === 6 ? prep.extras
                 : prep.extras.bonus !== undefined ? { bonus: prep.extras.bonus } : {};
             this.rollFor(count, sides, note || '', extras);
-            if (prep.quick) this.combat.act(prep.quick.op, prep.quick.id);
+            if (prep.quick) this.combat.act(prep.quick.op, prep.quick.id, undefined, prep.quick.move);
             return;
         }
 

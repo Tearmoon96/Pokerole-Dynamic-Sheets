@@ -111,6 +111,32 @@
 
 .tip-move-name { font-weight: 600; flex: 1; }
 
+/* A move used this Round (once each). On the GM screen an unused one shows
+   a faint circle to mark by hand. */
+.tip-move-used {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    padding: 0.05rem 0.3rem;
+    border-radius: 5px;
+    border: 1px solid transparent;
+    background: none;
+    white-space: nowrap;
+}
+button.tip-move-used:not(.on) { opacity: 0.35; }
+button.tip-move-used:not(.on):hover { opacity: 0.9; }
+.tip-move-used.on {
+    color: #fbbf24;
+    border-color: #fbbf2466;
+    background: #fbbf241a;
+}
+.tip-move:has(.tip-move-used.on) .tip-move-name { opacity: 0.6; }
+
 .tip-badge {
     font-size: 0.58rem;
     font-weight: 700;

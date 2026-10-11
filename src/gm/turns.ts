@@ -7,11 +7,13 @@
    and that repeats until nobody has an action left. Only the GM starts a new
    Round, which is what gives the five back.
 
-   The pip for a turn is filled the moment the turn STARTS, which is the
-   tracker's own convention (the move panel reads "Action N · needs N
-   successes" off the filled pips, and N has to be right while the turn is
-   being played). So passing costs nothing more; a delay hands the pip back.
-   Evasion and Clash are rolled out of turn and spend an action of their own.
+   A pip is filled when an action is DONE — the turn passing, or an Evasion
+   or a Clash rolled out of turn (2026-10-11, the owner's rule). So the
+   filled pips count the actions already taken, and the action being played
+   is the next one: with none filled a combatant is on action 1 and needs one
+   success, with two filled on action 3 and needs three (`actionOf`). Five
+   filled and they are done for the Round. A delay costs nothing: the pip
+   fills when the turn is finally played.
 
    A combatant may delay: step out of the order and come back later in this
    pass, after a chosen combatant or at the end. That reorders this pass only
@@ -30,6 +32,13 @@ export const actedOf = (p: GmCombatant): number => (p.acted as number) || 0;
 export type CanAct = (p: GmCombatant) => boolean;
 
 export const hasActions = (p: GmCombatant): boolean => actedOf(p) < MAX_ACTIONS;
+
+/** The action a combatant is on — the one after those already taken — which
+    is also how many successes its Accuracy needs. Past the last, they have
+    none left; callers show that rather than a sixth action. */
+export function actionOf(acted: number): number {
+    return Math.max(0, acted) + 1;
+}
 
 /** This pass's order: the delayed one if there is one — with anyone added
     since appended and anyone removed dropped — else the initiative order. */
@@ -52,10 +61,9 @@ function withActed(c: GmCombat, pid: string, delta: number): GmCombat {
     };
 }
 
-/** Hands the turn to `pid` and fills their pip for it. */
+/** Hands the turn to `pid`. Their pip fills when the turn is over. */
 function begin(c: GmCombat, pid: string | null): GmCombat {
-    const next = { ...c, turn: pid };
-    return pid ? withActed(next, pid, 1) : next;
+    return { ...c, turn: pid };
 }
 
 /** The first in this pass's order who has not had their turn and can act. */
@@ -84,16 +92,17 @@ export function stopTurns(c: GmCombat): GmCombat {
     return { ...c, turnsOn: false, turn: null, passed: [], passOrder: null, pass: 1 };
 }
 
-/** The current turn is over. */
+/** The current turn is over: its action is done, and its pip fills. */
 export function passTurn(c: GmCombat, canAct: CanAct): GmCombat {
     if (!c.turnsOn || !c.turn) return c;
-    const done: GmCombat = { ...c, passed: c.passed.includes(c.turn) ? c.passed : [...c.passed, c.turn], turn: null };
+    const acted = withActed(c, c.turn, 1);
+    const done: GmCombat = { ...acted, passed: c.passed.includes(c.turn) ? c.passed : [...c.passed, c.turn], turn: null };
     const next = nextUp(done, canAct);
     return next ? begin(done, next) : newPass(done, canAct, true);
 }
 
 /** The current combatant steps back to act after `after` (null: at the end of
-    the pass). Their pip is handed back; it fills again when the turn comes. */
+    the pass). Nothing is spent: the pip fills when the turn is played. */
 export function delayTurn(c: GmCombat, after: string | null, canAct: CanAct): GmCombat {
     const pid = c.turn;
     if (!pid) return c;
@@ -103,7 +112,7 @@ export function delayTurn(c: GmCombat, after: string | null, canAct: CanAct): Gm
        would just be the end of the pass with extra steps. */
     if (after && (at < 0 || c.passed.includes(after))) return c;
     order.splice(at < 0 ? order.length : at + 1, 0, pid);
-    const moved = withActed({ ...c, passOrder: order, turn: null }, pid, -1);
+    const moved: GmCombat = { ...c, passOrder: order, turn: null };
     const next = nextUp(moved, canAct);
     /* Delaying behind nobody who can act leaves the turn where it was. */
     return next && next !== pid ? begin(moved, next) : begin(moved, pid);
@@ -116,6 +125,20 @@ export function spendQuick(c: GmCombat, pid: string, what: 'eva' | 'clash'): GmC
     return {
         ...spent,
         participants: spent.participants.map((p) => (pidOf(p) === pid ? { ...p, [key]: true } : p)),
+    };
+}
+
+/** Marks a move used this Round, or clears the mark. */
+export function markMove(c: GmCombat, pid: string, move: string, used: boolean): GmCombat {
+    if (!c.participants.some((p) => pidOf(p) === pid)) return c;
+    return {
+        ...c,
+        participants: c.participants.map((p) => {
+            if (pidOf(p) !== pid) return p;
+            const had = Array.isArray(p.usedMoves) ? p.usedMoves : [];
+            const next = used ? (had.includes(move) ? had : [...had, move]) : had.filter((m) => m !== move);
+            return { ...p, usedMoves: next };
+        }),
     };
 }
 

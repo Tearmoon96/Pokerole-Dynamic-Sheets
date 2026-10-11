@@ -53,6 +53,9 @@ export interface GmCombatant {
         count. Cleared when the Round advances, exactly as the action pips are. */
     usedClash?: boolean;
     usedEva?: boolean;
+    /** The moves used this Round, by name: a move is once a Round. Marked
+        when its Accuracy is rolled, cleared with the pips. */
+    usedMoves?: string[];
     [key: string]: unknown;
 }
 
@@ -68,9 +71,12 @@ export interface GmCombat {
     /** Turns are being kept: the GM started them, and has not stopped them. */
     turnsOn: boolean;
     /** The turn tracker: the pid whose turn it is, or null — turns not kept,
-        or everyone's actions spent for the Round. A turn costs its combatant one action, filled the moment
-        the turn starts — see src/gm/turns.ts. */
+        or everyone's actions spent for the Round. A turn costs its combatant
+        one action, its pip filled when the turn is over — see src/gm/turns.ts. */
     turn: string | null;
+    /** Pips count actions DONE. A fight saved before that filled the current
+        turn's pip as it started, and loses that one pip once on load. */
+    pipsDone?: boolean;
     /** Who has had their turn in this pass. Everyone passing starts the next
         pass, a new action for each; only the GM starts a new Round. */
     passed: string[];
@@ -96,6 +102,8 @@ export interface GmTablePc {
 export interface GmDice {
     count: number;
     sides: number;
+    /** The move the set-up Accuracy is for: marked used when it is rolled. */
+    prepUse?: { pid: string; move: string } | null;
     history: unknown[];
     /** Show a pool's successes first and the rest after them. Display only:
         the stored faces keep the order they were rolled in. */

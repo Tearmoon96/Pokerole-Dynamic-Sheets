@@ -290,7 +290,7 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
                                 ...c,
                                 round: next,
                                 participants: c.participants.map((p) => ({
-                                    ...p, acted: 0, usedClash: false, usedEva: false,
+                                    ...p, acted: 0, usedClash: false, usedEva: false, usedMoves: [],
                                 })),
                             }, canActIn(s, dexById)));
                         }}

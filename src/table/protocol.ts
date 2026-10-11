@@ -149,6 +149,8 @@ export interface WireTurnEntry {
     acted?: number;
     eva?: boolean;
     clash?: boolean;
+    /** A player's character only: the moves it used this Round, by name. */
+    used?: string[];
 }
 
 export interface WireTurns {
@@ -216,7 +218,7 @@ export type Body =
     | { k: 'enter'; rid: string; chars: { key: CharKey; bonus: number }[] }
     /** Player to host: my turn is over, I delay it, or I spent an action on an
         Evasion or a Clash. */
-    | { k: 'turn'; op: TurnOp; id: string; after?: string };
+    | { k: 'turn'; op: TurnOp; id: string; after?: string; mv?: string };
 
 /** `acc`: an attack rolled, which costs nothing here — the GM screen only
     flags it, as a reminder to count the action. */

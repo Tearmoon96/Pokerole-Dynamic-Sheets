@@ -32,12 +32,15 @@ import {
     TRAINER_TOKEN, chooseTrainer, chosenTrainerId, monToken, useSoloState, useWorkingSet, workingTrainers,
 } from '../../table/character';
 import type { CardSheet } from '../../card/types';
+import { actionOf } from '../../gm/turns';
 
 /** What the fight knows about one of this player's characters: its combatant
     id, the action it is on and the once-a-Round rolls already made. */
 interface Seat {
     id: string;
     act: number;
+    /** Moves used this Round. */
+    used: string[];
     spent: QuickSpent;
 }
 
@@ -163,7 +166,11 @@ function CharacterBody() {
         const e = key && turns ? turns.order.find((x) => x.own === state.myId && x.ck === key) : null;
         if (!e) return null;
         const acted = e.acted ?? 0;
-        return { id: e.id, act: Math.max(1, acted), spent: { eva: !!e.eva || acted >= 5, clash: !!e.clash || acted >= 5 } };
+        /* The pips are actions done; the one being played is the next. */
+        return {
+            id: e.id, act: actionOf(acted), used: e.used ?? [],
+            spent: { eva: !!e.eva || acted >= 5, clash: !!e.clash || acted >= 5 },
+        };
     };
 
     /* Another trainer of this browser's already holds the seats in the fight. */
@@ -193,7 +200,7 @@ function CharacterBody() {
        GM rolls it and the feed says whose and what for. In the fight, an
        Evasion or a Clash also spends an action, and an attack is flagged to
        the GM screen so the action gets counted. */
-    const rollFrom = (token: string): DoRoll => (dice, meta, quick) => {
+    const rollFrom = (token: string): DoRoll => (dice, meta, quick, move) => {
         if (!(dice > 0)) return;
         if (quick === 'init') { prepInit(token, meta.bonus ?? 0, meta.who || ''); return; }
         const note = [meta.who, meta.what].filter(Boolean).join(' · ');
@@ -204,7 +211,7 @@ function CharacterBody() {
                 ...(meta.pain ? { pain: meta.pain } : {}),
                 ...(meta.need != null ? { need: meta.need } : {}),
             },
-            quick: quick && s ? { op: quick, id: s.id } : null,
+            quick: quick && s ? { op: quick, id: s.id, ...(quick === 'acc' && move ? { move } : {}) } : null,
             enter: null,
         });
     };
@@ -239,6 +246,7 @@ function CharacterBody() {
                 value={(n) => resolvePoolValue(dex, sheet, n) || 0}
                 pain={painPenalty(dex, sheet)}
                 act={s ? s.act : null} spent={s ? { ...s.spent, init: true } : undefined} doRoll={rollFrom(tip)}
+                used={s ? s.used : undefined}
             />
         );
     })();

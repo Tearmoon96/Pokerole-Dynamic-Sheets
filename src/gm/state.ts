@@ -14,7 +14,7 @@ export function uid(): string {
 /** A fresh, empty fight. The name is what the panel's head is titled. */
 export function newCombat(name: string): GmCombat {
     return {
-        gid: uid(), name, round: 1, participants: [], turnsOn: false, turn: null, passed: [], passOrder: null, pass: 1,
+        gid: uid(), name, round: 1, participants: [], turnsOn: false, turn: null, passed: [], passOrder: null, pass: 1, pipsDone: true,
     };
 }
 
@@ -95,14 +95,26 @@ function normalizeCombat(raw: unknown, fallbackName: string): GmCombat {
     const round = Number(r.round);
     const pass = Number(r.pass);
     const ids = (v: unknown) => (Array.isArray(v) ? v : []).filter((x): x is string => typeof x === 'string');
+    let participants = (Array.isArray(r.participants) ? r.participants : []) as GmCombatant[];
+    const turn = typeof r.turn === 'string' ? r.turn : null;
+    /* Saved while a pip filled as a turn STARTED: the combatant on turn has
+       one pip too many under the rule now (pips are actions done), and would
+       pay twice when the turn passes. */
+    if (r.pipsDone !== true && r.turnsOn === true && turn) {
+        participants = participants.map((p) => {
+            const q = p as unknown as { pid?: string; acted?: number };
+            return q.pid === turn && (q.acted || 0) > 0 ? { ...p, acted: (q.acted || 0) - 1 } : p;
+        });
+    }
     return {
         gid: typeof r.gid === 'string' && r.gid ? r.gid : uid(),
         name: typeof r.name === 'string' && r.name.trim() ? r.name : fallbackName,
         round: round > 0 ? Math.floor(round) : 1,
-        participants: (Array.isArray(r.participants) ? r.participants : []) as GmCombatant[],
+        participants,
         /* A fight saved before the turn tracker keeps no turns until started. */
         turnsOn: r.turnsOn === true,
-        turn: typeof r.turn === 'string' ? r.turn : null,
+        turn,
+        pipsDone: true,
         passed: ids(r.passed),
         passOrder: Array.isArray(r.passOrder) ? ids(r.passOrder) : null,
         pass: pass > 0 ? Math.floor(pass) : 1,

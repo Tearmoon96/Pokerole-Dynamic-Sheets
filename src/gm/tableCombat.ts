@@ -57,9 +57,12 @@ export function buildTurns(state: GmState, c: GmCombat, dexById: DexById): WireT
                fight is on is no secret at the table. */
             acted: actedOf(p),
         };
+        const used = Array.isArray(r.usedMoves) ? (r.usedMoves as string[]).filter((m) => typeof m === 'string' && m).slice(0, 16) : [];
         return pc ? {
             ...base, own: pc.member, ck: pc.key,
             eva: !!r.usedEva, clash: !!r.usedClash,
+            /* The player's own moves used this Round: the GM's never go out. */
+            ...(used.length ? { used: used.map((m) => m.slice(0, 60)) } : {}),
         } : base;
     });
     return {

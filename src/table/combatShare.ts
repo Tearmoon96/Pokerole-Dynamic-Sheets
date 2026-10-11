@@ -282,7 +282,7 @@ export class CombatShare {
         const entry = t ? t.order.find((e) => e.id === body.id) : null;
         if (!t || !entry || entry.own !== member) return;
         if ((body.op === 'pass' || body.op === 'delay') && t.cur !== body.id) return;
-        this.post({ t: 'act', member, op: body.op, pid: body.id, after: body.after ?? null });
+        this.post({ t: 'act', member, op: body.op, pid: body.id, after: body.after ?? null, move: body.mv ?? null });
     }
 
     private onGmOp(member: string, key: CharKey, op: PcOp): void {
@@ -378,9 +378,9 @@ export class CombatShare {
         this.api.changed();
     }
 
-    act(op: TurnOp, id: string, after?: string): void {
+    act(op: TurnOp, id: string, after?: string, move?: string): void {
         if (this.host) return;
-        void this.api.publish({ k: 'turn', op, id, ...(after ? { after } : {}) });
+        void this.api.publish({ k: 'turn', op, id, ...(after ? { after } : {}), ...(op === 'acc' && move ? { mv: move } : {}) });
     }
 
     /** Every character of mine in the fight (or on its way in) whose sheet

@@ -10,6 +10,7 @@ import { workingTrainerData } from '../../gm/workingSet';
 import { parsePcToken } from '../../gm/tablePcs';
 import { monShownName } from '../../gm/entities';
 import { MonTipBody, MoveTipShell, TrainerTipBody, useTipButtonState } from './MoveTip';
+import { actionOf, markMove, pidOf } from '../../gm/turns';
 import type { PokedexEntry } from '../../data/types';
 import type { CardSheet } from '../../card/types';
 
@@ -65,20 +66,31 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
        still add or take away dice for a modifier, and then presses Roll. An
        empty pool is not a roll of one die — the same rule the ailment rolls
        follow. */
-    const doRoll = (dice: number, meta: RollMeta) => {
+    /* What this round has already cost the subject. Only combatants have
+       actions, so a subject sitting in the roster rolls its plain Accuracy with
+       no target number. The filled pips are the actions already DONE, so the
+       one being played is the next: none filled is action one, needing one
+       success (src/gm/turns.ts). */
+    const part = participantForToken(state, dexById, token);
+    const act = part ? actionOf((part.acted as number) || 0) : null;
+    const pid = part ? pidOf(part) : null;
+
+    const doRoll = (dice: number, meta: RollMeta, quick?: string, move?: string) => {
         if (!(dice > 0)) return;
         store.update((s) => {
-            s.dice = { ...s.dice, count: dice, sides: 6, prep: { ...meta } };
+            s.dice = {
+                ...s.dice, count: dice, sides: 6, prep: { ...meta },
+                prepUse: quick === 'acc' && pid && move ? { pid, move } : null,
+            };
         });
     };
 
-    /* What this round has already cost the subject. Only combatants have
-       actions, so a subject sitting in the roster rolls its plain Accuracy with
-       no target number. The pip is filled for the action being taken, so the
-       count of filled pips IS the number of this action. Before the first pip
-       is clicked the subject is on action one. */
-    const part = participantForToken(state, dexById, token);
-    const act = part ? Math.max(1, (part.acted as number) || 0) : null;
+    const used = part && Array.isArray(part.usedMoves) ? part.usedMoves : [];
+    const toggleUsed = pid ? (move: string) => {
+        store.update((s) => {
+            s.combats = s.combats.map((c) => markMove(c, pid, move, !used.includes(move)));
+        });
+    } : undefined;
 
     /* A trainer resolves through EntityRef, which already reads a trainer's flat
        .json and a Pokemon's species-backed sheet the same way. */
@@ -123,6 +135,8 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
                 pain={painPenalty(dex, sheet)}
                 act={act}
                 doRoll={doRoll}
+                used={used}
+                onToggleUsed={toggleUsed}
             />
         </MoveTipShell>
     );

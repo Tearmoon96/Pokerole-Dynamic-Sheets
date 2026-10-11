@@ -42,7 +42,7 @@ export type CombatLinkMessage =
     /** Table → GM screen: these characters join the fight, initiative rolled. */
     | { t: 'enter'; member: string; player: string; chars: { key: CharKey; init: number }[] }
     /** Table → GM screen: a player passed, delayed or spent an action. */
-    | { t: 'act'; member: string; op: TurnOp; pid: string; after: string | null }
+    | { t: 'act'; member: string; op: TurnOp; pid: string; after: string | null; move?: string | null }
     /** Table → GM screen: the GM pressed Next on the table's strip. */
     | { t: 'next' }
     /** GM screen → table: say you are there, now. Answered from the table's
@@ -109,7 +109,9 @@ export function parseCombatLink(raw: unknown): CombatLinkMessage | null {
             const op = raw.op;
             if (member === null || pid === null || (raw.after !== null && after === null)) return null;
             if (op !== 'pass' && op !== 'delay' && op !== 'eva' && op !== 'clash' && op !== 'acc') return null;
-            return { t: 'act', member, op, pid, after };
+            const move = raw.move === undefined || raw.move === null ? null : str(raw.move, 60);
+            if (raw.move !== undefined && raw.move !== null && move === null) return null;
+            return { t: 'act', member, op, pid, after, move };
         }
         case 'turns': {
             if (raw.turns !== null && !isRecord(raw.turns)) return null;
