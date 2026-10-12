@@ -16,6 +16,7 @@
      hours    time those tables were open, first socket to last
      joins    every socket opened, reloads included */
 
+import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 
 const API = 'https://api.cloudflare.com/client/v4';
@@ -30,16 +31,23 @@ if (!token) {
 }
 const auth = { Authorization: 'Bearer ' + token };
 
+/* A token with Account Analytics alone may not list its accounts, so the
+   fallback is the account wrangler is logged in to. */
 async function accountId() {
     if (process.env.CF_ACCOUNT_ID) return process.env.CF_ACCOUNT_ID;
     const r = await fetch(API + '/accounts', { headers: auth });
-    const j = await r.json();
-    if (!j.success || !j.result?.length) {
-        console.error('The token reaches no account:', JSON.stringify(j.errors || j));
-        process.exit(1);
+    const j = await r.json().catch(() => ({}));
+    if (j.success && j.result?.length) {
+        if (j.result.length > 1) console.error('Several accounts; using ' + j.result[0].name + ' (set CF_ACCOUNT_ID for another).');
+        return j.result[0].id;
     }
-    if (j.result.length > 1) console.error('Several accounts; using ' + j.result[0].name + ' (set CF_ACCOUNT_ID for another).');
-    return j.result[0].id;
+    try {
+        const out = execSync('npx wrangler whoami', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+        const id = out.match(/\b[0-9a-f]{32}\b/)?.[0];
+        if (id) return id;
+    } catch { /* not logged in */ }
+    console.error('No account found: set CF_ACCOUNT_ID, or log in with npx wrangler login.');
+    process.exit(1);
 }
 
 async function sql(account, query) {
