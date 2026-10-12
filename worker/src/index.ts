@@ -33,6 +33,8 @@
 
 export interface Env {
     TABLE_ROOM: DurableObjectNamespace;
+    /** The usage counter. Optional: without the binding nothing is counted. */
+    STATS?: AnalyticsEngineDataset;
 }
 
 /* Big enough for a joiner's history sync — 30 rolls of up to 99 dice, encrypted
@@ -98,6 +100,28 @@ function originAllowed(req: Request): boolean {
    write per roll, so a busy table moves it at most this often; the idle wipe
    comes at most this much sooner than IDLE_MS after the last message. */
 const REARM_MS = 5 * 60 * 1000;
+
+/* The usage counter. Two kinds of data point, and only numbers in either:
+
+   - `join`: a socket opened. double1 = how many are in the room with it.
+   - `session`: a room emptied (or was wiped idle). double1 = the most people
+     it held at once, double2 = minutes from its first socket to its last.
+
+   A session's peak is the honest head count: a reload or a dropped Wi-Fi is
+   a second `join` but not a second person. A GM preparing alone and reloading
+   makes sessions of one, so the query script counts tables of two or more.
+   The room's own record (`STATS_KEY`) is deleted when the session is counted,
+   and with everything else in an idle wipe. */
+const STATS_KEY = 'stats';
+
+interface RoomStats {
+    /** When the session's first socket opened. */
+    start: number;
+    /** The most open sockets seen at once. */
+    peak: number;
+    /** Last sign of life: a join, a leave, or a move of the idle alarm. */
+    seen: number;
+}
 
 function text(body: string, status: number): Response {
     return new Response(body, { status, headers: CORS });
@@ -193,7 +217,7 @@ export class TableRoom implements DurableObject {
         message, which is all the bookkeeping needs. */
     private armedAt = 0;
 
-    constructor(private state: DurableObjectState) {}
+    constructor(private state: DurableObjectState, private env: Env) {}
 
     /** Pushes the idle wipe IDLE_MS into the future — at most once every
         REARM_MS, since each move is a storage write. */
@@ -201,6 +225,52 @@ export class TableRoom implements DurableObject {
         if (now - this.armedAt < REARM_MS) return;
         this.armedAt = now;
         await this.state.storage.setAlarm(now + IDLE_MS);
+        const stats = await this.state.storage.get<RoomStats>(STATS_KEY);
+        if (stats) await this.state.storage.put(STATS_KEY, { ...stats, seen: now });
+    }
+
+    /* ------------------------------------------------------- the counter */
+
+    /** One data point. Never throws: counting must not cost a table a socket. */
+    private count(kind: 'join' | 'session', doubles: number[]): void {
+        try {
+            this.env.STATS?.writeDataPoint({ blobs: [kind], doubles, indexes: [kind] });
+        } catch { /* the counter is best effort */ }
+    }
+
+    /** Sockets still open, leaving out `except` (the one going away). */
+    private openSockets(except?: WebSocket): number {
+        return this.state.getWebSockets().filter((w) => w !== except && w.readyState === WebSocket.OPEN).length;
+    }
+
+    /** Counts a finished session and forgets it. */
+    private async endSession(stats: RoomStats, end: number): Promise<void> {
+        this.count('session', [stats.peak, Math.max(0, Math.round((end - stats.start) / 60_000))]);
+        await this.state.storage.delete(STATS_KEY);
+    }
+
+    /** A socket just opened: `n` are open now, itself included. */
+    private async joined(n: number, now: number): Promise<void> {
+        this.count('join', [n]);
+        let stats = await this.state.storage.get<RoomStats>(STATS_KEY);
+        /* Alone in a room that still has a session: the last one ended
+           without a close reaching us (a redeploy, an eviction). Count it
+           as of its last sign of life, and start afresh. */
+        if (stats && n === 1) {
+            await this.endSession(stats, stats.seen);
+            stats = undefined;
+        }
+        stats = stats
+            ? { ...stats, peak: Math.max(stats.peak, n), seen: now }
+            : { start: now, peak: n, seen: now };
+        await this.state.storage.put(STATS_KEY, stats);
+    }
+
+    /** A socket went away; the last one out ends the session. */
+    private async left(ws: WebSocket): Promise<void> {
+        if (this.openSockets(ws) > 0) return;
+        const stats = await this.state.storage.get<RoomStats>(STATS_KEY);
+        if (stats) await this.endSession(stats, Date.now());
     }
 
     async fetch(req: Request): Promise<Response> {
@@ -220,6 +290,7 @@ export class TableRoom implements DurableObject {
         this.state.acceptWebSocket(server);
         server.serializeAttachment({ n: 0, since: Date.now() } satisfies SocketMeta);
 
+        await this.joined(this.openSockets(), Date.now());
         await this.rearm(Date.now());
 
         return new Response(null, { status: 101, webSocket: pair[0] });
@@ -273,13 +344,22 @@ export class TableRoom implements DurableObject {
         await this.rearm(now);
     }
 
-    webSocketError(ws: WebSocket): void {
+    async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
+        /* 1005 and 1006 mean "no code" and may not be sent back. */
+        try { ws.close(code === 1005 || code === 1006 ? 1000 : code, reason); } catch { /* already gone */ }
+        await this.left(ws);
+    }
+
+    async webSocketError(ws: WebSocket): Promise<void> {
         try { ws.close(1011, 'socket error'); } catch { /* already gone */ }
+        await this.left(ws);
     }
 
     async alarm(): Promise<void> {
         /* No alarm is set any more: the next activity must set one. */
         this.armedAt = 0;
+        const stats = await this.state.storage.get<RoomStats>(STATS_KEY);
+        if (stats) this.count('session', [stats.peak, Math.max(0, Math.round((stats.seen - stats.start) / 60_000))]);
         for (const ws of this.state.getWebSockets()) {
             try { ws.close(1001, 'table idle'); } catch { /* already gone */ }
         }

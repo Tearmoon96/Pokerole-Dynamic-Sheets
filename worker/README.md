@@ -147,3 +147,29 @@ later means adding a `v2` block, not rewriting `v1`.
 Redeploying drops every open socket. Clients reconnect on their own with
 exponential backoff, and the GM keeps their identity across it — so a redeploy
 mid-session interrupts a table for a few seconds rather than ending it.
+
+---
+
+## How much it is used
+
+The relay counts, in Workers Analytics Engine (dataset `pokerole_table`, free
+plan: 100,000 points written a day, kept about three months), two things and
+only numbers in either — no room address, no IP, no name:
+
+| Point | When | Numbers |
+|---|---|---|
+| `join` | a socket opens | how many are in the room with it |
+| `session` | a room empties, or is wiped idle | the most people it held at once, its minutes |
+
+A session's peak is the head count: a reload or a dropped connection is a
+second `join` but not a second person.
+
+```sh
+npm run stats          # the last 30 days, a line a day
+npm run stats -- 90    # the last 90
+```
+
+It needs an API token with **Account › Account Analytics › Read** (Cloudflare
+dashboard › My Profile › API Tokens › Create Token › Custom token), saved in
+`worker/.stats-token` (gitignored) or passed as `CF_STATS_TOKEN`. A table shows
+up once everyone has left it; a GM alone, preparing, counts as "solo".

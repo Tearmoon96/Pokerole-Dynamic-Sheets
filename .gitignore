@@ -78,3 +78,4 @@ dist-pwa/
 # every run and holding whatever lobbies were opened while testing.
 worker/.wrangler/
 worker/node_modules/
+worker/.stats-token

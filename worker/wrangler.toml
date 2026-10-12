@@ -23,3 +23,9 @@ new_sqlite_classes = ["TableRoom"]
 
 [observability]
 enabled = true
+
+# The usage counter: numbers only, never a room address or an IP (see
+# `count` in src/index.ts). `npm run stats` reads it back.
+[[analytics_engine_datasets]]
+binding = "STATS"
+dataset = "pokerole_table"
