@@ -370,6 +370,44 @@ modifier can still change the dice; a player's attack, Evasion or Clash in
 the fight lights the GM's combat row ([`rollPings.ts`](src/gm/rollPings.ts)).
 The relay is unchanged.
 
+The table's guided tour (one for the GM, one for players) is the shared one
+described under [Guided tours](#guided-tours); its steps are in
+[`tour/steps.tsx`](src/components/table/tour/steps.tsx), and the GM's map and
+fight steps carry a live line that turns green once the Map Maker or the GM
+screen reaches the table from another tab.
+
+## Guided tours
+
+Every page has a spotlight tour of a minute or so — one part lit, the rest
+dimmed and blurred, a card explaining it — weighted towards what is easy to
+miss: the License's equipment and coin purse, the card's pinned moves and
+social view, the GM board's rearranging and Shift-steps, the Map Maker's mouse
+shortcuts and fog. It is offered the first time a page is opened and replayed
+from the **?** beside each page's Home button.
+
+- [`src/lib/tour.ts`](src/lib/tour.ts): the tour ids, the steps' type, the
+  store, and whether to ask — this browser's own preference,
+  `pokerole_tours` = `{ never: page[], seen: tour[] }`. "Not now" asks again on
+  the next load; "Don't ask again" is per page. Headless Chrome is never asked
+  (every harness and the pixel comparison run there), unless the page sets
+  `__PDS_TOUR__`.
+- [`src/components/common/Tour.tsx`](src/components/common/Tour.tsx):
+  `GuidedTour` (the question and the overlay), `TourButton`, and
+  `useFirstTimeTour`, which waits until no dialog of the page's own is open.
+  The overlay is a click-proof shield, a blurred veil with the hole cut by an
+  even-odd `clip-path`, and the card; a frame loop follows the target, since
+  pages are live. While a tour runs no key reaches the page.
+- Each page's steps sit beside its app: `license/tourSteps.tsx`,
+  `card/tourSteps.tsx`, `gm/tourSteps.tsx`, `map/tourSteps.tsx`,
+  `table/tour/steps.tsx`. A step names its target by selectors — the first
+  VISIBLE match wins, or every match with `union` — and may hold a folded
+  panel open (`unfold`), pick a view (`view`: the table's Map / Table, the GM
+  board's tab on a phone), or be left out when its target is absent
+  (`optional`). The step's id is on `<html>` as `data-tour-step`, so CSS can
+  show what only a hover would (the License's Equipment button).
+- [`src/styles/shared/tour.css`](src/styles/shared/tour.css), imported by every
+  page, themed from the page's own tokens like the tooltip and the update bar.
+
 ## Phones and tablets
 
 The three original pages were built for a window that could spare 60px of

@@ -58,7 +58,7 @@ export function CharacterPanel() {
     }, []);
 
     return (
-        <div className="character-panel">
+        <div className="character-panel" data-tour="character">
             <FoldTitle id="character" open={open} onToggle={toggle} icon="fa-id-card">
                 My character
             </FoldTitle>

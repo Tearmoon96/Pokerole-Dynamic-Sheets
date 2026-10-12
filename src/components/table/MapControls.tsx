@@ -17,7 +17,7 @@ export function MapControls() {
     const full = map.entries.length >= MAX_TABLE_MAPS;
 
     return (
-        <div className="side-panel map-controls">
+        <div className="side-panel map-controls" data-tour="map-controls">
             <FoldTitle id="map" open={open} onToggle={toggle} icon="fa-map" extra={map.ready && (
                 <span className={'map-state ' + (map.show ? 'on' : 'off')}>
                     {map.show ? 'shown' : 'hidden'}

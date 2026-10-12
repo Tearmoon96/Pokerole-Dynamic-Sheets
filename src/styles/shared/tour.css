@@ -1,0 +1,273 @@
+/* ---------------- The guided tour ----------------
+   On every page (components/common/Tour.tsx). Above every panel, notice
+   (180) and dialog on the page; below the update bar (200), which must never
+   be hidden behind anything. The veil's hole is a clip-path the tour writes
+   every frame.
+
+   Themed like the tooltip and the update bar — the strong panel, hairline
+   and text colours each page defines — so it follows the License's theme and
+   the card's typing, light ones included. Its buttons are styled here in
+   full: the sheets have no page-wide button rule to lean on. */
+
+.tour-root {
+    position: fixed;
+    inset: 0;
+    z-index: 190;
+    font-family: inherit;
+}
+
+/* Takes every click, the hole's included: the tour is look, don't touch. */
+.tour-shield {
+    position: absolute;
+    inset: 0;
+}
+
+.tour-veil {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: rgb(0 0 0 / 0.55);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+
+.tour-ring {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+    border: 2px solid var(--accent);
+    border-radius: 10px;
+    box-shadow: 0 0 0 4px var(--accent-faint), 0 0 24px var(--accent-glow);
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.tour-card {
+    position: absolute;
+    width: min(24rem, calc(100vw - 1rem));
+    max-height: calc(100vh - 1rem);
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 0.9rem 1rem 0.75rem;
+    color: var(--text-primary);
+    background: var(--panel-strong);
+    border: 1px solid var(--accent-border);
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgb(0 0 0 / 0.5);
+    font-size: 0.84rem;
+    line-height: 1.5;
+    text-align: left;
+    transition: left 0.25s ease, top 0.25s ease;
+}
+
+.tour-card.tour-centered {
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tour-card, .tour-ring { transition: none; }
+}
+
+.tour-card h2 {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.3;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--text-primary);
+}
+.tour-card h2 .fa-route { color: var(--accent); margin-right: 0.25rem; }
+
+.tour-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+.tour-head h2 { flex: 1; }
+
+.tour-card p { margin: 0.55rem 0 0; }
+.tour-body > :first-child { margin-top: 0.55rem; }
+.tour-card strong { color: var(--text-primary); }
+
+.tour-steps {
+    margin: 0.55rem 0 0;
+    padding-left: 1.25rem;
+}
+.tour-steps li + li { margin-top: 0.3rem; }
+
+/* The tour's own buttons. */
+.tour-card .tour-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0.3rem 0.65rem;
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+    color: var(--text-primary);
+    background: var(--primary-faint);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: none;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.tour-card .tour-btn:hover { background: var(--primary-soft); border-color: var(--ghost-color); }
+.tour-card .tour-btn.accent { border-color: var(--accent-border); background: var(--accent-faint); }
+.tour-card .tour-btn.accent:hover { border-color: var(--accent); }
+.tour-card .tour-btn:focus-visible,
+.tour-card .tour-link:focus-visible,
+.tour-open:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+.tour-card .tour-close { flex: 0 0 auto; padding: 0.2rem 0.45rem; }
+
+/* A control named in the text, drawn the way it looks on the page. */
+.tour-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0 0.1rem;
+    padding: 0.02rem 0.4rem;
+    font-size: 0.76rem;
+    line-height: 1.5;
+    white-space: nowrap;
+    color: var(--text-primary);
+    background: var(--primary-faint);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    vertical-align: 0.05em;
+}
+
+.tour-card kbd {
+    padding: 0 0.3rem;
+    font-family: inherit;
+    font-size: 0.74rem;
+    border: 1px solid var(--border-color);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+}
+
+.tour-status {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    padding: 0.4rem 0.55rem;
+    font-size: 0.78rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+.tour-status.ok { border-color: var(--ok, #3aa593); color: var(--text-primary); }
+.tour-status.ok i { color: var(--ok, #3aa593); }
+.tour-status.wait i { color: var(--text-muted); }
+
+.tour-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.6rem;
+}
+
+/* A link that opens another tool, dressed as the tour's buttons. */
+.tour-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.78rem;
+    color: var(--text-primary);
+    text-decoration: none;
+    background: var(--primary-faint);
+    border: 1px solid var(--accent-border);
+    border-radius: 8px;
+    transition: background 0.15s, border-color 0.15s;
+}
+.tour-open:hover { background: var(--accent-faint); border-color: var(--accent); }
+.tour-open .tour-ext { font-size: 0.65rem; color: var(--text-muted); }
+
+.tour-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.85rem;
+}
+.tour-spacer { flex: 1; }
+
+.tour-dots {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+.tour-dot {
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 50%;
+    background: var(--border-color);
+}
+.tour-dot.on { background: var(--accent); }
+
+.tour-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 0.85rem;
+}
+
+/* The quiet way out: text, not a third button competing with Next. */
+.tour-card .tour-link {
+    margin: 0;
+    padding: 0.3rem 0.2rem;
+    font-family: inherit;
+    font-size: 0.78rem;
+    background: none;
+    border: none;
+    box-shadow: none;
+    color: var(--text-muted);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+.tour-card .tour-link:hover { background: none; color: var(--text-secondary); }
+
+.tour-card .tour-skip {
+    display: block;
+    margin: 0.35rem 0 0 auto;
+}
+
+.tour-foot { font-size: 0.74rem; color: var(--text-muted); }
+
+/* On a phone the card is a sheet across the screen: beside or below a
+   panel there is no room. Along the bottom, with the target scrolled to the
+   top; along the top for a target at the page's end (tour-top). */
+html[data-device="phone"] .tour-card:not(.tour-centered) {
+    left: 0 !important;
+    right: 0;
+    top: auto !important;
+    bottom: 0;
+    width: auto;
+    max-height: 55vh;
+    border-radius: 14px 14px 0 0;
+    padding-bottom: calc(0.75rem + var(--safe-bottom, 0px));
+    transition: none;
+}
+html[data-device="phone"] .tour-card.tour-top:not(.tour-centered) {
+    top: 0 !important;
+    bottom: auto;
+    border-radius: 0 0 14px 14px;
+    padding-top: calc(0.9rem + var(--safe-top, 0px));
+    padding-bottom: 0.75rem;
+}
+html[data-device="phone"] .tour-card .tour-btn {
+    min-height: 2.5rem;
+}

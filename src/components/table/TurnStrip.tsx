@@ -60,7 +60,7 @@ export function TurnStrip() {
            put one on, since the players can roll no initiative until then. */
         if (!state.isHost || !linked) return null;
         return (
-            <section className="turn-strip turn-strip-idle" aria-label="Turn order" data-no-fight="">
+            <section className="turn-strip turn-strip-idle" aria-label="Turn order" data-no-fight="" data-tour="turns">
                 <span className="muted">
                     <i className="fa-solid fa-khanda"></i> No fight on the table. In the GM screen,
                     press <i className="fa-solid fa-tower-broadcast" aria-label="Show on the table"></i> on
@@ -75,7 +75,7 @@ export function TurnStrip() {
     const later = turns.order.filter((e, i) => i > curIndex && !e.done && !e.out);
 
     return (
-        <section className="turn-strip" aria-label="Turn order">
+        <section className="turn-strip" aria-label="Turn order" data-tour="turns">
             <div className="turn-head">
                 <span className="turn-title">
                     <i className="fa-solid fa-khanda"></i> {turns.name}

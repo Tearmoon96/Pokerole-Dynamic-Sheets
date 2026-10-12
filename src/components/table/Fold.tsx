@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { useTour } from '../../lib/tour';
 
 const KEY = 'pokerole_table_folds';
 
@@ -16,9 +17,11 @@ function folded(): Record<string, true> {
     }
 }
 
-/** Whether the panel `id` is open, and the toggle. Open unless folded. */
+/** Whether the panel `id` is open, and the toggle. Open unless folded, or
+    while the tour is showing it — that open is the tour's, never saved. */
 export function useFold(id: string): [boolean, () => void] {
     const [open, setOpen] = useState(() => folded()[id] !== true);
+    const shown = useTour().unfold === id;
     const toggle = () => {
         const next = !open;
         setOpen(next);
@@ -29,7 +32,7 @@ export function useFold(id: string): [boolean, () => void] {
             localStorage.setItem(KEY, JSON.stringify(f));
         } catch { /* private mode: it folds, it just will not remember */ }
     };
-    return [open, toggle];
+    return [open || shown, toggle];
 }
 
 /** A side panel's title as the button that folds it. `extra` sits at the

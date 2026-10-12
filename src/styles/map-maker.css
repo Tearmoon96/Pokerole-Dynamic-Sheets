@@ -21,4 +21,6 @@
 @import './responsive/map.css';
 
 @import './shared/update-prompt.css';
+/* The guided tour and its first-time question. */
+@import './shared/tour.css';
 @import './shared/scrollbars.css';

@@ -357,7 +357,7 @@ export function MusicPanel() {
     if (!anything) return null;
 
     return (
-        <div className="side-panel music-panel">
+        <div className="side-panel music-panel" data-tour="music">
             <FoldTitle id="music" open={open} onToggle={toggle} icon="fa-music" extra={!open && (
                 waiting ? <span className="music-state wait"><i className="fa-solid fa-hourglass-half"></i> waiting</span>
                     : playing ? <span className="music-state on"><i className="fa-solid fa-play"></i> playing</span>

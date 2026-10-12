@@ -1,6 +1,6 @@
 /* The table itself, once you are in it. */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTable } from '../../table/TableContext';
 import { Credentials } from './Credentials';
 import { MemberList } from './MemberList';
@@ -13,6 +13,9 @@ import { MusicPanel } from './MusicPanel';
 import { CharacterPanel } from './CharacterPanel';
 import { TurnStrip } from './TurnStrip';
 import { CHANNELS } from '../../table/protocol';
+import { useTour } from '../../lib/tour';
+import { GuidedTour, TourButton, useFirstTimeTour } from '../common/Tour';
+import { tableSteps } from './tour/steps';
 
 export function TableView() {
     const { session, state } = useTable();
@@ -23,6 +26,14 @@ export function TableView() {
     /* On a phone the map and the rolls take turns; the map first. */
     const [phoneView, setPhoneView] = useState<'map' | 'rolls'>('map');
     const silenced = !music.unlocked && CHANNELS.some((c) => music.decks[c].playing);
+    const tourId = isHost ? 'table-gm' : 'table-player';
+
+    /* A step of the tour may need the other half of a phone's screen. */
+    const tourView = useTour().view;
+    useEffect(() => { if (tourView === 'map' || tourView === 'rolls') setPhoneView(tourView); }, [tourView]);
+
+    /* First time in this role on this browser: offer the tour. */
+    useFirstTimeTour(tourId);
 
     const connection = status === 'online'
         ? (isHost || hostOnline ? 'live' : 'waiting')
@@ -35,7 +46,7 @@ export function TableView() {
     /* The dice always sit in the right-hand column. The feed joins them there
        while a map takes the middle, and has the middle to itself otherwise. */
     const feed = (
-        <div className="feed-scroll">
+        <div className="feed-scroll" data-tour="feed">
             <RollFeed rolls={state.rolls} myName={shownName} members={state.members} sorted={state.isHost && state.successesFirst} />
         </div>
     );
@@ -49,7 +60,7 @@ export function TableView() {
 
     return (
         <div className="table-page">
-            <header className="table-bar">
+            <header className="table-bar" data-tour="bar">
                 <h1><i className="fa-solid fa-dice"></i> Rolling Table</h1>
 
                 <span className={'conn conn-' + connection}>
@@ -59,6 +70,7 @@ export function TableView() {
                 {isHost && <span className="role-badge"><i className="fa-solid fa-crown"></i> Game Master</span>}
 
                 <div className="bar-spacer"></div>
+                <TourButton id={tourId} className="icon-btn" />
                 <HomeButton className="icon-btn" />
 
                 <button className="danger" onClick={() => session.leave()}>
@@ -117,7 +129,7 @@ export function TableView() {
                         <MapStage />
                     </section>
                 ) : (
-                    <section className="table-center" aria-label="Rolls">
+                    <section className="table-center" aria-label="Rolls" data-tour="center">
                         <TurnStrip />
                         {feed}
                     </section>
@@ -153,6 +165,14 @@ export function TableView() {
                     )}
                 </main>
             </div>
+
+            <GuidedTour
+                id={tourId}
+                steps={tableSteps(session, isHost ? 'gm' : 'player')}
+                intro={isHost
+                    ? 'A one-minute tour of the Game Master\u2019s side: the table itself, and how to bring maps from the Map Maker and fights from the GM screen onto it.'
+                    : 'A one-minute tour of the table: your character, the dice, the feed and fights.'}
+            />
         </div>
     );
 }

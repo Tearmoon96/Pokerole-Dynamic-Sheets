@@ -33,6 +33,8 @@ import { wildSheetKey } from '../../card/cardContext';
 import { readSpriteFile, spriteUploadDir } from '../../card/customSprite';
 import type { CardMove } from '../../card/moves';
 import { HomeButton } from '../common/HomeButton';
+import { GuidedTour, TourButton, useFirstTimeTour } from '../common/Tour';
+import { CARD_STEPS, CARD_TOUR_INTRO } from './tourSteps';
 import { showAlert } from '../../lib/dialog';
 
 /* The whole Pokémon card.
@@ -49,6 +51,10 @@ export function CardApp() {
 
     /* Paint the theme before the browser shows a frame. */
     useLayoutEffect(() => { applyCardTheme(pokemon, sheet); }, [pokemon, sheet.themeType, sheet.pageTheme]);
+
+    /* Offered once a Pokémon is on the card: the empty landing has nothing
+       to show yet (and the question waits for it to go anyway). */
+    useFirstTimeTour('card', !ctx.isBlank);
 
     const [notesTall, setNotesTall] = useState(false);
     const [typeEffOpen, setTypeEffOpen] = useState(false);
@@ -273,6 +279,7 @@ export function CardApp() {
 
     /* Each tool button once, so the two orders below cannot drift apart. */
     const toolHome = <HomeButton key="home" className="type-eff-btn" />;
+    const toolTour = <TourButton key="tour" id="card" className="type-eff-btn" />;
 
     const toolTypeEff = (
         <button key="type" className="type-eff-btn" onClick={() => setTypeEffOpen(true)} title="Type Effectiveness">
@@ -338,11 +345,11 @@ export function CardApp() {
        are five or six and stay a single centred row. */
     const tools = ctx.wildMode ? (
         <>
-            <div className="tool-row">{toolHome}{toolWildSheets}{toolLoad}{toolHeal}</div>
+            <div className="tool-row">{toolHome}{toolTour}{toolWildSheets}{toolLoad}{toolHeal}</div>
             <div className="tool-row">{toolTypeEff}{toolAilments}{toolWeather}</div>
         </>
     ) : (
-        <>{toolHome}{toolTypeEff}{toolAilments}{toolWeather}{toolHeal}{toolLoad}</>
+        <>{toolHome}{toolTour}{toolTypeEff}{toolAilments}{toolWeather}{toolHeal}{toolLoad}</>
     );
 
     return (
@@ -536,6 +543,8 @@ export function CardApp() {
                 onClose={() => setClosingWild(null)}
                 onConfirm={(wid) => { void closeWild(wid); }}
             />
+
+            <GuidedTour id="card" steps={CARD_STEPS} intro={CARD_TOUR_INTRO} />
 
             {ctx.isBlank && (
                 <BlankLanding

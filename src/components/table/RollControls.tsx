@@ -32,7 +32,7 @@ export function RollControls() {
     };
 
     return (
-        <div className="roll-controls" data-keeps-tip="">
+        <div className="roll-controls" data-keeps-tip="" data-tour="dice">
             <div className="dice-chips">
                 {QUICK_DICE.map((s) => (
                     <button
@@ -161,7 +161,7 @@ function HostOptions() {
     const range = totalRange(count, sides);
 
     return (
-        <div className="host-options">
+        <div className="host-options" data-tour="host-options">
             {/* One line each; what they do is in the hint. */}
             <div className="host-toggles">
                 <label className="check" title="Your results stay on this screen. Untick for a roll the table should see.">

@@ -32,7 +32,7 @@ export function MemberList() {
     const [open, toggle] = useFold('members');
 
     return (
-        <div className="member-list">
+        <div className="member-list" data-tour="members">
             <FoldTitle id="members" open={open} onToggle={toggle} icon="fa-users"
                 extra={<span className="count">{members.length}</span>}>
                 At the table

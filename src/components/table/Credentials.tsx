@@ -37,7 +37,7 @@ export function Credentials() {
     ].join('\n');
 
     return (
-        <div className="credentials">
+        <div className="credentials" data-tour="invite">
             <FoldTitle id="invite" open={open} onToggle={toggle} icon="fa-key">Invite</FoldTitle>
 
             {open && <div className="cred-row">

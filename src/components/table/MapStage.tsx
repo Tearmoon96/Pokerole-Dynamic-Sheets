@@ -108,7 +108,7 @@ export function MapStage() {
     };
 
     return (
-        <div className="map-stage">
+        <div className="map-stage" data-tour="map-stage">
             <div className="map-stage-head">
                 <span className="map-stage-title">
                     <i className="fa-solid fa-map"></i> {map.title || 'Map'}

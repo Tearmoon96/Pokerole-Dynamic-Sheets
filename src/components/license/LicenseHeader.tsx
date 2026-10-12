@@ -1,6 +1,7 @@
 import { useSheetStore } from '../../state/SheetContext';
 import { useSession } from '../../state/SessionContext';
 import { HomeButton } from '../common/HomeButton';
+import { TourButton } from '../common/Tour';
 
 /** The licence title bar and the tool buttons along its top-right. */
 export function LicenseHeader({ onOpenTheme, onOpenInfo, hasUpdate, updateVersion }: {
@@ -21,6 +22,7 @@ export function LicenseHeader({ onOpenTheme, onOpenInfo, hasUpdate, updateVersio
             </div>
             <div className="license-tools">
                 <HomeButton className="type-eff-btn" />
+                <TourButton id="license" className="type-eff-btn" />
                 <button
                     className={'type-eff-btn' + (hasUpdate ? ' has-update' : '')}
                     id="info-btn"

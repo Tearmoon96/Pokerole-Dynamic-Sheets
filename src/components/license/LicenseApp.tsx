@@ -32,6 +32,8 @@ import { ManualPicker } from './ManualPicker';
 import { useUpdateCheck } from '../../hooks/useUpdateCheck';
 import { useAppData } from '../../data/AppDataContext';
 import { openCard } from '../../lib/navigation';
+import { GuidedTour, useFirstTimeTour } from '../common/Tour';
+import { LICENSE_STEPS, LICENSE_TOUR_INTRO } from './tourSteps';
 
 /* The four quadrants of the licence, plus the notepad under them.
 
@@ -76,6 +78,8 @@ export function LicenseApp() {
     }, [store]);
 
     const healingItem = (sheet.stats.clever || 0) + (sheet.skills.medicine || 0);
+
+    useFirstTimeTour('license');
 
     return (
         <>
@@ -140,7 +144,7 @@ export function LicenseApp() {
                 </section>
 
                 {/* QUADRANT 4: bag, potion satchel, badge case */}
-                <section className="panel">
+                <section className="panel" data-tour="bag">
                     <div className="section-bar">Bag</div>
                     <BagColumns />
 
@@ -202,6 +206,7 @@ export function LicenseApp() {
             <EquipmentModal open={equipOpen} onClose={() => setEquipOpen(false)} />
             <ManualPicker open={manualOpen} onClose={() => setManualOpen(false)} />
             <SessionDialogs />
+            <GuidedTour id="license" steps={LICENSE_STEPS} intro={LICENSE_TOUR_INTRO} />
         </>
     );
 }

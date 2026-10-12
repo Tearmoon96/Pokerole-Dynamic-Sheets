@@ -17,6 +17,9 @@ import { ActivePanelCtx, panelTabs } from '../../gm/phoneBoard';
 import { combatGidOf, isCombatPanelKey } from '../../gm/constants';
 import { useDeviceClass } from '../../lib/device';
 import type { PokedexEntry } from '../../data/types';
+import { useTour } from '../../lib/tour';
+import { GuidedTour, useFirstTimeTour } from '../common/Tour';
+import { GM_STEPS, GM_TOUR_INTRO } from './tourSteps';
 
 /* The board: six panels side by side, in whatever order and at whatever widths
    the GM has left them. */
@@ -137,6 +140,18 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
        on a tab that shows nothing at all. */
     const active = tabs.some((t) => t.key === activeTab) ? activeTab : (tabs[0]?.key ?? 'roster');
 
+    useFirstTimeTour('gm');
+
+    /* On a phone a tour step names the tab its panel is in; 'combat' is
+       whichever fight comes first. */
+    const tourView = useTour().view;
+    useEffect(() => {
+        if (!tourView) return;
+        const key = tourView === 'combat' ? tabs.find((t) => isCombatPanelKey(t.key))?.key : tourView;
+        if (key && tabs.some((t) => t.key === key)) setActiveTab(key);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tourView]);
+
     return (
         <>
             <TopBar />
@@ -179,6 +194,7 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
 
             <MovePanel token={tipToken} onClose={() => setTipToken(null)} />
             <AilmentPopover />
+            <GuidedTour id="gm" steps={GM_STEPS} intro={GM_TOUR_INTRO} />
         </>
     );
 }

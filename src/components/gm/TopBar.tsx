@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGm } from '../../gm/GmContext';
 import { panelTabs } from '../../gm/phoneBoard';
 import { HomeButton } from '../common/HomeButton';
+import { TourButton } from '../common/Tour';
 import { useGmConfirm } from './ConfirmDialog';
 import { useToast } from '../common/Toast';
 import { useAppData } from '../../data/AppDataContext';
@@ -104,6 +105,7 @@ export function TopBar() {
         <>
             <div className="topbar">
                 <HomeButton className="icon-btn" />
+                <TourButton id="gm" className="icon-btn" />
                 <span className="logo"><i className="fa-solid fa-chess-board"></i> Pokerole GM Screen</span>
 
                 {/* One toggle per board section, lit while the section is on.

@@ -4,6 +4,7 @@ import { useAppData } from '../../data/AppDataContext';
 import { useToast } from '../common/Toast';
 import { useGmConfirm } from '../gm/ConfirmDialog';
 import { HomeButton } from '../common/HomeButton';
+import { TourButton } from '../common/Tour';
 import { BackgroundControl, BordersControl, ExportControl, GridControl, ScaleControl, SizeControl, SnapToggle, StyleControl } from './TopBarControls';
 import {
     downloadMap, ensureWritable, forgetMapHandle, mapFileName, mapJson, parseMapFile,
@@ -121,6 +122,7 @@ export function MapTopBar({ onMaps, onSprites, onHotkeys, onRecipe, tableLink }:
     return (
         <div className="topbar map-topbar">
             <HomeButton className="icon-btn" />
+            <TourButton id="map" className="icon-btn" />
             <span className="logo"><i className="fa-solid fa-map"></i> <span className="map-logo-text">Map Maker</span></span>
 
             <button className="map-name-btn" onClick={onMaps} title="Your maps — open, create, rename">

@@ -16,6 +16,8 @@ import type { HotkeyAction } from '../../map/hotkeys';
 import type { Tool } from '../../map/types';
 import type { TableLiveLink } from '../../map/tableLive';
 import { TableLiveBanner } from './TableLinkControl';
+import { GuidedTour, useFirstTimeTour } from '../common/Tour';
+import { MAP_STEPS, MAP_TOUR_INTRO } from './tourSteps';
 
 /* The Map Maker: top bar, tool rail, the map, and the side panel. */
 
@@ -30,6 +32,7 @@ export function MapApp({ dataOk, tableLink }: { dataOk: boolean; tableLink: Tabl
     const { store, doc } = useMap();
     const toast = useToast();
     const [dialog, setDialog] = useState<'maps' | 'sprites' | 'hotkeys' | 'recipe' | null>(null);
+    useFirstTimeTour('map');
     const [spaceHeld, setSpaceHeld] = useState(false);
 
     useEffect(() => {
@@ -151,6 +154,7 @@ export function MapApp({ dataOk, tableLink }: { dataOk: boolean; tableLink: Tabl
             <SpriteChecklist open={dialog === 'sprites'} onClose={() => setDialog(null)} />
             <HotkeysDialog open={dialog === 'hotkeys'} onClose={() => setDialog(null)} />
             <RecipeDialog open={dialog === 'recipe'} onClose={() => setDialog(null)} />
+            <GuidedTour id="map" steps={MAP_STEPS} intro={MAP_TOUR_INTRO} />
         </>
     );
 }
