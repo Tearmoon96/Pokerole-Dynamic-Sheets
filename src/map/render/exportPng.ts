@@ -1,4 +1,4 @@
-import { styleOf } from '../styles';
+import { styleOf, tokenRing } from '../styles';
 import type { MapStyle } from '../styles';
 import { landmarkOf } from '../landmarks';
 import { TERRAINS } from '../terrain';
@@ -253,12 +253,12 @@ async function drawStamp(ctx: CanvasRenderingContext2D, s: MapStamp, style: MapS
         const d = px * 0.3, cx = px / 2 - px * 0.04 - d / 2, cy = -px / 2 + px * 0.04 + d / 2;
         ctx.beginPath();
         ctx.arc(cx, cy, d / 2, 0, Math.PI * 2);
-        ctx.fillStyle = typeColors[s.type];
+        ctx.fillStyle = tokenRing(style, typeColors[s.type]);
         ctx.fill();
-        ctx.strokeStyle = '#fff';
+        ctx.strokeStyle = style.token?.halo ?? '#fff';
         ctx.lineWidth = 2;
         ctx.stroke();
-        glyph(ctx, TYPE_ICONS[s.type] || 'fa-circle', cx, cy, px * 0.16, '#fff');
+        glyph(ctx, TYPE_ICONS[s.type] || 'fa-circle', cx, cy, px * 0.16, style.token?.halo ?? '#fff');
     }
     if (s.label) {
         const lab = style.label.small;
@@ -354,15 +354,18 @@ async function drawToken(ctx: CanvasRenderingContext2D, t: MapToken, style: MapS
         ? pokemonTokenChain(t.image).map((c) => c.url)
         : markerChain(style, t.kind === 'trainer' ? 'trainer' : 'wild');
     const art = await load(chain);
-    const inner = px / 2 - ring;
+    const look = style.token;
+    const color = tokenRing(style, t.color);
+    const ringW = look ? Math.max(2, px * 0.05) : ring;
+    const inner = px / 2 - ringW;
 
     ctx.save();
-    ctx.shadowColor = '#0007';
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 2;
+    ctx.shadowColor = look ? '#0005' : '#0007';
+    ctx.shadowBlur = look ? 3 : 6;
+    ctx.shadowOffsetY = look ? 1 : 2;
     ctx.beginPath();
     ctx.arc(x, y, px / 2, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffffd9';
+    ctx.fillStyle = look ? look.disc : '#ffffffd9';
     ctx.fill();
     ctx.restore();
 
@@ -372,6 +375,7 @@ async function drawToken(ctx: CanvasRenderingContext2D, t: MapToken, style: MapS
     ctx.clip();
     if (art) {
         ctx.imageSmoothingEnabled = !style.pixelated;
+        if (look) ctx.filter = look.filter;
         const d = inner * 2;
         if (/BoxSprites/.test(art.url)) {
             /* A Box sprite is a whole body in a square. The page frames it
@@ -388,19 +392,39 @@ async function drawToken(ctx: CanvasRenderingContext2D, t: MapToken, style: MapS
             ctx.drawImage(art.img, x - w / 2, y - h / 2, w, h);
         }
     } else {
-        ctx.fillStyle = t.color;
+        ctx.fillStyle = color;
         ctx.fillRect(x - inner, y - inner, inner * 2, inner * 2);
         glyph(ctx, t.kind === 'trainer' ? 'fa-user' : 'fa-question', x, y, px * 0.45, '#fff');
     }
     ctx.restore();
 
     ctx.beginPath();
-    ctx.arc(x, y, px / 2 - ring / 2, 0, Math.PI * 2);
-    ctx.strokeStyle = t.color;
-    ctx.lineWidth = ring;
+    ctx.arc(x, y, px / 2 - ringW / 2, 0, Math.PI * 2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = ringW;
     ctx.stroke();
+    if (look) {
+        ctx.beginPath();
+        ctx.arc(x, y, px / 2 + 0.5, 0, Math.PI * 2);
+        ctx.strokeStyle = look.ink;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
 
-    if (t.name) {
+    if (t.name && look) {
+        /* Lettered like the map's labels: ink on a halo of paper. */
+        const size = Math.max(9, px * 0.26);
+        ctx.font = `italic 400 ${size}px ${look.font}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const ty = y + px / 2 + 2 + size * 0.675;
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = look.halo + 'cc';
+        ctx.lineWidth = size * 0.3;
+        ctx.strokeText(t.name, x, ty);
+        ctx.fillStyle = look.ink;
+        ctx.fillText(t.name, x, ty);
+    } else if (t.name) {
         const size = Math.max(9, px * 0.26);
         ctx.font = `600 ${size}px Outfit, sans-serif`;
         const w = ctx.measureText(t.name).width + size * 0.7;

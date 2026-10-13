@@ -84,6 +84,22 @@ export interface MapStyle {
     /** How a landmark with no art of its own is drawn: the coloured disc, or
         an ink shield with a pale glyph, as an old atlas marks its cities. */
     marker?: 'disc' | 'shield';
+    /** Tokens drawn into the map rather than over it: the picture filtered
+        (`filter`, a CSS/canvas filter), a `disc` behind it, the token's own
+        colour mixed toward `tint` by `mix` for the ring, an `ink` hairline
+        round it, and the name lettered in `font` on a `halo` instead of a pill. */
+    token?: { filter: string; disc: string; tint: string; mix: number; ink: string; font: string; halo: string };
+}
+
+/** `a` mixed toward `b` by `k` (0..1), both #rrggbb. */
+function mixHex(a: string, b: string, k: number): string {
+    const ch = (h: string, i: number) => parseInt(h.replace('#', '').slice(i, i + 2), 16) || 0;
+    return '#' + [0, 2, 4].map((i) => Math.round(ch(a, i) * (1 - k) + ch(b, i) * k).toString(16).padStart(2, '0')).join('');
+}
+
+/** The colour a token's ring is drawn in, under this style. */
+export function tokenRing(style: MapStyle, color: string): string {
+    return style.token ? mixHex(color, style.token.tint, style.token.mix) : color;
 }
 
 const HAND_FONT = "'IM Fell English', 'Palatino Linotype', Georgia, serif";
@@ -174,6 +190,10 @@ const ancient: MapStyle = {
     pixelated: false,
     grid: '#4a382640',
     marker: 'shield',
+    token: {
+        filter: 'sepia(0.7) saturate(0.7) contrast(0.95)', disc: '#eadcb8e8', tint: '#8a6a3c', mix: 0.55,
+        ink: OLD_INK, font: HAND_FONT, halo: '#eadcb8',
+    },
     paper: { stain: '#8a6a3c', burn: '#3b2814', grain: 0.5, creases: true },
     terrain: {
         'clouds': { fill: '#e6dcc0', pattern: 'engr-clouds', ink: '#8a7a5e' },

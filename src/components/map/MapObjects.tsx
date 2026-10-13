@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { MapSprite } from './MapSprite';
 import { landmarkOf } from '../../map/landmarks';
 import { landmarkChain, markerChain, pokemonTokenChain } from '../../map/sprites';
@@ -7,6 +7,7 @@ import { midpoint, polygonD, sampleCurve, smoothPathD, taperOutline } from '../.
 import type { Pt } from '../../map/geometry';
 import { CELL } from '../../map/render/patterns';
 import { typeColors, TYPE_ICONS } from '../../lib/themeTables';
+import { tokenRing } from '../../map/styles';
 import type { MapStyle } from '../../map/styles';
 import {
     ANCHOR, fontOf, isPlain, labelTransform, labelType, layoutGlyphs, lineBaselines, measureWith,
@@ -153,7 +154,10 @@ function StampView({ stamp, style, selected, alone, onDown }: {
                 style={{ transform: stamp.flip ? 'scaleX(-1)' : undefined, fontSize: px * 0.45 }}
             />
             {typeColor && (
-                <span className="map-type-badge" style={{ background: typeColor, fontSize: px * 0.16 }} title={stamp.type}>
+                <span className="map-type-badge" style={{
+                    background: tokenRing(style, typeColor), fontSize: px * 0.16,
+                    borderColor: style.token?.halo, color: style.token?.halo,
+                }} title={stamp.type}>
                     <i className={'fa-solid ' + (TYPE_ICONS[stamp.type!] || 'fa-circle')}></i>
                 </span>
             )}
@@ -348,23 +352,29 @@ function TokenView({ token, style, selected, onDown }: {
     const candidates = token.kind === 'pokemon' && token.image
         ? pokemonTokenChain(token.image)
         : markerChain(style, token.kind === 'trainer' ? 'trainer' : 'wild');
+    const look = style.token;
+    const ring = tokenRing(style, token.color);
+    const inked = look ? {
+        background: look.disc, boxShadow: `0 0 0 1px ${look.ink}, 0 1px 3px #0005`,
+        '--tok-filter': look.filter, '--tok-ink': look.ink, '--tok-font': look.font, '--tok-halo': look.halo,
+    } as CSSProperties : null;
     return (
         <div
-            className={'map-obj map-token map-token-' + token.kind + (selected ? ' selected' : '')}
+            className={'map-obj map-token map-token-' + token.kind + (look ? ' inked' : '') + (selected ? ' selected' : '')}
             data-obj={'token:' + token.id}
-            style={{ left: token.x * CELL, top: token.y * CELL, width: px, height: px, borderColor: token.color, borderWidth: Math.max(2, px * 0.07) }}
+            style={{ left: token.x * CELL, top: token.y * CELL, width: px, height: px, borderColor: ring, borderWidth: Math.max(2, px * (look ? 0.05 : 0.07)), ...inked }}
             onPointerDown={(e) => onDown(e, { kind: 'token', id: token.id }, 'move')}
             title={token.name}
         >
             <MapSprite
                 candidates={candidates}
                 icon={token.kind === 'trainer' ? 'fa-user' : 'fa-question'}
-                color={token.color}
+                color={ring}
                 className={'map-token-art' + (style.pixelated ? ' pixelated' : '')}
                 style={{ fontSize: px * 0.45 }}
             />
             {token.name && (
-                <span className="map-token-name" style={{ fontSize: Math.max(9, px * 0.26), background: token.color }}>{token.name}</span>
+                <span className="map-token-name" style={{ fontSize: Math.max(9, px * 0.26), background: look ? undefined : token.color }}>{token.name}</span>
             )}
         </div>
     );
