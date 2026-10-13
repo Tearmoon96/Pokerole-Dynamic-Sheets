@@ -341,6 +341,76 @@ export function taperOutline(dense: Pt[], w0: number, w1: number): Pt[] {
     return [...left, ...right.reverse()];
 }
 
+/** A river as an engraver draws it, as SVG path strings at `scale`: the
+    water (`body`), an ink line down each bank (`banks`, with a stroke across
+    the source), a second line inside whichever bank faces away from the
+    light at the upper left (`shade`), and short strokes down the middle for
+    the current (`flow`). Widths in cells, growing from `w0` to `w1`. */
+export function riverInkD(pts: Pt[], w0: number, w1: number, scale: number): { body: string; banks: string; shade: string; flow: string; hatch: string } {
+    /* Evenly spaced, so the hatching and the current keep their rhythm
+       however far apart the points were placed. */
+    const curve = sampleCurve(pts), dense: Pt[] = curve.length ? [curve[0]] : [];
+    for (let i = 1; i < curve.length; i++) {
+        const [x0, y0] = curve[i - 1], [x1, y1] = curve[i];
+        const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 0.06));
+        for (let k = 1; k <= steps; k++) dense.push([x0 + (x1 - x0) * k / steps, y0 + (y1 - y0) * k / steps]);
+    }
+    const n = dense.length;
+    const out = { body: '', banks: '', shade: '', flow: '', hatch: '' };
+    if (n < 2) return out;
+    const lineD = (run: Pt[]) => run.length < 2 ? '' :
+        run.map(([x, y], i) => (i ? 'L' : 'M') + (x * scale).toFixed(1) + ' ' + (y * scale).toFixed(1)).join('');
+    const left: Pt[] = [], right: Pt[] = [], shade: Pt[][] = [], hatch: Pt[][] = [];
+    let run: Pt[] = [], side = 0, sinceHatch = 0;
+    for (let i = 0; i < n; i++) {
+        const a = dense[Math.max(0, i - 1)], b = dense[Math.min(n - 1, i + 1)];
+        let dx = b[0] - a[0], dy = b[1] - a[1];
+        const len = Math.hypot(dx, dy) || 1;
+        dx /= len; dy /= len;
+        const half = (w0 + (w1 - w0) * (i / (n - 1))) / 2;
+        const [x, y] = dense[i];
+        left.push([x - dy * half, y + dx * half]);
+        right.push([x + dy * half, y - dx * half]);
+        /* The left normal is (-dy, dx); it faces the shade when it points down and right. */
+        const s = (-dy + dx) > 0 ? 1 : -1;
+        if (s !== side && run.length) { shade.push(run); run = []; }
+        side = s;
+        const k = half * 0.5 * s;
+        run.push([x - dy * k, y + dx * k]);
+        /* Short strokes at the mountains' slant off the bank on the shaded
+           side, into the land, every so often. */
+        if (i) sinceHatch += Math.hypot(dense[i][0] - dense[i - 1][0], dense[i][1] - dense[i - 1][1]);
+        if (sinceHatch >= 0.13) {
+            sinceHatch = 0;
+            const bx = x - dy * half * s * 1.15, by = y + dx * half * s * 1.15;
+            hatch.push([[bx, by], [bx + 0.08, by + 0.18]]);
+        }
+    }
+    shade.push(run);
+    /* The current: a short stroke every so often, nudged off the middle by turns. */
+    const flow: Pt[][] = [];
+    let walked = 0, on: Pt[] | null = null, nth = 0;
+    for (let i = 1; i < n; i++) {
+        const [x0, y0] = dense[i - 1], [x1, y1] = dense[i];
+        walked += Math.hypot(x1 - x0, y1 - y0);
+        const half = (w0 + (w1 - w0) * (i / (n - 1))) / 2;
+        if (half < 0.07) continue;
+        const phase = walked % 1.1;
+        const dx = (x1 - x0) / (Math.hypot(x1 - x0, y1 - y0) || 1), dy = (y1 - y0) / (Math.hypot(x1 - x0, y1 - y0) || 1);
+        const off = (nth % 2 ? 0.18 : -0.12) * half;
+        if (phase < 0.4) {
+            if (!on) { on = []; flow.push(on); nth++; }
+            on.push([x1 - dy * off, y1 + dx * off]);
+        } else on = null;
+    }
+    out.body = polygonD([...left, ...right.slice().reverse()], scale);
+    out.banks = lineD(left) + lineD(right) + lineD([left[0], right[0]]);
+    out.shade = shade.map(lineD).join('');
+    out.flow = flow.map(lineD).join('');
+    out.hatch = hatch.map(lineD).join('');
+    return out;
+}
+
 export function polygonD(poly: Pt[], scale: number): string {
     if (!poly.length) return '';
     return poly.map(([x, y], i) => (i ? 'L' : 'M') + (x * scale).toFixed(1) + ' ' + (y * scale).toFixed(1)).join('') + 'Z';

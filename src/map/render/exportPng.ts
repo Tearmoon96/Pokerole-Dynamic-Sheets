@@ -3,7 +3,7 @@ import type { MapStyle } from '../styles';
 import { landmarkOf } from '../landmarks';
 import { TERRAINS } from '../terrain';
 import { landmarkChain, markerChain, pokemonTokenChain, terrainTextureUrl } from '../sprites';
-import { midpoint, polygonD, sampleCurve, smoothPathD, taperOutline } from '../geometry';
+import { midpoint, polygonD, riverInkD, sampleCurve, smoothPathD, taperOutline } from '../geometry';
 import type { Pt } from '../geometry';
 import { typeColors, TYPE_ICONS } from '../../lib/themeTables';
 import { CELL } from './patterns';
@@ -101,7 +101,21 @@ function drawPath(ctx: CanvasRenderingContext2D, p: MapPath, style: MapStyle): v
     const look = style.paths[p.kind];
     const w = Math.max(0.05, p.width * look.widthScale) * CELL;
     const casing = Math.max(2, w * 0.3);
-    if (look.taper) {
+    if (look.taper && look.engraved) {
+        const ws = look.widthScale;
+        const ink = riverInkD(p.points as Pt[], p.width * 0.25 * ws, p.width * ws, CELL);
+        const bank = Math.max(1.2, CELL * 0.05);
+        ctx.save();
+        ctx.fillStyle = look.color;
+        ctx.fill(new Path2D(ink.body));
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.strokeStyle = look.engraved;
+        ctx.globalAlpha = 0.7; ctx.lineWidth = bank * 0.55; ctx.stroke(new Path2D(ink.shade));
+        ctx.globalAlpha = 0.55; ctx.lineWidth = bank * 0.5; ctx.stroke(new Path2D(ink.flow));
+        ctx.globalAlpha = 0.8; ctx.lineWidth = bank * 0.45; ctx.stroke(new Path2D(ink.hatch));
+        ctx.globalAlpha = 1; ctx.lineWidth = bank; ctx.stroke(new Path2D(ink.banks));
+        ctx.restore();
+    } else if (look.taper) {
         const body = new Path2D(polygonD(taperOutline(sampleCurve(p.points as Pt[]), p.width * 0.25, p.width), CELL));
         if (look.casing) {
             ctx.fillStyle = look.casing;

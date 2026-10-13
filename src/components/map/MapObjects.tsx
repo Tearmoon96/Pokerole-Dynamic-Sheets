@@ -3,7 +3,7 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { MapSprite } from './MapSprite';
 import { landmarkOf } from '../../map/landmarks';
 import { landmarkChain, markerChain, pokemonTokenChain } from '../../map/sprites';
-import { midpoint, polygonD, sampleCurve, smoothPathD, taperOutline } from '../../map/geometry';
+import { midpoint, polygonD, riverInkD, sampleCurve, smoothPathD, taperOutline } from '../../map/geometry';
 import type { Pt } from '../../map/geometry';
 import { CELL } from '../../map/render/patterns';
 import { typeColors, TYPE_ICONS } from '../../lib/themeTables';
@@ -38,6 +38,20 @@ function PathShape({ path, style }: { path: MapPath; style: MapStyle }) {
     const casing = Math.max(2, w * 0.3);
     const dash = look.dash?.map((d) => d * w).join(' ');
 
+    if (look.taper && look.engraved) {
+        const ws = look.widthScale;
+        const ink = riverInkD(path.points as Pt[], path.width * 0.25 * ws, path.width * ws, CELL);
+        const bank = Math.max(1.2, CELL * 0.05);
+        return (
+            <>
+                <path d={ink.body} fill={look.color} />
+                <path d={ink.shade} fill="none" stroke={look.engraved} strokeOpacity={0.7} strokeWidth={bank * 0.55} strokeLinecap="round" strokeLinejoin="round" />
+                <path d={ink.flow} fill="none" stroke={look.engraved} strokeOpacity={0.55} strokeWidth={bank * 0.5} strokeLinecap="round" />
+                <path d={ink.hatch} fill="none" stroke={look.engraved} strokeOpacity={0.8} strokeWidth={bank * 0.45} strokeLinecap="round" />
+                <path d={ink.banks} fill="none" stroke={look.engraved} strokeWidth={bank} strokeLinecap="round" strokeLinejoin="round" />
+            </>
+        );
+    }
     if (look.taper) {
         const dense = sampleCurve(path.points as Pt[]);
         const body = polygonD(taperOutline(dense, path.width * 0.25, path.width), CELL);

@@ -37,6 +37,9 @@ export interface PathLook {
     widthScale: number;
     /** Rivers taper from their source. */
     taper?: boolean;
+    /** A tapered river drawn in ink in this colour: banks, a shaded inner
+        line and strokes for the current (`riverInkD`), not a casing. */
+    engraved?: string;
     cap: CanvasLineCap;
 }
 
@@ -221,7 +224,7 @@ const ancient: MapStyle = {
         'town-paving': { fill: '#d4c29c', pattern: 'engr-cobbles', ink: '#7a6a4e', edge: { color: '#8a7a5c88', width: 1 } },
     },
     paths: {
-        'river': { color: '#8a8468', casing: OLD_INK, widthScale: 0.8, taper: true, cap: 'round' },
+        'river': { color: '#c4bf9f', engraved: OLD_INK, widthScale: 1.3, taper: true, cap: 'round' },
         'road': { color: OLD_INK, widthScale: 0.12, cap: 'round' },
         'route': { color: OLD_INK, widthScale: 0.16, cap: 'round' },
         'trail': { color: OLD_INK, dash: [0.01, 3], widthScale: 0.12, cap: 'round' },

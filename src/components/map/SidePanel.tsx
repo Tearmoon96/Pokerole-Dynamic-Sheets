@@ -18,6 +18,7 @@ import { EDGE_KINDS, EDGE_NAME, paintValue } from '../../map/edges';
 import { FOG_COLORS, fogValue, fullFog } from '../../map/fog';
 import { EDGE_TINT } from '../../map/render/terrain';
 import type { EdgeKind, MapDoc, MapLabel, MapPath, MapSketch, MapStamp, MapToken, Selection } from '../../map/types';
+import { riverInkD } from '../../map/geometry';
 import { SketchFields, SketchPalette } from './SketchPanel';
 import type { MapStore } from '../../map/store';
 import { brushSizeHint, panHint, useHotkeys } from '../../map/hotkeys';
@@ -321,6 +322,16 @@ function PathPreview({ style, kind }: { style: MapStyle; kind: MapPath['kind'] }
     const look = style.paths[kind];
     const w = Math.max(2, 10 * look.widthScale);
     const d = 'M6 20 C 22 4, 38 36, 58 14';
+    if (look.taper && look.engraved) {
+        const ink = riverInkD([[6, 20], [22, 11], [38, 24], [58, 14]], 3, 10, 1);
+        return (
+            <svg className="map-path-preview" viewBox="0 0 64 32" width={64} height={32} style={{ background: style.terrain.grassland.fill }}>
+                <path d={ink.body} fill={look.color} />
+                <path d={ink.shade} fill="none" stroke={look.engraved} strokeOpacity={0.7} strokeWidth={0.6} />
+                <path d={ink.banks} fill="none" stroke={look.engraved} strokeWidth={1.1} strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        );
+    }
     return (
         <svg className="map-path-preview" viewBox="0 0 64 32" width={64} height={32} style={{ background: style.terrain.grassland.fill }}>
             {look.casing && <path d={d} fill="none" stroke={look.casing} strokeWidth={w + 4} strokeLinecap={look.cap} />}
