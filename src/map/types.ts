@@ -5,7 +5,7 @@
    the map's cells, switching the grid off or changing style never moves a
    thing — the renderer multiplies by the cell size at draw time. */
 
-export type StyleId = 'handdrawn' | 'anime' | 'townmap' | 'overworld';
+export type StyleId = 'handdrawn' | 'ancient' | 'anime' | 'townmap' | 'overworld';
 
 export type PathKind = 'river' | 'road' | 'route' | 'trail' | 'border' | 'sea-route';
 
@@ -143,6 +143,22 @@ export interface MapBorders {
     terrain: Partial<Record<string, EdgeKind>>;
 }
 
+/** A picture of the GM's own under the map — see picture.ts. Where it lies
+    is in cells like everything else, so resizing the map leaves it where it
+    was; "Fit to map" stretches it over the whole map again. */
+export interface MapPicture {
+    /** The key of its bytes in IndexedDB: the picture's hash. */
+    id: string;
+    /** The file it came from, to show. */
+    name: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    /** 0.1..1 */
+    opacity: number;
+}
+
 export interface MapDoc {
     id: string;
     name: string;
@@ -161,6 +177,9 @@ export interface MapDoc {
     /** The terrain code every bare sample shows — the layer under the
         painting. Rubbing terrain out uncovers it. */
     background: string;
+    /** A picture under the terrain: bare ground shows it instead of the
+        background terrain. Absent on an ordinary map. */
+    picture?: MapPicture;
     /** The painted border layer, run-length encoded like the terrain; empty
         when nothing was painted. See edges.ts. */
     edges: string;

@@ -10,6 +10,7 @@ import { CELL } from './patterns';
 import { fogImage } from './fog';
 import { drawSketch } from '../sketch';
 import { buildGeometry, drawGrid, drawTerrain } from './terrain';
+import { loadPicture } from '../picture';
 import type { TextureSource } from './terrain';
 import type { MapDoc, MapLabel, MapPath, MapStamp, MapToken } from '../types';
 import {
@@ -210,6 +211,29 @@ async function drawStamp(ctx: CanvasRenderingContext2D, s: MapStamp, style: MapS
         if (s.flip) ctx.scale(-1, 1);
         ctx.imageSmoothingEnabled = !style.pixelated;
         ctx.drawImage(art.img, -w / 2, -h / 2, w, h);
+        ctx.restore();
+    } else if (style.marker === 'shield') {
+        /* The same shield as .map-ph.shield, on its 100-unit box. */
+        const d = px * 0.86, u = (v: number) => (v - 50) / 100 * d;
+        const shield = (x0: number, x1: number, y0: number, mid: number, cx0: number, cy: number, tip: number) => {
+            const p = new Path2D();
+            p.moveTo(u(x0), u(y0)); p.lineTo(u(x1), u(y0)); p.lineTo(u(x1), u(mid));
+            p.bezierCurveTo(u(x1), u(cy), u(100 - cx0), u(tip - 11), u(50), u(tip));
+            p.bezierCurveTo(u(cx0), u(tip - 11), u(x0), u(cy), u(x0), u(mid));
+            p.closePath();
+            return p;
+        };
+        ctx.save();
+        ctx.shadowColor = '#0006'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 1;
+        ctx.fillStyle = '#3a2b1c';
+        ctx.fill(shield(12, 88, 5, 44, 29, 69, 96));
+        ctx.restore();
+        ctx.strokeStyle = '#eadcb8';
+        ctx.lineWidth = d * 0.03;
+        ctx.stroke(shield(18, 82, 11, 44, 32, 65, 89));
+        ctx.save();
+        if (s.flip) ctx.scale(-1, 1);
+        glyph(ctx, def.icon, 0, -d * 0.06, px * 0.36, '#eadcb8');
         ctx.restore();
     } else {
         const r = px * 0.39;
@@ -434,7 +458,8 @@ export async function renderMapPng(doc: MapDoc, opts: ExportOptions, load: Image
     ctx.fillRect(0, 0, w, h);
     ctx.setTransform(k, 0, 0, k, m, m);
 
-    drawTerrain(ctx, buildGeometry(doc, style), doc, style, textureSource);
+    const picture = doc.picture ? await loadPicture(doc.picture.id) : null;
+    drawTerrain(ctx, buildGeometry(doc, style), doc, style, textureSource, picture);
     if (opts.grid) {
         drawGrid(ctx, { ...doc, grid: { ...doc.grid, show: true, opacity: doc.grid.opacity || 0.5 } }, style, k,
             { x0: 0, y0: 0, x1: doc.cols, y1: doc.rows });

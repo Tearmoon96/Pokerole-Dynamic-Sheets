@@ -148,6 +148,7 @@ function StampView({ stamp, style, selected, alone, onDown }: {
                 candidates={landmarkChain(style, stamp.landmark)}
                 icon={def.icon}
                 color={def.color}
+                shape={style.marker}
                 className={'map-stamp-art' + (style.pixelated ? ' pixelated' : '')}
                 style={{ transform: stamp.flip ? 'scaleX(-1)' : undefined, fontSize: px * 0.45 }}
             />

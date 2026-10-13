@@ -190,6 +190,22 @@
 .map-bg-pop { width: 20rem; }
 .map-bg-group-name { font-size: 0.68rem; font-weight: 600; color: var(--text-secondary); margin: 0.55rem 0 0.25rem; }
 
+/* A picture of the GM's own under the map: in the background picker, and
+   in the new map form. */
+.map-picture { padding-bottom: 0.7rem; margin-bottom: 0.7rem; border-bottom: 1px solid var(--border-color); }
+.map-picture .map-hint { margin: 0 0 0.5rem; }
+.map-picture .map-field { margin-bottom: 0.45rem; }
+.map-picture-name { display: flex; align-items: center; gap: 0.45rem; font-size: 0.8rem; margin-bottom: 0.45rem; min-width: 0; }
+.map-picture-name > i { color: var(--accent); flex: 0 0 auto; }
+.map-picture-name.map-warn > i { color: inherit; }
+.map-picture-name > span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-picture-name .icon-btn { flex: 0 0 auto; }
+.map-picture-actions { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.map-picture-actions .map-chip:disabled { opacity: 0.5; cursor: default; }
+.map-new-picture { margin-top: 0.5rem; }
+.map-new-picture .map-new-paste { margin-top: 0; }
+.map-new-picture .map-hint { margin: 0.3rem 0 0; }
+
 /* Borders: the map's look, the blend width, each terrain's own. */
 .map-borders-btn { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; flex: 0 0 auto; }
 .map-borders-pop { width: 21rem; }

@@ -1,5 +1,6 @@
 import { idbDel, idbGet, idbSet } from '../state/idb';
 import { normalizeDoc } from './doc';
+import { blobToDataUrl, dataUrlToBlob, pictureBlob, storePicture } from './picture';
 import type { MapDoc } from './types';
 
 /* Map files: one map per .json, to keep beside the campaign or hand to a
@@ -15,23 +16,34 @@ export function mapFileName(doc: MapDoc): string {
     return base + '.map.json';
 }
 
-export function mapJson(doc: MapDoc, appVersion: string): string {
+/** The file's text. A map with a picture under it carries the picture too,
+    as a data URL, so the file opens in any browser. */
+export async function mapJson(doc: MapDoc, appVersion: string): Promise<string> {
+    const blob = doc.picture ? await pictureBlob(doc.picture.id) : null;
     return JSON.stringify({
         [MAP_MARKER]: true,
         app: appVersion || null,
         savedAt: new Date().toISOString(),
         map: doc,
+        ...(blob && doc.picture ? { picture: { id: doc.picture.id, data: await blobToDataUrl(blob) } } : {}),
     });
 }
 
-export function parseMapFile(text: string): MapDoc | null {
+/** The map in a file, its picture put back into this browser's store. */
+export async function parseMapFile(text: string): Promise<MapDoc | null> {
+    let data: Record<string, unknown>;
     try {
-        const data = JSON.parse(text);
-        if (!data || !data[MAP_MARKER]) return null;
-        return normalizeDoc(data.map);
+        data = JSON.parse(text);
     } catch {
         return null;
     }
+    if (!data || !data[MAP_MARKER]) return null;
+    const doc = normalizeDoc(data.map);
+    if (!doc?.picture) return doc;
+    const pic = data.picture as { id?: unknown; data?: unknown } | undefined;
+    const blob = pic && pic.id === doc.picture.id && typeof pic.data === 'string' ? dataUrlToBlob(pic.data) : null;
+    if (blob) await storePicture(doc.picture.id, blob);
+    return doc;
 }
 
 const handleKey = (id: string) => 'mapFile:' + id;

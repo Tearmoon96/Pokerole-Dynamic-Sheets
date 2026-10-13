@@ -172,6 +172,25 @@ zoom or grid setting ever moves anything.
   `_`) shows the map's `background` terrain, whatever it is at the time. The
   eraser paints bare samples, so rubbing out uncovers it, and swapping the
   background from sea to clouds swaps every bare patch at once.
+- **The Ancient style**: sepia ink on aged parchment. Beyond the style data
+  it adds the paper ([`render/paper.ts`](src/map/render/paper.ts)): a
+  low-resolution sheet of stains, burnt edges and folds per map, plus a
+  repeating grain, multiplied over the ground at the end of `drawTerrain` (so
+  the editor, the PNG and the players' picture agree; a picture under the map
+  is left untinted). Its mountains are the `hatch-peaks` painters, and a
+  landmark with no art is an ink shield (`MapStyle.marker`).
+- **A picture under the map** ([`src/map/picture.ts`](src/map/picture.ts)):
+  a map drawn by hand or in another program, chosen in the background menu
+  or with "Start from a picture" in the new map form (the rows then follow
+  the picture's shape). `MapDoc.picture` holds only the picture's id (its
+  hash) and where it lies, in cells; the bytes live in IndexedDB
+  (`pokerole-map-pictures`), since a picture would not fit in localStorage.
+  `drawTerrain` draws it first and then clips the terrain to
+  `TerrainGeometry.painted` — everything painted, traced like the layers —
+  so bare ground shows the picture, and everything else (objects, fog, the
+  players' copy) works unchanged. A map file carries the picture as a data
+  URL (`files.ts`). Pictures no map names are swept on a later visit, not at
+  once, so Undo can bring one back.
 - **Borders** ([`src/map/edges.ts`](src/map/edges.ts)): each edge between two
   terrains is drawn once, in one of four looks — the style's own, a line,
   none, or a soft blend. A painted border layer (a second sample raster, laid

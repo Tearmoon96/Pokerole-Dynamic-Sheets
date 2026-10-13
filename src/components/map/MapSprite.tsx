@@ -15,11 +15,14 @@ const missing = new Set<string>();
 
 export interface SpriteCandidate { url: string; className?: string }
 
-export function MapSprite({ candidates, icon, color, className, style, title }: {
+export function MapSprite({ candidates, icon, color, className, style, title, shape = 'disc' }: {
     candidates: (string | SpriteCandidate)[];
     /** The placeholder's FontAwesome glyph and disc colour. */
     icon: string;
     color: string;
+    /** The placeholder's outline: a coloured disc, or the ink shield an old
+        atlas marks its places with (the map style's `marker`). */
+    shape?: 'disc' | 'shield';
     className?: string;
     style?: CSSProperties;
     title?: string;
@@ -34,7 +37,10 @@ export function MapSprite({ candidates, icon, color, className, style, title }: 
        sprite sizes `.map-ph` itself. */
     if (!current) {
         return (
-            <span className="map-ph" style={{ ...style, background: color }} title={title}>
+            <span
+                className={'map-ph' + (shape === 'shield' ? ' shield' : '')}
+                style={shape === 'shield' ? style : { ...style, background: color }} title={title}
+            >
                 <i className={'fa-solid ' + icon}></i>
             </span>
         );

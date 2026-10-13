@@ -1,7 +1,7 @@
 # Map Maker art: where each picture goes
 
-The Map Maker draws a placeholder (a coloured disc with an icon) for every
-landmark until a picture exists for it. A picture is linked by its **file name
+The Map Maker draws a placeholder (a coloured disc with an icon; an ink shield
+in the Ancient style) for every landmark until a picture exists for it. A picture is linked by its **file name
 alone**: drop a PNG with the right name into the right folder and it appears
 on the next reload. There is no list to edit.
 
@@ -12,6 +12,7 @@ All under `PDS React Develop/app-data/images/MapSprites/`:
 | Folder | Used by |
 |---|---|
 | `HandDrawn/` | the Hand-drawn style |
+| `Ancient/` | the Ancient style |
 | `Anime/` | the Anime style |
 | `TownMap/` | the Town Map style |
 | `Overworld/` | the Overworld style |
@@ -19,7 +20,7 @@ All under `PDS React Develop/app-data/images/MapSprites/`:
 
 For each landmark the page tries the current style's folder first, then
 `Common/`, then draws the placeholder. So one picture in `Common/` covers all
-four styles, and a style-specific one overrides it for that style only.
+five styles, and a style-specific one overrides it for that style only.
 
 The **Sprite checklist** button in the Map Maker's top bar (the images icon)
 lists every file name against every folder and ticks the ones it found.

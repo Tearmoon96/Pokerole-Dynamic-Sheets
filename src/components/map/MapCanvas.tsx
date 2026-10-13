@@ -17,6 +17,7 @@ import type { Pt } from '../../map/geometry';
 import { landmarkOf } from '../../map/landmarks';
 import { CELL } from '../../map/render/patterns';
 import { buildGeometry, drawEdgeTint, drawGrid, drawTerrain, geometryKey } from '../../map/render/terrain';
+import { onPictureArrived, pictureNow } from '../../map/picture';
 import type { TerrainGeometry } from '../../map/render/terrain';
 import { onImageArrived } from '../../map/sprites';
 import { LabelsLayer, PathsLayer, SketchesLayer, StampsLayer, TokensLayer } from './MapObjects';
@@ -236,6 +237,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     }, [fit]);
 
     useEffect(() => onImageArrived(() => setTexTick((n) => n + 1)), []);
+    useEffect(() => onPictureArrived(() => setTexTick((n) => n + 1)), []);
 
     /* --------------------------------------------------------------- drawing */
 
@@ -254,7 +256,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             ctx.setTransform(dpr * view.zoom, 0, 0, dpr * view.zoom, dpr * view.x, dpr * view.y);
             const key = geometryKey(doc, style);
             if (!geoRef.current || geoRef.current.key !== key) geoRef.current = buildGeometry(doc, style);
-            drawTerrain(ctx, geoRef.current, doc, style);
+            drawTerrain(ctx, geoRef.current, doc, style, undefined, doc.picture ? pictureNow(doc.picture.id) : null);
             if (tool === 'edge') drawEdgeTint(ctx, doc);
             drawGrid(ctx, doc, style, view.zoom * dpr, {
                 x0: -view.x / view.zoom / CELL, y0: -view.y / view.zoom / CELL,

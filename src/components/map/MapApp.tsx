@@ -18,6 +18,7 @@ import type { TableLiveLink } from '../../map/tableLive';
 import { TableLiveBanner } from './TableLinkControl';
 import { GuidedTour, useFirstTimeTour } from '../common/Tour';
 import { MAP_STEPS, MAP_TOUR_INTRO } from './tourSteps';
+import { sweepPictures } from '../../map/picture';
 
 /* The Map Maker: top bar, tool rail, the map, and the side panel. */
 
@@ -33,6 +34,11 @@ export function MapApp({ dataOk, tableLink }: { dataOk: boolean; tableLink: Tabl
     const toast = useToast();
     const [dialog, setDialog] = useState<'maps' | 'sprites' | 'hotkeys' | 'recipe' | null>(null);
     useFirstTimeTour('map');
+    /* Pictures no map names any more, from earlier visits. */
+    useEffect(() => {
+        const t = window.setTimeout(() => { void sweepPictures(); }, 8000);
+        return () => window.clearTimeout(t);
+    }, []);
     const [spaceHeld, setSpaceHeld] = useState(false);
 
     useEffect(() => {

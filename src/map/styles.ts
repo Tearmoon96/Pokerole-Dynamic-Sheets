@@ -1,6 +1,6 @@
 import type { LabelRole, PathKind, StyleId } from './types';
 
-/* The four looks a map can be drawn in.
+/* The five looks a map can be drawn in.
 
    A style is data plus the few renderer switches in render/terrain.ts, so a new
    one is mostly a new entry here. What a style decides:
@@ -78,6 +78,12 @@ export interface MapStyle {
     label: Record<LabelRole, { font: string; size: number; weight: number; color: string; halo: string; italic?: boolean; upper?: boolean; spacing?: number }>;
     /** Route-number badge. */
     badge: { fill: string; text: string; border: string };
+    /** Aged paper laid over the ground: stains, burnt edges, folds and a
+        grain, multiplied in — see render/paper.ts. */
+    paper?: { stain: string; burn: string; grain: number; creases: boolean };
+    /** How a landmark with no art of its own is drawn: the coloured disc, or
+        an ink shield with a pale glyph, as an old atlas marks its cities. */
+    marker?: 'disc' | 'shield';
 }
 
 const HAND_FONT = "'IM Fell English', 'Palatino Linotype', Georgia, serif";
@@ -143,6 +149,72 @@ const handdrawn: MapStyle = {
         small: { font: HAND_FONT, size: 0.45, weight: 400, color: HAND_INK, halo: '#efe3c2aa', italic: true },
     },
     badge: { fill: '#f3e8cc', text: HAND_INK, border: HAND_INK },
+};
+
+/* An old atlas of the realm: sepia ink on stained parchment, mountains
+   hatched in ranges, coasts lined in ink, red only for borders and towns.
+   The fills stay within a narrow band of paper tones, nudged towards green
+   or grey just enough to tell the terrains apart. */
+const OLD_INK = '#4a3826';
+const OLD_RED = '#7e2a1c';
+const OLD_FONT = "'Uncial Antiqua', 'IM Fell English', Georgia, serif";
+
+const ancient: MapStyle = {
+    id: 'ancient', name: 'Ancient', folder: 'Ancient', icon: 'fa-chess-rook',
+    edgeMode: 'smooth',
+    backdrop: '#1d160f', frame: { color: OLD_INK, width: 4 },
+    coast: { color: '#5a43281a', widths: [1.2, 0.8, 0.45, 0.2] },
+    depth: {
+        steps: [0.22, 0.45, 0.72, 1.05],
+        colors: ['#e9dcb81c', '#00000000', '#00000000', '#00000000', '#00000000'],
+        line: { color: '#4a382659', width: 1 },
+    },
+    line: { color: OLD_INK, width: 1.6 },
+    shore: { color: '#4a3826cc', width: 2 },
+    pixelated: false,
+    grid: '#4a382640',
+    marker: 'shield',
+    paper: { stain: '#8a6a3c', burn: '#3b2814', grain: 0.5, creases: true },
+    terrain: {
+        'clouds': { fill: '#e6dcc0', pattern: 'clouds', ink: '#a8987a' },
+        'deep-sea': { fill: '#b9b394', edge: { color: '#4a382655', width: 1 } },
+        'sea': { fill: '#c6bf9e' },
+        'shallows': { fill: '#cfc6a2', pattern: 'ripples', ink: '#8f8566' },
+        'lake': { fill: '#bdb795', pattern: 'ripples', ink: '#7f775a', edge: { color: '#4a382677', width: 1 } },
+        'river': { fill: '#bdb795', pattern: 'ripples', ink: '#7f775a', edge: { color: '#4a382677', width: 1 } },
+        'swamp': { fill: '#c2b98e', pattern: 'swamp', ink: '#5c5a36', edge: { color: '#5c5a3677', width: 1 } },
+        'beach': { fill: '#e0d0a4', pattern: 'sand', ink: '#a8956a', edge: { color: '#a8956a88', width: 1 } },
+        'grassland': { fill: '#d8c79c' },
+        'flower-field': { fill: '#dcc8a0', pattern: 'tussocks', ink: '#7a5a4a99', edge: { color: '#7a5a4a66', width: 1 } },
+        'tall-grass': { fill: '#c4b682', pattern: 'tall-tussocks', ink: '#5e5634aa', edge: { color: '#5e563466', width: 1 } },
+        'forest': { fill: '#c6bd8c', pattern: 'forest-line', ink: OLD_INK, edge: { color: '#4a382688', width: 1.2 } },
+        'jungle': { fill: '#bdb784', pattern: 'jungle-line', ink: '#3a3420', edge: { color: '#4a382688', width: 1.2 } },
+        'desert': { fill: '#e2cd9a', pattern: 'dunes', ink: '#9a7c4c', edge: { color: '#9a7c4c88', width: 1 } },
+        'badlands': { fill: '#d6b88c', pattern: 'shrubs', ink: '#8a6440', edge: { color: '#7a543488', width: 1 } },
+        'tundra': { fill: '#e0d6bc', pattern: 'bare-trees', ink: '#6a5c48', edge: { color: '#6a5c4866', width: 1 } },
+        'snow': { fill: '#ece4cf', pattern: 'snow', ink: '#a89c84', edge: { color: '#7a6c5866', width: 1 } },
+        'mountain': { fill: '#d2bf94', pattern: 'hatch-peaks', ink: OLD_INK, edge: { color: '#4a382677', width: 1.2 } },
+        'snow-mountain': { fill: '#ddd2b6', pattern: 'hatch-snow-peaks', ink: OLD_INK, edge: { color: '#4a382677', width: 1.2 } },
+        'volcanic': { fill: '#c4aa86', pattern: 'volcanoes', ink: OLD_INK, edge: { color: '#5a3e2a88', width: 1.2 } },
+        'cave-floor': { fill: '#c8b490', pattern: 'rocks', ink: '#5e4c36', edge: { color: '#5e4c3688', width: 1.2 } },
+        'road': { fill: '#d6c194', edge: { color: '#4a382688', width: 1 } },
+        'town-paving': { fill: '#d4c29c', pattern: 'bricks', ink: '#8a7a5c', edge: { color: '#8a7a5c88', width: 1 } },
+    },
+    paths: {
+        'river': { color: '#8a8468', casing: OLD_INK, widthScale: 0.8, taper: true, cap: 'round' },
+        'road': { color: OLD_INK, widthScale: 0.12, cap: 'round' },
+        'route': { color: OLD_INK, widthScale: 0.16, cap: 'round' },
+        'trail': { color: OLD_INK, dash: [0.01, 3], widthScale: 0.12, cap: 'round' },
+        'border': { color: OLD_RED, dash: [2.6, 1.6], widthScale: 0.22, cap: 'butt' },
+        'sea-route': { color: '#4a3826b0', dash: [2, 2.4], widthScale: 0.1, cap: 'round' },
+    },
+    label: {
+        region: { font: OLD_FONT, size: 1.5, weight: 400, color: OLD_INK, halo: '#e6d6ae66', spacing: 0.12 },
+        town: { font: OLD_FONT, size: 0.75, weight: 400, color: OLD_RED, halo: '#e6d6ae88' },
+        route: { font: HAND_FONT, size: 0.6, weight: 400, color: OLD_INK, halo: '#e6d6ae66', italic: true },
+        small: { font: HAND_FONT, size: 0.45, weight: 400, color: OLD_INK, halo: '#e6d6ae66', italic: true },
+    },
+    badge: { fill: '#e6d6ae', text: OLD_INK, border: OLD_INK },
 };
 
 const ANIME_LINE = '#24324d';
@@ -306,7 +378,7 @@ const overworld: MapStyle = {
     badge: { fill: '#f8f8f8', text: '#202020', border: '#202020' },
 };
 
-export const MAP_STYLES: MapStyle[] = [handdrawn, anime, townmap, overworld];
+export const MAP_STYLES: MapStyle[] = [handdrawn, ancient, anime, townmap, overworld];
 
 export const STYLE_BY_ID = new Map(MAP_STYLES.map((s) => [s.id, s]));
 

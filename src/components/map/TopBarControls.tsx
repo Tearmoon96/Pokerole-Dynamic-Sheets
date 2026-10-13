@@ -12,6 +12,7 @@ import type { EdgeKind } from '../../map/types';
 import { exportSize, renderMapPng } from '../../map/render/exportPng';
 import type { ExportResult } from '../../map/render/exportPng';
 import { exportLoader, folderReadable, pickAppFolder, readAppFolder, readsFromDisk } from '../../map/render/exportImages';
+import { PICTURE_ACCEPT, fitPicture, importPicture, loadPicture, onPictureArrived, pictureMissing, rowsFor } from '../../map/picture';
 
 /* The map's own settings, each on the top bar with a small window of its own
    where it needs one — they used to share a Map settings dialog. */
@@ -27,6 +28,7 @@ function usePopover() {
 
 const STYLE_HINTS: Record<string, string> = {
     handdrawn: 'Ink on parchment, like an old atlas',
+    ancient: 'Sepia ink on aged parchment, like a realm\'s old atlas',
     anime: 'Flat, bright colours with clean outlines',
     townmap: 'The games\' region map: blocks and routes',
     overworld: 'Top-down pixel tiles, as walked in the games',
@@ -75,6 +77,97 @@ const BG_GROUPS: { name: string; test: (t: TerrainDef) => boolean }[] = [
     { name: 'Land', test: (t) => !t.sky && !t.water },
 ];
 
+/** A picture of the GM's own under the map: choose, fade, fit, remove. */
+function PictureSection() {
+    const { store, doc } = useMap();
+    const toast = useToast();
+    const input = useRef<HTMLInputElement>(null);
+    const [busy, setBusy] = useState(false);
+    const [, setTick] = useState(0);
+    useEffect(() => onPictureArrived(() => setTick((n) => n + 1)), []);
+    const pic = doc.picture;
+    useEffect(() => { if (pic) void loadPicture(pic.id); }, [pic]);
+    const missing = !!pic && pictureMissing(pic.id);
+
+    const choose = async (file: File) => {
+        setBusy(true);
+        try {
+            const info = await importPicture(file);
+            store.edit((d) => { d.picture = fitPicture(d, info, d.picture?.opacity ?? 1); });
+        } catch (e) {
+            toast('<i class="fa-solid fa-triangle-exclamation"></i> ' + (e as Error).message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    /* The map takes the picture's shape: as many rows as its columns need. */
+    const fitMap = () => {
+        if (!pic) return;
+        const rows = clampCells(rowsFor(doc.cols, pic));
+        store.edit((d) => {
+            const next = resizeDoc(d, d.cols, rows);
+            return { ...next, picture: { ...pic, x: 0, y: 0, w: next.cols, h: next.rows } };
+        });
+    };
+
+    return (
+        <div className="map-picture" data-map-picture>
+            <div className="map-popover-title">Picture</div>
+            {!pic ? (
+                <p className="map-hint">
+                    A map drawn by hand or in another program, under everything: paint on it, place landmarks,
+                    tokens and labels, fog it, and show it at the Rolling Table like any map.
+                </p>
+            ) : (
+                <>
+                    <div className={'map-picture-name' + (missing ? ' map-warn' : '')}>
+                        <i className={'fa-solid ' + (missing ? 'fa-triangle-exclamation' : 'fa-image')}></i>
+                        <span>{missing ? 'Not in this browser: choose the picture again' : (pic.name || 'Picture')}</span>
+                    </div>
+                    <label className="map-field">
+                        <span>Strength — {Math.round(pic.opacity * 100)}%</span>
+                        <input
+                            type="range" min={0.1} max={1} step={0.05} value={pic.opacity}
+                            onChange={(e) => {
+                                const v = Number(e.currentTarget.value);
+                                store.edit((d) => { if (d.picture) d.picture = { ...d.picture, opacity: v }; }, 'picture-opacity');
+                            }}
+                        />
+                    </label>
+                </>
+            )}
+            <div className="map-picture-actions">
+                <button className="map-chip" disabled={busy} onClick={() => input.current?.click()} data-picture-choose>
+                    <i className={'fa-solid ' + (busy ? 'fa-spinner fa-spin' : 'fa-image')}></i> {pic ? 'Replace…' : 'Choose a picture…'}
+                </button>
+                {pic && (
+                    <>
+                        <button className="map-chip" title="Stretch the picture over the whole map"
+                            onClick={() => store.edit((d) => { if (d.picture) d.picture = { ...d.picture, x: 0, y: 0, w: d.cols, h: d.rows }; })}>
+                            <i className="fa-solid fa-expand"></i> Fit to map
+                        </button>
+                        <button className="map-chip" title="Give the map as many rows as the picture's shape needs, and fit the picture to it" onClick={fitMap}>
+                            <i className="fa-solid fa-crop-simple"></i> Map to its shape
+                        </button>
+                        <button className="map-chip" onClick={() => store.edit((d) => { delete d.picture; })} data-picture-remove>
+                            <i className="fa-solid fa-trash-can"></i> Remove
+                        </button>
+                    </>
+                )}
+            </div>
+            <input
+                ref={input} type="file" accept={PICTURE_ACCEPT} hidden data-picture-input
+                onChange={(e) => {
+                    const file = e.currentTarget.files?.[0];
+                    e.currentTarget.value = '';
+                    if (file) void choose(file);
+                }}
+            />
+        </div>
+    );
+}
+
 export function BackgroundControl() {
     const { store, doc } = useMap();
     const pop = usePopover();
@@ -84,16 +177,22 @@ export function BackgroundControl() {
         <>
             <button
                 ref={pop.anchor} className="icon-btn map-bg-btn" aria-expanded={pop.open}
-                title={'Background: ' + bg.name + ' — shows wherever nothing is painted'} onClick={() => pop.setOpen((o) => !o)}
+                title={doc.picture ? 'Background: your picture — shows wherever nothing is painted'
+                    : 'Background: ' + bg.name + ' — shows wherever nothing is painted'}
+                onClick={() => pop.setOpen((o) => !o)}
             >
-                <span className={'map-bg-chip' + (style.pixelated ? ' pixelated' : '')} style={{ background: swatchBackground(style, bg.slug) }}></span>
-                <span className="map-btn-text"> {bg.name}</span> <i className="fa-solid fa-caret-down"></i>
+                {doc.picture
+                    ? <i className="fa-solid fa-image"></i>
+                    : <span className={'map-bg-chip' + (style.pixelated ? ' pixelated' : '')} style={{ background: swatchBackground(style, bg.slug) }}></span>}
+                <span className="map-btn-text"> {doc.picture ? 'Picture' : bg.name}</span> <i className="fa-solid fa-caret-down"></i>
             </button>
             <Popover anchor={pop.anchor} open={pop.open} onClose={pop.close} className="map-bg-pop">
+                <PictureSection />
                 <div className="map-popover-title">Background</div>
                 <p className="map-hint">
-                    The layer under everything painted. It shows wherever nothing is painted, and wherever the
-                    eraser rubs terrain out.
+                    {doc.picture
+                        ? 'Under a picture, bare ground shows the picture. The background terrain still decides how painted terrain meets it.'
+                        : 'The layer under everything painted. It shows wherever nothing is painted, and wherever the eraser rubs terrain out.'}
                 </p>
                 {BG_GROUPS.map((g) => (
                     <div key={g.name} className="map-bg-group">

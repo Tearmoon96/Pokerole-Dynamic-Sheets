@@ -1,14 +1,15 @@
-import { chaikinClosed, chaikinTagged, dropCollinearTagged, traceLevels, traceTagged } from '../geometry';
+import { chaikinClosed, chaikinTagged, dropCollinear, dropCollinearTagged, traceLevels, traceTagged } from '../geometry';
 import type { Pt } from '../geometry';
 import { TERRAINS } from '../terrain';
 import type { TerrainDef } from '../terrain';
 import type { MapStyle, TerrainLook } from '../styles';
 import type { EdgeKind, MapDoc } from '../types';
-import { codeIndex, resolvedOf } from '../raster';
+import { EMPTY, codeIndex, rasterOf, resolvedOf } from '../raster';
 import { edgeResolver, edgesOf } from '../edges';
 import { probeImage, terrainTextureUrl } from '../sprites';
 import { CELL, patternParts, tileScale } from './patterns';
 import { drawMarkers, markerPlan } from './markers';
+import { drawPaper } from './paper';
 import type { MarkerPlan } from './markers';
 
 /* The ground, drawn into a canvas.
@@ -97,6 +98,9 @@ export interface TerrainGeometry {
     depth?: Map<string, DepthBands | null>;
     /** Which markers each terrain keeps, by style and terrain; see markers.ts. */
     marks?: Map<string, MarkerPlan>;
+    /** On a map with a picture under it: where anything is painted. The
+        terrain is drawn only inside it, so bare ground shows the picture. */
+    painted?: Path2D | null;
 }
 
 /* A stretch's tag while building: which of the looks it is drawn in. 0 is
@@ -167,7 +171,7 @@ function addRuns(loop: Pt[], tags: Uint8Array, scale: number, sink: (tag: number
 export function geometryKey(doc: MapDoc, style: MapStyle): string {
     const b = doc.borders;
     return doc.cols + 'x' + doc.rows + '@' + doc.res + ':' + style.edgeMode + ':' + doc.background + ':'
-        + b.kind + ':' + b.soft + ':' + JSON.stringify(b.terrain) + ':' + doc.edges + ':' + doc.terrain;
+        + (doc.picture ? 'P:' : '') + b.kind + ':' + b.soft + ':' + JSON.stringify(b.terrain) + ':' + doc.edges + ':' + doc.terrain;
 }
 
 function emptyBox() {
@@ -175,6 +179,43 @@ function emptyBox() {
 }
 
 export function buildGeometry(doc: MapDoc, style: MapStyle): TerrainGeometry {
+    const geo = buildLayers(doc, style);
+    if (doc.picture) geo.painted = paintedArea(doc, style.edgeMode === 'blocky');
+    return geo;
+}
+
+/** Everything painted on a map, bare ground left out: traced and rounded
+    like the layers in a smooth style, square samples in a blocky one, so the
+    terrain ends where it would have met the background. */
+function paintedArea(doc: MapDoc, blocky: boolean): Path2D {
+    const r = rasterOf(doc);
+    const scale = CELL / r.res;
+    const out = new Path2D();
+    if (blocky) {
+        for (let y = 0; y < r.h; y++) {
+            let x = 0;
+            while (x < r.w) {
+                if (r.data[y * r.w + x] === EMPTY) { x++; continue; }
+                const x0 = x;
+                while (x < r.w && r.data[y * r.w + x] !== EMPTY) x++;
+                out.rect(x0 * scale, y * scale, (x - x0) * scale, scale);
+            }
+        }
+        return out;
+    }
+    const bin = new Uint8Array(r.data.length);
+    for (let i = 0; i < bin.length; i++) bin[i] = r.data[i] === EMPTY ? 0 : 1;
+    for (const raw of traceLevels(bin, r.w, r.h, [1])[0] ?? []) {
+        const loop = dropCollinear(chaikinClosed(chaikinClosed(raw)));
+        if (loop.length < 3) continue;
+        out.moveTo(loop[0][0] * scale, loop[0][1] * scale);
+        for (let i = 1; i < loop.length; i++) out.lineTo(loop[i][0] * scale, loop[i][1] * scale);
+        out.closePath();
+    }
+    return out;
+}
+
+function buildLayers(doc: MapDoc, style: MapStyle): TerrainGeometry {
     const key = geometryKey(doc, style);
     const r = resolvedOf(doc);
     const painted = edgesOf(doc);
@@ -1114,12 +1155,26 @@ function drawDepth(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: Map
 
 /** Draw the map's ground under the transform already set on `ctx` (world px). */
 export function drawTerrain(ctx: CanvasRenderingContext2D, geo: TerrainGeometry, doc: MapDoc, style: MapStyle,
-    textures: TextureSource = probeTexture): void {
+    textures: TextureSource = probeTexture, picture: CanvasImageSource | null = null): void {
     const W = doc.cols * CELL, H = doc.rows * CELL;
     ctx.save();
     const clip = new Path2D();
     clip.rect(0, 0, W, H);
     ctx.clip(clip);
+    if (doc.picture) {
+        /* The GM's own picture, then the terrain only where it is painted.
+           A picture still loading (or lost) leaves the backdrop showing. */
+        const p = doc.picture;
+        if (picture) {
+            ctx.save();
+            ctx.globalAlpha = p.opacity;
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(picture, p.x * CELL, p.y * CELL, p.w * CELL, p.h * CELL);
+            ctx.restore();
+        }
+        ctx.clip(geo.painted ?? new Path2D(), 'evenodd');
+    }
     ctx.imageSmoothingEnabled = !style.pixelated;
 
     geo.layers.forEach((layer, idx) => {
@@ -1186,6 +1241,9 @@ export function drawTerrain(ctx: CanvasRenderingContext2D, geo: TerrainGeometry,
         ctx.lineWidth = geo.blocky ? Math.min(style.line.width, CELL / doc.res) : style.line.width;
         ctx.stroke(geo.lines);
     }
+    /* Aged paper over all of it — still inside a picture's painted-ground
+       clip, so the GM's own picture is never re-tinted. */
+    drawPaper(ctx, doc, style);
     ctx.restore();
 
     ctx.strokeStyle = style.frame.color;

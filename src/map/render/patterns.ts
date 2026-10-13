@@ -48,7 +48,7 @@ const SELF_TILING = new Set(['bricks', 'clouds', 'puffs', 'px-bricks', 'px-cloud
    scatter repeats half as often and reads as random ground. Their counts are
    written per two-cell tile and scaled up by `area(S)`. */
 const BIG_TILE = new Set(['tussocks', 'tall-tussocks', 'flowers', 'swamp', 'forest-line', 'forest-fill',
-    'jungle-line', 'jungle-fill', 'shrubs', 'bare-trees', 'volcanoes', 'rocks',
+    'jungle-line', 'jungle-fill', 'shrubs', 'bare-trees', 'volcanoes', 'rocks', 'hatch-peaks', 'hatch-snow-peaks',
     'px-flowers', 'px-swamp', 'px-forest', 'px-jungle', 'px-shrubs', 'px-bare-trees', 'px-volcanic', 'px-rocks']);
 
 /** How many cells a side of this pattern's tile covers. */
@@ -239,7 +239,97 @@ function jungle(c: CanvasRenderingContext2D, S: number, ink: string, r: Rng, fil
     }
 }
 
+/* An engraver's mountain range, as an old atlas draws one: peaks in
+   clusters, each a pale lit face and a shadowed flank filled with parallel
+   hatching, under one ink outline. The lit face is nearly opaque, so a peak
+   in front hides the one behind it. `snow` leaves the top of every peak
+   unhatched and paler: bare paper reads as snow. */
+function hatchedRange(c: CanvasRenderingContext2D, S: number, ink: string, r: Rng, mark: Mark, snow: boolean) {
+    const peaks: { x: number; y: number; w: number; h: number; sk: number }[] = [];
+    for (const p of scatter(r, S, Math.round(4 * area(S)), S * 0.11)) {
+        const n = 2 + (r() * 3 | 0);
+        for (let k = 0; k < n; k++) {
+            const w = S * (0.06 + r() * 0.045);
+            peaks.push({
+                x: p.x + (r() - 0.5) * S * 0.14, y: p.y + (r() - 0.5) * S * 0.06,
+                w, h: w * (0.95 + r() * 0.5), sk: (r() - 0.5) * 0.35,
+            });
+        }
+    }
+    peaks.sort((a, b) => a.y - b.y);
+    const lw = S / 125;
+    for (const { x, y, w, h, sk } of peaks) {
+        mark();
+        const top: [number, number] = [x + w * sk, y - h];
+        /* A rugged slope: three jags, one of them sometimes a shoulder. */
+        const slope = (from: [number, number], to: [number, number]): [number, number][] => {
+            const out: [number, number][] = [];
+            for (const t of [0.28, 0.55, 0.8]) {
+                out.push([from[0] + (to[0] - from[0]) * t + (r() - 0.5) * w * 0.28,
+                    from[1] + (to[1] - from[1]) * t + (r() - 0.4) * h * 0.14]);
+            }
+            return out;
+        };
+        const left = slope([x - w, y], top);
+        const right = slope(top, [x + w, y]);
+        const ridgeFoot: [number, number] = [x + w * (0.05 + r() * 0.2), y];
+        const outline = () => {
+            c.beginPath(); c.moveTo(x - w, y);
+            for (const q of left) c.lineTo(q[0], q[1]);
+            c.lineTo(top[0], top[1]);
+            for (const q of right) c.lineTo(q[0], q[1]);
+            c.lineTo(x + w, y);
+        };
+        /* The lit face, over everything behind. */
+        outline(); c.closePath();
+        c.fillStyle = snow ? '#f2ead6f0' : '#e2d3abf0';
+        c.fill();
+        /* The shadowed flank: summit, down the right slope, back up the ridge. */
+        const shadow = () => {
+            c.beginPath(); c.moveTo(top[0], top[1]);
+            for (const q of right) c.lineTo(q[0], q[1]);
+            c.lineTo(x + w, y); c.lineTo(ridgeFoot[0], ridgeFoot[1]); c.closePath();
+        };
+        c.save();
+        shadow();
+        c.fillStyle = shade(ink, 0.2) + (snow ? '26' : '44');
+        c.fill();
+        c.clip();
+        if (snow) { c.beginPath(); c.rect(x - w * 2, y - h * 0.6, w * 4, h); c.clip(); }
+        c.strokeStyle = ink; line(c, lw * 0.75);
+        const step = Math.max(2.5, w * 0.12);
+        for (let d = -h; d < w * 2; d += step) {
+            c.beginPath();
+            c.moveTo(top[0] + d, top[1]);
+            c.lineTo(top[0] + d + h * 0.5, top[1] + h * 1.1);
+            c.stroke();
+        }
+        c.restore();
+        /* A few strokes down the lit face, the ridge, the outline, scree. */
+        c.strokeStyle = ink; line(c, lw * 0.6);
+        for (let k = 0; k < 2; k++) {
+            const t = 0.35 + r() * 0.3, q = left[1];
+            c.beginPath();
+            c.moveTo(q[0] + (top[0] - q[0]) * t, q[1] + (top[1] - q[1]) * t);
+            c.lineTo(q[0] + (top[0] - q[0]) * t - w * 0.12, q[1] + (top[1] - q[1]) * t + h * 0.22);
+            c.stroke();
+        }
+        line(c, lw);
+        c.beginPath(); c.moveTo(top[0], top[1]);
+        c.quadraticCurveTo((top[0] + ridgeFoot[0]) / 2 + w * 0.1, (top[1] + y) / 2, ridgeFoot[0], ridgeFoot[1] - h * 0.1);
+        c.stroke();
+        outline(); c.stroke();
+        line(c, lw * 0.7);
+        for (let k = 0; k < 2; k++) {
+            const bx = x + (r() - 0.2) * w * 1.4;
+            c.beginPath(); c.moveTo(bx, y + h * 0.04); c.lineTo(bx + w * 0.3, y + h * 0.04); c.stroke();
+        }
+    }
+}
+
 const SMOOTH: Record<string, Painter> = {
+    'hatch-peaks'(c, S, ink, r, mark) { hatchedRange(c, S, ink, r, mark, false); },
+    'hatch-snow-peaks'(c, S, ink, r, mark) { hatchedRange(c, S, ink, r, mark, true); },
     waves(c, S, ink, r) {
         c.strokeStyle = ink; line(c, S / 70);
         for (let i = 0; i < 5; i++) {

@@ -7,7 +7,9 @@ import type { Raster } from './raster';
 import { DEFAULT_BORDERS, MAX_SOFT, MIN_SOFT, decodeEdges, edgesOf, encodeEdges, isEdgeKind, rememberEdges } from './edges';
 import { decodeFog, encodeFog, fogOf, rememberFog } from './fog';
 import { normalizeSketch } from './sketch';
-import type { EdgeKind, LabelRole, MapBorders, MapDoc, MapLabel, MapPath, MapStamp, MapToken, StyleId } from './types';
+import type {
+    EdgeKind, LabelRole, MapBorders, MapDoc, MapLabel, MapPath, MapPicture, MapStamp, MapToken, StyleId,
+} from './types';
 
 /* Pure operations on a MapDoc. Nothing here touches the DOM or storage, so the
    harness in .verify/ can drive all of it from Node. */
@@ -26,12 +28,13 @@ export function clampCells(n: number): number {
 /** A new map: nothing painted yet, so all of it is the background. */
 export function createDoc(opts: {
     name?: string; cols?: number; rows?: number; styleId?: StyleId; background?: string; scaleLabel?: string;
+    picture?: MapPicture;
 } = {}): MapDoc {
     const cols = clampCells(opts.cols ?? 40);
     const rows = clampCells(opts.rows ?? 30);
     const res = pickRes(cols, rows);
     const background = (TERRAIN_BY_SLUG.get(opts.background ?? 'sea') ?? TERRAIN_BY_SLUG.get('sea')!).code;
-    return {
+    const doc: MapDoc = {
         id: uid(),
         name: opts.name?.trim() || 'New map',
         styleId: opts.styleId ?? 'handdrawn',
@@ -52,6 +55,8 @@ export function createDoc(opts: {
         sketches: [],
         updatedAt: new Date().toISOString(),
     };
+    if (opts.picture) doc.picture = opts.picture;
+    return doc;
 }
 
 const num = (v: unknown, dflt: number): number => (typeof v === 'number' && isFinite(v) ? v : dflt);
@@ -109,7 +114,8 @@ export function normalizeDoc(raw: unknown): MapDoc | null {
     let fog = str(r.fog, '');
     if (fog && runTotal(fog) !== cols * res * rows * res) fog = encodeFog(decodeFog(fog, cols * res * rows * res));
 
-    return {
+    const picture = normalizePicture(r.picture);
+    const out: MapDoc = {
         id: str(r.id, '') || uid(),
         name: str(r.name, 'Untitled map'),
         styleId,
@@ -148,6 +154,23 @@ export function normalizeDoc(raw: unknown): MapDoc | null {
             })),
         sketches: arr<unknown>(r.sketches).map(normalizeSketch).filter((k): k is NonNullable<typeof k> => !!k),
         updatedAt: str(r.updatedAt, new Date().toISOString()),
+    };
+    if (picture) out.picture = picture;
+    return out;
+}
+
+/** A picture's place, kept only when it is whole and sane. */
+function normalizePicture(raw: unknown): MapPicture | undefined {
+    if (!raw || typeof raw !== 'object') return undefined;
+    const p = raw as Record<string, unknown>;
+    const id = str(p.id, '');
+    if (!/^[a-z0-9]{8,64}$/.test(id)) return undefined;
+    const w = num(p.w, 0), h = num(p.h, 0);
+    if (!(w > 0 && h > 0)) return undefined;
+    return {
+        id, name: str(p.name, '').slice(0, 120),
+        x: num(p.x, 0), y: num(p.y, 0), w, h,
+        opacity: Math.max(0.1, Math.min(1, num(p.opacity, 1))),
     };
 }
 

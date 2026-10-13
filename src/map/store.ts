@@ -413,7 +413,7 @@ export function findObject(doc: MapDoc, sel: Selection): { id: string } | undefi
    are replaced, never mutated, so identity is enough. */
 function sameDoc(a: MapDoc, b: MapDoc): boolean {
     return a.terrain === b.terrain && a.edges === b.edges && a.fog === b.fog && a.stamps === b.stamps && a.tokens === b.tokens
-        && a.labels === b.labels && a.paths === b.paths && a.sketches === b.sketches;
+        && a.labels === b.labels && a.paths === b.paths && a.sketches === b.sketches && a.picture === b.picture;
 }
 
 function readIndex(): SavedIndex | null {

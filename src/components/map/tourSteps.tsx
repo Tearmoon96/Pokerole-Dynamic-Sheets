@@ -56,9 +56,13 @@ export const MAP_STEPS: TourStep[] = [
         title: 'The look of the map',
         target: ['.map-styles', '.map-settings'],
         union: true,
-        body: <p>Four drawing styles, the background, and the <strong>borders</strong> between terrains: soft
-            blends, ink lines or none, chosen per pair of terrains with the <Btn icon="fa-bezier-curve" /> tool.
-            Then the grid, snapping, the size in cells and what one cell means.</p>,
+        body: <>
+            <p>Five drawing styles, the background, and the <strong>borders</strong> between terrains: soft
+                blends, ink lines or none, chosen per pair of terrains with the <Btn icon="fa-bezier-curve" /> tool.
+                Then the grid, snapping, the size in cells and what one cell means.</p>
+            <p>Have a map drawn by hand or in another program? The background menu takes a <strong>picture</strong>:
+                paint, mark and fog it like any map, and show it at the table.</p>
+        </>,
     },
     {
         id: 'fog',

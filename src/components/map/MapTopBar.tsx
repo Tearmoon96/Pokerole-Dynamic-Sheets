@@ -45,9 +45,8 @@ export function MapTopBar({ onMaps, onSprites, onHotkeys, onRecipe, tableLink }:
 
     const saveAs = async () => {
         store.flush();
-        const json = mapJson(doc, data.version);
         if (!window.showSaveFilePicker) {
-            downloadMap(json, mapFileName(doc));
+            downloadMap(await mapJson(doc, data.version), mapFileName(doc));
             setStatus({ text: 'Downloaded — this browser cannot overwrite a file in place.', warn: false });
             return;
         }
@@ -64,7 +63,9 @@ export function MapTopBar({ onMaps, onSprites, onHotkeys, onRecipe, tableLink }:
         }
         setHandle(h);
         await rememberMapHandle(doc.id, h);
-        await report(await writeMapFile(h, json), h);
+        /* Made after the picker: a picture under the map makes it slow, and
+           the picker needs the click's user activation. */
+        await report(await writeMapFile(h, await mapJson(doc, data.version)), h);
     };
 
     const report = async (ok: boolean, h: FileSystemFileHandle) => {
@@ -86,7 +87,7 @@ export function MapTopBar({ onMaps, onSprites, onHotkeys, onRecipe, tableLink }:
             setStatus({ text: 'That file is no longer writable — choose it again with Save.', warn: true });
             return;
         }
-        await report(await writeMapFile(handle, mapJson(doc, data.version)), handle);
+        await report(await writeMapFile(handle, await mapJson(doc, data.version)), handle);
     };
 
     const accept = async (parsed: MapDoc, name: string, h: FileSystemFileHandle | null) => {
@@ -114,7 +115,7 @@ export function MapTopBar({ onMaps, onSprites, onHotkeys, onRecipe, tableLink }:
                 types: [{ description: 'Pokerole map', accept: { 'application/json': ['.json'] } }],
             });
         } catch { return; }
-        const parsed = parseMapFile(await (await h.getFile()).text());
+        const parsed = await parseMapFile(await (await h.getFile()).text());
         if (!parsed) { toast('<i class="fa-solid fa-triangle-exclamation"></i> That is not a map file.'); return; }
         await accept(parsed, h.name, h);
     };
@@ -188,7 +189,7 @@ export function MapTopBar({ onMaps, onSprites, onHotkeys, onRecipe, tableLink }:
                     const file = e.currentTarget.files?.[0];
                     e.currentTarget.value = '';
                     if (!file) return;
-                    const parsed = parseMapFile(await file.text());
+                    const parsed = await parseMapFile(await file.text());
                     if (!parsed) { toast('<i class="fa-solid fa-triangle-exclamation"></i> That is not a map file.'); return; }
                     await accept(parsed, file.name, null);
                 }}

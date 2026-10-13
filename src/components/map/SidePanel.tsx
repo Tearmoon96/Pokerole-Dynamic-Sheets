@@ -302,7 +302,7 @@ function LandmarkPalette({ style }: { style: MapStyle }) {
                         onClick={() => store.setUi({ landmark: l.slug, tool: 'stamp' })}
                     >
                         <MapSprite
-                            candidates={landmarkChain(style, l.slug)} icon={l.icon} color={l.color}
+                            candidates={landmarkChain(style, l.slug)} icon={l.icon} color={l.color} shape={style.marker}
                             className={'map-tile-art' + (style.pixelated ? ' pixelated' : '')}
                         />
                         <span className="map-tile-name">{l.name}</span>
