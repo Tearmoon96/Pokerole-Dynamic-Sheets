@@ -42,6 +42,7 @@ import { hostUploadKey } from './identity';
 import type { TableApi } from './link';
 import { MapShare } from './mapShare';
 import { CombatShare } from './combatShare';
+import { RULES_KEY, readGmMegaRules, writeTableMegaRules } from '../lib/megaRules';
 import { MusicController } from './music/music';
 import type { TransportStatus } from './transport';
 import { cleanText, parseInner, parseSigned, safeParse } from './validate';
@@ -104,15 +105,16 @@ export interface TableState {
     sides: number;
     note: string;
     prep: PreparedRoll | null;
+    /** The feed shows a pool's successes before its other dice, as the GM
+        screen's Dice panel can. The GM's and each player's own choice:
+        display only, this browser only, never sent. */
+    successesFirst: boolean;
 
     /* Host-only controls. Meaningless for a player and never sent. */
     hideMyRolls: boolean;
     scripted: boolean;
     scriptSuccesses: number;
     scriptTotal: number;
-    /** The GM's feed shows a pool's successes before its other dice, as the
-        GM screen's Dice panel can. Display only, this browser only. */
-    successesFirst: boolean;
 }
 
 function initialState(): TableState {
@@ -501,6 +503,7 @@ export class TableSession {
         });
         this.transport.start();
         this.combat.begin(isHost, lobbyId);
+        if (isHost) window.addEventListener('storage', this.onRulesSaved);
 
         this.heartbeat = window.setInterval(() => this.tick(), HEARTBEAT_MS);
 
@@ -558,6 +561,8 @@ export class TableSession {
         this.map.end();
         this.music.end();
         this.combat.end();
+        window.removeEventListener('storage', this.onRulesSaved);
+        this.publishedRules = '';
         this.clock.stop();
         this.transport?.stop();
         this.transport = null;
@@ -574,6 +579,8 @@ export class TableSession {
         The host's keypair is deliberately kept, so the same lobby can be hosted
         again later — see identity.ts. */
     leave(): void {
+        /* A player's table rules go with the table; a GM's own stay theirs. */
+        if (!this.store.state.isHost) writeTableMegaRules('', null);
         this.teardown();
         clearSession();
         this.store.state = initialState();
@@ -685,6 +692,7 @@ export class TableSession {
             this.map.greet();
             this.music.greet();
             this.combat.greet();
+            this.publishRules(false);
         } else {
             const online = Date.now() - this.hostSeenAt < PRESENCE_TIMEOUT_MS;
             if (online !== this.store.state.hostOnline) {
@@ -873,6 +881,11 @@ export class TableSession {
                 this.combat.onPcop(body);
                 break;
 
+            case 'rules':
+                /* Kept for this browser's cards until the player leaves. */
+                writeTableMegaRules(this.store.state.lobbyId, body.mega);
+                break;
+
             case 'kick':
                 if (body.id === this.store.state.myId) {
                     this.leave();
@@ -960,7 +973,25 @@ export class TableSession {
         this.map.greet();
         this.music.greet();
         this.combat.greet();
+        this.publishRules(true);
     }
+
+    /** The GM's Mega-Evolution rules, to everyone: when they change (read on
+        every heartbeat, and at once when the GM screen saves them) and to
+        whoever just arrived. */
+    private publishedRules = '';
+    private publishRules(force: boolean): void {
+        if (!this.store.state.isHost || !this.room) return;
+        const mega = readGmMegaRules();
+        const text = JSON.stringify(mega);
+        if (!force && text === this.publishedRules) return;
+        this.publishedRules = text;
+        void this.publish({ k: 'rules', mega });
+    }
+
+    private onRulesSaved = (e: StorageEvent): void => {
+        if (e.key === RULES_KEY) this.publishRules(false);
+    };
 
     private onRequest(
         id: string, body: Extract<Body, { k: 'request' }>,
@@ -1281,7 +1312,7 @@ function readFlag(key: string): boolean {
     try { return localStorage.getItem(key) === '1'; } catch { return false; }
 }
 
-/** Successes first in the feed — the GM's own preference, kept in this browser. */
+/** Successes first in the feed — this person's own preference, kept in this browser. */
 export function saveSuccessesFirst(on: boolean): void {
     try { localStorage.setItem(SORT_KEY, on ? '1' : '0'); } catch { /* private mode */ }
 }

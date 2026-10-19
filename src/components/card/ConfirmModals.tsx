@@ -3,6 +3,9 @@ import { useCard } from '../../card/CardContext';
 import { useAppData } from '../../data/AppDataContext';
 import { megaStoneOf } from '../common/MonName';
 import { getPoolMax } from '../../card/pools';
+import { useEffect, useState } from 'react';
+import { megaBlocker, megaEffects, savedMegaMoves } from '../../card/mega';
+import { activeMegaRules, megaRulesSource } from '../../lib/megaRules';
 
 /* The confirmations: evolve (twice, because it is permanent), mega (once,
    because it is not), loading another species, deleting a custom move, and the
@@ -60,13 +63,23 @@ export function EvolveWarnModal({ targetId, stage, onCancel, onAdvance, onConfir
 export function MegaConfirmModal({ pending, onCancel, onConfirm }: {
     pending: { id: string; into: boolean } | null;
     onCancel: () => void;
-    onConfirm: (id: string, into: boolean) => void;
+    onConfirm: (id: string, into: boolean, ownMoves: boolean) => void;
 }) {
     const { data } = useAppData();
+    const { sheet } = useCard();
     const target = pending ? data.pokemon.find((p) => p._id === pending.id) : null;
     const tname = target ? target.Name.replace(/\s*\(Mega[^)]*\)/, '') : 'its base form';
     const stone = (target && pending?.into) ? megaStoneOf(target) : null;
     const into = !!pending?.into;
+
+    /* Read when the dialog opens: the GM may have changed them since load. */
+    const rules = pending ? activeMegaRules() : null;
+    const source = pending ? megaRulesSource() : 'book';
+    const blocked = rules && into ? megaBlocker(sheet, rules) : '';
+    const saved = target && into ? savedMegaMoves(sheet, target._id) : null;
+    const [own, setOwn] = useState(false);
+    /* A Mega that had its own moves last time starts on them again. */
+    useEffect(() => { if (pending) setOwn(!!saved); }, [pending?.id, pending?.into]);   // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <Modal open={!!pending} onClose={onCancel} id="mega-confirm-modal">
@@ -79,22 +92,50 @@ export function MegaConfirmModal({ pending, onCancel, onConfirm }: {
                     <>
                         Mega Evolve <strong>{tname}</strong>
                         {stone && <> with its <strong>{stone}</strong></>}. Base stats, caps and ability
-                        change to the Mega form; everything you have filled in on the sheet carries over.
-                        This is <strong>temporary</strong> — you can revert it at any time.
+                        change to the Mega form. This is <strong>temporary</strong> — you can revert it
+                        at any time.
                     </>
                 ) : (
-                    <>
-                        Return to <strong>{tname}</strong>, the form it Mega Evolved from. Everything on
-                        the sheet carries over.
-                    </>
+                    <>Return to <strong>{tname}</strong>, the form it Mega Evolved from.</>
                 )}
+            </p>
+            {rules && (
+                <ul className="mega-effects" id="mega-effects">
+                    {megaEffects(rules, sheet, into).map((line) => <li key={line}>{line}</li>)}
+                </ul>
+            )}
+            {into && rules?.moves && !blocked && (
+                <fieldset className="mega-moves" id="mega-moves">
+                    <legend>A different moveset for the Mega form?</legend>
+                    <label>
+                        <input type="radio" name="mega-moves" checked={!own} onChange={() => setOwn(false)} />
+                        <span>No — keep its current moves</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="mega-moves" checked={own} onChange={() => setOwn(true)}
+                            data-mega-own="" />
+                        <span>
+                            Yes — {saved
+                                ? <>its Mega moves from last time ({saved.length} pinned)</>
+                                : <>start with none pinned, and pin the Mega&rsquo;s own</>}.
+                            {' '}The current pins come back when it reverts.
+                        </span>
+                    </label>
+                </fieldset>
+            )}
+            {blocked && <p className="modal-text mega-blocked" id="mega-blocked">{blocked}</p>}
+            <p className="mega-source">
+                {source === 'table' ? 'Rules set by the GM of your table.'
+                    : source === 'gm' ? 'Rules from your GM screen\u2019s Settings.'
+                        : 'The Core Book\u2019s rules.'}
             </p>
             <div className="modal-actions">
                 <button className="form-btn cancel" onClick={onCancel}>Cancel</button>
                 <button
                     className="form-btn save"
                     id="mega-confirm-btn"
-                    onClick={() => pending && onConfirm(pending.id, pending.into)}
+                    disabled={!!blocked}
+                    onClick={() => pending && onConfirm(pending.id, pending.into, own)}
                 >
                     {into ? 'Mega Evolve' : 'Revert'}
                 </button>

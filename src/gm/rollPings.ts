@@ -1,7 +1,8 @@
 /* A player at the rolling table rolled an attack, an Evasion or a Clash for a
-   character in the fight: the combat tracker lights that row up, as a
-   reminder to count the action — the one thing a GM forgets most. An Evasion
-   or a Clash lights its own chip too. Hovering a light puts it out.
+   character in the fight: the action is counted on its own (the pip fills,
+   src/gm/turns.ts), and the combat tracker lights that row up to say who
+   just acted. An Evasion or a Clash lights its own chip too. Hovering a
+   light puts it out.
 
    Kept in memory, per combatant: a reminder, not a record, so a reload that
    loses it loses nothing that matters. */

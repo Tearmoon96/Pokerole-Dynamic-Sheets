@@ -8,7 +8,7 @@ import type { WireTurnEntry, WireTurns } from '../table/protocol';
 import { LIMITS } from '../table/protocol';
 import { IMAGE_RE } from '../table/slim';
 import { initOffset } from './combat';
-import { entityPool, entityRef, monShownName, participantToken } from './entities';
+import { entityPool, entityRef, monShownName, participantLook, participantToken } from './entities';
 import { uid } from './state';
 import { parsePcToken, pcToken } from './tablePcs';
 import { actedOf, hasActions, passOrderOf, pidOf } from './turns';
@@ -41,7 +41,9 @@ export function buildTurns(state: GmState, c: GmCombat, dexById: DexById): WireT
     const order: WireTurnEntry[] = passOrderOf(c).map((pid) => {
         const p = byId.get(pid)!;
         const r = rec(p);
-        const dex = typeof r.dexId === 'string' && r.dexId ? dexById(r.dexId) : null;
+        /* As it is now: a Mega Evolution since it joined changes its picture. */
+        const look = participantLook(state, dexById, p);
+        const dex = look.dexId ? dexById(look.dexId) : null;
         const img = dex && IMAGE_RE.test(dex.Image) ? dex.Image : '';
         const pc = parsePcToken(String(r.src || ''));
         /* A player's character goes by its own name — the tracker's label
@@ -49,7 +51,7 @@ export function buildTurns(state: GmState, c: GmCombat, dexById: DexById): WireT
         const own = pc ? entityRef(state, dexById, String(r.src)) : null;
         const base: WireTurnEntry = {
             id: pid,
-            name: String((own && own.name) || r.label || '?').slice(0, 48) || '?',
+            name: String((own && own.name) || look.label || '?').slice(0, 48) || '?',
             img,
             own: '', ck: '',
             done: c.passed.includes(pid),

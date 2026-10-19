@@ -11,7 +11,7 @@ import type { CharKey } from '../table/slim';
 import { buildTurns, canActIn, enterFight, ownedBy, tableCombatOf } from './tableCombat';
 import { onPcEdit, pcToken, pruneTablePcs } from './tablePcs';
 import { addPing } from './rollPings';
-import { delayTurn, markMove, passTurn, spendQuick } from './turns';
+import { delayTurn, passTurn, spendRoll } from './turns';
 import type { GmCombat, GmState } from './types';
 
 /* ------------------------------------------------- is a table listening */
@@ -226,22 +226,16 @@ function linkRun(store: GmStore, dexRef: { current: (id: string) => PokedexEntry
                     break;
                 }
                 case 'act': {
-                    /* An attack, an Evasion or a Clash: a light on the row, so
-                       the GM remembers the action. An attack changes nothing
-                       else. */
+                    /* An attack, an Evasion or a Clash is the action done: its
+                       pip fills (and the move or the mark is used for the
+                       Round), and the row lights up to say who just acted. */
                     const fight = tableCombatOf(store.state);
                     if ((m.op === 'acc' || m.op === 'eva' || m.op === 'clash')
                         && fight && ownedBy(fight, m.member, m.pid)) addPing(m.pid, m.op);
-                    if (m.op === 'acc') {
-                        /* The move is used for the Round. */
-                        const move = m.move;
-                        if (move) onTable((c) => (ownedBy(c, m.member, m.pid) ? markMove(c, m.pid, move, true) : c));
-                        break;
-                    }
                     onTable((c, s) => {
                         if (!ownedBy(c, m.member, m.pid)) return c;
                         const canAct = canActIn(s, dexById);
-                        if (m.op === 'eva' || m.op === 'clash') return spendQuick(c, m.pid, m.op);
+                        if (m.op === 'acc' || m.op === 'eva' || m.op === 'clash') return spendRoll(c, m.pid, m.op, m.move || undefined);
                         if (c.turn !== m.pid) return c;
                         return m.op === 'pass' ? passTurn(c, canAct) : delayTurn(c, m.after, canAct);
                     });

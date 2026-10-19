@@ -33,3 +33,49 @@
 /* Two buttons in the corner rather than the roster's four, so the name keeps
    the room the other two would have taken. */
 .character-card .trainer-name { padding-right: 4rem; }
+
+/* Mega Evolving from the panel: the button on a Pokémon's row, lit while it
+   is a Mega, and the confirmation (the GM dialog's frame). */
+.character-card .mega-btn i { color: var(--ghost-color); }
+.character-card .mega-btn.on { border-color: var(--ghost-color); }
+
+.mega-dialog {
+    width: min(30rem, 92vw);
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    max-height: 88vh;
+    overflow-y: auto;
+}
+
+.mega-dialog .gm-dialog-text { margin: 0; }
+
+.mega-choices { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.mega-choices button.on { border-color: var(--ghost-color); color: var(--text-primary); }
+
+.mega-dialog .mega-effects {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+.mega-dialog .mega-moves {
+    border: 1px solid var(--border-color);
+    border-radius: 9px;
+    padding: 0.4rem 0.7rem 0.55rem;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.mega-dialog .mega-moves legend { padding: 0 0.25rem; color: var(--text-primary); font-weight: 600; }
+.mega-dialog .mega-moves label { display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; line-height: 1.4; }
+.mega-dialog .mega-moves input { margin-top: 0.2rem; accent-color: var(--ghost-color); }
+.mega-dialog .mega-blocked { margin: 0; color: var(--danger); font-weight: 600; font-size: 0.82rem; }
+.mega-dialog .mega-source { margin: 0; font-size: 0.72rem; color: var(--text-secondary); }
+.mega-dialog .gm-dialog-actions button:disabled { opacity: 0.45; cursor: not-allowed; }

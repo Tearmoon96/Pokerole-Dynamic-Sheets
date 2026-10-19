@@ -41,6 +41,11 @@ export interface GmNpc {
     nature?: string;
 }
 
+/** One action a combatant did this Round, one entry per pip filled: an
+    Accuracy (with its move's name), an Evasion, a Clash, or a turn passed
+    without any of the three. */
+export interface ActLogEntry { k: 'acc' | 'eva' | 'clash' | 'turn'; move?: string }
+
 export interface GmCombatant {
     gid: string;
     /** How to find the live sheet: a trainer, one of their Pokémon, or a wild. */
@@ -56,6 +61,9 @@ export interface GmCombatant {
     /** The moves used this Round, by name: a move is once a Round. Marked
         when its Accuracy is rolled, cleared with the pips. */
     usedMoves?: string[];
+    /** Every action done this Round, in order (src/gm/turns.ts): what the
+        tracker's hover on the sprite lists. Cleared with the pips. */
+    actLog?: ActLogEntry[];
     [key: string]: unknown;
 }
 
@@ -77,6 +85,9 @@ export interface GmCombat {
     /** Pips count actions DONE. A fight saved before that filled the current
         turn's pip as it started, and loses that one pip once on load. */
     pipsDone?: boolean;
+    /** The combatant on turn has already rolled its action (an Accuracy, an
+        Evasion or a Clash), so passing the turn fills no further pip. */
+    turnSpent?: boolean;
     /** Who has had their turn in this pass. Everyone passing starts the next
         pass, a new action for each; only the GM starts a new Round. */
     passed: string[];
@@ -102,8 +113,9 @@ export interface GmTablePc {
 export interface GmDice {
     count: number;
     sides: number;
-    /** The move the set-up Accuracy is for: marked used when it is rolled. */
-    prepUse?: { pid: string; move: string } | null;
+    /** The combatant whose Accuracy, Evasion or Clash is set up, and the
+        move an Accuracy is for: rolling it fills a pip (src/gm/turns.ts). */
+    prepUse?: { pid: string; op?: 'acc' | 'eva' | 'clash'; move?: string } | null;
     history: unknown[];
     /** Show a pool's successes first and the rest after them. Display only:
         the stored faces keep the order they were rolled in. */

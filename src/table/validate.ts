@@ -15,6 +15,7 @@ import { UNSAFE_TEXT } from './text';
 import { MAX_COLOR } from './colors';
 import { IMAGE_RE, isCharKey, parseSlimMon, parseSlimTrainer, parseStatus } from './slim';
 import type { CharKey } from './slim';
+import { parseMegaRules } from '../lib/megaRules';
 import type {
     Body, ChannelId, ChannelState, Fade, Inner, RollExtras, TrackLoad, WireFile, WireMapImage, WireMember, WireRoll,
     WireTrack, WireTurnEntry, WireTurns,
@@ -435,6 +436,11 @@ export function parseBody(raw: unknown): Body | null {
             const turns = raw.turns === null ? null : parseTurns(raw.turns);
             if (rev === null || (raw.turns !== null && !turns)) return null;
             return { k: 'turns', rev, turns };
+        }
+        case 'rules': {
+            if (!exactly(raw, ['k', 'mega'])) return null;
+            const mega = parseMegaRules(raw.mega);
+            return mega ? { k: 'rules', mega } : null;
         }
         case 'pcop': {
             if (!exactly(raw, ['k', 'to', 'key', 'oid', 'hp', 'will', 'status'])) return null;

@@ -13,7 +13,7 @@ import { useToast } from '../common/Toast';
 import { uid } from '../../gm/state';
 import { normalizeStatus } from '../../gm/ailments';
 import { trainerPoolMax } from '../../gm/pools';
-import { adjustPool, monShownName, wildKey, wildLiveSheet } from '../../gm/entities';
+import { adjustPool, monShownName, wildDexId, wildKey, wildLiveSheet } from '../../gm/entities';
 import { readWorking, upsertWorkingTrainer, workingTrainerData } from '../../gm/workingSet';
 import { TRAINER_MARKER } from '../../state/constants';
 import { WILD_MARKER, wildSheetKey } from '../../card/cardContext';
@@ -368,12 +368,14 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
     const renderWild = (w: GmWild, move: ReactNode, cls: string) => {
                 const sheet = wildLiveSheet(w);
                 const wToken = 'w:' + w.gid;
+                /* What it is now: it may have evolved or Mega Evolved on its card. */
+                const dexId = wildDexId(w);
                 return (
                     <div className={cls} key={w.gid}>
                         <div className="card-move-strip">{move}</div>
                         <MonRow
-                            dex={dexById(w.dexId)}
-                            dexId={w.dexId}
+                            dex={dexById(dexId)}
+                            dexId={dexId}
                             sheet={sheet}
                             token={wToken}
                             onStep={step(wToken)}
@@ -386,9 +388,9 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                                         className="icon-btn"
                                         title={'Add to ' + (focusedCombat ? focusedCombat.name : 'combat')}
                                         onClick={() => {
-                                            const label = monShownName(dexById, w.dexId, sheet) + ' (wild)';
+                                            const label = monShownName(dexById, dexId, sheet) + ' (wild)';
                                             addParticipant({
-                                                label, kind: 'wild', dexId: w.dexId, src: 'w:' + w.gid,
+                                                label, kind: 'wild', dexId, src: 'w:' + w.gid,
                                             } as never);
                                             toast('<i class="fa-solid fa-khanda"></i> '
                                                 + escapeHtml(label) + intoWhere);
@@ -417,7 +419,7 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                                                         x.gid === w.gid ? { ...x, pushed: true, wid } : x);
                                                 });
                                             }
-                                            window.open('pokemon-card.html' + wildUrl(w.dexId, wid), '_blank');
+                                            window.open('pokemon-card.html' + wildUrl(dexId, wid), '_blank');
                                         }}
                                     >
                                         <i className="fa-solid fa-arrow-up-right-from-square"></i>
@@ -430,7 +432,7 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                                                unless it was downloaded first. */
                                             const go = await confirm({
                                                 icon: 'fa-trash-can', danger: true, confirmLabel: 'Remove',
-                                                title: 'Remove ' + monShownName(dexById, w.dexId, sheet) + '?',
+                                                title: 'Remove ' + monShownName(dexById, dexId, sheet) + '?',
                                                 text: 'A wild Pokémon is kept nowhere else. Download it first if you want it back later.',
                                             });
                                             if (!go) return;

@@ -4,13 +4,14 @@ import type { RollMeta } from '../../gm/dice';
 import { painFromHp, painPenalty } from '../../gm/moves';
 import { resolvePoolValue } from '../../gm/pools';
 import {
-    entityPool, entityRef, participantForToken, trainerIdAt, wildLiveSheet,
+    entityPool, entityRef, participantForToken, trainerIdAt, wildDexId, wildLiveSheet,
 } from '../../gm/entities';
 import { workingTrainerData } from '../../gm/workingSet';
 import { parsePcToken } from '../../gm/tablePcs';
 import { monShownName } from '../../gm/entities';
 import { MonTipBody, MoveTipShell, TrainerTipBody, useTipButtonState } from './MoveTip';
 import { actionOf, markMove, pidOf } from '../../gm/turns';
+import { MAX_ACTIONS } from '../../gm/combat';
 import type { PokedexEntry } from '../../data/types';
 import type { CardSheet } from '../../card/types';
 
@@ -46,7 +47,7 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
         if (parts[0] === 'w') {
             const w = state.wilds.find((x) => x.gid === parts[1]);
             if (!w) return null;
-            return { dexId: w.dexId, sheet: wildLiveSheet(w), owner: 'Wild' };
+            return { dexId: wildDexId(w), sheet: wildLiveSheet(w), owner: 'Wild' };
         }
         const pc = parsePcToken(token);
         if (pc && pc.key !== 't') {
@@ -74,13 +75,20 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
     const part = participantForToken(state, dexById, token);
     const act = part ? actionOf((part.acted as number) || 0) : null;
     const pid = part ? pidOf(part) : null;
+    /* An Evasion and a Clash are once a Round, and nothing is rollable once
+       the five actions are spent — the table's character panel draws them
+       the same way. */
+    const done = part ? ((part.acted as number) || 0) >= MAX_ACTIONS : false;
+    const spent = part ? { eva: !!part.usedEva || done, clash: !!part.usedClash || done } : undefined;
 
     const doRoll = (dice: number, meta: RollMeta, quick?: string, move?: string) => {
         if (!(dice > 0)) return;
         store.update((s) => {
             s.dice = {
                 ...s.dice, count: dice, sides: 6, prep: { ...meta },
-                prepUse: quick === 'acc' && pid && move ? { pid, move } : null,
+                /* Rolling it is the action: Roll fills the pip. */
+                prepUse: pid && (quick === 'acc' || quick === 'eva' || quick === 'clash')
+                    ? { pid, op: quick, ...(quick === 'acc' && move ? { move } : {}) } : null,
             };
         });
     };
@@ -105,6 +113,7 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
                     value={asTrainer.value}
                     pain={hp ? painFromHp(hp.cur, hp.max) : 0}
                     act={act}
+                    spent={spent}
                     doRoll={doRoll}
                 />
             </MoveTipShell>
@@ -134,6 +143,7 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
                 value={(n) => resolvePoolValue(dex, sheet, n) || 0}
                 pain={painPenalty(dex, sheet)}
                 act={act}
+                spent={spent}
                 doRoll={doRoll}
                 used={used}
                 onToggleUsed={toggleUsed}

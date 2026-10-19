@@ -12,6 +12,7 @@
 @import './gm/roster.css';
 @import './gm/status-chips.css';
 @import './gm/move-panel.css';
+@import './gm/confirm-dialog.css';
 @import './table/layout.css';
 @import './table/join.css';
 @import './table/feed.css';

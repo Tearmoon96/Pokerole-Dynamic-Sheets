@@ -13,6 +13,7 @@ import { AilmentPopover } from './AilmentPopover';
 import { cycleStatus } from '../../gm/entities';
 import { useCombatLink } from '../../gm/useCombatLink';
 import { WORKING_KEY } from '../../state/constants';
+import { WILD_OPEN_KEY } from '../../card/cardContext';
 import { ActivePanelCtx, panelTabs } from '../../gm/phoneBoard';
 import { combatGidOf, isCombatPanelKey } from '../../gm/constants';
 import { useDeviceClass } from '../../lib/device';
@@ -59,7 +60,7 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
         let lastSeen = localStorage.getItem(WORKING_KEY);
         const refresh = () => store.refresh();
         const onStorage = (e: StorageEvent) => {
-            if (e.key === WORKING_KEY || (e.key || '').indexOf('pokerole_wild_') === 0) refresh();
+            if (e.key === WORKING_KEY || e.key === WILD_OPEN_KEY || (e.key || '').indexOf('pokerole_wild_') === 0) refresh();
         };
         const poll = window.setInterval(() => {
             const now = localStorage.getItem(WORKING_KEY);

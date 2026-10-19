@@ -33,6 +33,15 @@
 
 .combat-row.spent { opacity: 0.45; }
 
+/* The sprite's box, which carries the hover listing the Round's actions. */
+.combat-row .c-token {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    cursor: help;
+}
+
 .combat-row .c-sprite {
     width: 32px;
     height: 32px;
@@ -345,8 +354,8 @@
 }
 
 
-/* A player rolled an attack, an Evasion or a Clash for this one at the table:
-   count the action. Yellow, apart from the theme's red and every player's
+/* A player rolled an attack, an Evasion or a Clash for this one at the table,
+   and its pip filled: who just acted. Yellow, apart from the theme's red and every player's
    colour, and pulsing until the GM hovers it. */
 .pips.pinged, .used-mark.pinged {
     position: relative;

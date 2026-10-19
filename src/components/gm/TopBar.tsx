@@ -4,6 +4,7 @@ import { panelTabs } from '../../gm/phoneBoard';
 import { HomeButton } from '../common/HomeButton';
 import { TourButton } from '../common/Tour';
 import { useGmConfirm } from './ConfirmDialog';
+import { SettingsDialog } from './SettingsDialog';
 import { useToast } from '../common/Toast';
 import { useAppData } from '../../data/AppDataContext';
 import { upsertWorkingTrainer } from '../../gm/workingSet';
@@ -22,6 +23,7 @@ export function TopBar() {
     const [handle, setHandle] = useState<FileSystemFileHandle | null>(null);
     const [status, setStatus] = useState<{ text: string; warn: boolean }>({ text: '', warn: false });
     const fileInput = useRef<HTMLInputElement>(null);
+    const [settingsOpen, setSettingsOpen] = useState(false);
 
     /* Remember which file Quick Save writes to, from a previous session */
     useEffect(() => {
@@ -174,8 +176,19 @@ export function TopBar() {
                         <i className="fa-solid fa-folder-open"></i> Load
                     </button>
                 </div>
+                <button
+                    className="icon-btn"
+                    id="gm-settings-btn"
+                    aria-label="Settings"
+                    title="Settings: the Mega-Evolution rules your table plays by"
+                    onClick={() => setSettingsOpen(true)}
+                >
+                    <i className="fa-solid fa-gear"></i>
+                </button>
                 <span className="version" id="version-label">{data.version ? 'v' + data.version : ''}</span>
             </div>
+
+            <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
             {/* Fallback for browsers without showOpenFilePicker */}
             <input

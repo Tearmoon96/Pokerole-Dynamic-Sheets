@@ -115,6 +115,7 @@ function normalizeCombat(raw: unknown, fallbackName: string): GmCombat {
         turnsOn: r.turnsOn === true,
         turn,
         pipsDone: true,
+        turnSpent: r.turnSpent === true && !!turn,
         passed: ids(r.passed),
         passOrder: Array.isArray(r.passOrder) ? ids(r.passOrder) : null,
         pass: pass > 0 ? Math.floor(pass) : 1,

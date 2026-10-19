@@ -3,6 +3,8 @@ import { useCard } from '../../card/CardContext';
 import { useAppData } from '../../data/AppDataContext';
 import { Suggestions } from '../common/Suggestions';
 import { ItemSprite } from '../common/ItemSprite';
+import { isMegaForm } from '../../card/evolution';
+import { activeMegaRules } from '../../lib/megaRules';
 
 /* Loyalty / Happiness / Disobedience, the held item and the nature.
 
@@ -29,8 +31,11 @@ function MiniTracker({ track }: { track: 'loyalty' | 'happiness' | 'disobedience
 }
 
 export function ConditionPanel() {
-    const { sheet, store } = useCard();
+    const { sheet, store, pokemon } = useCard();
     const { data } = useAppData();
+    /* Under the rule that a Mega Stone cannot be taken or switched, a Mega's
+       held item stays put until it reverts. */
+    const stoneLocked = (!!sheet.megaFrom || isMegaForm(pokemon)) && activeMegaRules().lockStone;
 
     /* Only one dropdown is ever open — the original closed the other on every
        keystroke — so a single piece of state names which. */
@@ -73,6 +78,10 @@ export function ConditionPanel() {
             <div className="tracker-row">
                 <span className="tracker-label">
                     <i className="fa-solid fa-gem" style={{ color: '#67e8f9' }}></i> Held Item
+                    {stoneLocked && (
+                        <i className="fa-solid fa-lock held-item-locked" id="held-item-lock"
+                            title="Mega Stones cannot be taken, switched or removed while Mega Evolved"></i>
+                    )}
                 </span>
                 <div className="item-search-wrap">
                     <input
@@ -81,9 +90,10 @@ export function ConditionPanel() {
                         className="pool-text-input"
                         autoComplete="off"
                         value={itemValue}
-                        onChange={(e) => { setItemDraft(e.currentTarget.value); setOpen('item'); }}
-                        onFocus={() => setOpen('item')}
-                        onClick={() => setOpen('item')}
+                        readOnly={stoneLocked}
+                        onChange={(e) => { if (stoneLocked) return; setItemDraft(e.currentTarget.value); setOpen('item'); }}
+                        onFocus={() => { if (!stoneLocked) setOpen('item'); }}
+                        onClick={() => { if (!stoneLocked) setOpen('item'); }}
                         onBlur={() => {
                             setOpen(null);
                             if (itemDraft != null) { store.update((s) => { s.heldItem = itemDraft; }); setItemDraft(null); }
@@ -92,7 +102,7 @@ export function ConditionPanel() {
                     <Suggestions
                         id="item-suggestions"
                         className="move-suggestions item-suggestions"
-                        open={open === 'item'}
+                        open={open === 'item' && !stoneLocked}
                         hiddenCount={itemMatches.length - itemShown.length}
                         rows={itemShown.map((it) => ({
                             key: it._id || it.Name,

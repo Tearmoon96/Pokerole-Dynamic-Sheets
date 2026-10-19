@@ -1,6 +1,6 @@
 import type { PokedexEntry } from '../data/types';
 import type { CardSheet } from '../card/types';
-import { wildSheetKey } from '../card/cardContext';
+import { WILD_OPEN_KEY, wildSheetKey } from '../card/cardContext';
 import type { TrainerState } from '../state/types';
 import type { GmCombatant, GmState, GmWild } from './types';
 import { STATUS_ICONS, normalizeStatus } from './ailments';
@@ -8,6 +8,8 @@ import type { GmStatus } from './ailments';
 import { monPoolCur, monPoolMax, resolvePoolValue, trainerPoolMax, trainerPoolValue } from './pools';
 import { mutateWorkingTrainer, workingTrainerData } from './workingSet';
 import { emitPcEdit, parsePcToken } from './tablePcs';
+import { readWildOpen } from '../card/wild';
+import { megaShownName } from '../card/mega';
 
 /* One way to reach any subject on the screen.
 
@@ -40,6 +42,26 @@ export function wildKey(w: GmWild): string {
     return wildSheetKey(w.wid || w.dexId);
 }
 
+/** The species a wild is now. A wild opened on a card may have evolved or
+    Mega Evolved there: the card files it under its new species in the open
+    set (WILD_OPEN_KEY), while `w.dexId` is the one it was added as. */
+export function wildDexId(w: GmWild): string {
+    if (!w.pushed) return w.dexId;
+    const wid = w.wid || w.dexId;
+    const hit = openWilds().find((e) => e.wid === wid);
+    return hit ? hit.dexId : w.dexId;
+}
+
+/* Read on every render of every wild row: parsed once per change of the text. */
+let openRaw: string | null = null;
+let openList: ReturnType<typeof readWildOpen> = [];
+function openWilds(): ReturnType<typeof readWildOpen> {
+    let raw: string | null = null;
+    try { raw = localStorage.getItem(WILD_OPEN_KEY); } catch { /* private mode */ }
+    if (raw !== openRaw) { openRaw = raw; openList = readWildOpen(); }
+    return openList;
+}
+
 /** A wild that has been pushed to a card tab is edited there, so the live copy
     in localStorage wins over the one loaded from file. */
 export function wildLiveSheet(w: GmWild): Partial<CardSheet> {
@@ -62,7 +84,7 @@ export function monShownName(
     const nick = ((sheet && sheet.nickname) || '').trim();
     if (nick) return nick;
     const p = dexById(dexId);
-    return p ? p.Name : dexId;
+    return p ? megaShownName(p.Name) : dexId;
 }
 
 /** Returns null when that trainer is no longer on the screen at all, so callers
@@ -147,9 +169,10 @@ export function entityRef(
         const w = state.wilds.find((x) => x.gid === p[1]);
         if (!w) return null;
         const sheet = wildLiveSheet(w);
-        const dex = dexById(w.dexId);
+        const dexId = wildDexId(w);
+        const dex = dexById(dexId);
         return {
-            kind: 'wild', token: token!, name: monShownName(dexById, w.dexId, sheet), dex, sheet,
+            kind: 'wild', token: token!, name: monShownName(dexById, dexId, sheet), dex, sheet,
             status: normalizeStatus(sheet.status), rank: sheet.rank || '',
             value: (n) => resolvePoolValue(dex, sheet, n) || 0,
         };
@@ -217,6 +240,28 @@ export function participantToken(
     const src = (p as unknown as Record<string, string>).src;
     if (src && resolveToken(state, src) && entityRef(state, dexById, src)) return src;
     return 'c:' + (p as unknown as Record<string, string>).pid;
+}
+
+/** What a combatant looks like now: the species it is, and its label to
+    match. The tracker stores both as they were when it joined the fight, and
+    a Pokémon may have evolved or Mega Evolved since — on its card, or at the
+    table for a player's. The label's species name is swapped for the new one;
+    a nickname, which names neither, stays as it is. */
+export function participantLook(
+    state: GmState,
+    dexById: (id: string) => PokedexEntry | null,
+    p: GmCombatant,
+): { dexId: string | null; label: string } {
+    const rec = p as unknown as Record<string, unknown>;
+    const stored = typeof rec.dexId === 'string' && rec.dexId ? rec.dexId : null;
+    const label = String(rec.label || '');
+    const ref = entityRef(state, dexById, participantToken(state, dexById, p));
+    const now = ref && ref.dex ? ref.dex._id : null;
+    if (!stored || !now || now === stored) return { dexId: stored, label };
+    const was = dexById(stored), is = dexById(now);
+    if (!was || !is) return { dexId: now, label };
+    const swap = [megaShownName(was.Name), was.Name].find((n) => label.includes(n));
+    return { dexId: now, label: swap ? label.replace(swap, megaShownName(is.Name)) : label };
 }
 
 /* Which combatant, if any, a token names. Both sides go through resolveToken
@@ -400,7 +445,7 @@ export function adjustPool(
         const w = state.wilds.find((x) => x.gid === parts[1]);
         if (!w) return;
         const sheet = wildLiveSheet(w) as unknown as Record<string, number>;
-        const dex = dexById(w.dexId);
+        const dex = dexById(wildDexId(w));
         const max = monPoolMax(dex, sheet as Partial<CardSheet>, key);
         sheet[key] = clamp(monPoolCur(dex, sheet as Partial<CardSheet>, key) + delta, max);
         /* Write back wherever that sheet came from: the card's own key once the

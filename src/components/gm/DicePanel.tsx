@@ -3,7 +3,7 @@ import { useGm } from '../../gm/GmContext';
 import { CRIT_DAMAGE, CRIT_MARGIN } from '../../gm/constants';
 import { HISTORY_LIMIT, VERDICTS, faceOrder, painStruck, roll } from '../../gm/dice';
 import type { RollEntry, RollMeta } from '../../gm/dice';
-import { markMove } from '../../gm/turns';
+import { spendRoll } from '../../gm/turns';
 
 /* The dice roller: quick d-chips, a count/sides stepper, the last roll in full
    and a compact history behind it. */
@@ -24,9 +24,11 @@ export function DicePanel({ onReorder }: {
     const doRoll = () => store.update((s) => {
         const meta = (s.dice.prep || {}) as RollMeta;
         const entry = roll(s.dice.count, s.dice.sides, meta, CRIT_MARGIN);
-        /* An Accuracy uses its move for the Round. */
+        /* An Accuracy, an Evasion or a Clash is the action done: the pip
+           fills, and the move or the mark is used for the Round. A set-up
+           saved before `op` existed was always an Accuracy. */
         const use = s.dice.prep ? s.dice.prepUse : null;
-        if (use) s.combats = s.combats.map((c) => markMove(c, use.pid, use.move, true));
+        if (use) s.combats = s.combats.map((c) => spendRoll(c, use.pid, use.op || 'acc', use.move));
         s.dice = { ...s.dice, prep: null, prepUse: null, history: [entry, ...s.dice.history].slice(0, HISTORY_LIMIT) };
     });
 

@@ -94,10 +94,22 @@ export function megaRevertTargetId(
     return e ? nameToId(all, e.From!) : null;
 }
 
+/** How a Mega Evolution carries the attributes over (src/card/mega.ts). An
+    ordinary evolution passes neither: trained points carry, cut to fit the
+    new species' limits. */
+export interface EvolveOpts {
+    /** false: the trained attributes and the Def / Sp. Def offsets stay
+        behind, and the new form starts at its species' own values. */
+    carryTrained?: boolean;
+    /** true: carried points are never cut to fit; a limit they pass is
+        raised to where they land. */
+    liftCap?: boolean;
+}
+
 /* Build the sheet for the target form: clone everything, then rebase the stats
    and pick the right ability. Uses the CURRENT page's stat values to work out
    how much the user added. */
-export function buildEvolvedSheet(src: StatSource, targetDex: PokedexEntry): CardSheet {
+export function buildEvolvedSheet(src: StatSource, targetDex: PokedexEntry, opts: EvolveOpts = {}): CardSheet {
     const s: CardSheet = JSON.parse(JSON.stringify(src.sheet));
     s.trainedStats = s.trainedStats || {};
     /* Read before the stats are rebased: a Pokémon evolving at full health comes
@@ -109,18 +121,27 @@ export function buildEvolvedSheet(src: StatSource, targetDex: PokedexEntry): Car
     };
 
     const currentDefaults = defaultStats(src.pokemon);
-    const rebase = (key: string, newBase: number, newMax: number) => {
+    const lifted: Record<string, number> = {};
+    const rebase = (key: string, newBase: number, newMax: number, combat: boolean) => {
         const oldBase = currentDefaults[key].base;              // species base of current form
         const userDelta = (getStatBase(src, key) + (src.sheet.trainedStats[key] || 0)) - oldBase;
+        if (combat && opts.carryTrained === false) { s.trainedStats[key] = 0; return; }
+        if (combat && opts.liftCap) {
+            s.trainedStats[key] = Math.max(0, userDelta);
+            if (newBase + s.trainedStats[key] > newMax) lifted[key] = newBase + s.trainedStats[key];
+            return;
+        }
         s.trainedStats[key] = Math.max(0, Math.min(userDelta, newMax - newBase));
     };
     Object.entries(EVO_COMBAT).forEach(([key, [bf, mf]]) =>
-        rebase(key, targetDex[bf] as number, targetDex[mf] as number));
-    EVO_SOCIAL.forEach((key) => rebase(key, 1, 5));           // social base/cap never change
+        rebase(key, targetDex[bf] as number, targetDex[mf] as number, true));
+    EVO_SOCIAL.forEach((key) => rebase(key, 1, 5, false));    // social base/cap never change
 
-    /* Base/cap now come from the new species' defaults */
+    /* Base/cap now come from the new species' defaults — save a cap the
+       carried points were let past. */
     s.customBaseStats = {};
-    s.customMaxStats = {};
+    s.customMaxStats = lifted;
+    if (opts.carryTrained === false) { s.defBonus = 0; s.spDefBonus = 0; }
 
     /* Keep the chosen ability if the new form still has it, or if it is a custom
        ability (which is not tied to the species), else default */

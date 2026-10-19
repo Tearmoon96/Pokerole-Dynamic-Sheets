@@ -18,6 +18,7 @@
 
 import type { GmStatus } from '../gm/ailments';
 import type { CharKey, SlimMon, SlimTrainer } from './slim';
+import type { MegaRules } from '../lib/megaRules';
 
 export const PROTOCOL_VERSION = 1;
 
@@ -206,6 +207,9 @@ export type Body =
     | { k: 'map'; rev: number; show: boolean; title: string; live: boolean; image: WireMapImage | null }
     /** Host only. The turn strip, or null when no fight is on the table. */
     | { k: 'turns'; rev: number; turns: WireTurns | null }
+    /** Host only. The Mega-Evolution rules the GM set (src/lib/megaRules.ts):
+        players' cards and character panels Mega Evolve by them. */
+    | { k: 'rules'; mega: MegaRules }
     /** Host only. The GM changed one of `to`'s characters in the fight: the
         HP, Will or status it now has. Values, not steps, so a resend is
         harmless. */
@@ -217,11 +221,11 @@ export type Body =
         initiative, 1d6 + bonus. */
     | { k: 'enter'; rid: string; chars: { key: CharKey; bonus: number }[] }
     /** Player to host: my turn is over, I delay it, or I spent an action on an
-        Evasion or a Clash. */
+        attack, an Evasion or a Clash. */
     | { k: 'turn'; op: TurnOp; id: string; after?: string; mv?: string };
 
-/** `acc`: an attack rolled, which costs nothing here — the GM screen only
-    flags it, as a reminder to count the action. */
+/** `acc`: an attack rolled. Like an Evasion or a Clash it is an action done:
+    the GM screen fills its pip and marks the move (`mv`) used for the Round. */
 export type TurnOp = 'pass' | 'delay' | 'eva' | 'clash' | 'acc';
 
 export interface Inner {

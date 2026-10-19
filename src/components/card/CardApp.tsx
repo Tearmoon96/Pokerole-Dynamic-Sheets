@@ -24,6 +24,9 @@ import {
     buildEvolvedSheet, forwardEvolutions, isMegaForm, megaEvolutions, megaRevertTargetId,
 } from '../../card/evolution';
 import type { EvolutionTarget } from '../../card/evolution';
+import { megaEvolveSheet, megaRevertSheet } from '../../card/mega';
+import { activeMegaRules } from '../../lib/megaRules';
+import type { CardSheet } from '../../card/types';
 import { readWorking, trainerMonEntry } from '../../card/persistence';
 import { cardStorageKey, WORKING_KEY } from '../../card/cardContext';
 import {
@@ -113,13 +116,23 @@ export function CardApp() {
         location.search = '?' + p.toString();
     }, [ctx]);
 
-    /** Persist the rebased sheet to the target species, then load it. */
-    const transformInto = useCallback((targetId: string, opts: { mega?: boolean } = {}) => {
+    /** Persist the rebased sheet to the target species, then load it. A Mega
+        Evolution and its revert follow the rules in force (src/card/mega.ts). */
+    const transformInto = useCallback((targetId: string, opts: { mega?: boolean; revert?: boolean; ownMoves?: boolean } = {}) => {
         const targetDex = data.pokemon.find((p) => p._id === targetId);
         if (!targetDex) return;
-        const adjusted = buildEvolvedSheet(src, targetDex);
-        /* A normal evolve or a revert clears mega state. */
-        adjusted.megaFrom = opts.mega === true ? pokemon._id : '';
+        let adjusted: CardSheet;
+        if (opts.mega) {
+            const r = megaEvolveSheet(src, targetDex, activeMegaRules(), !!opts.ownMoves);
+            if ('error' in r) { void showAlert(r.error); return; }
+            adjusted = r.sheet;
+        } else if (opts.revert) {
+            adjusted = megaRevertSheet(src, targetDex, activeMegaRules());
+        } else {
+            adjusted = buildEvolvedSheet(src, targetDex);
+            /* A normal evolve clears mega state. */
+            adjusted.megaFrom = '';
+        }
 
         if (ctx.inTrainerMode) {
             const w = readWorking();
@@ -527,7 +540,10 @@ export function CardApp() {
             <MegaConfirmModal
                 pending={megaPending}
                 onCancel={() => setMegaPending(null)}
-                onConfirm={(id, into) => { setMegaPending(null); transformInto(id, { mega: into }); }}
+                onConfirm={(id, into, ownMoves) => {
+                    setMegaPending(null);
+                    transformInto(id, into ? { mega: true, ownMoves } : { revert: true });
+                }}
             />
 
             <WildSwitcherModal

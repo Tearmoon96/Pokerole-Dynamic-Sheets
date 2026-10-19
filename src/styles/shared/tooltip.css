@@ -54,6 +54,8 @@
     color: var(--text-secondary);
 }
 
+#app-tooltip.tt-lines .tt-body { white-space: pre-line; }
+
 /* Single-line tooltips have no heading, so the body is the main text */
 #app-tooltip .tt-body:only-child {
     color: var(--text-primary);

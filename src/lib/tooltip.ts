@@ -193,6 +193,9 @@ function render(el: HTMLElement, text: string): boolean {
     const bx = box!, hd = head!, bd = body!;
     const nl = text.indexOf('\n');
     bx.textContent = '';
+    /* A hint that is a list keeps its line breaks (the combat tracker's
+       actions this Round); every other one runs its body as one paragraph. */
+    bx.classList.toggle('tt-lines', el.hasAttribute('data-tt-lines'));
     if (nl > -1) {
         hd.textContent = text.slice(0, nl).trim();
         bd.textContent = text.slice(nl + 1).trim();

@@ -24,7 +24,13 @@ import { adjustPool, cycleStatus, entityPool, entityRef } from '../../gm/entitie
 import type { CharKey } from '../../table/slim';
 import { painFromHp, painPenalty } from '../../gm/moves';
 import { resolvePoolValue, trainerPoolMax } from '../../gm/pools';
-import { upsertWorkingTrainer, workingTrainerData } from '../../gm/workingSet';
+import { mutateWorkingTrainer, upsertWorkingTrainer, workingTrainerData } from '../../gm/workingSet';
+import { isMegaForm, megaEvolutions, megaRevertTargetId } from '../../card/evolution';
+import { megaEvolveSheet, megaRevertSheet } from '../../card/mega';
+import { normalizeCardSheet } from '../../card/persistence';
+import { activeMegaRules } from '../../lib/megaRules';
+import { MegaDialog } from './MegaDialog';
+import type { MegaAsk } from './MegaDialog';
 import { normalizeState } from '../../state/normalize';
 import { TRAINER_MARKER } from '../../state/constants';
 import { teamCardUrl } from '../../lib/navigation';
@@ -87,6 +93,8 @@ function CharacterBody() {
     const [picked, setPicked] = useState<string | null>(() => chosenTrainerId());
     const fileRef = useRef<HTMLInputElement>(null);
     const [loadNote, setLoadNote] = useState('');
+    const [megaAsk, setMegaAsk] = useState<MegaAsk | null>(null);
+    const closeMega = useCallback(() => setMegaAsk(null), []);
     useTipButtonState(tip);
 
     const list = workingTrainers();
@@ -198,8 +206,8 @@ function CharacterBody() {
     /* A roll from a sheet is SET UP in the dice controls, not sent: the player
        may still add or take away dice for a modifier, then presses Roll. The
        GM rolls it and the feed says whose and what for. In the fight, an
-       Evasion or a Clash also spends an action, and an attack is flagged to
-       the GM screen so the action gets counted. */
+       attack, an Evasion or a Clash also spends an action: the GM screen
+       fills its pip. */
     const rollFrom = (token: string): DoRoll => (dice, meta, quick, move) => {
         if (!(dice > 0)) return;
         if (quick === 'init') { prepInit(token, meta.bonus ?? 0, meta.who || ''); return; }
@@ -214,6 +222,43 @@ function CharacterBody() {
             quick: quick && s ? { op: quick, id: s.id, ...(quick === 'acc' && move ? { move } : {}) } : null,
             enter: null,
         });
+    };
+
+    /* Mega Evolving at the table, by the GM's rules: the sheet in this
+       browser's working set changes, the card and the GM's copy follow it. */
+    const askMega = (idx: number, dex: PokedexEntry, sheet: Partial<CardSheet> | null) => {
+        const s = (sheet || {}) as Partial<CardSheet>;
+        if (isMegaForm(dex)) {
+            const back = megaRevertTargetId(data.pokemon, dex, normalizeCardSheet(dex, s));
+            const target = back ? dexById(back) : null;
+            if (target) setMegaAsk({ idx, into: false, target, sheet: s, choices: [] });
+            return;
+        }
+        const choices = megaEvolutions(data.pokemon, dex)
+            .map((m) => dexById(m.id)).filter((p): p is PokedexEntry => !!p);
+        if (choices.length) setMegaAsk({ idx, into: true, target: choices[0], sheet: s, choices });
+    };
+    const doMega = (ask: MegaAsk, ownMoves: boolean) => {
+        setMegaAsk(null);
+        const rules = activeMegaRules();
+        let error = '';
+        mutateWorkingTrainer(trainerId, (tt) => {
+            const slot = (tt.team || [])[ask.idx];
+            const dex = slot && slot.dexId ? dexById(slot.dexId) : null;
+            if (!slot || !dex) return;
+            const src = { pokemon: dex, sheet: normalizeCardSheet(dex, (slot.sheet || null) as Partial<CardSheet> | null) };
+            if (ask.into) {
+                const r = megaEvolveSheet(src, ask.target, rules, ownMoves);
+                if ('error' in r) { error = r.error; return; }
+                slot.sheet = r.sheet as never;
+            } else {
+                slot.sheet = megaRevertSheet(src, ask.target, rules) as never;
+            }
+            slot.dexId = ask.target._id;
+        });
+        if (error) session.notify(error);
+        setTip(null);
+        refresh();
     };
 
     const trainerRef = entityRef(solo, dexById, TRAINER_TOKEN);
@@ -328,10 +373,13 @@ function CharacterBody() {
                     ) : team.map((x) => {
                         const token = monToken(x.idx);
                         const sheet = (x.slot.sheet || null) as Partial<CardSheet> | null;
+                        const dex = dexById(x.slot.dexId);
+                        const isMega = !!dex && isMegaForm(dex);
+                        const canMega = !!dex && !isMega && megaEvolutions(data.pokemon, dex).length > 0;
                         return (
                             <MonRow
                                 key={x.idx}
-                                dex={dexById(x.slot.dexId)}
+                                dex={dex}
                                 dexId={x.slot.dexId}
                                 sheet={sheet}
                                 token={token}
@@ -339,14 +387,26 @@ function CharacterBody() {
                                 onCycleStatus={onCycle(token)}
                                 onOpenTip={() => setTip(tip === token ? null : token)}
                                 buttons={
-                                    <button
-                                        className="icon-btn"
-                                        title="Open the Pokémon card"
-                                        onClick={() => window.open(
-                                            teamCardUrl(t, x.slot.dexId, x.slot.uid, x.idx), '_blank')}
-                                    >
-                                        <i className="fa-solid fa-arrow-up-right-from-square"></i>
-                                    </button>
+                                    <>
+                                        {(canMega || isMega) && (
+                                            <button
+                                                className={'icon-btn mega-btn' + (isMega ? ' on' : '')}
+                                                data-mega={isMega ? 'revert' : 'evolve'}
+                                                title={isMega ? 'Revert the Mega Evolution' : 'Mega Evolve'}
+                                                onClick={() => dex && askMega(x.idx, dex, sheet)}
+                                            >
+                                                <i className={'fa-solid ' + (isMega ? 'fa-rotate-left' : 'fa-atom')}></i>
+                                            </button>
+                                        )}
+                                        <button
+                                            className="icon-btn"
+                                            title="Open the Pokémon card"
+                                            onClick={() => window.open(
+                                                teamCardUrl(t, x.slot.dexId, x.slot.uid, x.idx), '_blank')}
+                                        >
+                                            <i className="fa-solid fa-arrow-up-right-from-square"></i>
+                                        </button>
+                                    </>
                                 }
                             />
                         );
@@ -357,6 +417,7 @@ function CharacterBody() {
             {tip && tipBody && (
                 <MoveTipShell token={tip} onClose={closeTip}>{tipBody}</MoveTipShell>
             )}
+            <MegaDialog ask={megaAsk} onCancel={closeMega} onConfirm={doMega} />
         </>
     );
 }

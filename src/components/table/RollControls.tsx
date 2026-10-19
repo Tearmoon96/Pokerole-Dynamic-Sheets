@@ -92,7 +92,11 @@ export function RollControls() {
                 onKeyDown={(e) => { if (e.key === 'Enter' && !waiting) session.requestRoll(); }}
             />
 
-            {isHost && <HostOptions />}
+            {isHost ? <HostOptions /> : (
+                <div className="host-options player-options">
+                    <div className="host-toggles"><SuccessesFirst /></div>
+                </div>
+            )}
 
             {prep && (
                 <div className="dice-prep" data-dice-prep="">
@@ -155,6 +159,25 @@ export function RollControls() {
     );
 }
 
+/** Display only, this browser only: the GM and every player choose it alike. */
+function SuccessesFirst() {
+    const { session, state } = useTable();
+    return (
+        <label className="check" title="Show a pool's successes first and the other dice after them, in your feed.">
+            <input
+                type="checkbox"
+                checked={state.successesFirst}
+                onChange={(e) => {
+                    const on = e.currentTarget.checked;
+                    session.set('successesFirst', on);
+                    saveSuccessesFirst(on);
+                }}
+            />
+            <span><i className="fa-solid fa-arrow-down-wide-short"></i> Successes first</span>
+        </label>
+    );
+}
+
 function HostOptions() {
     const { session, state } = useTable();
     const { sides, count } = state;
@@ -182,18 +205,7 @@ function HostOptions() {
                     <span><i className="fa-solid fa-wand-magic-sparkles"></i> Scripted result</span>
                 </label>
 
-                <label className="check" title="Show a pool's successes first and the other dice after them, in your feed.">
-                    <input
-                        type="checkbox"
-                        checked={state.successesFirst}
-                        onChange={(e) => {
-                            const on = e.currentTarget.checked;
-                            session.set('successesFirst', on);
-                            saveSuccessesFirst(on);
-                        }}
-                    />
-                    <span><i className="fa-solid fa-arrow-down-wide-short"></i> Successes first</span>
-                </label>
+                <SuccessesFirst />
             </div>
 
             {state.scripted && (

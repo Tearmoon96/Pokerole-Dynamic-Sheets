@@ -541,6 +541,62 @@ select.move-edit-input optgroup {
     color: var(--text-primary);
 }
 
+/* The Mega confirmation: what the rules in force will do, and the moveset
+   question. */
+.mega-effects {
+    margin: 0;
+    padding-left: 1.2rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.mega-moves {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 8px 12px 10px;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.mega-moves legend {
+    padding: 0 4px;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.mega-moves label {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+    line-height: 1.4;
+}
+
+.mega-moves input { margin-top: 3px; accent-color: var(--ghost-color); }
+
+.mega-blocked { color: #f43f5e; font-weight: 600; }
+
+.mega-source {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    opacity: 0.8;
+}
+
+.form-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* A Mega's held item under the "Mega Stones cannot be removed" rule. */
+.held-item-locked {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    margin-left: 6px;
+}
+
 .modal-actions {
     display: flex;
     justify-content: flex-end;
