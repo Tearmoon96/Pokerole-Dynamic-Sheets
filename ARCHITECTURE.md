@@ -288,8 +288,18 @@ started knows the table at once rather than dropping their rolls until their
 next heartbeat. A second browser or device is still a player: the host key
 cannot leave the browser that made the table.
 
+**The GM can lock the room** (the padlock in the Invite title). Locking keeps
+the key fingerprints of everyone on the roster (`pokerole_table_lock`, so it
+outlives a GM reload); a hello from any other key is answered with
+`{k:'locked', id}` (one refusal per 1.5 s across the table) and gets no seat.
+A kick while locked drops the key from the list. A waiting player counts as
+let in only on a roster that lists them, never on just any GM message.
+Locking decides who takes part, not who can read: the room key is the
+password's, so only a new password stops a reader.
+
 **A bad actor at the table is bounded, not trusted.** Anyone with the password
-reads the whole table, by design, and a kick is not a ban — a new table is.
+reads the whole table, by design, and a kick is not a ban — a new table is
+(a kick under the room lock is one until it is unlocked).
 Within that, a patched page cannot: take someone's name (the host numbers a
 name already in use, its own above all, and rolls carry that name); push the
 roster past the 16 every page accepts, however many keys it makes; turn hellos

@@ -11,7 +11,8 @@ import { initOffset } from './combat';
 import { entityPool, entityRef, monShownName, participantLook, participantToken } from './entities';
 import { uid } from './state';
 import { parsePcToken, pcToken } from './tablePcs';
-import { actedOf, hasActions, passOrderOf, pidOf } from './turns';
+import { actedOf, hasActions, passOrderOf, pidOf, usedCount } from './turns';
+import { clashLimit, evaLimit } from '../lib/combatMods';
 import type { CanAct } from './turns';
 import type { GmCombat, GmCombatant, GmState } from './types';
 
@@ -63,7 +64,10 @@ export function buildTurns(state: GmState, c: GmCombat, dexById: DexById): WireT
         const used = Array.isArray(r.usedMoves) ? (r.usedMoves as string[]).filter((m) => typeof m === 'string' && m).slice(0, 16) : [];
         return pc ? {
             ...base, own: pc.member, ck: pc.key,
-            eva: !!r.usedEva, clash: !!r.usedClash,
+            /* Whether there are any left this Round: the player's panel
+               greys the chip on that, however many the offsets allow. */
+            eva: usedCount(r.usedEva) >= evaLimit(own && own.mods),
+            clash: usedCount(r.usedClash) >= clashLimit(own && own.mods),
             /* The player's own moves used this Round: the GM's never go out. */
             ...(used.length ? { used: used.map((m) => m.slice(0, 60)) } : {}),
         } : base;

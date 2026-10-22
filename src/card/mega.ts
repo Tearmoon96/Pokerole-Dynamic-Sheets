@@ -4,6 +4,7 @@ import { buildEvolvedSheet } from './evolution';
 import { getPoolMax } from './pools';
 import type { StatSource } from './pools';
 import type { CardSheet, StatusState } from './types';
+import type { CombatMods } from '../lib/combatMods';
 
 /* Mega Evolving and reverting, by the rules in force (src/lib/megaRules.ts).
    Pure: (sheet, species, rules) -> sheet. The card (CardApp) and the rolling
@@ -26,6 +27,8 @@ export interface MegaStash {
     customMaxStats: Record<string, number>;
     defBonus: number;
     spDefBonus: number;
+    /** Absent on a stash made before combat offsets existed. */
+    combatMods?: CombatMods;
     pinnedMoves: string[];
 }
 
@@ -101,6 +104,7 @@ export function megaEvolveSheet(
         customBaseStats: clone(before.customBaseStats || {}),
         customMaxStats: clone(before.customMaxStats || {}),
         defBonus: before.defBonus || 0, spDefBonus: before.spDefBonus || 0,
+        ...(before.combatMods ? { combatMods: clone(before.combatMods) } : {}),
         pinnedMoves: [...(before.pinnedMoves || [])],
     };
 
@@ -140,6 +144,8 @@ export function megaRevertSheet(src: StatSource, base: PokedexEntry, rules: Mega
         s.customMaxStats = clone(stash.customMaxStats);
         s.defBonus = stash.defBonus;
         s.spDefBonus = stash.spDefBonus;
+        if (stash.combatMods) s.combatMods = clone(stash.combatMods);
+        else delete s.combatMods;
         const back: StatSource = { pokemon: base, sheet: s };
         const hpMax = getPoolMax(back, 'hp'), willMax = getPoolMax(back, 'will');
         if (rules.keepOriginal) {

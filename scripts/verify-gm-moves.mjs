@@ -91,10 +91,13 @@ for (const name of SPECIES) {
                 const move = ALL_MOVES.find((m) => m.Name === mn);
                 if (!move) continue;
                 checked++;
-                const a = JSON.stringify(legacy.computeMoveTotals(dex, sheet,
-                    legacy.applyMoveOverrides(sheet, move)));
-                const b = JSON.stringify(ported.computeMoveTotals(dex, sheet,
-                    ported.applyMoveOverrides(sheet, move), itemByName));
+                const la = legacy.computeMoveTotals(dex, sheet, legacy.applyMoveOverrides(sheet, move));
+                const pa = ported.computeMoveTotals(dex, sheet,
+                    ported.applyMoveOverrides(sheet, move), itemByName);
+                /* The port adds fields the original never had (the combat
+                   offsets' share, the crit margin): compare what both have. */
+                const a = JSON.stringify(la);
+                const b = JSON.stringify(Object.fromEntries(Object.keys(la).map((k) => [k, pa[k]])));
                 if (a !== b) {
                     bad++;
                     if (bad < 6) console.log(`MISMATCH ${name} / ${held || 'no item'} / ${mn}\n  ${a}\n  ${b}`);

@@ -9,12 +9,15 @@ import { useTable } from '../../table/TableContext';
 import { formatLobbyId } from '../../table/encoding';
 import { copyText } from './copy';
 import { FoldTitle, useFold } from './Fold';
+import { TableConfirm } from './TableConfirm';
+import type { TableAsk } from './TableConfirm';
 
 export function Credentials() {
     const { session, state } = useTable();
     const [shown, setShown] = useState(false);
     const [copied, setCopied] = useState('');
     const [open, toggle] = useFold('invite');
+    const [ask, setAsk] = useState<TableAsk | null>(null);
 
     const pretty = formatLobbyId(state.lobbyId);
 
@@ -36,9 +39,46 @@ export function Credentials() {
         location.origin + location.pathname + '?lobby=' + state.lobbyId,
     ].join('\n');
 
+    /* The room lock: a warning first, either way, then the session's own
+       three seconds before it can be flipped again. */
+    const busy = state.lockBusyUntil > 0;
+    const others = state.members.filter((m) => !m.host).length;
+    const askLock = () => setAsk(state.locked ? {
+        title: 'Unlock the room?', icon: 'fa-lock-open', ok: 'Unlock',
+        text: <>Anyone with the lobby id and the password will be able to join again.</>,
+        onOk: () => session.setLock(false),
+    } : {
+        title: 'Lock the room?', icon: 'fa-lock', ok: 'Lock',
+        text: <>
+            {others === 0 ? 'Nobody else is at the table: only you will be able to come back.'
+                : others === 1 ? 'Only the player at the table now will be able to come back after a crash or a reload.'
+                    : 'Only the ' + others + ' players at the table now will be able to come back after a crash or a reload.'}
+            {' '}Anyone else is turned away, even with the password. A player kicked while it is locked stays out.
+            {'\n\n'}It does not stop someone who has the password from READING the table: only a new password does that.
+        </>,
+        onOk: () => session.setLock(true),
+    });
+
+    const lockButton = state.isHost && (
+        <button
+            className={'icon-btn room-lock' + (state.locked ? ' on' : '')}
+            aria-pressed={state.locked}
+            aria-label={state.locked ? 'Unlock the room' : 'Lock the room'}
+            title={(state.locked
+                ? 'Room locked: only the people who were at the table when you locked it can come back. Click to unlock.'
+                : 'Lock the room: only the people at the table now will be able to come back.')
+                + (busy ? '\n(Wait a moment before changing it again.)' : '')}
+            disabled={busy}
+            onClick={askLock}
+        >
+            <i className={'fa-solid ' + (state.locked ? 'fa-lock' : 'fa-lock-open')}></i>
+        </button>
+    );
+
     return (
         <div className="credentials" data-tour="invite">
-            <FoldTitle id="invite" open={open} onToggle={toggle} icon="fa-key">Invite</FoldTitle>
+            <FoldTitle id="invite" open={open} onToggle={toggle} icon="fa-key" extra={lockButton}>Invite</FoldTitle>
+            <TableConfirm ask={ask} onClose={() => setAsk(null)} />
 
             {open && <div className="cred-row">
                 <span className="cred-label">Lobby id</span>

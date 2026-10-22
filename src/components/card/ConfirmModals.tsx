@@ -227,6 +227,7 @@ export function HealModal({ open, onClose }: { open: boolean; onClose: () => voi
                             s.disabledMove = null;
                             s.defBonus = 0;
                             s.spDefBonus = 0;
+                            delete s.combatMods;
                         });
                         onClose();
                     }}

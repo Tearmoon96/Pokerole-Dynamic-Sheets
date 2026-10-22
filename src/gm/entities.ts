@@ -10,6 +10,8 @@ import { mutateWorkingTrainer, workingTrainerData } from './workingSet';
 import { emitPcEdit, parsePcToken } from './tablePcs';
 import { readWildOpen } from '../card/wild';
 import { megaShownName } from '../card/mega';
+import { modsOfSheet, modsOfTrainer, putSheetMods, putTrainerMods } from '../lib/combatMods';
+import type { CombatMods } from '../lib/combatMods';
 
 /* One way to reach any subject on the screen.
 
@@ -107,6 +109,9 @@ export interface EntityRef {
     dex?: PokedexEntry | null;
     sheet?: Partial<CardSheet>;
     participant?: Record<string, unknown>;
+    /** Temporary combat offsets (lib/combatMods); `value` already carries
+        the attributes' share. */
+    mods: CombatMods;
     value: (n: string) => number;
 }
 
@@ -126,6 +131,7 @@ export function entityRef(
             kind: 'trainer', token: token!, name: data.name || 'Trainer', data,
             status: normalizeStatus((data as unknown as Record<string, unknown>).status),
             rank: data.rank || '',
+            mods: modsOfTrainer(data),
             value: (n) => trainerPoolValue(data, n),
         };
     }
@@ -139,6 +145,7 @@ export function entityRef(
         return {
             kind: 'mon', token: token!, name: monShownName(dexById, slot.dexId, sheet), dex, sheet,
             status: normalizeStatus(sheet.status), rank: sheet.rank || '',
+            mods: modsOfSheet(sheet),
             value: (n) => resolvePoolValue(dex, sheet, n) || 0,
         };
     }
@@ -152,6 +159,7 @@ export function entityRef(
             return {
                 kind: 'trainer', token: token!, name: copy.trainer.name || 'Trainer', data,
                 status: normalizeStatus(copy.trainer.status), rank: copy.trainer.rank || '',
+                mods: modsOfTrainer(data),
                 value: (n) => trainerPoolValue(data, n),
             };
         }
@@ -162,6 +170,7 @@ export function entityRef(
         return {
             kind: 'mon', token: token!, name: monShownName(dexById, mon.dexId, sheet), dex, sheet,
             status: normalizeStatus(sheet.status), rank: sheet.rank || '',
+            mods: modsOfSheet(sheet),
             value: (n) => resolvePoolValue(dex, sheet, n) || 0,
         };
     }
@@ -174,6 +183,7 @@ export function entityRef(
         return {
             kind: 'wild', token: token!, name: monShownName(dexById, dexId, sheet), dex, sheet,
             status: normalizeStatus(sheet.status), rank: sheet.rank || '',
+            mods: modsOfSheet(sheet),
             value: (n) => resolvePoolValue(dex, sheet, n) || 0,
         };
     }
@@ -186,12 +196,28 @@ export function entityRef(
             participant: part as unknown as Record<string, unknown>,
             status: normalizeStatus((part as unknown as Record<string, unknown>).status),
             rank: '',
+            mods: {},
             /* Nothing to resolve a pool against, so a hand-typed combatant's
                cure rolls are left for the GM to size */
             value: () => 0,
         };
     }
     return null;
+}
+
+/** `ref.value` without the temporary combat offsets: the sheet's own
+    numbers, which the stats popup and the move panel print beside the
+    offset ones. */
+export function bareValue(ref: EntityRef): (n: string) => number {
+    if (ref.kind === 'trainer' && ref.data) {
+        const data = { ...ref.data, combatMods: undefined };
+        return (n) => trainerPoolValue(data, n);
+    }
+    if (ref.sheet) {
+        const sheet = { ...ref.sheet, combatMods: undefined };
+        return (n) => resolvePoolValue(ref.dex ?? null, sheet, n) || 0;
+    }
+    return ref.value;
 }
 
 /** Current and maximum HP or Will for whatever an EntityRef points at.
@@ -342,6 +368,62 @@ export function writeStatus(
         holder.status = normalizeStatus(holder.status);
         mutate(holder.status);
         emitPcEdit(pc.member, pc.key, { status: { ...holder.status } });
+        onWildChanged();
+    }
+}
+
+/** Write a subject's combat offsets back where it came from, whole: `mods`
+    is what it has now, not a step. Same routes as writeStatus; a player's
+    character is sent the full set, so a resend changes nothing. A hand-typed
+    combatant has no sheet to hold them. */
+export function writeMods(
+    state: GmState,
+    token: string,
+    mods: CombatMods,
+    onWildChanged: () => void,
+): void {
+    const p = String(resolveToken(state, token) || '').split(':');
+    if (p[0] === 't') {
+        const id = trainerIdAt(state, +p[1]);
+        if (!id) return;
+        mutateWorkingTrainer(id, (data) => putTrainerMods(data as unknown as Record<string, unknown>, mods));
+    } else if (p[0] === 'm') {
+        const id = trainerIdAt(state, +p[1]);
+        if (!id) return;
+        mutateWorkingTrainer(id, (data) => {
+            const slot = (data.team || [])[+p[2]];
+            if (!slot) return;
+            if (!slot.sheet) slot.sheet = {};
+            putSheetMods(slot.sheet as Record<string, unknown>, mods);
+        });
+    } else if (p[0] === 'w') {
+        const w = state.wilds.find((x) => x.gid === p[1]);
+        if (!w) return;
+        const sheet = wildLiveSheet(w) as Record<string, unknown>;
+        putSheetMods(sheet, mods);
+        if (w.pushed && localStorage.getItem(wildKey(w))) {
+            try { localStorage.setItem(wildKey(w), JSON.stringify(sheet)); }
+            catch { /* quota */ }
+        } else {
+            w.sheet = sheet as unknown as CardSheet;
+            onWildChanged();
+        }
+    } else if (p[0] === 'p') {
+        const pc = parsePcToken(p.join(':'));
+        const copy = pc ? state.tablePcs[pc.member] : null;
+        if (!pc || !copy) return;
+        let now: CombatMods;
+        if (pc.key === 't') {
+            if (!copy.trainer) return;
+            putTrainerMods(copy.trainer as unknown as Record<string, unknown>, mods);
+            now = modsOfTrainer(copy.trainer);
+        } else {
+            const mon = copy.mons[pc.key];
+            if (!mon) return;
+            putSheetMods(mon.sheet as unknown as Record<string, unknown>, mods);
+            now = modsOfSheet(mon.sheet);
+        }
+        emitPcEdit(pc.member, pc.key, { mods: now });
         onWildChanged();
     }
 }

@@ -2,13 +2,24 @@ import type { PokedexEntry } from '../data/types';
 import type { CardSheet } from '../card/types';
 import type { TrainerState } from '../state/types';
 import { statAilmentPenalty } from '../card/pools';
+import { ATTR_MOD_KEYS, modOf, modsOfSheet, modsOfTrainer } from '../lib/combatMods';
+import type { AttrModKey } from '../lib/combatMods';
 
 /* Dice pools, ported from the Pokémon card.
 
    Everything here mirrors the card's own functions with the sheet passed in
    instead of read off a module-level `sheetState`. The card is the reference: if
    its maths changes, these have to follow or the GM screen starts quoting
-   numbers the card disagrees with. */
+   numbers the card disagrees with.
+
+   One thing the card does not do: an attribute here carries the sheet's
+   temporary combat offset (lib/combatMods), since these are the pools the
+   rolls are made from. Only the pools — HP and Will maxima never see it. */
+
+/** The combat offset on an attribute, or 0 for anything that is not one. */
+function attrMod(mods: Parameters<typeof modOf>[0], token: string): number {
+    return (ATTR_MOD_KEYS as readonly string[]).includes(token) ? modOf(mods, token as AttrModKey) : 0;
+}
 
 export const COMBAT_STATS = ['strength', 'dexterity', 'vitality', 'special', 'insight'];
 export const SOCIAL_STATS = ['tough', 'cool', 'beauty', 'cute', 'clever'];
@@ -78,7 +89,8 @@ export function trainerPoolValue(data: TrainerState, name: string): number {
         /* A trainer can be paralysed from this screen too; the status lives in
            their shared record beside the stats. */
         const status = (data as unknown as { status?: { major?: string | null } }).status;
-        return Math.max(0, (stats[token] || 0) - statAilmentPenalty(status, token));
+        return Math.max(0, (stats[token] || 0) - statAilmentPenalty(status, token)
+            + attrMod(modsOfTrainer(data as unknown as { combatMods?: unknown }), token));
     }
     if (skills && token in skills) return skills[token] || 0;
     if (token === 'will' || token === 'willpower') return trainerPoolMax(data, 'will');
@@ -95,7 +107,7 @@ export function resolvePoolValue(
     const s = (sheet || {}) as Partial<CardSheet>;
     if (COMBAT_STATS.includes(token) || SOCIAL_STATS.includes(token)) {
         const own = statBase(dex, s, token) + ((s.trainedStats && s.trainedStats[token]) || 0);
-        return Math.max(0, own - statAilmentPenalty(s.status, token));
+        return Math.max(0, own - statAilmentPenalty(s.status, token) + attrMod(modsOfSheet(s), token));
     }
     if (token === 'will' || token === 'willpower') return monPoolMax(dex, s, 'will');
     if (token === 'hp') return monPoolMax(dex, s, 'hp');

@@ -16,6 +16,7 @@ import { MAX_COLOR } from './colors';
 import { IMAGE_RE, isCharKey, parseSlimMon, parseSlimTrainer, parseStatus } from './slim';
 import type { CharKey } from './slim';
 import { parseMegaRules } from '../lib/megaRules';
+import { parseMods } from '../lib/combatMods';
 import type {
     Body, ChannelId, ChannelState, Fade, Inner, RollExtras, TrackLoad, WireFile, WireMapImage, WireMember, WireRoll,
     WireTrack, WireTurnEntry, WireTurns,
@@ -109,6 +110,11 @@ function parseExtras(raw: Record<string, unknown>): RollExtras | undefined {
         if (n === null) return undefined;
         out.need = n;
     }
+    if (raw.crit !== undefined) {
+        const c = int(raw.crit, 0, LIMITS.MAX_CRIT);
+        if (c === null || out.need === undefined) return undefined;
+        out.crit = c;
+    }
     /* A sum roll counts no successes, so there is nothing for pain to strike
        or a target to be measured against. */
     if (out.bonus !== undefined && (out.pain !== undefined || out.need !== undefined)) return undefined;
@@ -117,7 +123,7 @@ function parseExtras(raw: Record<string, unknown>): RollExtras | undefined {
 
 export function parseRoll(raw: unknown): WireRoll | null {
     if (!isRecord(raw)) return null;
-    if (!exactly(raw, ['id', 'label', 'vals', 'total', 'succ', 'net', 't', 'who', 'note', 'bonus', 'pain', 'need'])) return null;
+    if (!exactly(raw, ['id', 'label', 'vals', 'total', 'succ', 'net', 't', 'who', 'note', 'bonus', 'pain', 'need', 'crit'])) return null;
 
     const id = idText(raw.id);
     if (!id) return null;
@@ -333,7 +339,7 @@ export function parseBody(raw: unknown): Body | null {
             return { k: 'roster', members };
         }
         case 'request': {
-            if (!exactly(raw, ['k', 'rid', 'count', 'sides', 'note', 'bonus', 'pain', 'need'])) return null;
+            if (!exactly(raw, ['k', 'rid', 'count', 'sides', 'note', 'bonus', 'pain', 'need', 'crit'])) return null;
             const rid = idText(raw.rid);
             const count = int(raw.count, LIMITS.MIN_COUNT, LIMITS.MAX_COUNT);
             const sides = int(raw.sides, LIMITS.MIN_SIDES, LIMITS.MAX_SIDES);
@@ -371,6 +377,11 @@ export function parseBody(raw: unknown): Body | null {
             if (!exactly(raw, ['k', 'id'])) return null;
             const id = fingerprintText(raw.id);
             return id ? { k: 'kick', id } : null;
+        }
+        case 'locked': {
+            if (!exactly(raw, ['k', 'id'])) return null;
+            const id = fingerprintText(raw.id);
+            return id ? { k: 'locked', id } : null;
         }
         case 'library': {
             if (!exactly(raw, ['k', 'tracks'])) return null;
@@ -444,19 +455,21 @@ export function parseBody(raw: unknown): Body | null {
             return mega ? { k: 'rules', mega } : null;
         }
         case 'pcop': {
-            if (!exactly(raw, ['k', 'to', 'key', 'oid', 'hp', 'will', 'status'])) return null;
+            if (!exactly(raw, ['k', 'to', 'key', 'oid', 'hp', 'will', 'status', 'mods'])) return null;
             const to = fingerprintText(raw.to);
             const oid = idText(raw.oid);
             if (!to || !oid || !isCharKey(raw.key)) return null;
             const hp = poolValue(raw.hp), will = poolValue(raw.will);
             const status = raw.status === undefined ? undefined : parseStatus(raw.status);
-            if (hp === null || will === null || status === null) return null;
-            if (hp === undefined && will === undefined && status === undefined) return null;
+            const mods = raw.mods === undefined ? undefined : parseMods(raw.mods);
+            if (hp === null || will === null || status === null || mods === null) return null;
+            if (hp === undefined && will === undefined && status === undefined && mods === undefined) return null;
             return {
                 k: 'pcop', to, key: raw.key, oid,
                 ...(hp !== undefined ? { hp } : {}),
                 ...(will !== undefined ? { will } : {}),
                 ...(status !== undefined ? { status } : {}),
+                ...(mods !== undefined ? { mods } : {}),
             };
         }
         case 'pc': {

@@ -30,9 +30,9 @@
    goes. */
 .tip-quick .tip-used { opacity: 0.45; text-decoration: line-through; }
 
-/* Two buttons in the corner rather than the roster's four, so the name keeps
-   the room the other two would have taken. */
-.character-card .trainer-name { padding-right: 4rem; }
+/* Three buttons in the corner rather than the roster's four (rolls, stats,
+   the License), so the name keeps the room the fourth would have taken. */
+.character-card .trainer-name { padding-right: 6rem; }
 
 /* Mega Evolving from the panel: the button on a Pokémon's row, lit while it
    is a Mega, and the confirmation (the GM dialog's frame). */

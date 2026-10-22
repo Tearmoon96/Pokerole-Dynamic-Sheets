@@ -19,9 +19,11 @@ import {
     writeStatus,
 } from '../../gm/entities';
 import { PoolBar } from './RosterBits';
+import { StatsButton, statsKey } from './StatTip';
 import { canActIn } from '../../gm/tableCombat';
 import { parsePcToken, pruneTablePcs } from '../../gm/tablePcs';
-import { actLogOf, passTurn, pidOf, roundTurns, settleTurn, startTurns, stopTurns } from '../../gm/turns';
+import { actLogOf, passTurn, pidOf, roundTurns, settleTurn, startTurns, stopTurns, usedCount } from '../../gm/turns';
+import { clashLimit, evaLimit, modOf } from '../../lib/combatMods';
 import { useTablePresence } from '../../gm/useCombatLink';
 import { clearPing, usePings } from '../../gm/rollPings';
 import { pcColorVars } from '../../table/colors';
@@ -134,7 +136,7 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
            included, so the history shows what it really rolled. The FIELD keeps
            the unparalysed number and the row shifts it for display, so curing
            the paralysis later puts the 2 back without a re-roll. */
-        const bonus = ref.value('Dexterity') + ref.value('Alert');
+        const bonus = ref.value('Dexterity') + ref.value('Alert') + modOf(ref.mods, 'init');
         const mod = initOffset(ref.status);
         store.update((s) => {
             const entry = roll(1, 6, { who: ref.name, what: 'Initiative', bonus }, CRIT_MARGIN);
@@ -291,7 +293,7 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
                                 ...c,
                                 round: next,
                                 participants: c.participants.map((p) => ({
-                                    ...p, acted: 0, usedClash: false, usedEva: false, usedMoves: [], actLog: [],
+                                    ...p, acted: 0, usedClash: 0, usedEva: 0, usedMoves: [], actLog: [],
                                 })),
                             }, canActIn(s, dexById)));
                         }}
@@ -444,8 +446,12 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
                                 const n = parseInt(v, 10);
                                 return { ...x, init: isNaN(n) ? undefined : n };
                             })}
-                            onUsed={(key) => patch((p as unknown as Record<string, string>).pid,
-                                (x) => ({ ...x, [key]: !x[key] }))}
+                            onUsed={(key, limit) => patch((p as unknown as Record<string, string>).pid,
+                                /* One more each click, back to none past the allowance. */
+                                (x) => {
+                                    const n = usedCount(x[key]);
+                                    return { ...x, [key]: n >= limit ? 0 : n + 1 };
+                                })}
                             onRollInit={() => rollInitiative(
                                 resolveToken(state, participantToken(p)) || participantToken(p),
                                 (p as unknown as Record<string, string>).pid)}
@@ -503,9 +509,10 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
 }
 
 /* Clash and Evasion are once per Round each — and one Clash, whether it was
-   rolled off Strength or off Special — so what the row needs is a mark, not a
-   counter. Kept here beside the component that draws them so a third one is
-   added in one place. */
+   rolled off Strength or off Special — so what the row needs is a mark. A
+   character whose offsets allow more (Double Team, Detect…) gets a count on
+   the same button instead: "EVA 1/3". Kept here beside the component that
+   draws them so a third one is added in one place. */
 const USED_MARKS: { key: 'usedClash' | 'usedEva'; label: string; icon: string; tip: string }[] = [
     {
         key: 'usedClash', label: 'CLASH', icon: 'fa-hand-fist',
@@ -530,7 +537,7 @@ function CombatRow({ p, moved, current, idx, total, round, token, dexById, onPip
     dexById: (id: string) => PokedexEntry | null;
     onPip: (i: number) => void;
     onInit: (v: string) => void;
-    onUsed: (key: 'usedClash' | 'usedEva') => void;
+    onUsed: (key: 'usedClash' | 'usedEva', limit: number) => void;
     onRollInit: () => void;
     onMove: (dir: number) => void;
     onRemove: () => void;
@@ -561,7 +568,8 @@ function CombatRow({ p, moved, current, idx, total, round, token, dexById, onPip
     const shown = init == null ? '' : String(editing ? init : init + mod);
     /* A hand-typed combatant has no sheet behind it, so there is nothing to
        roll off — the GM types that one in, as they always did. */
-    const initBonus = ref && ref.kind !== 'custom' ? ref.value('Dexterity') + ref.value('Alert') : 0;
+    const initBonus = ref && ref.kind !== 'custom'
+        ? ref.value('Dexterity') + ref.value('Alert') + modOf(ref.mods, 'init') : 0;
     const canRollInit = init == null && !!ref && ref.kind !== 'custom';
     const flags = ref ? roundFlags(ref, p, round) : [];
     const kindIcon = rec.kind === 'trainer' ? 'fa-user'
@@ -669,19 +677,25 @@ function CombatRow({ p, moved, current, idx, total, round, token, dexById, onPip
                         behind it still clashes once a Round. */}
                     <div className="c-used">
                         {USED_MARKS.map((m) => {
-                            const on = !!p[m.key];
                             const kind = m.key === 'usedEva' ? 'eva' : 'clash';
+                            const limit = kind === 'eva' ? evaLimit(ref?.mods) : clashLimit(ref?.mods);
+                            const n = Math.min(limit, usedCount(p[m.key]));
+                            const on = n >= limit;
                             const lit = pings.includes(kind);
                             return (
                                 <button
                                     key={m.key}
-                                    className={'used-mark' + (on ? ' on' : '') + (lit ? ' pinged' : '')}
+                                    className={'used-mark' + (on ? ' on' : n ? ' part' : '') + (lit ? ' pinged' : '')}
                                     aria-pressed={on}
-                                    title={on ? 'Used this Round' : m.tip}
+                                    data-used={n}
+                                    title={limit > 1
+                                        ? n + ' of ' + limit + ' this Round — click to count one more'
+                                        : (on ? 'Used this Round' : m.tip)}
                                     onMouseEnter={() => clearPing(pid, kind)}
-                                    onClick={() => onUsed(m.key)}
+                                    onClick={() => onUsed(m.key, limit)}
                                 >
                                     <i className={'fa-solid ' + m.icon}></i>{m.label}
+                                    {limit > 1 && <span className="used-count">{n}/{limit}</span>}
                                 </button>
                             );
                         })}
@@ -724,6 +738,10 @@ function CombatRow({ p, moved, current, idx, total, round, token, dexById, onPip
                             <i className={'fa-solid '
                                 + (rec.kind === 'trainer' ? 'fa-dice-d6' : 'fa-list-ul')}></i>
                         </button>
+                    )}
+                    {ref && ref.kind !== 'custom' && (
+                        <StatsButton token={token} mods={ref.mods} className="c-tip"
+                            onOpen={() => onOpenTip(statsKey(token))} />
                     )}
                     <button className="c-remove danger" title="Remove from combat" onClick={onRemove}>
                         <i className="fa-solid fa-xmark"></i>

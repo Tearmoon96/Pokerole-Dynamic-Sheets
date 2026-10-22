@@ -8,6 +8,8 @@ import { mixHex } from '../../lib/color';
 import type { PokedexEntry } from '../../data/types';
 import type { CardSheet } from '../../card/types';
 import type { ReactNode } from 'react';
+import { isEmptyMods, modsOfSheet } from '../../lib/combatMods';
+import { StatsButton } from './StatTip';
 
 /* The pieces a roster row is built from: a pool bar with its ±1 buttons, the
    type chips, and the Pokémon row that carries all of it. */
@@ -73,7 +75,7 @@ export function TypeChips({ p }: { p: PokedexEntry | null }) {
     );
 }
 
-export function MonRow({ dex, dexId, sheet, token, buttons, onStep, onCycleStatus, onOpenTip }: {
+export function MonRow({ dex, dexId, sheet, token, buttons, onStep, onCycleStatus, onOpenTip, onOpenStats }: {
     dex: PokedexEntry | null;
     dexId: string;
     sheet: Partial<CardSheet> | null;
@@ -83,8 +85,13 @@ export function MonRow({ dex, dexId, sheet, token, buttons, onStep, onCycleStatu
     onStep?: (key: 'hp' | 'will', delta: number, e: React.MouseEvent) => void;
     onCycleStatus?: (key: string, e: React.MouseEvent) => void;
     onOpenTip?: () => void;
+    /** A button of its own for the stats popup; where there is none, the
+        move panel's corner opens it, and the move button says when offsets
+        are on. */
+    onOpenStats?: () => void;
 }) {
     const hpMax = monPoolMax(dex, sheet, 'hp');
+    const mods = modsOfSheet(sheet);
     const willMax = monPoolMax(dex, sheet, 'will');
     const dexById = () => dex;
 
@@ -113,14 +120,17 @@ export function MonRow({ dex, dexId, sheet, token, buttons, onStep, onCycleStatu
             <div className="mon-actions">
                 {token && onOpenTip && (
                     <button
-                        className="icon-btn tip-btn"
+                        className={'icon-btn tip-btn' + (!onOpenStats && !isEmptyMods(mods) ? ' has-mods' : '')}
                         data-tip-for={token}
-                        title="Pinned moves, accuracy and damage"
+                        title={!onOpenStats && !isEmptyMods(mods)
+                            ? 'Pinned moves, accuracy and damage — combat offsets are on'
+                            : 'Pinned moves, accuracy and damage'}
                         onClick={onOpenTip}
                     >
                         <i className="fa-solid fa-list-ul"></i>
                     </button>
                 )}
+                {token && onOpenStats && <StatsButton token={token} mods={mods} onOpen={onOpenStats} />}
                 {buttons}
             </div>
         </div>

@@ -116,6 +116,27 @@ export function CardApp() {
         location.search = '?' + p.toString();
     }, [ctx]);
 
+    /* Another tab writing this sheet — the rolling table's character panel,
+       the GM screen's stats popup or HP bar — shows here at once: on the
+       browser's storage event, on focus, and on a light poll for the case of
+       a card left open on a second monitor. A slot that changed species
+       there reopens the card on it. */
+    useEffect(() => {
+        const sync = () => {
+            const moved = store.syncFromStorage();
+            if (moved) gotoPokemon(moved);
+        };
+        const onStorage = (e: StorageEvent) => { if (e.storageArea === localStorage) sync(); };
+        window.addEventListener('storage', onStorage);
+        window.addEventListener('focus', sync);
+        const poll = window.setInterval(sync, 1000);
+        return () => {
+            window.removeEventListener('storage', onStorage);
+            window.removeEventListener('focus', sync);
+            clearInterval(poll);
+        };
+    }, [store, gotoPokemon]);
+
     /** Persist the rebased sheet to the target species, then load it. A Mega
         Evolution and its revert follow the rules in force (src/card/mega.ts). */
     const transformInto = useCallback((targetId: string, opts: { mega?: boolean; revert?: boolean; ownMoves?: boolean } = {}) => {

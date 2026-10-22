@@ -16,6 +16,8 @@ import { CHANNELS } from '../../table/protocol';
 import { useTour } from '../../lib/tour';
 import { GuidedTour, TourButton, useFirstTimeTour } from '../common/Tour';
 import { tableSteps } from './tour/steps';
+import { TableConfirm } from './TableConfirm';
+import type { TableAsk } from './TableConfirm';
 
 export function TableView() {
     const { session, state } = useTable();
@@ -25,6 +27,7 @@ export function TableView() {
     const mapOn = map.show && (!!map.url || map.loading !== null || !!map.error);
     /* On a phone the map and the rolls take turns; the map first. */
     const [phoneView, setPhoneView] = useState<'map' | 'rolls'>('map');
+    const [ask, setAsk] = useState<TableAsk | null>(null);
     const silenced = !music.unlocked && CHANNELS.some((c) => music.decks[c].playing);
     const tourId = isHost ? 'table-gm' : 'table-player';
 
@@ -73,9 +76,24 @@ export function TableView() {
                 <TourButton id={tourId} className="icon-btn" />
                 <HomeButton className="icon-btn" />
 
-                <button className="danger" onClick={() => session.leave()}>
-                    <i className="fa-solid fa-right-from-bracket"></i> Leave table
-                </button>
+                {isHost ? (
+                    <button className="danger" id="close-table" onClick={() => setAsk({
+                        title: 'Close the table?', icon: 'fa-door-closed', ok: 'Close table', danger: true,
+                        text: <>
+                            This browser forgets the table: the roll history is deleted, and so is the room lock.
+                            {' '}Players stay in a table with no GM until they leave.
+                            {'\n\n'}To open it again, create it from the same lobby id and password.
+                        </>,
+                        onOk: () => session.leave(),
+                    })}>
+                        <i className="fa-solid fa-door-closed"></i> Close table
+                    </button>
+                ) : (
+                    <button className="danger" onClick={() => session.leave()}>
+                        <i className="fa-solid fa-right-from-bracket"></i> Leave table
+                    </button>
+                )}
+                <TableConfirm ask={ask} onClose={() => setAsk(null)} />
             </header>
 
             {state.statusDetail && (

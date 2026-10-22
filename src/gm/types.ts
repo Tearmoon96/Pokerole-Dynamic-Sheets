@@ -53,11 +53,13 @@ export interface GmCombatant {
     name?: string;
     initiative?: number;
     actions?: number;
-    /** Clash and Evasion are once per Round each, whichever of the two Clash
-        pools was used, so the tracker carries a mark for each rather than a
-        count. Cleared when the Round advances, exactly as the action pips are. */
-    usedClash?: boolean;
-    usedEva?: boolean;
+    /** How many Clashes and Evasions this Round, whichever of the two Clash
+        pools was used. Once a Round each, unless the character's combat
+        offsets allow more (`extraClash` / `extraEva`, lib/combatMods). A
+        board saved when these were marks has `true` for one: read them with
+        `usedCount`. Cleared when the Round advances, as the action pips are. */
+    usedClash?: boolean | number;
+    usedEva?: boolean | number;
     /** The moves used this Round, by name: a move is once a Round. Marked
         when its Accuracy is rolled, cleared with the pips. */
     usedMoves?: string[];

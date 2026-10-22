@@ -1,0 +1,201 @@
+/* ---------------- Combat offsets ----------------
+   The stats popup (StatTip.tsx) and the marks a temporary offset leaves on
+   every number it moves — in the move panel's chips and pools too. Up is
+   the "ok" green, down the danger red, the same pair the pool steppers use,
+   so a forgotten offset reads at a glance as one. */
+
+.mod-num.up { color: var(--ok) !important; }
+.mod-num.down { color: #fca5a5 !important; }
+
+.mod-delta {
+    font-size: 0.75em;
+    font-weight: 700;
+    margin-left: 0.15em;
+    vertical-align: 0.15em;
+}
+
+/* A row button whose character has offsets on: a ring in the accent, so it
+   is seen without opening anything. Not ::after — base.css grows small
+   controls with a transparent ::after for the hit area. */
+.tip-btn.has-mods {
+    color: var(--crit);
+    border-color: var(--crit);
+    box-shadow: 0 0 6px #f0b42955;
+}
+
+/* The corner button that swaps the move panel and the stats popup. */
+.tip-switch {
+    position: absolute;
+    top: 0.35rem;
+    right: 1.95rem;
+    height: 1.3rem;
+    padding: 0 0.4rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+}
+.tip-switch:hover { border-color: var(--ghost-color); color: var(--text-primary); background: var(--primary-soft); }
+.tip-switch i { font-size: 0.6rem; }
+
+/* Both corner buttons are up there: the name keeps clear of them. */
+.mon-tooltip:has(.tip-switch) .tip-head { padding-right: 5.5rem; }
+
+/* High Critical, a crit offset, or a move that always crits. */
+.tip-crit {
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    border-radius: 5px;
+    padding: 0.05rem 0.3rem;
+    border: 1px solid var(--crit);
+    color: var(--crit);
+    background: #f0b4291a;
+    white-space: nowrap;
+}
+
+/* ---- the popup ---- */
+
+/* Wider than the move panel: two columns side by side. */
+#stat-tooltip { width: 660px; max-width: calc(100vw - 16px); }
+
+.stat-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+        "pools defs"
+        "attrs combat";
+    column-gap: 1.1rem;
+    row-gap: 0.2rem;
+}
+.stat-area { min-width: 0; }
+.stat-area-pools { grid-area: pools; align-self: center; }
+.stat-area-defs { grid-area: defs; align-self: center; }
+.stat-area-attrs { grid-area: attrs; }
+.stat-area-combat { grid-area: combat; }
+
+.stat-pools { margin: 0; }
+
+/* Too narrow for two columns: one, HP and Will first, then the attributes,
+   the defences and the rest. */
+@media (max-width: 700px) {
+    #stat-tooltip { width: calc(100vw - 20px); }
+    .stat-cols {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "pools" "attrs" "defs" "combat";
+    }
+    .stat-area-defs { margin-top: 0.45rem; }
+}
+
+.stat-section {
+    font-size: 0.6rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin: 0.45rem 0 0.15rem;
+}
+
+.stat-grid { display: flex; flex-direction: column; }
+
+.stat-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 3.4rem auto 4.6rem;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.12rem 0.2rem;
+    border-radius: 6px;
+    font-size: 0.74rem;
+}
+.stat-row + .stat-row { border-top: 1px solid var(--border-glow); }
+/* "per round" after the Evasions / Clashes count. */
+.stat-unit {
+    font-family: inherit;
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.stat-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.stat-base,
+.stat-total {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.7rem;
+    text-align: right;
+    white-space: nowrap;
+}
+.stat-base { color: var(--text-muted); }
+.stat-total { font-weight: 700; color: var(--text-primary); }
+
+.stat-row.up { background: #3aa59314; }
+.stat-row.up .stat-total { color: var(--ok); }
+.stat-row.down { background: #ef444414; }
+.stat-row.down .stat-total { color: #fca5a5; }
+
+.stat-step { display: inline-flex; align-items: center; gap: 0.2rem; }
+
+.stat-btn {
+    width: 1.35rem;
+    height: 1.35rem;
+    padding: 0;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.stat-btn:hover:not(:disabled) { border-color: var(--ghost-color); color: var(--text-primary); background: var(--primary-soft); }
+.stat-btn:disabled { opacity: 0.3; cursor: default; }
+
+.stat-off {
+    min-width: 1.6rem;
+    text-align: center;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+.stat-row.up .stat-off.on { color: var(--ok); font-weight: 700; }
+.stat-row.down .stat-off.on { color: #fca5a5; font-weight: 700; }
+
+.stat-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--border-glow);
+}
+.stat-note { font-size: 0.66rem; color: var(--text-muted); }
+
+.stat-reset {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--danger);
+    background: transparent;
+    color: #fca5a5;
+    cursor: pointer;
+}
+.stat-reset:hover:not(:disabled) { background: #ef444422; }
+.stat-reset:disabled { opacity: 0.35; border-color: var(--border-color); color: var(--text-muted); cursor: default; }
+
+/* ---- the combat row's Evasion / Clash count ---- */
+.used-count { margin-left: 0.2rem; font-weight: 700; }
+.used-mark.part {
+    color: var(--crit);
+    border-color: var(--crit);
+}
+
+@media (pointer: coarse) {
+    .stat-btn { width: 2rem; height: 2rem; }
+    .tip-switch { height: 1.8rem; }
+}

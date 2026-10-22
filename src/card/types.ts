@@ -1,3 +1,5 @@
+import type { CombatMods } from '../lib/combatMods';
+
 /* The Pokémon card's own sheet, as it is written into a trainer's .json (under
    the team slot or the box entry) or into localStorage for a standalone card.
 
@@ -61,6 +63,10 @@ export interface CardSheet {
        raised or the Pokémon evolves. Display-only — see defenceValue. */
     defBonus: number;
     spDefBonus: number;
+    /** Temporary combat offsets set from the stats popup on the GM screen
+        and at the rolling table (lib/combatMods). The two defences are not in
+        it: those are the two fields above. Absent when nothing is on. */
+    combatMods?: CombatMods;
     /** Pre-1.2.0 absolute pool sizes. Migrated on load and never written again;
         kept null so an older copy of the app falls back to the derived value. */
     hpMax: number | null;

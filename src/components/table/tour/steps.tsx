@@ -63,6 +63,8 @@ const gmSteps = (session: TableSession): TourStep[] => [
                 link in one go. Paste it in your group chat.</p>
             <p>The password is what keeps strangers out, so send it somewhere private. The link never
                 carries it.</p>
+            <p><Btn icon="fa-lock-open" /> locks the room once everyone is in: they can still come back after
+                a crash or a reload, nobody new can join until you unlock it.</p>
         </>,
     },
     {
@@ -73,8 +75,8 @@ const gmSteps = (session: TableSession): TourStep[] => [
             <p>The dot tells you whether you are connected. <Btn icon="fa-circle-question" /> brings this tour
                 back at any time.</p>
             <p>Reloading or closing the tab is fine: the page rejoins your table by itself.
-                <Btn icon="fa-right-from-bracket">Leave table</Btn> forgets it on this device, so press it only
-                when the campaign is done with this table.</p>
+                <Btn icon="fa-door-closed">Close table</Btn> forgets it on this device, roll history
+                included, so press it only when the campaign is done with this table.</p>
         </>,
     },
     {

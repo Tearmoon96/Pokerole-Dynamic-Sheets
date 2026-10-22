@@ -113,6 +113,11 @@ export interface TableState {
     successesFirst: boolean;
 
     /* Host-only controls. Meaningless for a player and never sent. */
+    /** The room is locked: only those at the table when it was locked can
+        come back. */
+    locked: boolean;
+    /** Lock and unlock wait this long after a change (epoch ms). */
+    lockBusyUntil: number;
     hideMyRolls: boolean;
     scripted: boolean;
     scriptSuccesses: number;
@@ -145,6 +150,8 @@ function initialState(): TableState {
            checkbox starts in. Making it opt-in would mean the first roll of
            every session leaks by accident. */
         prep: null,
+        locked: false,
+        lockBusyUntil: 0,
         hideMyRolls: true,
         scripted: false,
         successesFirst: readFlag(SORT_KEY),
@@ -257,6 +264,32 @@ function loadFeed(lobbyId: string): LocalRoll[] {
 
 function forgetFeed(): void {
     try { localStorage.removeItem(FEED_KEY); } catch { /* nothing to do */ }
+}
+
+/* The locked room. The GM keeps who was at the table when it was locked —
+   their key fingerprints — so a reload of the GM's page keeps it locked and
+   keeps letting the same people back. One table's at a time, as the feed. */
+const LOCK_KEY = 'pokerole_table_lock';
+/** A lock or an unlock, then nothing for this long: no spamming it. */
+const LOCK_GAP_MS = 3000;
+/** Refusals to people knocking on a locked room: at most one this often. */
+const REFUSE_GAP_MS = 1500;
+
+function saveLock(lobbyId: string, ids: Set<string> | null): void {
+    try {
+        if (ids) localStorage.setItem(LOCK_KEY, JSON.stringify({ lobbyId, ids: [...ids] }));
+        else localStorage.removeItem(LOCK_KEY);
+    } catch { /* full, or private mode */ }
+}
+
+function loadLock(lobbyId: string): Set<string> | null {
+    try {
+        const raw = JSON.parse(localStorage.getItem(LOCK_KEY) || 'null');
+        if (!raw || raw.lobbyId !== lobbyId || !Array.isArray(raw.ids)) return null;
+        return new Set(raw.ids.filter((id: unknown) => typeof id === 'string').slice(0, LIMITS.MAX_MEMBERS));
+    } catch {
+        return null;
+    }
 }
 
 /* The replay record (`seen`) outlives a reload, a rejoin and the table moving
@@ -403,6 +436,11 @@ export class TableSession {
     private greetAt = 0;
     private greetTimer: number | null = null;
     private fullNoticeAt = 0;
+    /** Locked: who may come back. Null while the room is open. */
+    private allowed: Set<string> | null = null;
+    private refusedAt = 0;
+    private refusedNoticeAt = 0;
+    private lockTimer: number | null = null;
 
     /* Requests made while the socket was down. Held as bodies, not as sealed
        envelopes, because they are re-signed with a fresh sequence and timestamp
@@ -554,6 +592,7 @@ export class TableSession {
             this.names.set(identity.id, name);
             this.colors.set(identity.id, savedColor());
         }
+        this.allowed = isHost ? loadLock(lobbyId) : null;
 
         const wait = !isHost && !trusted;
         if (wait) {
@@ -575,6 +614,7 @@ export class TableSession {
             s.rolls = isHost ? loadFeed(lobbyId) : [];
             s.pending = [];
             s.hostOnline = isHost;
+            s.locked = this.allowed !== null;
             s.error = '';
         });
 
@@ -606,7 +646,8 @@ export class TableSession {
         })();
     }
 
-    /** The lobby's GM answered: the id and the password are right. */
+    /** The lobby's GM let us in: the id and the password are right, and the
+        GM's roster lists us. */
     private joined(): void {
         const v = this.verifying;
         if (!v) return;
@@ -629,6 +670,21 @@ export class TableSession {
         this.fail(reached
             ? 'No table answered with that lobby id and password. Check both, and that the GM has the table open.'
             : 'Could not reach the table\u2019s relay. Check your connection and try again.');
+    }
+
+    /** The GM's room is locked and we were not at the table when it was.
+        A newcomer goes as one whose table never answered — nothing kept; a
+        player who had sat here keeps the saved session, so a reload tries
+        again (the GM may have unlocked by then). */
+    private turnedAway(): void {
+        const v = this.verifying;
+        this.teardown();
+        if (v) {
+            clearSession();
+            if (!v.known) void forgetMemberIdentity(v.lobbyId).catch(() => { /* nothing to undo */ });
+        }
+        this.store.update((s) => { s.joinWait = false; s.status = 'offline'; s.members = []; });
+        this.fail('The table is locked: only the people who were at it can come back. Ask the GM to unlock it.');
     }
 
     /** `moved`: the table carries on in another tab of this browser, so the
@@ -700,7 +756,7 @@ export class TableSession {
     leave(): void {
         /* A player's table rules go with the table; a GM's own stay theirs. */
         if (!this.store.state.isHost) writeTableMegaRules('', null);
-        else forgetFeed();
+        else { forgetFeed(); saveLock('', null); }
         this.teardown();
         clearSession();
         this.store.state = initialState();
@@ -944,7 +1000,6 @@ export class TableSession {
         if (inner.f !== this.store.state.lobbyId) return;
 
         this.hostSeenAt = Date.now();
-        if (this.verifying) this.joined();
 
         /* The GM's page has started (again): a reload, the table moving to
            another tab of the GM's browser, or a GM arriving after us. It knows
@@ -961,6 +1016,11 @@ export class TableSession {
                     s.members = body.members;
                     s.hostOnline = true;
                 });
+                /* Admitted means listed. Any message from the GM proves the
+                   table is real, but a locked room answers a stranger too —
+                   with a refusal — and its next heartbeat must not count as
+                   letting them in. */
+                if (this.verifying && body.members.some((m) => m.id === this.store.state.myId)) this.joined();
                 break;
 
             case 'result':
@@ -1022,6 +1082,10 @@ export class TableSession {
                 }
                 break;
 
+            case 'locked':
+                if (body.id === this.store.state.myId) this.turnedAway();
+                break;
+
             default:
                 /* hello, request: other players talking to the host. Not ours. */
                 break;
@@ -1041,6 +1105,12 @@ export class TableSession {
             }
             return;
         }
+        /* Locked: only those at the table when it was locked come back.
+           Someone already sitting here (a heartbeat) is one of them. */
+        if (this.allowed && !this.allowed.has(id) && !this.names.has(id)) {
+            this.refuse(id);
+            return;
+        }
         this.lastSeenAt.set(id, Date.now());
         this.names.set(id, this.uniqueName(id, name));
         if (color === undefined) this.colors.delete(id);
@@ -1056,6 +1126,22 @@ export class TableSession {
         if (this.greeted.get(id) !== sid) {
             this.greeted.set(id, sid);
             this.greetArrivals();
+        }
+    }
+
+    /** Tells a stranger at a locked room so, rather than leave an up-to-date
+        page waiting out its 15 seconds. One refusal at a time across the
+        table, so a flood of made-up keys costs a frame every 1.5 s and no
+        more; an older page ignores it and simply never gets a seat. */
+    private refuse(id: string): void {
+        const now = Date.now();
+        if (now - this.refusedAt >= REFUSE_GAP_MS) {
+            this.refusedAt = now;
+            void this.publish({ k: 'locked', id });
+        }
+        if (now - this.refusedNoticeAt > 60_000) {
+            this.refusedNoticeAt = now;
+            this.notify('Someone tried to join the locked table.');
         }
     }
 
@@ -1401,8 +1487,27 @@ export class TableSession {
         this.buckets.delete(id);
         this.music.forget(id);
         this.combat.forget(id);
+        /* Kicked from a locked room is out until it is unlocked. */
+        if (this.allowed?.delete(id)) saveLock(this.store.state.lobbyId, this.allowed);
         void this.publish({ k: 'kick', id });
         this.publishRoster();
+    }
+
+    /** Locks the room — whoever is at the table now (and anyone dropped in
+        the last 80 s, still on the roster) may come back, nobody else — or
+        opens it again. Then nothing for LOCK_GAP_MS either way. */
+    setLock(on: boolean): void {
+        const s = this.store.state;
+        if (!s.isHost || s.locked === on || Date.now() < s.lockBusyUntil) return;
+        this.allowed = on ? new Set(this.names.keys()) : null;
+        saveLock(s.lobbyId, this.allowed);
+        const until = Date.now() + LOCK_GAP_MS;
+        this.store.update((st) => { st.locked = on; st.lockBusyUntil = until; });
+        if (this.lockTimer !== null) clearTimeout(this.lockTimer);
+        this.lockTimer = window.setTimeout(() => {
+            this.lockTimer = null;
+            this.store.update((st) => { st.lockBusyUntil = 0; });
+        }, LOCK_GAP_MS);
     }
 
     /* ------------------------------------------------------------ UI state */
@@ -1464,6 +1569,7 @@ function extrasOf(r: RollExtras): RollExtras {
     if (r.bonus !== undefined) out.bonus = r.bonus;
     if (r.pain !== undefined) out.pain = r.pain;
     if (r.need !== undefined) out.need = r.need;
+    if (r.crit !== undefined) out.crit = r.crit;
     return out;
 }
 
@@ -1473,11 +1579,16 @@ function cleanExtras(e: RollExtras): RollExtras {
     const out: RollExtras = {};
     if (e.pain) out.pain = clamp(e.pain, 0, LIMITS.MAX_PAIN);
     if (e.need !== undefined) out.need = clamp(e.need, 1, LIMITS.MAX_NEED);
+    /* The usual margin stays off the wire, so an ordinary attack still reads
+       on a page from before the margin travelled. */
+    if (out.need !== undefined && e.crit !== undefined && e.crit !== LIMITS.MAX_CRIT) {
+        out.crit = clamp(e.crit, 0, LIMITS.MAX_CRIT);
+    }
     return out;
 }
 
 function hasExtras(r: WireRoll): boolean {
-    return r.bonus !== undefined || r.pain !== undefined || r.need !== undefined;
+    return r.bonus !== undefined || r.pain !== undefined || r.need !== undefined || r.crit !== undefined;
 }
 
 function signed(n: number): string {

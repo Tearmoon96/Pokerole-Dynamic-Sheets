@@ -27,6 +27,7 @@ import type { CharKey, SlimMon, SlimTrainer } from './slim';
 import { randomId } from './protocol';
 import type { Body, TurnOp, WireMember, WireTurns } from './protocol';
 import type { TableApi } from './link';
+import { putSheetMods, putTrainerMods } from '../lib/combatMods';
 
 export interface CombatView {
     /** The fight on the table, or null. On the GM's table every count is in
@@ -436,6 +437,10 @@ export class CombatShare {
             if (body.hp !== undefined) target.hp = body.hp;
             if (body.will !== undefined) target.will = body.will;
             if (body.status !== undefined) target.status = normalizeStatus(body.status);
+            if (body.mods !== undefined) {
+                if (body.key === 't') putTrainerMods(target, body.mods);
+                else putSheetMods(target, body.mods);
+            }
         });
         b.acks = { ...b.acks, [body.key]: body.oid };
         saveBinding(b);

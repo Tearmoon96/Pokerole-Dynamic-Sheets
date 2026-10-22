@@ -1,3 +1,4 @@
+import type { CombatMods } from '../lib/combatMods';
 /* The trainer sheet, exactly as it is written to a trainer's .json file.
 
    These types describe a serialised on-disk format that people already have
@@ -108,6 +109,9 @@ export interface TrainerState {
         pool still follows Vitality / Insight instead of freezing. */
     hpMaxBonus: number;
     willMaxBonus: number;
+    /** Temporary combat offsets set from the stats popup (lib/combatMods),
+        Defense and Sp. Defense included. Absent when nothing is on. */
+    combatMods?: CombatMods;
     /** Pre-1.2.0 absolute pool sizes. Migrated in normalize and never written
         again; kept null so an older copy of the app can still derive them. */
     hpMax: number | null;

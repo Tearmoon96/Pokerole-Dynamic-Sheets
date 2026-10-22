@@ -17,6 +17,8 @@ import { isCharKey, parseSlimMon, parseSlimTrainer, parseStatus } from '../table
 import type { CharKey, SlimMon, SlimTrainer } from '../table/slim';
 import type { TurnOp, WireTurns } from '../table/protocol';
 import type { GmStatus } from '../gm/ailments';
+import { parseMods } from './combatMods';
+import type { CombatMods } from './combatMods';
 
 export const COMBAT_LINK_CHANNEL = 'pds-table-combat';
 
@@ -26,9 +28,10 @@ export const COMBAT_LOST_MS = 6000;
 
 export interface LinkMember { id: string; name: string; color?: number }
 
-/** A change the GM made to a player's character: what its HP, Will or status
-    now IS — never a step, so a message delivered twice changes nothing. */
-export interface PcOp { hp?: number; will?: number; status?: GmStatus }
+/** A change the GM made to a player's character: what its HP, Will, status
+    or combat offsets now ARE — never a step, so a message delivered twice
+    changes nothing. `mods` is the whole set, a Pokemon's two defences in it. */
+export interface PcOp { hp?: number; will?: number; status?: GmStatus; mods?: CombatMods }
 
 export type CombatLinkMessage =
     /** Table → GM screen: a hosted table is open, with these players at it. */
@@ -128,6 +131,11 @@ export function parseCombatLink(raw: unknown): CombatLinkMessage | null {
                 const status = parseStatus(o.status);
                 if (!status) return null;
                 op.status = status;
+            }
+            if (o.mods !== undefined) {
+                const mods = parseMods(o.mods);
+                if (!mods) return null;
+                op.mods = mods;
             }
             return { t: 'op', member, key: raw.key, op };
         }

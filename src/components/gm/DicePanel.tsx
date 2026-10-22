@@ -143,6 +143,7 @@ export function DicePanel({ onReorder }: {
                         <span className="dice-prep-text">
                             {[prep.who, prep.what].filter(Boolean).join(' · ') || 'Roll set up'}
                             {prep.need != null && <> · needs {prep.need}</>}
+                            {prep.need != null && prep.crit != null && <> · crit at +{prep.crit}</>}
                             {!!prep.pain && <> · pain −{prep.pain}</>}
                         </span>
                         <button

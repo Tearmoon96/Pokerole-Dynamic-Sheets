@@ -141,7 +141,7 @@ export function buildEvolvedSheet(src: StatSource, targetDex: PokedexEntry, opts
        carried points were let past. */
     s.customBaseStats = {};
     s.customMaxStats = lifted;
-    if (opts.carryTrained === false) { s.defBonus = 0; s.spDefBonus = 0; }
+    if (opts.carryTrained === false) { s.defBonus = 0; s.spDefBonus = 0; delete s.combatMods; }
 
     /* Keep the chosen ability if the new form still has it, or if it is a custom
        ability (which is not tied to the species), else default */

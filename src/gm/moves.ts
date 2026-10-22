@@ -1,6 +1,7 @@
 import { formatPoolTotal, monPoolCur, monPoolMax, resolvePoolString } from './pools';
 import type { PokedexEntry, ItemEntry, MoveEntry } from '../data/types';
 import type { CardSheet } from '../card/types';
+import { critMargin, modOf, modsOfSheet } from '../lib/combatMods';
 
 /* Move totals for the board's move panel.
 
@@ -13,7 +14,7 @@ export interface GmMove extends MoveEntry {
     AccuracyOffset?: number;
     PowerOffset?: number;
     Learned?: string;
-    Attributes?: { AccuracyReduction?: number;[key: string]: unknown };
+    Attributes?: { AccuracyReduction?: number; HighCritical?: boolean; AlwaysCrit?: boolean;[key: string]: unknown };
 }
 
 /* Types that name no real type: a move listed as Typeless or Varies never gets
@@ -104,6 +105,13 @@ export interface GmMoveTotals {
     accN: number | null;
     powN: number | null;
     bonus: DamageBonus;
+    /** How much of each pool is the sheet's temporary combat offsets — its
+        own Accuracy / Damage offset plus those on the attributes the pool
+        reads — so the panel can mark a number that is not the sheet's own. */
+    accMod: number;
+    powMod: number;
+    /** Successes over the target that make this move a critical. */
+    crit: number;
 }
 
 export function computeMoveTotals(
@@ -112,8 +120,12 @@ export function computeMoveTotals(
     move: GmMove,
     itemByName: (name: string) => ItemEntry | null,
 ): GmMoveTotals {
-    const accOffset = moveAccuracyPenalty(move) + (move.AccuracyOffset || 0);
-    const powOffset = move.PowerOffset || 0;
+    const mods = modsOfSheet(sheet);
+    const accOffset = moveAccuracyPenalty(move) + (move.AccuracyOffset || 0) + modOf(mods, 'accuracy');
+    const powOffset = (move.PowerOffset || 0) + modOf(mods, 'damage');
+    /* The same sheet without its offsets, to say how much of a pool they are. */
+    const bare = sheet && sheet.combatMods ? { ...sheet, combatMods: undefined } : sheet;
+    let accMod = 0, powMod = 0;
 
     let acc: string | null = null, accN: number | null = null;
     const accParts = [move.Accuracy1, move.Accuracy2, move.Accuracy3].filter(Boolean) as string[];
@@ -121,18 +133,20 @@ export function computeMoveTotals(
         const r = resolvePoolString(dex, sheet, accParts.join(' + '));
         acc = formatPoolTotal(r, accOffset);
         accN = r.total + accOffset;
+        accMod = modOf(mods, 'accuracy') + r.total - resolvePoolString(dex, bare, accParts.join(' + ')).total;
     }
 
     let pow: string | null = null, powN: number | null = null;
     const bonus = damageBonuses(dex, sheet, move, itemByName);
     if (move.Power > 0 || move.Damage1 || move.Damage2 || powOffset) {
-        const r = resolvePoolString(dex, sheet,
-            [move.Damage1, move.Damage2].filter(Boolean).join(' + '));
+        const pool = [move.Damage1, move.Damage2].filter(Boolean).join(' + ');
+        const r = resolvePoolString(dex, sheet, pool);
         const flat = (move.Power || 0) + powOffset + bonus.total;
         pow = formatPoolTotal(r, flat);
         powN = r.total + flat;
+        powMod = modOf(mods, 'damage') + r.total - resolvePoolString(dex, bare, pool).total;
     }
-    return { acc, pow, accN, powN, bonus };
+    return { acc, pow, accN, powN, bonus, accMod, powMod, crit: critMargin(move, mods) };
 }
 
 export function painPenalty(dex: PokedexEntry | null, sheet: Partial<CardSheet> | null): number {

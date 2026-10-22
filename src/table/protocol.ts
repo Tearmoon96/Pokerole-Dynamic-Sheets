@@ -19,6 +19,7 @@
 import type { GmStatus } from '../gm/ailments';
 import type { CharKey, SlimMon, SlimTrainer } from './slim';
 import type { MegaRules } from '../lib/megaRules';
+import type { CombatMods } from '../lib/combatMods';
 
 export const PROTOCOL_VERSION = 1;
 
@@ -47,6 +48,10 @@ export interface WireRoll {
     pain?: number;
     /** The successes an accuracy roll needed: its action number this round. */
     need?: number;
+    /** Successes over `need` that make it a critical, when not the usual 3
+        (High Critical, a crit offset, a move that always crits). Only with
+        `need`. */
+    crit?: number;
 }
 
 /** The optional extras a roll request can carry, as they travel. */
@@ -54,6 +59,7 @@ export interface RollExtras {
     bonus?: number;
     pain?: number;
     need?: number;
+    crit?: number;
 }
 
 export interface WireMember {
@@ -191,6 +197,9 @@ export type Body =
     | { k: 'clear' }
     /** Host only. */
     | { k: 'kick'; id: string }
+    /** Host only. The room is locked and this key was not at the table when
+        it was: not let in. */
+    | { k: 'locked'; id: string }
     /** Host only. The music library everyone prefetches. */
     | { k: 'library'; tracks: WireTrack[] }
     /** Host only. Both decks. Sent on every change and every few seconds. */
@@ -215,9 +224,9 @@ export type Body =
         players' cards and character panels Mega Evolve by them. */
     | { k: 'rules'; mega: MegaRules }
     /** Host only. The GM changed one of `to`'s characters in the fight: the
-        HP, Will or status it now has. Values, not steps, so a resend is
-        harmless. */
-    | { k: 'pcop'; to: string; key: CharKey; oid: string; hp?: number; will?: number; status?: GmStatus }
+        HP, Will, status or combat offsets it now has. Values, not steps, so a
+        resend is harmless. */
+    | { k: 'pcop'; to: string; key: CharKey; oid: string; hp?: number; will?: number; status?: GmStatus; mods?: CombatMods }
     /** Player to host: one of my characters as the GM's copy should have it.
         `ack` is the last `pcop` applied to it, so the host stops resending. */
     | { k: 'pc'; key: CharKey; ack?: string; trainer?: SlimTrainer; mon?: SlimMon }
@@ -269,6 +278,8 @@ export const LIMITS = {
     MAX_BONUS: 99,
     MAX_PAIN: 5,
     MAX_NEED: 5,
+    /** The usual critical margin, the most a roll may say it needs. */
+    MAX_CRIT: 3,
 
     /** Kept below the relay's own 32 KB ceiling. */
     MAX_WIRE_CHARS: 24 * 1024,

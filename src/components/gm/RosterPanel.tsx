@@ -15,6 +15,7 @@ import { normalizeStatus } from '../../gm/ailments';
 import { trainerPoolMax } from '../../gm/pools';
 import { adjustPool, monShownName, wildDexId, wildKey, wildLiveSheet } from '../../gm/entities';
 import { readWorking, upsertWorkingTrainer, workingTrainerData } from '../../gm/workingSet';
+import { isEmptyMods, modsOfTrainer } from '../../lib/combatMods';
 import { TRAINER_MARKER } from '../../state/constants';
 import { WILD_MARKER, wildSheetKey } from '../../card/cardContext';
 import { wildUrl } from '../../card/wild';
@@ -235,9 +236,11 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                                     the trainer holding them had nowhere to roll
                                     from. */}
                                 <button
-                                    className="icon-btn tip-btn"
+                                    className={'icon-btn tip-btn' + (isEmptyMods(modsOfTrainer(t)) ? '' : ' has-mods')}
                                     data-tip-for={tToken}
-                                    title="Initiative, evasion and clash rolls"
+                                    title={isEmptyMods(modsOfTrainer(t))
+                                        ? 'Initiative, evasion and clash rolls'
+                                        : 'Initiative, evasion and clash rolls — combat offsets are on'}
                                     onClick={() => onOpenTip(tToken)}
                                 >
                                     <i className="fa-solid fa-dice-d6"></i>

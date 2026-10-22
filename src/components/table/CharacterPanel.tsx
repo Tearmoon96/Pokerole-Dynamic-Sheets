@@ -20,7 +20,10 @@ import { StatusChips } from '../gm/StatusChips';
 import { MonTipBody, MoveTipShell, TrainerTipBody, useTipButtonState } from '../gm/MoveTip';
 import type { DoRoll, QuickSpent } from '../gm/MoveTip';
 import { normalizeStatus } from '../../gm/ailments';
-import { adjustPool, cycleStatus, entityPool, entityRef } from '../../gm/entities';
+import { adjustPool, bareValue, cycleStatus, entityPool, entityRef, writeMods } from '../../gm/entities';
+import { StatTipBody, StatsButton, splitTipKey, statsKey } from '../gm/StatTip';
+import { modOf, modsOfTrainer } from '../../lib/combatMods';
+import type { CombatMods } from '../../lib/combatMods';
 import type { CharKey } from '../../table/slim';
 import { painFromHp, painPenalty } from '../../gm/moves';
 import { resolvePoolValue, trainerPoolMax } from '../../gm/pools';
@@ -89,6 +92,8 @@ function CharacterBody() {
     const { session, state } = useTable();
     const { data } = useAppData();
     const [, refresh] = useWorkingSet();
+    /* The open popup: a token for its move panel, `statsKey(token)` for its
+       stats popup. */
     const [tip, setTip] = useState<string | null>(null);
     const [picked, setPicked] = useState<string | null>(() => chosenTrainerId());
     const fileRef = useRef<HTMLInputElement>(null);
@@ -166,6 +171,11 @@ function CharacterBody() {
         cycleStatus(solo, dexById, token, key, () => {});
         refresh();
     };
+    const setMods = (token: string) => (next: CombatMods) => {
+        writeMods(solo, token, next, () => {});
+        refresh();
+    };
+    const toggleTip = (key: string) => setTip(tip === key ? null : key);
 
     /* Where a character stands in the fight on the table, if it is in it. */
     const turns = session.combat.view.turns;
@@ -218,6 +228,7 @@ function CharacterBody() {
                 ...(meta.bonus != null ? { bonus: meta.bonus } : {}),
                 ...(meta.pain ? { pain: meta.pain } : {}),
                 ...(meta.need != null ? { need: meta.need } : {}),
+                ...(meta.need != null && meta.crit != null ? { crit: meta.crit } : {}),
             },
             quick: quick && s ? { op: quick, id: s.id, ...(quick === 'acc' && move ? { move } : {}) } : null,
             enter: null,
@@ -262,21 +273,38 @@ function CharacterBody() {
     };
 
     const trainerRef = entityRef(solo, dexById, TRAINER_TOKEN);
-    const trainerInitBonus = trainerRef ? trainerRef.value('Dexterity') + trainerRef.value('Alert') : 0;
+    const trainerInitBonus = trainerRef
+        ? trainerRef.value('Dexterity') + trainerRef.value('Alert') + modOf(trainerRef.mods, 'init') : 0;
 
     const team = (Array.isArray(t.team) ? t.team : [])
         .map((slot, idx) => ({ slot, idx }))
         .filter((x) => x.slot && x.slot.dexId);
 
+    const open = splitTipKey(tip);
     const tipBody = (() => {
-        if (!tip) return null;
-        const ref = entityRef(solo, dexById, tip);
+        const token = open.token;
+        if (!token) return null;
+        const ref = entityRef(solo, dexById, token);
         if (!ref) return null;
+        if (open.stats) {
+            const types = ref.dex ? [ref.dex.Type1, ref.dex.Type2].filter(Boolean).join(' / ') : '';
+            return (
+                <StatTipBody
+                    subject={ref} bare={bareValue(ref)}
+                    sub={ref.kind === 'trainer' ? 'Trainer' + (ref.rank ? ' · ' + ref.rank : '') : types}
+                    hp={entityPool(ref, 'hp')} will={entityPool(ref, 'will')}
+                    onPool={(key, delta, e) => step(token)(key, delta, e)}
+                    onMods={setMods(token)}
+                />
+            );
+        }
+        const tip = token;
         const s = seat(tip);
         if (ref.kind === 'trainer') {
             const hp = entityPool(ref, 'hp');
             return (
                 <TrainerTipBody
+                    mods={ref.mods} bare={bareValue(ref)}
                     name={ref.name} rank={ref.rank} value={ref.value}
                     pain={hp ? painFromHp(hp.cur, hp.max) : 0}
                     act={s ? s.act : null} spent={s?.spent} doRoll={rollFrom(tip)} noInit
@@ -287,6 +315,7 @@ function CharacterBody() {
         const dex = ref.dex, sheet = ref.sheet;
         return (
             <MonTipBody
+                mods={ref.mods} bare={bareValue(ref)}
                 token={tip} dex={dex} sheet={sheet} who={ref.name} owner={t.name || ''}
                 value={(n) => resolvePoolValue(dex, sheet, n) || 0}
                 pain={painPenalty(dex, sheet)}
@@ -352,10 +381,12 @@ function CharacterBody() {
                             className="icon-btn tip-btn"
                             data-tip-for={TRAINER_TOKEN}
                             title="Evasion and clash rolls"
-                            onClick={() => setTip(tip === TRAINER_TOKEN ? null : TRAINER_TOKEN)}
+                            onClick={() => toggleTip(TRAINER_TOKEN)}
                         >
                             <i className="fa-solid fa-dice-d6"></i>
                         </button>
+                        <StatsButton token={TRAINER_TOKEN} mods={modsOfTrainer(t)}
+                            onOpen={() => toggleTip(statsKey(TRAINER_TOKEN))} />
                         <button
                             className="icon-btn"
                             title="Open your Trainer License"
@@ -385,7 +416,8 @@ function CharacterBody() {
                                 token={token}
                                 onStep={step(token)}
                                 onCycleStatus={onCycle(token)}
-                                onOpenTip={() => setTip(tip === token ? null : token)}
+                                onOpenTip={() => toggleTip(token)}
+                                onOpenStats={() => toggleTip(statsKey(token))}
                                 buttons={
                                     <>
                                         {(canMega || isMega) && (
@@ -414,8 +446,17 @@ function CharacterBody() {
                 </div>
             </div>
 
-            {tip && tipBody && (
-                <MoveTipShell token={tip} onClose={closeTip}>{tipBody}</MoveTipShell>
+            {open.token && tipBody && (
+                <MoveTipShell
+                    token={open.token} onClose={closeTip} id={open.stats ? 'stat-tooltip' : 'mon-tooltip'}
+                    switchTo={open.stats
+                        ? { label: open.token === TRAINER_TOKEN ? 'Rolls' : 'Moves',
+                            icon: open.token === TRAINER_TOKEN ? 'fa-dice-d6' : 'fa-list-ul',
+                            onClick: () => setTip(open.token) }
+                        : { label: 'Stats', icon: 'fa-sliders', onClick: () => setTip(statsKey(open.token!)) }}
+                >
+                    {tipBody}
+                </MoveTipShell>
             )}
             <MegaDialog ask={megaAsk} onCancel={closeMega} onConfirm={doMega} />
         </>

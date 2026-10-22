@@ -144,10 +144,18 @@ export function delayTurn(c: GmCombat, after: string | null, canAct: CanAct): Gm
     return next && next !== pid ? begin(moved, next) : { ...moved, turn: pid };
 }
 
+/** A Clash or Evasion mark as a count: a board saved when they were marks
+    has `true` for one. */
+export function usedCount(v: unknown): number {
+    if (v === true) return 1;
+    return typeof v === 'number' && v > 0 ? Math.floor(v) : 0;
+}
+
 /** An Accuracy, an Evasion or a Clash was rolled: one action done, in its
-    turn or out of it. An Evasion or a Clash also takes the Round's mark, an
-    Accuracy its move (`markMove`). Rolled in the combatant's own turn, it is
-    that turn's action, and passing the turn fills nothing more. */
+    turn or out of it. An Evasion or a Clash also counts towards the Round's
+    allowance, an Accuracy takes its move (`markMove`). Rolled in the
+    combatant's own turn, it is that turn's action, and passing the turn
+    fills nothing more. */
 export function spendRoll(c: GmCombat, pid: string, what: 'acc' | 'eva' | 'clash', move?: string): GmCombat {
     if (!byPid(c, pid)) return c;
     let next = spendOne(c, pid, what === 'acc' && move ? { k: what, move: move.slice(0, 60) } : { k: what });
@@ -155,7 +163,10 @@ export function spendRoll(c: GmCombat, pid: string, what: 'acc' | 'eva' | 'clash
         if (move) next = markMove(next, pid, move, true);
     } else {
         const key = what === 'eva' ? 'usedEva' : 'usedClash';
-        next = { ...next, participants: next.participants.map((p) => (pidOf(p) === pid ? { ...p, [key]: true } : p)) };
+        next = {
+            ...next,
+            participants: next.participants.map((p) => (pidOf(p) === pid ? { ...p, [key]: usedCount(p[key]) + 1 } : p)),
+        };
     }
     return c.turnsOn && c.turn === pid ? { ...next, turnSpent: true } : next;
 }

@@ -3,6 +3,8 @@
    Pokerole pools are d6 where 4-6 is a success, so d6 rolls also report
    successes; other dice just show faces and total. */
 
+import { CRIT_MARGIN } from './constants';
+
 export interface RollEntry {
     label: string;
     vals: number[];
@@ -23,6 +25,10 @@ export interface RollEntry {
     bonus?: number | null;
     pain?: number;
     verdict?: string;
+    /** The successes over `need` that make a critical, when not the usual
+        three: 2 for a High Critical move, less with a crit offset, 0 for a
+        move that always crits. Absent on rolls made before it existed. */
+    crit?: number;
     /** Carried so a hit can roll the damage in one more click. `what` names
         the damage roll; older entries without it fall back to the accuracy's. */
     dmg?: { token: string; mi: number; dice: number; what?: string } | null;
@@ -37,9 +43,11 @@ export const VERDICTS: Record<string, { label: string; cls: string; icon: string
     fumble: { label: 'Critical failure', cls: 'fumble', icon: 'fa-skull' },
 };
 
-export function accuracyVerdict(succ: number, need: number, critMargin: number): string {
-    if (succ >= need + critMargin) return 'crit';
-    if (succ <= need - critMargin) return 'fumble';
+/** `critMargin` is the move's (see `critMargin` in lib/combatMods); the
+    critical failure stays at `fumbleMargin`, three, whatever the move. */
+export function accuracyVerdict(succ: number, need: number, critMargin: number, fumbleMargin = CRIT_MARGIN): string {
+    if (succ >= need + critMargin && succ >= need) return 'crit';
+    if (succ <= need - fumbleMargin) return 'fumble';
     return succ >= need ? 'hit' : 'miss';
 }
 
@@ -80,7 +88,7 @@ export function roll(count: number, sides: number, meta: RollMeta, critMargin: n
     /* An Accuracy roll made against a target number carries its verdict with it,
        so the history still reads as a hit or a miss later. */
     if (entry.need != null && succ != null) {
-        entry.verdict = accuracyVerdict(entry.net!, entry.need, critMargin);
+        entry.verdict = accuracyVerdict(entry.net!, entry.need, entry.crit ?? critMargin, critMargin);
     }
     return entry;
 }

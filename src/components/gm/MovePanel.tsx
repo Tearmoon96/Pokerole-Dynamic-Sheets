@@ -4,13 +4,14 @@ import type { RollMeta } from '../../gm/dice';
 import { painFromHp, painPenalty } from '../../gm/moves';
 import { resolvePoolValue } from '../../gm/pools';
 import {
-    entityPool, entityRef, participantForToken, trainerIdAt, wildDexId, wildLiveSheet,
+    bareValue, entityPool, entityRef, participantForToken, trainerIdAt, wildDexId, wildLiveSheet,
 } from '../../gm/entities';
 import { workingTrainerData } from '../../gm/workingSet';
 import { parsePcToken } from '../../gm/tablePcs';
 import { monShownName } from '../../gm/entities';
-import { MonTipBody, MoveTipShell, TrainerTipBody, useTipButtonState } from './MoveTip';
-import { actionOf, markMove, pidOf } from '../../gm/turns';
+import { MonTipBody, MoveTipShell, TrainerTipBody } from './MoveTip';
+import { actionOf, markMove, pidOf, usedCount } from '../../gm/turns';
+import { clashLimit, evaLimit } from '../../lib/combatMods';
 import { MAX_ACTIONS } from '../../gm/combat';
 import type { PokedexEntry } from '../../data/types';
 import type { CardSheet } from '../../card/types';
@@ -25,12 +26,17 @@ interface TipTarget { dexId: string; sheet: Partial<CardSheet>; owner: string }
 
 const HIDDEN = <div className="mon-tooltip" id="mon-tooltip" style={{ display: 'none' }} />;
 
-export function MovePanel({ token, onClose }: { token: string | null; onClose: () => void }) {
+export function MovePanel({ token, onClose, onStats }: {
+    token: string | null;
+    onClose: () => void;
+    /** Swap to the stats popup of the same subject (StatPanel). */
+    onStats: (token: string) => void;
+}) {
     const { state, store } = useGm();
     const { data } = useAppData();
-    useTipButtonState(token);
 
     if (!token) return HIDDEN;
+    const toStats = { label: 'Stats', icon: 'fa-sliders', onClick: () => onStats(token) };
 
     const dexById = (id: string): PokedexEntry | null =>
         data.pokemon.find((p) => p._id === id) || null;
@@ -79,7 +85,12 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
        the five actions are spent — the table's character panel draws them
        the same way. */
     const done = part ? ((part.acted as number) || 0) >= MAX_ACTIONS : false;
-    const spent = part ? { eva: !!part.usedEva || done, clash: !!part.usedClash || done } : undefined;
+    const subject = entityRef(state, dexById, token);
+    const mods = subject?.mods;
+    const spent = part ? {
+        eva: usedCount(part.usedEva) >= evaLimit(mods) || done,
+        clash: usedCount(part.usedClash) >= clashLimit(mods) || done,
+    } : undefined;
 
     const doRoll = (dice: number, meta: RollMeta, quick?: string, move?: string) => {
         if (!(dice > 0)) return;
@@ -102,12 +113,14 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
 
     /* A trainer resolves through EntityRef, which already reads a trainer's flat
        .json and a Pokemon's species-backed sheet the same way. */
-    const asTrainer = entityRef(state, dexById, token);
+    const asTrainer = subject;
     if (asTrainer && asTrainer.kind === 'trainer') {
         const hp = entityPool(asTrainer, 'hp');
         return (
-            <MoveTipShell token={token} onClose={onClose}>
+            <MoveTipShell token={token} onClose={onClose} switchTo={toStats}>
                 <TrainerTipBody
+                    mods={asTrainer.mods}
+                    bare={bareValue(asTrainer)}
                     name={asTrainer.name}
                     rank={asTrainer.rank}
                     value={asTrainer.value}
@@ -133,8 +146,10 @@ export function MovePanel({ token, onClose }: { token: string | null; onClose: (
 
     const sheet = target.sheet;
     return (
-        <MoveTipShell token={token} onClose={onClose}>
+        <MoveTipShell token={token} onClose={onClose} switchTo={subject ? toStats : undefined}>
             <MonTipBody
+                mods={subject?.mods}
+                bare={subject ? bareValue(subject) : undefined}
                 token={token}
                 dex={dex}
                 sheet={sheet}

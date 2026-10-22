@@ -9,6 +9,9 @@ import { NpcPanel } from './NpcPanel';
 import { NotesPanel } from './NotesPanel';
 import { GeneratorPanel } from './GeneratorPanel';
 import { MovePanel } from './MovePanel';
+import { StatPanel } from './StatPanel';
+import { splitTipKey, statsKey } from './StatTip';
+import { useTipButtonState } from './MoveTip';
 import { AilmentPopover } from './AilmentPopover';
 import { cycleStatus } from '../../gm/entities';
 import { useCombatLink } from '../../gm/useCombatLink';
@@ -28,7 +31,11 @@ import { GM_STEPS, GM_TOUR_INTRO } from './tourSteps';
 export function GmApp({ dataOk }: { dataOk: boolean }) {
     const { state, store } = useGm();
     const { data } = useAppData();
+    /* One popup at a time: a token opens its move panel, `statsKey(token)`
+       its stats popup (StatTip.tsx). */
     const [tipToken, setTipToken] = useState<string | null>(null);
+    const tip = splitTipKey(tipToken);
+    useTipButtonState(tipToken);
 
     /* The phone board shows one panel at a time behind a tab bar — five
        390px panels side by side on a 412px screen means four of them are
@@ -193,7 +200,10 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
                 </main>
             </ActivePanelCtx.Provider>
 
-            <MovePanel token={tipToken} onClose={() => setTipToken(null)} />
+            <MovePanel token={tip.stats ? null : tip.token} onClose={() => setTipToken(null)}
+                onStats={(t) => setTipToken(statsKey(t))} />
+            <StatPanel token={tip.stats ? tip.token : null} onClose={() => setTipToken(null)}
+                onMoves={(t) => setTipToken(t)} />
             <AilmentPopover />
             <GuidedTour id="gm" steps={GM_STEPS} intro={GM_TOUR_INTRO} />
         </>

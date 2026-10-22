@@ -9,13 +9,19 @@
    no photo, no notes, no bag. A whole sheet would not fit in a frame anyway.
 
    The parsers follow validate.ts: exactly these fields or the message is
-   dropped. Text is cleaned, numbers are bounded, every list is capped. */
+   dropped. Text is cleaned, numbers are bounded, every list is capped.
+
+   The combat offsets (lib/combatMods) are the one optional part: left out
+   while a character has none, so a copy without them still reads on a GM's
+   page from before they existed. */
 
 import { LIMITS } from './protocol';
 import { UNSAFE_TEXT } from './text';
 import type { GmStatus } from '../gm/ailments';
 import type { TrainerState } from '../state/types';
 import type { CardSheet, MoveOverride } from '../card/types';
+import { MOD_RANGE, isEmptyMods, normalizeMods, parseMods } from '../lib/combatMods';
+import type { CombatMods } from '../lib/combatMods';
 
 export interface SlimTrainer {
     name: string;
@@ -30,6 +36,7 @@ export interface SlimTrainer {
     skills: Record<string, number>;
     extras: { name: string; value: number }[];
     status: GmStatus;
+    combatMods?: CombatMods;
 }
 
 export interface SlimMonSheet {
@@ -55,6 +62,11 @@ export interface SlimMonSheet {
     customMoves: string[];
     moveOverrides: Record<string, MoveOverride>;
     status: GmStatus;
+    /** Present only when not empty / not 0. The defences are the card's own
+        fields, as on the sheet. */
+    combatMods?: CombatMods;
+    defBonus?: number;
+    spDefBonus?: number;
 }
 
 export interface SlimMon {
@@ -123,7 +135,18 @@ export function slimTrainer(t: TrainerState): SlimTrainer {
         skills: numberMap(t.skills),
         extras: named(t.extras),
         status: slimStatus((t as unknown as { status?: unknown }).status),
+        ...slimMods(t.combatMods),
     };
+}
+
+function slimMods(raw: unknown): { combatMods?: CombatMods } {
+    const m = normalizeMods(raw);
+    return isEmptyMods(m) ? {} : { combatMods: m };
+}
+
+function slimDefence(v: unknown): number {
+    const [lo, hi] = MOD_RANGE.def;
+    return typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : 0;
 }
 
 export function slimMon(dexId: string, sheet: Partial<CardSheet> | null): SlimMon {
@@ -160,7 +183,19 @@ export function slimMon(dexId: string, sheet: Partial<CardSheet> | null): SlimMo
             customMoves: (Array.isArray(s.customMoves) ? s.customMoves : []).filter((m) => pinned.includes(m)),
             moveOverrides: overrides,
             status: slimStatus(s.status),
+            ...monMods(s),
         },
+    };
+}
+
+function monMods(s: Partial<CardSheet>): Pick<SlimMonSheet, 'combatMods' | 'defBonus' | 'spDefBonus'> {
+    const m = normalizeMods(s.combatMods);
+    delete m.def; delete m.spDef;
+    const def = slimDefence(s.defBonus), spDef = slimDefence(s.spDefBonus);
+    return {
+        ...(isEmptyMods(m) ? {} : { combatMods: m }),
+        ...(def ? { defBonus: def } : {}),
+        ...(spDef ? { spDefBonus: spDef } : {}),
     };
 }
 
@@ -232,9 +267,18 @@ export function parseStatus(v: unknown): GmStatus | null {
 
 const nullableInt = (v: unknown): number | null | undefined => (v === null ? null : (intIn(v) ?? undefined));
 
+/** The optional offsets: undefined when absent, null when present and bad. */
+function optMods(v: unknown): CombatMods | null | undefined {
+    return v === undefined ? undefined : parseMods(v);
+}
+function optDefence(v: unknown): number | null | undefined {
+    const [lo, hi] = MOD_RANGE.def;
+    return v === undefined ? undefined : intIn(v, lo, hi);
+}
+
 export function parseSlimTrainer(v: unknown): SlimTrainer | null {
     if (!isRec(v) || !exactly(v, ['name', 'rank', 'hp', 'will', 'hpMax', 'willMax', 'hpMaxBonus',
-        'willMaxBonus', 'stats', 'skills', 'extras', 'status'])) return null;
+        'willMaxBonus', 'stats', 'skills', 'extras', 'status', 'combatMods'])) return null;
     const name = cleanStr(v.name, MAX_TEXT);
     const rank = cleanStr(v.rank, MAX_TEXT);
     const hp = intIn(v.hp), will = intIn(v.will);
@@ -243,9 +287,14 @@ export function parseSlimTrainer(v: unknown): SlimTrainer | null {
     const stats = parseNumMap(v.stats), skills = parseNumMap(v.skills);
     const extras = parseNamed(v.extras);
     const status = parseStatus(v.status);
+    const combatMods = optMods(v.combatMods);
     if (!name || rank === null || hp === null || will === null || hpMax === undefined || willMax === undefined
-        || hpMaxBonus === null || willMaxBonus === null || !stats || !skills || !extras || !status) return null;
-    return { name, rank, hp, will, hpMax, willMax, hpMaxBonus, willMaxBonus, stats, skills, extras, status };
+        || hpMaxBonus === null || willMaxBonus === null || !stats || !skills || !extras || !status
+        || combatMods === null) return null;
+    return {
+        name, rank, hp, will, hpMax, willMax, hpMaxBonus, willMaxBonus, stats, skills, extras, status,
+        ...(combatMods && !isEmptyMods(combatMods) ? { combatMods } : {}),
+    };
 }
 
 function parseMoveNames(v: unknown, max: number): string[] | null {
@@ -279,7 +328,8 @@ function parseOverride(v: unknown): MoveOverride | null {
 
 const SHEET_FIELDS = ['nickname', 'rank', 'hp', 'will', 'hpMax', 'willMax', 'hpMaxBonus', 'willMaxBonus',
     'heldItem', 'trainedStats', 'customBaseStats', 'skills', 'categoryRatings', 'specialties', 'loyalty',
-    'happiness', 'disobedience', 'pinnedMoves', 'customMoves', 'moveOverrides', 'status'] as const;
+    'happiness', 'disobedience', 'pinnedMoves', 'customMoves', 'moveOverrides', 'status',
+    'combatMods', 'defBonus', 'spDefBonus'] as const;
 
 export function parseSlimMon(v: unknown): SlimMon | null {
     if (!isRec(v) || !exactly(v, ['dexId', 'sheet'])) return null;
@@ -298,6 +348,10 @@ export function parseSlimMon(v: unknown): SlimMon | null {
     const pinnedMoves = parseMoveNames(s.pinnedMoves, MAX_PINNED);
     const customMoves = parseMoveNames(s.customMoves, MAX_PINNED);
     const status = parseStatus(s.status);
+    const combatMods = optMods(s.combatMods);
+    const defBonus = optDefence(s.defBonus), spDefBonus = optDefence(s.spDefBonus);
+    if (combatMods === null || defBonus === null || spDefBonus === null
+        || (combatMods && (combatMods.def !== undefined || combatMods.spDef !== undefined))) return null;
     if (nickname === null || rank === null || heldItem === null || hp === undefined || will === undefined
         || hpMax === undefined || willMax === undefined || hpMaxBonus === null || willMaxBonus === null
         || loyalty === null || happiness === null || disobedience === null || !trainedStats || !customBaseStats
@@ -315,6 +369,9 @@ export function parseSlimMon(v: unknown): SlimMon | null {
             nickname, rank, hp, will, hpMax, willMax, hpMaxBonus, willMaxBonus, heldItem, trainedStats,
             customBaseStats, skills, categoryRatings, specialties, loyalty, happiness, disobedience,
             pinnedMoves, customMoves, moveOverrides, status,
+            ...(combatMods && !isEmptyMods(combatMods) ? { combatMods } : {}),
+            ...(defBonus ? { defBonus } : {}),
+            ...(spDefBonus ? { spDefBonus } : {}),
         },
     };
 }

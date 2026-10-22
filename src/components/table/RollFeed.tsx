@@ -56,7 +56,7 @@ function FeedRow({ roll, mine, color, sorted }: {
     /* Worked out here from the net successes rather than sent: a receiver
        recomputes `net` from the faces, so the verdict follows from those. */
     const verdict = roll.need != null && roll.net != null
-        ? VERDICTS[accuracyVerdict(roll.net, roll.need, CRIT_MARGIN)] : null;
+        ? VERDICTS[accuracyVerdict(roll.net, roll.need, roll.crit ?? CRIT_MARGIN, CRIT_MARGIN)] : null;
     const label = roll.label + (roll.bonus == null ? '' : (roll.bonus < 0 ? ' − ' : ' + ') + Math.abs(roll.bonus));
 
     return (

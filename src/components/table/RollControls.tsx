@@ -104,6 +104,7 @@ export function RollControls() {
                     <span className="dice-prep-text">
                         {state.note || 'Roll set up'}
                         {prep.extras.need !== undefined && <> · needs {prep.extras.need}</>}
+                        {prep.extras.crit !== undefined && <> · crit at +{prep.extras.crit}</>}
                         {!!prep.extras.pain && <> · pain −{prep.extras.pain}</>}
                     </span>
                     {bonus !== undefined && (
