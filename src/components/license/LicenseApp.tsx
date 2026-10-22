@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useSheetStore } from '../../state/SheetContext';
 import { useTheme } from '../../hooks/useTheme';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
-import { useNatureRowAlignment } from '../../hooks/useNatureRowAlignment';
 import { PhotoArch } from './PhotoArch';
 import { LicensePlate } from './LicensePlate';
 import { CombatPills, SocialPills } from './StatPills';
@@ -45,7 +44,6 @@ export function LicenseApp() {
 
     useTheme(sheet.themeType);
     useDocumentTitle(sheet.name);
-    useNatureRowAlignment([sheet.id, sheet.name, sheet.player]);
 
     const { data } = useAppData();
     const update = useUpdateCheck(data.version, data.repo);
@@ -109,8 +107,10 @@ export function LicenseApp() {
                     </div>
                 </section>
 
-                {/* QUADRANT 2: attributes, skills, achievements, nature & rank */}
-                <section className="panel">
+                {/* QUADRANT 2: attributes, skills, achievements, nature & rank,
+                    the badge case at the foot — the room between them is what
+                    the Extra box grows into */}
+                <section className="panel q2-panel">
                     <div className="q2-grid">
                         <CombatPills />
                         <SocialPills />
@@ -118,6 +118,10 @@ export function LicenseApp() {
                         <Achievements />
                         <NatureRank />
                         <ExtraPanel />
+                        <div className="badge-case">
+                            <div className="section-bar small">Gym Badge Case</div>
+                            <BadgeStrip onPick={setBadgeIndex} />
+                        </div>
                     </div>
                 </section>
 
@@ -143,8 +147,8 @@ export function LicenseApp() {
                     />
                 </section>
 
-                {/* QUADRANT 4: bag, potion satchel, badge case */}
-                <section className="panel" data-tour="bag">
+                {/* QUADRANT 4: bag, potion satchel, other stuff */}
+                <section className="panel q4-panel" data-tour="bag">
                     <div className="section-bar">Bag</div>
                     <BagColumns />
 
@@ -174,8 +178,6 @@ export function LicenseApp() {
                         </div>
                     </div>
 
-                    <div className="section-bar small" style={{ marginTop: '16px' }}>Gym Badge Case</div>
-                    <BadgeStrip onPick={setBadgeIndex} />
                 </section>
 
                 {/* Full-width notepad */}

@@ -1,23 +1,43 @@
 /* ---------------- Stats quadrant ---------------- */
+/* Nature / Rank and Extra sit right under the achievements and the
+   tower, one gap below like the tower's own boxes; the badge case keeps
+   to the foot of the panel, so the room between is what the Extra box
+   grows into before anything has to move. */
+.q2-panel {
+    display: flex;
+    flex-direction: column;
+}
+
 .q2-grid {
+    flex: 1;
     display: grid;
     grid-template-columns: 1fr 1fr 158px;
+    grid-template-rows: auto auto auto 1fr;
     grid-template-areas:
         "combat social skills"
         "ach    ach    skills"
-        "natrank natrank extra";
+        "natrank natrank extra"
+        "badges badges badges";
     gap: 12px;
 }
 
 @media (max-width: 480px) {
     .q2-grid {
         grid-template-columns: 1fr 1fr;
+        grid-template-rows: none;
         grid-template-areas:
             "combat social"
             "skills skills"
             "ach    ach"
-            "natrank extra";
+            "natrank extra"
+            "badges badges";
     }
+}
+
+.badge-case {
+    grid-area: badges;
+    align-self: end;
+    padding-top: 4px;
 }
 
 .pill-col {
@@ -209,22 +229,6 @@
     border-color: var(--accent);
     color: var(--bg-color);
     box-shadow: 0 0 8px var(--accent-glow);
-}
-
-/* The bottom row of this quadrant has to sit level with the CHARACTER
-   row of the licence plate opposite it. How far apart the two land is
-   the attribute pills plus the achievements box measured against the
-   photo arch — font metrics included, so it comes out differently in
-   different browsers and a constant here could only ever be right in
-   one of them. alignNatureRow() measures it and sets the variable.
-
-   Both items take the same offset: they share the grid row, so moving
-   them together keeps the Extra box level with Nature — and keeps it
-   exactly as tall as the four tower boxes, which growing those boxes to
-   push this row down would not. */
-.nature-rank,
-.extra-panel {
-    margin-top: var(--natrank-lift, 0px);
 }
 
 /* Nature / Rank pill inputs */

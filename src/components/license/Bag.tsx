@@ -62,7 +62,58 @@ function BagColumn({ bagKey, label }: { bagKey: BagKey; label: string }) {
 
     return (
         <div className="bag-col">
-            <div className="bag-col-label">{label}</div>
+            {/* The column's title is its add menu: the item list opens under
+                it, filtered as you type, and Enter keeps a name the list does
+                not have (homebrew). */}
+            <div className="bag-col-head">
+                <button
+                    className={'bag-col-label' + (open ? ' open' : '')}
+                    aria-expanded={open}
+                    title={'Add an item to ' + label.toLowerCase()}
+                    /* No focus on press: it would blur the search box, which
+                       closes the menu, and the click would open it again. */
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => { setOpen(!open); setQuery(''); }}
+                >
+                    {label}
+                    <i className={'fa-solid ' + (open ? 'fa-caret-up' : 'fa-caret-down')}></i>
+                </button>
+                {open && (
+                    <div className="bag-add-wrap">
+                        <input
+                            type="text"
+                            id={'bag-input-' + bagKey}
+                            className="specialty-input"
+                            autoComplete="off"
+                            autoFocus
+                            placeholder="Search, or type your own..."
+                            value={query}
+                            onChange={(e) => setQuery(e.currentTarget.value)}
+                            onBlur={() => setOpen(false)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') addBagItem(query);
+                                else if (e.key === 'Escape') setOpen(false);
+                            }}
+                        />
+                        <Suggestions
+                            id={'bag-sugg-' + bagKey}
+                            open
+                            hiddenCount={matches.length - shown.length}
+                            rows={shown.map((it) => ({
+                                key: it._id || it.Name,
+                                title: it.Description ? it.Name + '\n' + it.Description : undefined,
+                                onSelect: () => addBagItem(it.Name),
+                                content: (
+                                    <>
+                                        <ItemSprite image={it.Image} />
+                                        <span className="item-suggestion-name">{it.Name}</span>
+                                    </>
+                                ),
+                            }))}
+                        />
+                    </div>
+                )}
+            </div>
             <div className="bag-list" id={'bag-list-' + bagKey}>
                 {!items.length && <span className="bag-empty">Nothing in here yet.</span>}
                 {items.map((entry, idx) => {
@@ -102,40 +153,6 @@ function BagColumn({ bagKey, label }: { bagKey: BagKey; label: string }) {
                         </div>
                     );
                 })}
-            </div>
-            <div className="bag-add">
-                <div className="bag-add-wrap">
-                    <input
-                        type="text"
-                        id={'bag-input-' + bagKey}
-                        className="specialty-input"
-                        autoComplete="off"
-                        placeholder="Add an item..."
-                        value={query}
-                        onChange={(e) => { setQuery(e.currentTarget.value); setOpen(true); }}
-                        onFocus={() => setOpen(true)}
-                        onBlur={() => setOpen(false)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') addBagItem(query); }}
-                    />
-                    <Suggestions
-                        id={'bag-sugg-' + bagKey}
-                        open={open}
-                        hiddenCount={matches.length - shown.length}
-                        rows={shown.map((it) => ({
-                            key: it._id || it.Name,
-                            title: it.Description ? it.Name + '\n' + it.Description : undefined,
-                            onSelect: () => addBagItem(it.Name),
-                            content: (
-                                <>
-                                    <ItemSprite image={it.Image} />
-                                    <span className="item-suggestion-name">{it.Name}</span>
-                                </>
-                            ),
-                        }))}
-                    />
-                </div>
-                <button className="specialty-add-btn" onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => addBagItem(query)}>Add</button>
             </div>
         </div>
     );

@@ -59,10 +59,14 @@ export const LICENSE_STEPS: TourStep[] = [
     },
     {
         id: 'extra',
-        title: 'Your own specialties',
-        target: ['.extra-panel'],
-        body: <p>Under the skills, <strong>Extra</strong> holds tracks you name yourself: a homebrew skill,
-            a trade, anything your campaign needs. Add a row with <Btn icon="fa-plus" />.</p>,
+        title: 'Your own specialties, and badges',
+        target: ['.extra-panel', '.badge-case'],
+        union: true,
+        body: <>
+            <p>Under the skills, <strong>Extra</strong> holds tracks you name yourself: a homebrew skill,
+                a trade, anything your campaign needs. Add a row with <Btn icon="fa-plus" />.</p>
+            <p>Click a slot in the badge case to award a badge and pick its type.</p>
+        </>,
     },
     {
         id: 'team',
@@ -82,12 +86,13 @@ export const LICENSE_STEPS: TourStep[] = [
     },
     {
         id: 'bag',
-        title: 'Bag and badges',
+        title: 'Bag',
         target: ['[data-tour="bag"]'],
         body: <>
+            <p>Click <strong>Out of battle</strong> or <strong>In battle</strong> to add an item: pick it from
+                the list, or type a name of your own and press Enter.</p>
             <p>Items in the bag have <Btn icon="fa-minus" /> to use one and <Btn icon="fa-plus" /> to add one.
                 The <strong>Healing Item</strong> value works itself out from Clever + Medicine.</p>
-            <p>Click a slot in the badge case to award a badge and pick its type.</p>
         </>,
     },
     {

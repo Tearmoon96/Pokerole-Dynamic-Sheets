@@ -96,7 +96,8 @@ html[data-device="phone"] .q2-grid {
         "skills"
         "ach"
         "natrank"
-        "extra";
+        "extra"
+        "badges";
 }
 
 html[data-device="phone"] .team-grid6,
