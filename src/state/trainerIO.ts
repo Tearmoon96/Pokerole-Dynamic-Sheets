@@ -6,6 +6,7 @@ import { sortByOrder } from '../lib/reorder';
 import type { WorkingTrainer } from './workingSet';
 import { dirEntries, ensureWorkingFolderScaffold, getDirHandle, rememberDirHandle } from '../lib/fileSystem';
 import { showAlert } from '../lib/dialog';
+import { escapeHtml } from '../lib/html';
 
 /* Reading and writing the trainer .json files.
 
@@ -201,7 +202,7 @@ export async function writeTrainerFile(
             await w.close();
             entry.handle = h;
             entry.fileName = h.name;
-            return { message: '<i class="fa-solid fa-circle-check"></i> Saved ' + entry.fileName + ' to the folder' };
+            return { message: '<i class="fa-solid fa-circle-check"></i> Saved ' + escapeHtml(entry.fileName) + ' to the folder' };
         } catch (e) { void showAlert('Could not save the file: ' + (e as Error).message, { title: 'Not saved', icon: 'fa-triangle-exclamation' }); return null; }
     }
 
@@ -216,12 +217,12 @@ export async function writeTrainerFile(
             await w.close();
             entry.handle = h;
             entry.fileName = h.name;
-            return { message: '<i class="fa-solid fa-circle-check"></i> Saved ' + entry.fileName };
+            return { message: '<i class="fa-solid fa-circle-check"></i> Saved ' + escapeHtml(entry.fileName) };
         } catch { return null; }   // user cancelled the save dialog
     }
 
     // No File System Access API: fall back to a download
     download(json, fname);
     entry.fileName = fname;
-    return { message: '<i class="fa-solid fa-download"></i> Downloaded ' + fname };
+    return { message: '<i class="fa-solid fa-download"></i> Downloaded ' + escapeHtml(fname) };
 }

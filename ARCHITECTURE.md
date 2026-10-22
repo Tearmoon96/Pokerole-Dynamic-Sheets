@@ -324,6 +324,8 @@ additional data (so the store cannot reorder, drop or swap them), and only a
 reference — id, size and SHA-256 — travels on the socket, signed by the GM. The
 store is still blind. Only the GM writes to it: the host's page claims the room
 with a random upload key on connect, and the relay keeps only that key's hash.
+An idle room's files are wiped after six hours, but the claim is kept for 90
+days more, so nobody else can take the store between two sessions.
 Parts travel eight to a request, both ways, and the GM checks what survived with
 one request for the whole room: the relay's free plan counts requests, not
 bytes. A player keeps every file it has verified, by its SHA-256, in IndexedDB

@@ -16,7 +16,10 @@ import type {
      - pokedex/moves/items/abilities/natures/version assign to `window.X`
      - equip-icons and sprite-frames use a top-level `const`, which lands in the
        global *lexical* environment and is therefore NOT a property of window.
-       Indirect eval at global scope is the only way to reach those. */
+       Indirect eval used to reach those; the pages' Content-Security-Policy
+       refuses eval, so a classic script of our own (public/assets/
+       app-data-consts.js) reads them by name after the bundles and puts them
+       on window. */
 
 const BUNDLES = [
     'pokedex-db.js', 'moves-db.js', 'items-db.js', 'abilities-db.js', 'natures-db.js',
@@ -34,13 +37,13 @@ function injectScript(src: string): Promise<void> {
     });
 }
 
-/** Read a script-level `const` binding, which never becomes a window property. */
+/** Where the copy-across script lives, beside the built bundles. */
+const CONSTS_SCRIPT = 'assets/app-data-consts.js';
+
+/** Read a script-level `const` binding, as the copy-across script left it. */
 function readLexical<T>(name: string): T | undefined {
-    try {
-        return (0, eval)(`typeof ${name} !== 'undefined' ? ${name} : undefined`) as T | undefined;
-    } catch {
-        return undefined;
-    }
+    const consts = (window as unknown as { PDS_APP_DATA_CONSTS?: Record<string, unknown> }).PDS_APP_DATA_CONSTS;
+    return consts?.[name] as T | undefined;
 }
 
 let pending: Promise<AppData> | null = null;
@@ -50,6 +53,7 @@ export function loadAppData(): Promise<AppData> {
     if (pending) return pending;
     pending = (async () => {
         for (const file of BUNDLES) await injectScript(DATA_BASE + file);
+        await injectScript(CONSTS_SCRIPT).catch(() => { /* the icons fall back to none, as a missing bundle did */ });
         const w = window as unknown as Record<string, unknown>;
         return {
             pokemon: (w.ALL_POKEMON as PokedexEntry[]) ?? [],

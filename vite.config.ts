@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { createHash } from 'node:crypto';
 import { createReadStream, statSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 
@@ -76,6 +77,35 @@ function devPageAliases(pages: string[]) {
     };
 }
 
+
+/* A Content-Security-Policy for every built page, as a <meta> (GitHub Pages
+   sends no headers of our own). Scripts only: the page's own files, the
+   inline DATA_BASE line by its hash, and on the table YouTube's player API.
+   No 'unsafe-inline', so markup that slips into a toast or a popover cannot
+   run an `onerror=` or a <script> of its own — the box-name XSS would have
+   stopped there. Images, media, fonts and connections are left open: the
+   sheets draw sprites from GitHub, the table talks to the relay, and a
+   policy there would guard little and break much.
+
+   Inline scripts are hashed as built, so editing the DATA_BASE line in a
+   built page blocks it — the app then falls back to 'app-data/', which is
+   what the line says anyway. `npm run dev` gets no policy: Vite's dev server
+   injects inline scripts of its own. */
+const PAGE_SCRIPT_SOURCES: Record<string, string[]> = {
+    'rolling-table': ['https://www.youtube.com'],
+};
+
+function withCsp(html: string, page: string): string {
+    const hashes = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
+        .map((m) => "'sha256-" + createHash('sha256').update(m[1]).digest('base64') + "'");
+    const policy = [
+        "script-src 'self' " + [...hashes, ...(PAGE_SCRIPT_SOURCES[page] ?? [])].join(' '),
+        "base-uri 'none'",
+    ].join('; ');
+    const meta = '<meta http-equiv="Content-Security-Policy" content="' + policy.trim() + '">';
+    /* Right after the charset: a policy covers only what comes after it. */
+    return html.replace(/(<meta charset="UTF-8">)/i, '$1\n    ' + meta);
+}
 
 export const PAGES = ['trainer-license', 'pokemon-card', 'gm-screen', 'rolling-table', 'map-maker'];
 const FIRST_PAGE = PAGES[0];
@@ -172,12 +202,18 @@ export default defineConfig(({ command }) => {
                             },
                         },
                         {
+                            /* FontAwesome. The stylesheet carries an integrity
+                               hash, so it is fetched with CORS and only a real
+                               200 may be kept: an opaque copy (status 0), which
+                               the old 'pokerole-cdn' cache holds from before,
+                               fails the check and every icon would go. Hence
+                               the new cache name too. */
                             urlPattern: /^https:\/\/cdnjs\.cloudflare\.com\/.*/,
                             handler: 'CacheFirst',
                             options: {
-                                cacheName: 'pokerole-cdn',
+                                cacheName: 'pokerole-cdn-cors',
                                 expiration: { maxEntries: 64, maxAgeSeconds: 60 * 60 * 24 * 365 },
-                                cacheableResponse: { statuses: [0, 200] },
+                                cacheableResponse: { statuses: [200] },
                             },
                         },
                     ],
@@ -210,6 +246,7 @@ export default defineConfig(({ command }) => {
                                exists and React aborts on a missing container. */
                             .replace(/\s+type="module"/g, ' defer')
                             .replace(/\s+crossorigin(?=[\s>])/g, '');
+                        out.source = withCsp(out.source, out.fileName.replace(/\.html$/, ''));
                         delete bundle[key];
                         bundle[out.fileName] = out;
                     }

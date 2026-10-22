@@ -87,7 +87,10 @@ const FIXTURE = `<script>
 
 const seed = readFileSync(ROOT + '/.verify/seed-snippet.html', 'utf8');
 const inject = (src, dest) => {
+    /* The built pages' Content-Security-Policy would refuse the inline seed
+       and fixture scripts; it is not what this harness compares. */
     const html = readFileSync(src, 'utf8')
+        .replace(/<meta http-equiv="Content-Security-Policy"[^>]*>\s*/i, '')
         .replace('<head>', '<head>\n' + ASSUME_DISK + '\n' + seed + '\n' + HIDE_TRANSIENTS, 1)
         .replace('</body>', FIXTURE + '\n</body>');
     writeFileSync(dest, html);

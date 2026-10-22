@@ -1,6 +1,7 @@
 import { BOX_CAPACITY, BOX_SPRITE_CYCLE } from './constants';
 import { defaultBoxes, genUid } from './defaults';
 import type { BoxEntry, MonEntry, TrainerState } from './types';
+import { escapeHtml } from '../lib/html';
 
 /* PC storage: named boxes of Pokémon this trainer owns but isn't carrying.
 
@@ -75,7 +76,7 @@ export type MoveResult = { ok: true } | { ok: false; message?: string };
 
 const full = (name: string): MoveResult => ({
     ok: false,
-    message: '<i class="fa-solid fa-triangle-exclamation"></i> ' + name + ' is full.',
+    message: '<i class="fa-solid fa-triangle-exclamation"></i> ' + escapeHtml(name) + ' is full.',
 });
 
 /** Team slot -> box. `boxIdx` null means the open box, or the first with room. */

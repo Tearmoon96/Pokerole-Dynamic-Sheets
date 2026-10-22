@@ -43,9 +43,22 @@ export function accuracyVerdict(succ: number, need: number, critMargin: number):
     return succ >= need ? 'hit' : 'miss';
 }
 
+/** One die, from the browser's cryptographic generator rather than
+    Math.random, whose stream can be predicted from enough of its output. The
+    top of the 32-bit range that does not divide evenly is thrown back, so no
+    face comes up more often than another. Low numbers make low faces, as
+    Math.random's did, so a harness can still force a roll. */
+function face(sides: number): number {
+    const n = Math.max(1, Math.floor(sides));
+    const limit = 0x100000000 - (0x100000000 % n);
+    const buf = new Uint32Array(1);
+    do crypto.getRandomValues(buf); while (buf[0] >= limit);
+    return 1 + Math.floor(buf[0] / (limit / n));
+}
+
 /** Roll `count` dice of `sides`, and work out what it means. */
 export function roll(count: number, sides: number, meta: RollMeta, critMargin: number): RollEntry {
-    const vals = Array.from({ length: count }, () => 1 + Math.floor(Math.random() * sides));
+    const vals = Array.from({ length: count }, () => face(sides));
     /* A sum roll adds a flat number to the faces and is NOT a pool: Initiative
        is 1d6 + Dexterity + Alert, one die however big the pools behind it are,
        and counting 4-6 on that one die would say nothing. `succ` stays null,

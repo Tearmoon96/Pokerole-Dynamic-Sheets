@@ -259,6 +259,38 @@ function forgetFeed(): void {
     try { localStorage.removeItem(FEED_KEY); } catch { /* nothing to do */ }
 }
 
+/* The replay record (`seen`) outlives a reload, a rejoin and the table moving
+   to another tab. Kept in memory only, it started empty each time, and for the
+   five minutes a message's timestamp stays acceptable the relay — or anyone
+   who had recorded the traffic — could send the GM's kick or a roll round
+   again. Older than that it is worth nothing, and is not read back. */
+const SEEN_KEY = 'pokerole_table_seen';
+
+type Seen = Map<string, Map<string, number>>;
+
+function saveSeen(lobbyId: string, seen: Seen): void {
+    const list = [...seen].map(([f, sids]) => [f, [...sids]]);
+    try { localStorage.setItem(SEEN_KEY, JSON.stringify({ lobbyId, at: Date.now(), seen: list })); } catch { /* full, or private mode */ }
+}
+
+function loadSeen(lobbyId: string): Seen {
+    const out: Seen = new Map();
+    try {
+        const raw = JSON.parse(localStorage.getItem(SEEN_KEY) || 'null');
+        if (!raw || raw.lobbyId !== lobbyId || !Array.isArray(raw.seen)) return out;
+        if (typeof raw.at !== 'number' || Math.abs(Date.now() - raw.at) > LIMITS.CLOCK_SKEW_MS) return out;
+        for (const entry of raw.seen.slice(-SEEN_SENDERS)) {
+            if (!Array.isArray(entry) || typeof entry[0] !== 'string' || !Array.isArray(entry[1])) continue;
+            const sids = new Map<string, number>();
+            for (const pair of entry[1].slice(-SEEN_SIDS)) {
+                if (Array.isArray(pair) && typeof pair[0] === 'string' && Number.isInteger(pair[1])) sids.set(pair[0], pair[1]);
+            }
+            if (sids.size) out.set(entry[0], sids);
+        }
+    } catch { /* unreadable: start empty, as before */ }
+    return out;
+}
+
 type Listener = () => void;
 
 export class TableStore {
@@ -344,7 +376,7 @@ export class TableSession {
     private seq = 0;
     /** sender -> their session ids, least recently heard first -> the last
         sequence number taken from each. */
-    private seen = new Map<string, Map<string, number>>();
+    private seen: Seen = new Map();
     /** Player: the session id the GM's page last spoke with. A new one means
         that page started again — see dispatch. */
     private hostSid = '';
@@ -505,7 +537,7 @@ export class TableSession {
         this.files = new BlobChannel(this.room.key, this.room.addr, uploadKey);
         this.sid = randomId(6);
         this.seq = 0;
-        this.seen.clear();
+        this.seen = loadSeen(lobbyId);
         this.hostSid = '';
         this.queue = [];
         this.hostSeenAt = isHost ? Date.now() : 0;
@@ -556,6 +588,7 @@ export class TableSession {
         if (isHost) window.addEventListener('storage', this.onRulesSaved);
 
         this.heartbeat = window.setInterval(() => this.tick(), HEARTBEAT_MS);
+        window.addEventListener('pagehide', this.keepSeen);
 
         /* The GM takes the room's file store before anything is uploaded to it;
            both features start once that is settled either way. */
@@ -602,6 +635,8 @@ export class TableSession {
         Map Maker and the GM screen get no goodbye — it would end a live map
         and drop the fight's link — and the new tab's beat simply takes over. */
     private teardown(moved = false): void {
+        this.keepSeen();
+        window.removeEventListener('pagehide', this.keepSeen);
         this.verifying = null;
         if (this.verifyTimer !== null) {
             clearTimeout(this.verifyTimer);
@@ -626,6 +661,12 @@ export class TableSession {
         this.files = null;
         this.tabLock.drop();
     }
+
+    /** Only a session that got as far as a room has a record worth keeping;
+        the teardown that opens every begin() must not wipe the saved one. */
+    private keepSeen = (): void => {
+        if (this.room) saveSeen(this.store.state.lobbyId, this.seen);
+    };
 
     private fail(message: string): void {
         this.store.update((s) => { s.phase = 'setup'; s.error = message; });
