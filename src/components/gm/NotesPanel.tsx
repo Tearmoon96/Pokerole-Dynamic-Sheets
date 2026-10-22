@@ -17,12 +17,21 @@ function notePreview(n: GmNoteSheet): string {
 }
 
 /** Size a note to its text. scrollHeight reads 0 on an element that has not
-    been laid out, so this runs after the note is in the document. */
+    been laid out, so this runs after the note is in the document.
+
+    The sheet holds its height while the note is measured. Collapsing a long
+    note to 'auto' for that instant shortened the panel under it, the panel's
+    scroll position was clamped to fit, and setting the height back did not
+    return it — so every keystroke dragged the view until the caret sat at the
+    bottom edge. */
 function autoGrow(el: HTMLTextAreaElement | null): void {
     if (!el) return;
+    const sheet = el.parentElement;
+    if (sheet) sheet.style.minHeight = sheet.offsetHeight + 'px';
     el.style.height = 'auto';
     const borders = el.offsetHeight - el.clientHeight;
     el.style.height = (el.scrollHeight + borders) + 'px';
+    if (sheet) sheet.style.minHeight = '';
 }
 
 export function NotesPanel({ onReorder }: { onReorder: (from: string, to: string) => void }) {
@@ -207,6 +216,26 @@ function NoteSheet({ note, moved, nested, folders, canUp, canDown, autoFocus, on
     }, [autoFocus]);
 
     useEffect(() => { autoGrow(bodyRef.current); }, [note.open, note.body]);
+
+    /* And again when its width changes. A note in a panel hidden at load —
+       every phone tab but the first — measured nothing and stayed five lines
+       tall, and a panel made narrower wraps the text onto more lines than the
+       box holds; the box hides its overflow, so either way the rest of the
+       note was out of sight until the next keystroke. */
+    useEffect(() => {
+        const el = bodyRef.current;
+        if (!el || typeof ResizeObserver === 'undefined') return;
+        let width = el.clientWidth;
+        const watch = new ResizeObserver(() => {
+            if (el.clientWidth === width) return;
+            width = el.clientWidth;
+            /* A frame later: resizing what is observed from inside the
+               observer's own callback is a loop the browser reports. */
+            requestAnimationFrame(() => autoGrow(el));
+        });
+        watch.observe(el);
+        return () => watch.disconnect();
+    }, [note.open]);
 
     return (
         <div className={'note-sheet' + (note.open ? ' open' : '') + (nested ? ' nested' : '')
