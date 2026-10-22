@@ -14,6 +14,13 @@
    - a start is scheduled LEAD_MS ahead, so everyone begins on the same beat
      instead of each as their message lands.
 
+   What travels. A file goes to the relay, and to the players, only when the
+   table needs it: once it is on a deck, or ahead of time if the GM preloads
+   it (`pre`). The rest of a library stays in the GM's browser. Every
+   megabyte is a request to the relay for each person at the table, and the
+   relay's free allowance counts requests; so does every message, which is
+   why the reports below are sent when they change rather than on a timer.
+
    The ready check. Before a deck starts, the GM's page looks at what every
    player last reported (`mstat`): downloaded, sound enabled, nothing failed.
    If anyone is not ready the GM sees who and why, and either waits — the deck
@@ -31,6 +38,7 @@
    reaches a player's browser at all. */
 
 import { MissingFileError } from '../blobs';
+import { compactAudio } from './compact';
 import { LIMITS } from '../protocol';
 import type { Body, ChannelId, ChannelState, TrackLoad, WireFile, WireTrack } from '../protocol';
 import { CHANNELS, randomId } from '../protocol';
@@ -46,8 +54,13 @@ import type { LibEntry } from './library';
     before the moment it names. */
 export const LEAD_MS = 1200;
 const TICK_MS = 250;
-const HEARTBEAT_MS = 5000;
-const STAT_MS = 5000;
+/** The GM repeats the decks this often, for anyone who missed a change.
+    Every change goes out at once; this is only the safety net. */
+const HEARTBEAT_MS = 30_000;
+/** A player's report goes out when it changes, and at least this often
+    while there is music to report on. Under 20 s, which is what a GM page
+    from before this waited before calling a player silent. */
+const STAT_MS = 15_000;
 /** Past this, jump; under it, nudge the rate. */
 const SEEK_FILE_S = 0.25;
 const SEEK_YT_S = 0.6;
@@ -56,12 +69,21 @@ const IN_SYNC_S = 0.012;
 /** After a jump or a start, the player's clock needs a moment to settle. */
 const SETTLE_MS = 600;
 /** A player report older than this counts as no report. */
-const STAT_STALE_MS = 20_000;
+const STAT_STALE_MS = 45_000;
 /** A file the relay did not have is asked for again after this. */
 const RETRY_MS = 10_000;
 const VERIFY_MS = 10 * 60_000;
 /** The least time between two looks at the relay prompted by players. */
 const LOST_GAP_MS = 15_000;
+/** What the table's music may hold on the relay. With the maps' share
+    (mapShare.ts MAP_BUDGET) it stays under the room's 256 MB, so the relay
+    never drops a file to make room. It used to: a library past the quota
+    had its oldest tracks dropped, sent again, which dropped others, and every
+    player downloaded each one again, for as long as the table was open. The
+    GM's page now takes tracks off itself, least recently used first. */
+export const MUSIC_BUDGET = 128 * 1024 * 1024;
+/** A track the relay loses twice in this long is not sent again by itself. */
+const LOSS_WINDOW_MS = 30 * 60_000;
 
 /* Fades: in a touch longer than out, so a scene settles in and an ambience
    slips away. The lead gives the message time to land before the volume
@@ -102,6 +124,8 @@ export interface GmTrack {
     dur: number;
     /** Players see the title. */
     reveal: boolean;
+    /** Players download it ahead of time, not only once it is on a deck. */
+    pre: boolean;
     size: number;
     /** 0..1 while it is going up to the relay. */
     upload: number | null;
@@ -303,6 +327,11 @@ export class MusicController {
     private uploading = new Map<string, number>();
     private uploadErrors = new Map<string, string>();
     private pumping = false;
+    /** When each track was last put on a deck: the least recent leaves the
+        relay first when the music's share is full. */
+    private usedAt = new Map<string, number>();
+    /** When the relay was found to have lost each track. */
+    private losses = new Map<string, number[]>();
 
     private onGesture = () => this.unlock();
     /** Bumped by every begin and end, so a begin still awaiting the
@@ -356,7 +385,7 @@ export class MusicController {
             this.verifier = window.setInterval(() => { void this.verifyUploads(); }, VERIFY_MS);
             void this.verifyUploads();
         } else {
-            this.beat = window.setInterval(() => this.sendStat(true), STAT_MS);
+            this.beat = window.setInterval(() => { if (this.view.library.length) this.sendStat(true); }, STAT_MS);
         }
     }
 
@@ -387,6 +416,8 @@ export class MusicController {
         this.uploads = {};
         this.uploading.clear();
         this.uploadErrors.clear();
+        this.usedAt.clear();
+        this.losses.clear();
         this.lastStat = '';
         this.view = emptyMusicView();
     }
@@ -672,7 +703,9 @@ export class MusicController {
         void this.prefetch();
     }
 
-    /** Downloads the library one file at a time, the decks' tracks first. */
+    /** Downloads, one file at a time, what the table needs: the decks'
+        tracks first, then those the GM preloads. Nothing else is fetched
+        until it is on a deck. */
     private async prefetch(): Promise<void> {
         if (this.fetching || this.host) return;
         const files = this.api.files();
@@ -683,7 +716,7 @@ export class MusicController {
                 const lib = this.view.library;
                 const onDeck = new Set(CHANNELS.map((c) => this.view.decks[c].track));
                 const wanted = lib
-                    .filter((t) => t.kind === 'file' && t.file && !this.sources.has(t.id))
+                    .filter((t) => t.kind === 'file' && t.file && !this.sources.has(t.id) && (t.pre || onDeck.has(t.id)))
                     .filter((t) => {
                         const st = this.view.tracks[t.id];
                         if (!st || st.state !== 'failed') return true;
@@ -795,8 +828,10 @@ export class MusicController {
     private sendStat(force: boolean): void {
         if (this.host) return;
         const body = this.stat();
-        /* The drift moves every report; only the rest decides "changed". */
-        const key = JSON.stringify({ ...body, drift: null });
+        /* The drift moves every report; only whether it is in sync (what the
+           GM's list shows at a glance) counts as a change. */
+        const band = (d: number | null) => (d === null ? null : Math.abs(d) < 50);
+        const key = JSON.stringify({ ...body, drift: [band(body.drift.bg), band(body.drift.scene)] });
         if (!force && key === this.lastStat && Date.now() - this.lastStatAt < STAT_MS) return;
         this.lastStat = key;
         this.lastStatAt = Date.now();
@@ -862,7 +897,7 @@ export class MusicController {
             const title = e.reveal ? e.title : '';
             if (e.kind === 'yt' && e.yt) out.push({ id: e.id, title, kind: 'yt', yt: e.yt, dur: e.dur });
             else if (e.kind === 'file' && this.uploads[e.id]) {
-                out.push({ id: e.id, title, kind: 'file', file: this.uploads[e.id], dur: e.dur });
+                out.push({ id: e.id, title, kind: 'file', file: this.uploads[e.id], dur: e.dur, ...(e.pre ? { pre: true as const } : {}) });
             }
         }
         return out.slice(0, LIMITS.MAX_TRACKS);
@@ -893,7 +928,7 @@ export class MusicController {
     private refreshGm(): void {
         const gm: GmTrack[] = this.entries.map((e) => ({
             id: e.id, title: e.title, kind: e.kind, yt: e.yt, dur: e.dur, reveal: e.reveal === true,
-            size: e.blob?.size ?? 0,
+            pre: e.pre === true, size: e.blob?.size ?? 0,
             upload: this.uploading.get(e.id) ?? null,
             uploadError: this.uploadErrors.get(e.id) ?? '',
             onTable: e.kind === 'yt' || !!this.uploads[e.id],
@@ -905,7 +940,17 @@ export class MusicController {
         void saveLibrary(this.entries);
     }
 
-    /** Sends every file track the relay does not have yet, one at a time. */
+    private onDeck(id: string): boolean {
+        return CHANNELS.some((c) => this.view.decks[c].track === id);
+    }
+
+    /** A file the table needs on the relay: on a deck, or preloaded. */
+    private wanted(e: LibEntry): boolean {
+        return e.kind === 'file' && !!e.blob && (e.pre === true || this.onDeck(e.id));
+    }
+
+    /** Sends what the table needs and the relay does not have, one at a
+        time, a deck's track first. */
     private async pumpUploads(): Promise<void> {
         if (this.pumping || !this.host) return;
         const files = this.api.files();
@@ -913,9 +958,15 @@ export class MusicController {
         this.pumping = true;
         try {
             for (;;) {
-                const next = this.entries.find((e) => e.kind === 'file' && e.blob && !this.uploads[e.id]
-                    && !this.uploadErrors.has(e.id));
+                const waiting = this.entries.filter((e) => this.wanted(e) && !this.uploads[e.id] && !this.uploadErrors.has(e.id));
+                const next = waiting.find((e) => this.onDeck(e.id)) ?? waiting[0];
                 if (!next || !next.blob) break;
+                if (!this.makeRoom(next)) {
+                    this.uploadErrors.set(next.id, 'The preloaded tracks would pass the table’s '
+                        + MUSIC_BUDGET / 1024 / 1024 + ' MB of music. Preload fewer.');
+                    this.refreshGm();
+                    continue;
+                }
                 this.uploading.set(next.id, 0);
                 this.refreshGm();
                 let last = 0;
@@ -940,22 +991,73 @@ export class MusicController {
         }
     }
 
-    /** Checks the relay still has the files the table was told about, and
-        sends again any it lost. `only` limits it to those tracks. */
+    /** Takes tracks off the relay, least recently used first, until `next`
+        fits in MUSIC_BUDGET. A track on a deck never goes, and a preloaded
+        one only to make room for a deck's. False when it still would not
+        fit. */
+    private makeRoom(next: LibEntry): boolean {
+        const size = next.blob?.size ?? 0;
+        let used = Object.values(this.uploads).reduce((n, f) => n + f.size, 0);
+        if (used + size <= MUSIC_BUDGET) return true;
+        const forDeck = this.onDeck(next.id);
+        const candidates = Object.keys(this.uploads)
+            .filter((id) => id !== next.id && !this.onDeck(id))
+            .map((id) => ({ id, pre: this.entries.find((e) => e.id === id)?.pre === true, at: this.usedAt.get(id) ?? 0 }))
+            .filter((c) => forDeck || !c.pre)
+            .sort((a, b) => Number(a.pre) - Number(b.pre) || a.at - b.at);
+        const gone: string[] = [];
+        for (const c of candidates) {
+            if (used + size <= MUSIC_BUDGET) break;
+            used -= this.uploads[c.id].size;
+            gone.push(c.id);
+        }
+        if (used + size > MUSIC_BUDGET) return false;
+        const files = this.api.files();
+        const uploads = { ...this.uploads };
+        for (const id of gone) {
+            void files?.remove(uploads[id].id);
+            delete uploads[id];
+        }
+        this.uploads = uploads;
+        void saveUploads(this.lobby, this.uploads);
+        this.announceLibrary();
+        return true;
+    }
+
+    /** True when this is the second time in LOSS_WINDOW_MS the relay lost it. */
+    private lostAgain(id: string): boolean {
+        const now = Date.now();
+        const list = [...(this.losses.get(id) ?? []).filter((t) => now - t < LOSS_WINDOW_MS), now];
+        this.losses.set(id, list);
+        return list.length >= 2;
+    }
+
+    /** Checks the relay still has the files the table was told about — one
+        request for all of them — and sends again the ones it lost that the
+        table still needs. `only` limits it to those tracks. */
     private async verifyUploads(only?: string[]): Promise<void> {
         const files = this.api.files();
         if (!this.host || !files) return;
         let changed = false;
-        for (const [id, ref] of Object.entries(this.uploads)) {
-            if (only && !only.includes(id)) continue;
-            if (!this.entries.some((e) => e.id === id)) {
-                delete this.uploads[id];
-                changed = true;
-                continue;
-            }
-            if (!await files.present(ref)) {
+        const stale = Object.keys(this.uploads).filter((id) => !this.entries.some((e) => e.id === id));
+        if (stale.length) {
+            const next = { ...this.uploads };
+            for (const id of stale) delete next[id];
+            this.uploads = next;
+            changed = true;
+        }
+        const checked = Object.entries(this.uploads).filter(([id]) => !only || only.includes(id));
+        const found = checked.length ? await files.inventory() : null;
+        if (found) {
+            const lost = checked.filter(([id, ref]) => this.uploads[id] === ref && !found.has(ref)).map(([id]) => id);
+            if (lost.length) {
                 const next = { ...this.uploads };
-                delete next[id];
+                for (const id of lost) {
+                    delete next[id];
+                    /* Lost twice in a short while: something keeps dropping
+                       it, and sending it again would only go round. */
+                    if (this.lostAgain(id)) this.uploadErrors.set(id, 'The relay keeps losing this track, so it is not sent again by itself.');
+                }
                 this.uploads = next;
                 changed = true;
             }
@@ -977,8 +1079,7 @@ export class MusicController {
                 problems.push(f.name + ' is not an audio file.');
                 continue;
             }
-            if (f.size > 64_000_000) { problems.push(f.name + ' is over 64 MB.'); continue; }
-            const url = URL.createObjectURL(f);
+            let url = URL.createObjectURL(f);
             let dur = 0;
             try {
                 dur = await probe(url);
@@ -987,9 +1088,29 @@ export class MusicController {
                 problems.push(f.name + ': this browser cannot play it.');
                 continue;
             }
+            /* A big or lossless file is re-encoded smaller (compact.ts); the
+               table only ever has the small copy. */
+            let blob: Blob = f;
+            const small = await compactAudio(f, dur);
+            if (small) {
+                const smallUrl = URL.createObjectURL(small);
+                const smallDur = await probe(smallUrl).catch(() => -1);
+                if (smallDur >= 0) {
+                    URL.revokeObjectURL(url);
+                    url = smallUrl;
+                    blob = small;
+                } else {
+                    URL.revokeObjectURL(smallUrl);
+                }
+            }
+            if (blob.size > 64_000_000) {
+                URL.revokeObjectURL(url);
+                problems.push(f.name + ' is over 64 MB.');
+                continue;
+            }
             const id = randomId(8);
             const title = cleanText(f.name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' '), LIMITS.MAX_TITLE) || 'Track';
-            this.entries = [...this.entries, { id, title, kind: 'file', blob: f, dur: Math.min(dur, LIMITS.MAX_SECONDS) }];
+            this.entries = [...this.entries, { id, title, kind: 'file', blob, dur: Math.min(dur, LIMITS.MAX_SECONDS) }];
             this.sources.set(id, { url, file: 'local' });
         }
         this.persistLibrary();
@@ -1030,6 +1151,17 @@ export class MusicController {
         this.persistLibrary();
         this.refreshGm();
         this.announceLibrary();
+    }
+
+    /** Whether players download this track ahead of time. */
+    setPreload(id: string, pre: boolean): void {
+        if (!this.host) return;
+        this.entries = this.entries.map((e) => (e.id === id ? { ...e, pre } : e));
+        this.uploadErrors.delete(id);
+        this.persistLibrary();
+        this.refreshGm();
+        this.announceLibrary();
+        void this.pumpUploads();
     }
 
     remove(id: string): void {
@@ -1082,6 +1214,12 @@ export class MusicController {
         const wasPlaying = this.view.decks[ch].playing;
         this.setWaiting(ch, false);
         this.setDeck(ch, { track: id, playing: false, pos: 0, ref: 0, fade: null });
+        /* On a deck is when a track goes to the table: a fresh try, whatever
+           went wrong before. */
+        this.usedAt.set(id, Date.now());
+        this.uploadErrors.delete(id);
+        this.refreshGm();
+        void this.pumpUploads();
         if (wasPlaying) this.play(ch);
     }
 

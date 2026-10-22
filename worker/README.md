@@ -18,8 +18,9 @@ That is why the limits below are all about volume and never about content.
 | Sockets per room | 16 | A leaked password cannot become an unbounded room |
 | Rate | 40 messages / 10 s per socket | One loud client cannot drown the others |
 | Idle teardown | 6 hours | Abandoned rooms do not hold connections open, and their files are deleted |
-| File part | 1 MiB | Under SQLite's 2 MB row; a file is up to 64 parts. A longer upload is read to its end (an unread body breaks the runtime) but no more than 1 MiB of it is held |
-| Files per room | 256 MB | The oldest files go first when a new part would pass it |
+| File part | 1 MiB | Under SQLite's 2 MB row; a file is up to 64 parts. A longer upload is read to its end (an unread body breaks the runtime) but no more than a batch of it is held |
+| Batch | 8 parts | One request carries up to 8 parts either way: the free plan counts requests, not bytes |
+| Files per room | 256 MB | The oldest files go first when a new part would pass it. The GM's page keeps music (128 MB) and maps (96 MB) under it, so this is a last resort |
 | Pages | the site and `localhost` | A browser names the page a socket or request comes from, so another website cannot spend this account's allowance through its visitors. A request naming no page (not a browser) is let through: the limits above are what hold it |
 
 The idle alarm is a storage write, so a busy room moves it at most every five
@@ -33,9 +34,11 @@ room also keeps files, in its Durable Object's own SQLite:
 | Route | What |
 |---|---|
 | `POST /room/<addr>/claim` | The GM's page takes the room on connect, with a random upload key. The first claim wins; only the key's hash is stored |
-| `PUT /room/<addr>/blob/<id>/<part>` | One sealed part. Needs the upload key |
-| `GET /room/<addr>/blob/<id>/<part>` | One part, to anyone with the address |
-| `GET /room/<addr>/blob/<id>` | Which parts exist — how the GM notices a file was dropped |
+| `PUT /room/<addr>/blob/<id>?from=<i>` | Up to 8 sealed parts from part `i` on, each prefixed by its length (4 bytes, big-endian). Needs the upload key |
+| `GET /room/<addr>/blob/<id>?from=<i>&n=<k>` | Parts `i` to `i+k-1` (k up to 8), framed the same way, or 404 if any is missing |
+| `GET /room/<addr>/blobs` | Every file in the room and how many parts of it are there — the GM's one look at what survived |
+| `PUT` / `GET /room/<addr>/blob/<id>/<part>` | One part: the routes before batches, kept for pages that have not updated |
+| `GET /room/<addr>/blob/<id>` | Which parts of one file exist (older pages) |
 | `DELETE /room/<addr>/blob/<id>` | Needs the upload key |
 
 Every part is sealed with the room key before it is sent, so the store is as

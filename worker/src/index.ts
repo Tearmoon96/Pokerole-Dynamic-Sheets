@@ -67,6 +67,13 @@ const MAX_PART_BYTES = 1024 * 1024;
 const MAX_PARTS = 64;
 const ROOM_QUOTA_BYTES = 256 * 1024 * 1024;
 
+/* Every request is what the free plan counts, not every byte, so parts travel
+   in batches: `?from=<i>&n=<k>` reads up to BATCH_PARTS of them in one GET, and
+   `?from=<i>` writes as many in one PUT. A batch is each part prefixed by its
+   length (4 bytes, big-endian). The one-part routes stay for older pages. */
+const BATCH_PARTS = 8;
+const MAX_BATCH_BYTES = BATCH_PARTS * (MAX_PART_BYTES + 4);
+
 /* 128 random bits, hex. The client draws it; anything else is refused. */
 const BLOB_ID_RE = /^[a-f0-9]{32}$/;
 
@@ -179,28 +186,66 @@ export default {
             return env.TABLE_ROOM.get(env.TABLE_ROOM.idFromName(addr)).fetch(req);
         }
 
-        /* The file store: `claim`, `blob/<id>` and `blob/<id>/<part>`. Shapes
-           are checked here, before a Durable Object is woken for them. */
-        const okShape = (rest.length === 1 && rest[0] === 'claim')
+        /* The file store: `claim`, `blobs`, `blob/<id>` and `blob/<id>/<part>`.
+           Shapes are checked here, before a Durable Object is woken for them. */
+        const okShape = (rest.length === 1 && (rest[0] === 'claim' || rest[0] === 'blobs'))
             || (rest[0] === 'blob' && rest.length >= 2 && rest.length <= 3 && BLOB_ID_RE.test(rest[1])
                 && (rest.length === 2 || /^\d{1,2}$/.test(rest[2])));
-        /* A body is always read to the end here, before anything answers:
-           a response sent over an unread upload makes the runtime fail
-           reading it afterwards (and `wrangler dev` exits outright). No more
-           than a part's worth of it is kept. */
-        let body: ArrayBuffer | null = null;
-        if (req.method === 'PUT' || req.method === 'POST') {
-            body = await readCapped(req, MAX_PART_BYTES);
-            if (body === null) return text('part too large', 413);
-        } else {
+        /* A body is always read to the end before anything answers: a
+           response sent over an unread upload makes the runtime fail reading
+           it afterwards (and `wrangler dev` exits outright). A request that
+           goes no further is drained here; one that does is handed on
+           unread, and the room reads it — this side has 10 ms of CPU, which
+           copying an 8 MB batch could eat into. */
+        if (!okShape) {
             await readCapped(req, 0);
+            return text('not found', 404);
         }
-        if (!okShape) return text('not found', 404);
-
+        const upload = req.method === 'PUT' || req.method === 'POST';
+        if (!upload) await readCapped(req, 0);
         return env.TABLE_ROOM.get(env.TABLE_ROOM.idFromName(addr)).fetch(
-            new Request(req.url, { method: req.method, headers: req.headers, body }));
+            new Request(req.url, { method: req.method, headers: req.headers, body: upload ? req.body : null }));
     },
 };
+
+/** `?from=<i>&n=<k>` on a blob, or null when there is none or it is out of
+    range. `n` is 1 when absent (a PUT says how many by its body). */
+function batchOf(url: URL): { from: number; n: number } | null {
+    const from = url.searchParams.get('from');
+    if (from === null || !/^\d{1,2}$/.test(from)) return null;
+    const raw = url.searchParams.get('n');
+    const n = raw === null ? 1 : /^\d{1,2}$/.test(raw) ? Number(raw) : 0;
+    if (n < 1 || n > BATCH_PARTS || Number(from) + n > MAX_PARTS) return null;
+    return { from: Number(from), n };
+}
+
+/** Splits a batch body into its parts. Null when the framing is wrong. */
+function unframe(body: ArrayBuffer): ArrayBuffer[] | null {
+    const view = new DataView(body);
+    const parts: ArrayBuffer[] = [];
+    let at = 0;
+    while (at < body.byteLength) {
+        if (at + 4 > body.byteLength || parts.length >= BATCH_PARTS) return null;
+        const len = view.getUint32(at);
+        at += 4;
+        if (len === 0 || len > MAX_PART_BYTES || at + len > body.byteLength) return null;
+        parts.push(body.slice(at, at + len));
+        at += len;
+    }
+    return parts.length ? parts : null;
+}
+
+function frame(parts: ArrayBuffer[]): Uint8Array {
+    const out = new Uint8Array(parts.reduce((n, p) => n + 4 + p.byteLength, 0));
+    const view = new DataView(out.buffer);
+    let at = 0;
+    for (const p of parts) {
+        view.setUint32(at, p.byteLength);
+        out.set(new Uint8Array(p), at + 4);
+        at += 4 + p.byteLength;
+    }
+    return out;
+}
 
 /** Per-socket bookkeeping. Kept on the socket itself so the room can hibernate
     between messages instead of holding memory open for an idle table. */
@@ -395,7 +440,11 @@ export class TableRoom implements DurableObject {
     private async files(req: Request, rest: string[]): Promise<Response> {
         this.schema();
         /* Read before anything can answer — see the note in the Worker. */
-        const data = req.method === 'PUT' || req.method === 'POST' ? await req.arrayBuffer() : null;
+        let data: ArrayBuffer | null = null;
+        if (req.method === 'PUT' || req.method === 'POST') {
+            data = await readCapped(req, MAX_BATCH_BYTES);
+            if (data === null) return text('part too large', 413);
+        }
         return this.route(req, rest, data);
     }
 
@@ -416,8 +465,38 @@ export class TableRoom implements DurableObject {
             return text('ok', 200);
         }
 
+        /* Every file in the room and how many parts of each are here: the
+           GM's one look at what survived, rather than one look per file. */
+        if (rest[0] === 'blobs') {
+            if (req.method !== 'GET') return text('method not allowed', 405);
+            const files: Record<string, number> = {};
+            for (const r of this.sql.exec<{ id: string; n: number }>('SELECT id, COUNT(*) AS n FROM blobs GROUP BY id')) {
+                files[r.id] = r.n;
+            }
+            return new Response(JSON.stringify({ files }), {
+                headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...CORS },
+            });
+        }
+
         const id = rest[1];
         const part = rest.length === 3 ? Number(rest[2]) : null;
+        const url = new URL(req.url);
+        const batch = part === null && url.searchParams.has('from') ? batchOf(url) : null;
+        if (part === null && url.searchParams.has('from') && !batch) return text('bad batch', 400);
+
+        if (req.method === 'GET' && batch) {
+            const rows = this.sql.exec<{ part: number; data: ArrayBuffer }>(
+                'SELECT part, data FROM blobs WHERE id = ? AND part >= ? AND part < ? ORDER BY part',
+                id, batch.from, batch.from + batch.n).toArray();
+            if (rows.length !== batch.n) return text('no such part', 404);
+            return new Response(frame(rows.map((r) => r.data)), {
+                headers: {
+                    'content-type': 'application/octet-stream',
+                    'cache-control': 'private, max-age=21600, immutable',
+                    ...CORS,
+                },
+            });
+        }
 
         if (req.method === 'GET') {
             if (part === null) {
@@ -450,15 +529,28 @@ export class TableRoom implements DurableObject {
             return text('ok', 200);
         }
 
-        if (req.method === 'PUT' && part !== null) {
-            if (part >= MAX_PARTS) return text('too many parts', 413);
-            if (!data || data.byteLength === 0) return text('empty part', 400);
-            if (data.byteLength > MAX_PART_BYTES) return text('part too large', 413);
+        if (req.method === 'PUT' && (part !== null || batch)) {
+            let parts: ArrayBuffer[];
+            const first = part ?? batch!.from;
+            if (part !== null) {
+                if (!data || data.byteLength === 0) return text('empty part', 400);
+                if (data.byteLength > MAX_PART_BYTES) return text('part too large', 413);
+                parts = [data];
+            } else {
+                const split = data ? unframe(data) : null;
+                if (!split) return text('bad batch', 400);
+                parts = split;
+            }
+            if (first + parts.length > MAX_PARTS) return text('too many parts', 413);
 
-            this.sql.exec('DELETE FROM blobs WHERE id = ? AND part = ?', id, part);
-            if (!this.makeRoom(data.byteLength, id)) return text('room storage full', 507);
-            this.sql.exec('INSERT INTO blobs (id, part, data, size, at) VALUES (?, ?, ?, ?, ?)',
-                id, part, data, data.byteLength, Date.now());
+            const total = parts.reduce((n, p) => n + p.byteLength, 0);
+            this.sql.exec('DELETE FROM blobs WHERE id = ? AND part >= ? AND part < ?', id, first, first + parts.length);
+            if (!this.makeRoom(total, id)) return text('room storage full', 507);
+            const now = Date.now();
+            parts.forEach((p, i) => {
+                this.sql.exec('INSERT INTO blobs (id, part, data, size, at) VALUES (?, ?, ?, ?, ?)',
+                    id, first + i, p, p.byteLength, now);
+            });
             await this.touch();
             return text('ok', 200);
         }

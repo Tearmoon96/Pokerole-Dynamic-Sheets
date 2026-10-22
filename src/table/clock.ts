@@ -27,8 +27,10 @@ const BURST_GAP_MS = 400;
    fastest-wins rule keeps it. */
 const FOLLOW = 15;
 const FOLLOW_GAP_MS = 3000;
-/** After that, often enough to follow a drifting clock and no more. */
-const STEADY_MS = 30_000;
+/** After that, often enough to follow a drifting clock and no more. A
+    computer's clock wanders by a few milliseconds a minute at worst, and
+    each ping is a message the relay's free allowance counts. */
+const STEADY_MS = 60_000;
 /** A ping with no answer by then is forgotten. */
 const TIMEOUT_MS = 5000;
 

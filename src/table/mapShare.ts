@@ -34,6 +34,11 @@ const SAVED_PREFIX = 'pokeroleTable:map:';
 export const MAX_TABLE_MAPS = 12;
 /** The least time between two looks at the relay prompted by players. */
 const CHECK_GAP_MS = 15_000;
+/** What the table's maps may hold on the relay together. With the music's
+    own share (music.ts MUSIC_BUDGET) it stays under the room's 256 MB, so the
+    relay never has to drop a file to make room — a drop is what used to send
+    the GM's page re-uploading, and the players re-downloading, in a loop. */
+const MAP_BUDGET = 96 * 1024 * 1024;
 
 /** One map the GM holds, as the GM's own panel lists it. */
 export interface MapEntry {
@@ -439,6 +444,10 @@ export class MapShare {
             if (!this.entries.some((e) => e.key === key) && this.entries.length >= MAX_TABLE_MAPS) {
                 throw new Error('The table holds ' + MAX_TABLE_MAPS + ' maps at most: remove one first.');
             }
+            const held = this.entries.filter((e) => e.key !== key).reduce((n, e) => n + e.file.size, 0);
+            if (held + blob.size > MAP_BUDGET) {
+                throw new Error('The table’s maps would pass ' + MAP_BUDGET / 1024 / 1024 + ' MB: remove one first.');
+            }
             this.uploading = true;
             this.uploadingKey = key;
             this.droppedWhileUploading = false;
@@ -501,8 +510,10 @@ export class MapShare {
     async verify(): Promise<void> {
         const files = this.files();
         if (!this.host || !files || this.uploading) return;
+        const found = await files.inventory();
+        if (!found) return;
         for (const s of [...this.entries]) {
-            if (await files.present(s.file)) continue;
+            if (found.has(s.file)) continue;
             if (!this.entries.some((e) => e.key === s.key && e.file.id === s.file.id)) continue;
             try {
                 await this.stage(s.key, s.blob, s.w, s.h, s.title, s.live, s.mapId, s.objects);

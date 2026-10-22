@@ -13,6 +13,7 @@
 
 import { sealPart, sha256Hex, unsealPart } from './crypto';
 import type { Bytes } from './encoding';
+import { cachedFile, keepFile } from './fileCache';
 import { FILE_MIME_RE } from './protocol';
 import { relayBase } from './relay';
 
@@ -21,6 +22,9 @@ import { relayBase } from './relay';
 export const PART_BYTES = 1_000_000;
 /** The relay keeps 64 parts a file. */
 export const MAX_FILE_BYTES = 64 * PART_BYTES;
+/** Parts per request, both ways: the relay's free allowance counts requests,
+    so a 6 MB track is one GET rather than six. */
+const BATCH_PARTS = 8;
 
 export interface BlobRef {
     /** 32 hex characters, drawn here at random. */
@@ -87,17 +91,20 @@ export class BlobChannel {
         const id = randomHex(16);
         const parts = partsFor(data.length);
 
-        for (let i = 0; i < parts; i++) {
-            signal?.throwIfAborted();
-            const plain = data.slice(i * PART_BYTES, (i + 1) * PART_BYTES);
-            const sealed = await sealPart(this.key, this.addr, id, i, parts, plain);
-            await this.putPart(id, i, sealed, signal);
-            onProgress?.((i + 1) / parts);
+        for (let from = 0; from < parts; from += BATCH_PARTS) {
+            const sealed: Bytes[] = [];
+            for (let i = from; i < Math.min(parts, from + BATCH_PARTS); i++) {
+                signal?.throwIfAborted();
+                const plain = data.slice(i * PART_BYTES, (i + 1) * PART_BYTES);
+                sealed.push(await sealPart(this.key, this.addr, id, i, parts, plain));
+            }
+            await this.putBatch(id, from, frame(sealed), signal);
+            onProgress?.((from + sealed.length) / parts);
         }
         return { id, sha, size: data.length, parts, mime: cleanMime(file.type) };
     }
 
-    private async putPart(id: string, part: number, body: Bytes, signal?: AbortSignal): Promise<void> {
+    private async putBatch(id: string, from: number, body: Bytes, signal?: AbortSignal): Promise<void> {
         /* A part that fails is tried again a couple of times: a phone hotspot
            drops a request now and then, and starting a 40 MB upload over for
            one of them would be the wrong answer. */
@@ -105,7 +112,7 @@ export class BlobChannel {
         let reclaimed = false;
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
-                const res = await fetch(this.base + '/blob/' + id + '/' + part, {
+                const res = await fetch(this.base + '/blob/' + id + '?from=' + from, {
                     method: 'PUT', body, headers: this.writeHeaders(), signal,
                 });
                 if (res.ok) return;
@@ -126,17 +133,26 @@ export class BlobChannel {
         throw new Error('Upload failed: ' + lastError + '.');
     }
 
-    /** True when every part of the file is still on the relay. An idle table
-        is wiped after six hours, and a full one drops its oldest files. */
-    async present(ref: BlobRef): Promise<boolean> {
+    /** Which files are still whole on the relay — an idle table is wiped
+        after six hours, and a full one drops its oldest files — in one
+        request for all of them. Null when the relay could not be asked, which
+        callers take as "no news" rather than as everything lost. */
+    async inventory(): Promise<Inventory | null> {
         try {
-            const res = await fetch(this.base + '/blob/' + ref.id, { cache: 'no-store' });
-            if (!res.ok) return false;
-            const body = await res.json() as { parts?: unknown };
-            return Array.isArray(body.parts) && body.parts.length === ref.parts;
+            const res = await fetch(this.base + '/blobs', { cache: 'no-store' });
+            if (!res.ok) return null;
+            const body = await res.json() as { files?: unknown };
+            if (!body.files || typeof body.files !== 'object') return null;
+            const files = body.files as Record<string, unknown>;
+            return { has: (ref) => files[ref.id] === ref.parts };
         } catch {
-            return false;
+            return null;
         }
+    }
+
+    /** True when every part of this one file is still on the relay. */
+    async present(ref: BlobRef): Promise<boolean> {
+        return (await this.inventory())?.has(ref) ?? false;
     }
 
     async remove(id: string): Promise<void> {
@@ -146,20 +162,32 @@ export class BlobChannel {
         } catch { /* it is evicted in time anyway */ }
     }
 
-    /** The file, checked. Throws on anything that does not verify. */
+    /** The file, checked. Throws on anything that does not verify. A file
+        this browser has had before, under any id at any table, comes from
+        its own cache (fileCache.ts) and costs the relay nothing. */
     async download(ref: BlobRef, onProgress?: Progress, signal?: AbortSignal): Promise<Blob> {
+        /* The validator already refused any other type; this is the line that
+           decides what the blob URL opens as, so it checks again. */
+        const mime = cleanMime(ref.mime);
+        const kept = await cachedFile(ref.sha, ref.size, mime);
+        if (kept) { onProgress?.(1); return kept; }
+
         const chunks: Bytes[] = [];
         let total = 0;
-        for (let i = 0; i < ref.parts; i++) {
-            const res = await fetch(this.base + '/blob/' + ref.id + '/' + i, { signal });
+        for (let from = 0; from < ref.parts; from += BATCH_PARTS) {
+            const n = Math.min(BATCH_PARTS, ref.parts - from);
+            const res = await fetch(this.base + '/blob/' + ref.id + '?from=' + from + '&n=' + n, { signal });
             if (res.status === 404) throw new MissingFileError();
             if (!res.ok) throw new Error('the relay answered ' + res.status);
-            const wire = new Uint8Array(await res.arrayBuffer()) as Bytes;
-            const plain = await unsealPart(this.key, this.addr, ref.id, i, ref.parts, wire);
-            if (!plain) throw new Error('a part of the file did not verify');
-            chunks.push(plain);
-            total += plain.length;
-            onProgress?.((i + 1) / ref.parts);
+            const wires = unframe(new Uint8Array(await res.arrayBuffer()) as Bytes);
+            if (!wires || wires.length !== n) throw new Error('a part of the file did not verify');
+            for (let k = 0; k < n; k++) {
+                const plain = await unsealPart(this.key, this.addr, ref.id, from + k, ref.parts, wires[k]);
+                if (!plain) throw new Error('a part of the file did not verify');
+                chunks.push(plain);
+                total += plain.length;
+            }
+            onProgress?.((from + n) / ref.parts);
         }
         if (total !== ref.size) throw new Error('the file is not the size the GM announced');
 
@@ -167,10 +195,44 @@ export class BlobChannel {
         let at = 0;
         for (const c of chunks) { whole.set(c, at); at += c.length; }
         if (await sha256Hex(whole) !== ref.sha) throw new Error('the file does not match what the GM shared');
-        /* The validator already refused any other type; this is the line that
-           decides what the blob URL opens as, so it checks again. */
-        return new Blob([whole], { type: cleanMime(ref.mime) });
+        const blob = new Blob([whole], { type: mime });
+        void keepFile(ref.sha, blob);
+        return blob;
     }
+}
+
+/** What `inventory` found: whether a file is still whole on the relay. */
+export interface Inventory {
+    has(ref: BlobRef): boolean;
+}
+
+/* A batch on the wire: each part prefixed by its length, 4 bytes big-endian
+   (worker/src/index.ts reads and writes the same). */
+function frame(parts: Bytes[]): Bytes {
+    const out = new Uint8Array(parts.reduce((n, p) => n + 4 + p.length, 0)) as Bytes;
+    const view = new DataView(out.buffer);
+    let at = 0;
+    for (const p of parts) {
+        view.setUint32(at, p.length);
+        out.set(p, at + 4);
+        at += 4 + p.length;
+    }
+    return out;
+}
+
+function unframe(body: Bytes): Bytes[] | null {
+    const view = new DataView(body.buffer, body.byteOffset, body.byteLength);
+    const parts: Bytes[] = [];
+    let at = 0;
+    while (at < body.length) {
+        if (at + 4 > body.length) return null;
+        const len = view.getUint32(at);
+        at += 4;
+        if (at + len > body.length) return null;
+        parts.push(body.slice(at, at + len) as Bytes);
+        at += len;
+    }
+    return parts;
 }
 
 /** The relay no longer has the file: the GM's page sends it again. */

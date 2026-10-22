@@ -87,6 +87,10 @@ export interface WireTrack {
     yt?: string;
     /** Seconds; 0 while unknown. */
     dur: number;
+    /** A file the GM wants every player to have before it is needed. Any
+        other file is fetched only once it is on a deck. Absent, never
+        false, so a library without one still reads on an older page. */
+    pre?: true;
 }
 
 /** The two decks the GM mixes: a Background bed and the current Scene. */

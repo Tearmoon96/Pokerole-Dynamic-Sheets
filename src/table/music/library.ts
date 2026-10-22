@@ -26,6 +26,9 @@ export interface LibEntry {
     dur: number;
     /** Players see the title. Off unless the GM turns it on. */
     reveal?: boolean;
+    /** Players download it ahead of time. Off unless the GM turns it on:
+        otherwise a file reaches the table only once it is on a deck. */
+    pre?: boolean;
 }
 
 export interface SavedDecks {

@@ -324,6 +324,16 @@ additional data (so the store cannot reorder, drop or swap them), and only a
 reference — id, size and SHA-256 — travels on the socket, signed by the GM. The
 store is still blind. Only the GM writes to it: the host's page claims the room
 with a random upload key on connect, and the relay keeps only that key's hash.
+Parts travel eight to a request, both ways, and the GM checks what survived with
+one request for the whole room: the relay's free plan counts requests, not
+bytes. A player keeps every file it has verified, by its SHA-256, in IndexedDB
+([`fileCache.ts`](src/table/fileCache.ts), 400 MB, least recently used out
+first), so a file met again — another table, another week, a new upload of the
+same track — costs the relay nothing. The GM's page keeps the room's files
+under its 256 MB itself (music 128 MB, maps 96 MB): past the quota the relay
+drops the oldest files, and a dropped file used to be sent again, dropping
+another, with every player downloading each one again, for as long as the
+table was open.
 
 **The maps** ([`mapShare.ts`](src/table/mapShare.ts)) are pictures the GM's
 browser uploads as they arrive. The GM can hold up to twelve and shows at most
@@ -351,7 +361,13 @@ picture players already have again without them — never the map as it is now,
 which may hold edits not yet synced.
 
 **The music** ([`src/table/music/`](src/table/music/)) is never streamed. Every
-browser holds its own copy of each track — files downloaded ahead of time,
+browser holds its own copy of each track — a file reaches the relay and the
+players once it is on a deck, or ahead of time if the GM preloads it (the
+cloud on its row, `pre` on the wire); a WAV, FLAC or high-bitrate file is
+re-encoded to Opus in WebM by the GM's own browser when it is added
+([`compact.ts`](src/table/music/compact.ts), WebCodecs, with Cues so it seeks
+at once); when the music's share is full the GM's page takes the least
+recently used track off the relay, never one on a deck;
 YouTube links in each player's own YouTube player, kept on the page for its
 sound but never shown — and the GM publishes only
 what the two decks (Background and Scene) are doing — a track is on one deck

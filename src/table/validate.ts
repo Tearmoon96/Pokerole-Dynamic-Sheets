@@ -186,7 +186,8 @@ export function parseFile(raw: unknown): WireFile | null {
 }
 
 function parseTrack(raw: unknown): WireTrack | null {
-    if (!isRecord(raw) || !exactly(raw, ['id', 'title', 'kind', 'file', 'yt', 'dur'])) return null;
+    if (!isRecord(raw) || !exactly(raw, ['id', 'title', 'kind', 'file', 'yt', 'dur', 'pre'])) return null;
+    if (raw.pre !== undefined && (raw.pre !== true || raw.kind !== 'file')) return null;
     const id = idText(raw.id);
     /* '' is a title the GM has not revealed. */
     const title = raw.title === '' ? '' : cleanText(raw.title, LIMITS.MAX_TITLE);
@@ -196,7 +197,7 @@ function parseTrack(raw: unknown): WireTrack | null {
         if (raw.yt !== undefined) return null;
         const file = parseFile(raw.file);
         if (!file || !/^(audio|video)\/|^application\/octet-stream$/.test(file.mime)) return null;
-        return { id, title, kind: 'file', file, dur };
+        return raw.pre ? { id, title, kind: 'file', file, dur, pre: true } : { id, title, kind: 'file', file, dur };
     }
     if (raw.kind === 'yt') {
         if (raw.file !== undefined) return null;
