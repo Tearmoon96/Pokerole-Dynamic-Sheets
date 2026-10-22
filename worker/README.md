@@ -114,9 +114,9 @@ it clears the override again.
 
 **Use two separate browser profiles**, not two tabs. The lobby session and the
 signing keys live in localStorage and IndexedDB, which every tab of one profile
-shares — so a second tab would restore the first tab's identity and believe it
-is the same person. A normal window plus a private window is the quickest split;
-a second browser gives you a third seat.
+shares — so a second tab restores the first tab's identity, IS the same person,
+and takes the table over while the first tab stands down. A normal window plus
+a private window is the quickest split; a second browser gives you a third seat.
 
 Then: create a table in one, copy the invite, join from the other.
 

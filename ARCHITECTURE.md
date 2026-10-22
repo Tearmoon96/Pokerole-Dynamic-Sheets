@@ -273,6 +273,21 @@ session then records that the GM answered, so a reload rejoins even while the
 GM is away. A GM rejoining is checked against the room address kept beside
 the host key.
 
+**One tab per table in a browser.** Every tab of a browser profile is the same
+person at a table — the same keys, the same saved session — so a second tab
+used to be a second copy of them: for the GM, two hosts blind to each other
+(a page drops what its own key signed) that both rolled every request. A tab
+at a table holds a Web Lock named after it
+([`tabLock.ts`](src/table/tabLock.ts)). The newest tab takes it, a reload
+included, and the tab it came from stands down with a **Use it here** button,
+saying no goodbye to the Map Maker or the GM screen: their links carry on
+with the new tab. The GM's feed, hidden rolls included, is kept for the table
+being hosted, so the new tab and a reload start with it. A player says hello
+as soon as a GM page with a new session id speaks, so a GM page that has just
+started knows the table at once rather than dropping their rolls until their
+next heartbeat. A second browser or device is still a player: the host key
+cannot leave the browser that made the table.
+
 **A bad actor at the table is bounded, not trusted.** Anyone with the password
 reads the whole table, by design, and a kick is not a ban — a new table is.
 Within that, a patched page cannot: take someone's name (the host numbers a

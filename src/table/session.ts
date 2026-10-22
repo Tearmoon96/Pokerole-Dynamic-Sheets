@@ -45,7 +45,8 @@ import { CombatShare } from './combatShare';
 import { RULES_KEY, readGmMegaRules, writeTableMegaRules } from '../lib/megaRules';
 import { MusicController } from './music/music';
 import type { TransportStatus } from './transport';
-import { cleanText, parseInner, parseSigned, safeParse } from './validate';
+import { TabLock } from './tabLock';
+import { cleanText, parseInner, parseRoll, parseSigned, safeParse } from './validate';
 
 /** A roll as this browser holds it. `hidden` is set only on the host's own
     machine, for a roll that was never published — it is not a wire field and
@@ -63,7 +64,8 @@ export interface PendingRoll {
     at: number;
 }
 
-export type Phase = 'setup' | 'joining' | 'live';
+/** `elsewhere`: another tab of this browser took the table (tabLock.ts). */
+export type Phase = 'setup' | 'joining' | 'live' | 'elsewhere';
 
 /** A roll set up from a character sheet and waiting for the Roll button. The
     player may still change the dice (or the bonus) for a modifier first. */
@@ -225,6 +227,38 @@ function clearSession(): void {
     try { localStorage.removeItem(SESSION_KEY); } catch { /* nothing to do */ }
 }
 
+/* The GM's own feed. Players get theirs back from the GM, but the GM's page
+   is the one copy there is — its hidden rolls exist nowhere else — so it is
+   kept for the table being hosted, and a reload, or the table moving to
+   another tab (tabLock.ts), starts with it. One table's at a time. */
+const FEED_KEY = 'pokerole_table_feed';
+
+function saveFeed(lobbyId: string, rolls: LocalRoll[]): void {
+    const kept = rolls.map((r) => (r.hidden ? { ...stripLocal(r), hidden: true } : stripLocal(r)));
+    try { localStorage.setItem(FEED_KEY, JSON.stringify({ lobbyId, rolls: kept })); } catch { /* full, or private mode */ }
+}
+
+function loadFeed(lobbyId: string): LocalRoll[] {
+    try {
+        const raw = JSON.parse(localStorage.getItem(FEED_KEY) || 'null');
+        if (!raw || raw.lobbyId !== lobbyId || !Array.isArray(raw.rolls)) return [];
+        const out: LocalRoll[] = [];
+        for (const r of raw.rolls.slice(0, LIMITS.HISTORY)) {
+            if (!r || typeof r !== 'object') continue;
+            const { hidden, ...wire } = r as Record<string, unknown>;
+            const roll = parseRoll(wire);
+            if (roll) out.push(hidden === true ? { ...roll, hidden: true } : roll);
+        }
+        return out;
+    } catch {
+        return [];
+    }
+}
+
+function forgetFeed(): void {
+    try { localStorage.removeItem(FEED_KEY); } catch { /* nothing to do */ }
+}
+
 type Listener = () => void;
 
 export class TableStore {
@@ -311,6 +345,14 @@ export class TableSession {
     /** sender -> their session ids, least recently heard first -> the last
         sequence number taken from each. */
     private seen = new Map<string, Map<string, number>>();
+    /** Player: the session id the GM's page last spoke with. A new one means
+        that page started again — see dispatch. */
+    private hostSid = '';
+
+    /** This tab's hold on the table, and whether it was at it when another
+        tab took it — then taking it back needs no GM to answer first. */
+    private tabLock = new TabLock();
+    private wasLive = false;
 
     /* Host-side bookkeeping. Empty on a player. */
     private names = new Map<string, string>();
@@ -451,12 +493,20 @@ export class TableSession {
                saved session, never from a password typed into the form. */
             if (!addr && trusted) await rememberHostRoom(lobbyId, room.addr);
         }
+        const uploadKey = isHost ? await hostUploadKey(lobbyId) : null;
+        /* Before anything starts: any other tab of this browser at this
+           table stands down first (tabLock.ts). Nothing from here waits on
+           anything until the socket is started, so a tab that loses the
+           table later is one that has wholly begun, and teardown stops all
+           of it. */
+        await this.tabLock.take(lobbyId, () => this.movedAway());
         this.room = room;
         this.identity = identity;
-        this.files = new BlobChannel(this.room.key, this.room.addr, isHost ? await hostUploadKey(lobbyId) : null);
+        this.files = new BlobChannel(this.room.key, this.room.addr, uploadKey);
         this.sid = randomId(6);
         this.seq = 0;
         this.seen.clear();
+        this.hostSid = '';
         this.queue = [];
         this.hostSeenAt = isHost ? Date.now() : 0;
 
@@ -490,7 +540,7 @@ export class TableSession {
             s.myName = name;
             s.isHost = isHost;
             s.members = isHost ? [{ id: identity.id, name, host: true }] : [];
-            s.rolls = [];
+            s.rolls = isHost ? loadFeed(lobbyId) : [];
             s.pending = [];
             s.hostOnline = isHost;
             s.error = '';
@@ -517,6 +567,8 @@ export class TableSession {
             if (this.files !== files) return;
             this.map.onMissing = (id) => this.music.reportMissing(id);
             await this.map.begin(isHost, lobbyId);
+            /* Left meanwhile, or moved to another tab: no music here. */
+            if (this.files !== files) return;
             await this.music.begin(isHost, lobbyId);
         })();
     }
@@ -546,7 +598,10 @@ export class TableSession {
             : 'Could not reach the table\u2019s relay. Check your connection and try again.');
     }
 
-    private teardown(): void {
+    /** `moved`: the table carries on in another tab of this browser, so the
+        Map Maker and the GM screen get no goodbye — it would end a live map
+        and drop the fight's link — and the new tab's beat simply takes over. */
+    private teardown(moved = false): void {
         this.verifying = null;
         if (this.verifyTimer !== null) {
             clearTimeout(this.verifyTimer);
@@ -558,9 +613,9 @@ export class TableSession {
         }
         if (this.rosterTimer !== null) { clearTimeout(this.rosterTimer); this.rosterTimer = null; }
         if (this.greetTimer !== null) { clearTimeout(this.greetTimer); this.greetTimer = null; }
-        this.map.end();
+        this.map.end(moved);
         this.music.end();
-        this.combat.end();
+        this.combat.end(moved);
         window.removeEventListener('storage', this.onRulesSaved);
         this.publishedRules = '';
         this.clock.stop();
@@ -569,10 +624,33 @@ export class TableSession {
         this.room = null;
         this.identity = null;
         this.files = null;
+        this.tabLock.drop();
     }
 
     private fail(message: string): void {
         this.store.update((s) => { s.phase = 'setup'; s.error = message; });
+    }
+
+    /** Another tab of this browser took the table: this one lets go of all of
+        it and says so. The lobby, password and name stay, to take it back. */
+    private movedAway(): void {
+        this.wasLive = this.store.state.phase === 'live';
+        this.teardown(true);
+        this.store.update((s) => {
+            s.phase = 'elsewhere';
+            s.joinWait = false;
+            s.pending = [];
+            s.prep = null;
+        });
+    }
+
+    /** Takes the table back from the tab that has it, which stands down in
+        turn. A tab that was still waiting for the GM to answer waits again. */
+    async resume(): Promise<void> {
+        const s = this.store.state;
+        if (s.phase !== 'elsewhere') return;
+        const saved = this.wasLive ? { lobbyId: s.lobbyId, password: s.password, name: s.myName, ok: true } : null;
+        await this.joinLobby(s.lobbyId, s.password, s.myName, saved);
     }
 
     /** Leaves for good: stops the socket, forgets the saved session, and resets.
@@ -581,6 +659,7 @@ export class TableSession {
     leave(): void {
         /* A player's table rules go with the table; a GM's own stay theirs. */
         if (!this.store.state.isHost) writeTableMegaRules('', null);
+        else forgetFeed();
         this.teardown();
         clearSession();
         this.store.state = initialState();
@@ -825,6 +904,15 @@ export class TableSession {
 
         this.hostSeenAt = Date.now();
         if (this.verifying) this.joined();
+
+        /* The GM's page has started (again): a reload, the table moving to
+           another tab of the GM's browser, or a GM arriving after us. It knows
+           nobody yet and drops a roll asked for by anyone who has not said
+           hello, so say it now rather than at the next heartbeat. */
+        if (inner.sid !== this.hostSid) {
+            this.hostSid = inner.sid;
+            void this.announce();
+        }
 
         switch (body.k) {
             case 'roster':
@@ -1153,6 +1241,7 @@ export class TableSession {
         this.store.update((s) => {
             s.rolls = [{ ...entry, hidden, seenAt: Date.now() }, ...s.rolls].slice(0, LIMITS.HISTORY);
         });
+        saveFeed(this.store.state.lobbyId, this.store.state.rolls);
 
         /* A hidden roll is not published at all, rather than published with a
            flag telling clients to look away. Nothing leaves this browser, so
@@ -1259,6 +1348,7 @@ export class TableSession {
     clearFeed(): void {
         if (!this.store.state.isHost) return;
         this.store.update((s) => { s.rolls = []; });
+        saveFeed(this.store.state.lobbyId, []);
         void this.publish({ k: 'clear' });
     }
 

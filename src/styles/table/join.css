@@ -141,6 +141,15 @@ button.big {
     box-shadow: 0 0 10px var(--accent-glow);
 }
 
+/* ---------------- The table moved to another tab ---------------- */
+
+.elsewhere-id {
+    margin: 0;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
 /* Back to the chooser, in the card's corner — the join screen has no bar. */
 .join-home {
     position: absolute;

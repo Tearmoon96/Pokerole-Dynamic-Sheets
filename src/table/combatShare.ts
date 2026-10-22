@@ -144,12 +144,14 @@ export class CombatShare {
         this.api.changed();
     }
 
-    end(): void {
+    /** `quiet`: the table moved to another tab rather than closing, so the
+        GM screen is not told goodbye — it would drop the fight's link. */
+    end(quiet = false): void {
         if (this.beat !== null) clearInterval(this.beat);
         if (this.pump !== null) clearInterval(this.pump);
         this.beat = this.pump = null;
         if (this.link) {
-            this.post({ t: 'bye' });
+            if (!quiet) this.post({ t: 'bye' });
             this.link.removeEventListener('message', this.onLink);
             this.link.close();
             this.link = null;

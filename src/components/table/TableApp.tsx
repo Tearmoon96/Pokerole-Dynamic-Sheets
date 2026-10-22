@@ -3,6 +3,7 @@
 import { useTable } from '../../table/TableContext';
 import { isHostedOrigin } from '../../data/paths';
 import { cryptoAvailable } from '../../table/crypto';
+import { ElsewhereNotice } from './ElsewhereNotice';
 import { JoinScreen } from './JoinScreen';
 import { OfflineNotice } from './OfflineNotice';
 import { TableView } from './TableView';
@@ -25,5 +26,6 @@ export function TableApp() {
         );
     }
 
+    if (state.phase === 'elsewhere') return <ElsewhereNotice />;
     return state.phase === 'live' ? <TableView /> : <JoinScreen />;
 }

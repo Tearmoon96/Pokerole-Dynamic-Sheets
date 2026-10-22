@@ -219,7 +219,9 @@ export class MapShare {
         this.openLink();
     }
 
-    end(): void {
+    /** `quiet`: the table moved to another tab rather than closing, so the
+        Map Maker is not told goodbye — that would end its live map. */
+    end(quiet = false): void {
         this.generation++;
         this.abort?.abort();
         this.abort = null;
@@ -229,7 +231,7 @@ export class MapShare {
         this.checkTimer = null;
         this.checkAt = 0;
         if (this.channel) {
-            this.post({ t: 'bye' });
+            if (!quiet) this.post({ t: 'bye' });
             this.channel.close();
             this.channel = null;
         }
