@@ -53,6 +53,13 @@ const RATE_MAX = 40;
    hold connections open on a free plan. Clients heartbeat every 25s. */
 const IDLE_MS = 6 * 60 * 60 * 1000;
 
+/* The idle wipe takes the files but keeps the claim (the hash of the GM's
+   upload key) this much longer. Wiped with the rest, the claim reopened after
+   every six quiet hours, and a player with the password could take it between
+   two sessions with one request — the GM could then share no map or music on
+   that table again. Kept, it costs ~100 bytes a room. */
+const CLAIM_KEEP_MS = 90 * 24 * 60 * 60 * 1000;
+
 /* 160 bits of room address, base32. Anything else is not one of ours, and is
    refused before a Durable Object is ever created — otherwise a crawler could
    spawn actors just by walking URLs. */
@@ -269,9 +276,16 @@ export class TableRoom implements DurableObject {
     private async rearm(now: number): Promise<void> {
         if (now - this.armedAt < REARM_MS) return;
         this.armedAt = now;
-        await this.state.storage.setAlarm(now + IDLE_MS);
-        const stats = await this.state.storage.get<RoomStats>(STATS_KEY);
-        if (stats) await this.state.storage.put(STATS_KEY, { ...stats, seen: now });
+        /* Best effort, like the counter: storage that refuses writes must not
+           cost anyone their socket — the relay can still relay. */
+        try {
+            await this.state.storage.setAlarm(now + IDLE_MS);
+            /* Activity calls off a kept claim's expiry (see alarm). A room that
+               never used the file store has no table to delete from. */
+            try { this.sql.exec("DELETE FROM meta WHERE k = 'expire'"); } catch { /* no file store */ }
+            const stats = await this.state.storage.get<RoomStats>(STATS_KEY);
+            if (stats) await this.state.storage.put(STATS_KEY, { ...stats, seen: now });
+        } catch { /* the next activity tries again */ }
     }
 
     /* ------------------------------------------------------- the counter */
@@ -297,6 +311,14 @@ export class TableRoom implements DurableObject {
     /** A socket just opened: `n` are open now, itself included. */
     private async joined(n: number, now: number): Promise<void> {
         this.count('join', [n]);
+        /* Never throws: this runs before the socket is handed back, so a
+           storage write refused here would keep everyone out of the table. */
+        try {
+            await this.track(n, now);
+        } catch { /* the counter is best effort */ }
+    }
+
+    private async track(n: number, now: number): Promise<void> {
         let stats = await this.state.storage.get<RoomStats>(STATS_KEY);
         /* Alone in a room that still has a session: the last one ended
            without a close reaching us (a redeploy, an eviction). Count it
@@ -314,8 +336,10 @@ export class TableRoom implements DurableObject {
     /** A socket went away; the last one out ends the session. */
     private async left(ws: WebSocket): Promise<void> {
         if (this.openSockets(ws) > 0) return;
-        const stats = await this.state.storage.get<RoomStats>(STATS_KEY);
-        if (stats) await this.endSession(stats, Date.now());
+        try {
+            const stats = await this.state.storage.get<RoomStats>(STATS_KEY);
+            if (stats) await this.endSession(stats, Date.now());
+        } catch { /* the counter is best effort */ }
     }
 
     async fetch(req: Request): Promise<Response> {
@@ -400,16 +424,31 @@ export class TableRoom implements DurableObject {
         await this.left(ws);
     }
 
+    /** Two alarms: the idle wipe, IDLE_MS after the last activity, and —
+        for a room whose file store was claimed — the claim's expiry,
+        CLAIM_KEEP_MS after that, unless activity called it off first. */
     async alarm(): Promise<void> {
         /* No alarm is set any more: the next activity must set one. */
         this.armedAt = 0;
-        const stats = await this.state.storage.get<RoomStats>(STATS_KEY);
-        if (stats) this.count('session', [stats.peak, Math.max(0, Math.round((stats.seen - stats.start) / 60_000))]);
+        this.schema();
+        const now = Date.now();
         for (const ws of this.state.getWebSockets()) {
             try { ws.close(1001, 'table idle'); } catch { /* already gone */ }
         }
-        /* An abandoned table's files and upload key go with it. */
-        await this.state.storage.deleteAll();
+        const expire = this.sql.exec<{ v: string }>("SELECT v FROM meta WHERE k = 'expire'").toArray()[0];
+        const claimed = this.sql.exec("SELECT v FROM meta WHERE k = 'key'").toArray().length > 0;
+        if (!claimed || (expire && now >= Number(expire.v))) {
+            /* Nothing worth keeping, or kept long enough: all of it goes. */
+            await this.state.storage.deleteAll();
+            return;
+        }
+        const stats = await this.state.storage.get<RoomStats>(STATS_KEY);
+        if (stats) this.count('session', [stats.peak, Math.max(0, Math.round((stats.seen - stats.start) / 60_000))]);
+        await this.state.storage.delete(STATS_KEY);
+        /* An abandoned table's files go; its claim stays theirs. */
+        this.sql.exec('DELETE FROM blobs');
+        this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES ('expire', ?)", String(now + CLAIM_KEEP_MS));
+        await this.state.storage.setAlarm(now + CLAIM_KEEP_MS);
     }
 
     /* ------------------------------------------------------- the file store */

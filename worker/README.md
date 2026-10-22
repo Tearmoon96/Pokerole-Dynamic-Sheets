@@ -18,6 +18,7 @@ That is why the limits below are all about volume and never about content.
 | Sockets per room | 16 | A leaked password cannot become an unbounded room |
 | Rate | 40 messages / 10 s per socket | One loud client cannot drown the others |
 | Idle teardown | 6 hours | Abandoned rooms do not hold connections open, and their files are deleted |
+| Claim kept | 90 days | The GM's claim survives the idle teardown, so a player cannot take the file store between sessions |
 | File part | 1 MiB | Under SQLite's 2 MB row; a file is up to 64 parts. A longer upload is read to its end (an unread body breaks the runtime) but no more than a batch of it is held |
 | Batch | 8 parts | One request carries up to 8 parts either way: the free plan counts requests, not bytes |
 | Files per room | 256 MB | The oldest files go first when a new part would pass it. The GM's page keeps music (128 MB) and maps (96 MB) under it, so this is a last resort |
