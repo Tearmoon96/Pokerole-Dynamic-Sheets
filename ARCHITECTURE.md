@@ -432,6 +432,39 @@ modifier can still change the dice; a player's attack, Evasion or Clash in
 the fight lights the GM's combat row ([`rollPings.ts`](src/gm/rollPings.ts)).
 The relay is unchanged.
 
+### The GM's sheets and gifts
+
+**A roster trainer can be shared** with the table, whole, team included
+([`npcShare.ts`](src/table/npcShare.ts)). The GM screen only writes who sees
+it and who may change it (`GmState.npcShares`, the menu in
+[`NpcShareMenu.tsx`](src/components/gm/NpcShareMenu.tsx)); the hosting table
+in the same browser reads that, and the trainer, straight from localStorage.
+What goes out is the trainer in pieces — the trainer itself, and each team
+Pokémon by its uid — deflated ([`zpart.ts`](src/table/zpart.ts)), only the
+pieces that changed, after 1.5 s without a further change. Nothing goes at
+rest; someone arriving gets every shared trainer whole, and a copy that
+missed a piece asks for it again (`npcwant`). Pictures go once through the
+file store, by hash. PC boxes and bookmarks are never shared.
+
+On a player's page each shared trainer is a working set of its own,
+`pokerole_table_npc_<id>`, listed in `pokerole_table_npcs`
+([`npcMode.ts`](src/state/npcMode.ts)). The License and the card opened with
+`?npc=<id>` take that key as their `WORKING_KEY`, so they edit it with no code
+of their own; read only, their stores refuse every change. A player allowed
+to edit has their changes sent back the same way (`npcset`), and the GM's
+table writes them into the GM's working set, where the GM screen, the
+License and the cards see them — which is why the License now follows
+`storage` events. A piece edited and not yet sent is never overwritten by
+one arriving. Who sees a trainer is enforced by players' pages, not by the
+encryption: the room has one key.
+
+**A wild Pokémon can be given** to a player (`GmState.gifts`, `gift`): they
+pick a trainer and it goes to the first empty team slot, else a PC box
+([`addMonToTrainer`](src/state/boxes.ts), which the License's Capture uses
+too). The answer (`giftr`) is kept in `pokerole_table_gift_results` until the
+GM screen applies it: accepted, the wild leaves the roster. The relay is
+unchanged.
+
 The table's guided tour (one for the GM, one for players) is the shared one
 described under [Guided tours](#guided-tours); its steps are in
 [`tour/steps.tsx`](src/components/table/tour/steps.tsx), and the GM's map and

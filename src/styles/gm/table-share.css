@@ -1,0 +1,132 @@
+/* The roster's two menus for the rolling table (NpcShareMenu.tsx): who sees
+   a shared trainer and who may change it, and a wild given to a player. A
+   portal on <body>, placed against its button like the folder menu. */
+
+.table-share-menu {
+    position: fixed;
+    z-index: 75;
+    width: min(19rem, calc(100vw - 16px));
+    max-height: min(26rem, 80vh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.55rem 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--panel-solid);
+    color: var(--text-primary);
+    box-shadow: 0 12px 28px #000000a6, 0 0 16px var(--border-glow);
+    font-size: 0.8rem;
+}
+
+.table-share-menu .tsm-head {
+    font-weight: 700;
+    margin-bottom: 0.45rem;
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.table-share-menu .tsm-check {
+    display: flex;
+    gap: 0.45rem;
+    align-items: center;
+    cursor: pointer;
+}
+
+.table-share-menu .tsm-seg {
+    display: flex;
+    margin: 0.5rem 0;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table-share-menu .tsm-seg button {
+    flex: 1;
+    padding: 0.3rem 0.4rem;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.table-share-menu .tsm-seg button.on {
+    background: var(--accent);
+    color: #fff;
+}
+
+.table-share-menu .tsm-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    column-gap: 0.7rem;
+    row-gap: 0.25rem;
+    align-items: center;
+}
+
+.table-share-menu .tsm-row {
+    display: contents;
+}
+
+.table-share-menu .tsm-col {
+    font-size: 0.7rem;
+    opacity: 0.7;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.table-share-menu .tsm-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.table-share-menu input[type="checkbox"] {
+    justify-self: center;
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--accent);
+}
+
+.table-share-menu .tsm-note {
+    margin: 0.5rem 0 0;
+    opacity: 0.75;
+    line-height: 1.35;
+}
+
+.table-share-menu .tsm-wide {
+    display: flex;
+    gap: 0.45rem;
+    align-items: center;
+    width: 100%;
+    margin-top: 0.3rem;
+    padding: 0.38rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.table-share-menu .tsm-wide:hover:not(:disabled) {
+    border-color: var(--accent);
+}
+
+/* The button of a trainer that is shared, or a wild on offer. */
+.trainer-actions .icon-btn.on,
+.mon-actions .icon-btn.on {
+    color: var(--accent);
+}
+
+html[data-pointer="coarse"] .table-share-menu .tsm-wide,
+html[data-pointer="coarse"] .table-share-menu .tsm-seg button {
+    min-height: 44px;
+}
+
+html[data-pointer="coarse"] .table-share-menu input[type="checkbox"] {
+    width: 1.4rem;
+    height: 1.4rem;
+}

@@ -15,6 +15,7 @@ import { useTipButtonState } from './MoveTip';
 import { AilmentPopover } from './AilmentPopover';
 import { cycleStatus } from '../../gm/entities';
 import { useCombatLink } from '../../gm/useCombatLink';
+import { useGiftResults } from '../../gm/useGiftResults';
 import { WORKING_KEY } from '../../state/constants';
 import { WILD_OPEN_KEY } from '../../card/cardContext';
 import { ActivePanelCtx, panelTabs } from '../../gm/phoneBoard';
@@ -49,6 +50,8 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
 
     /* The fight on the rolling table, when one is hosted in this browser. */
     useCombatLink(store, dexById);
+    /* Wild Pokémon given to players there, and their answers. */
+    useGiftResults(store);
 
     /* Keeping the roster in step with the trainer sheet.
 

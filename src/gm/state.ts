@@ -5,7 +5,7 @@ import {
 import { normalizeFolders } from './folders';
 import { DEFAULT_GEN_OPTS, RECENT_ROLLS } from './generator';
 import type { GmGenOpts } from './generator';
-import type { GmCombat, GmCombatant, GmLayout, GmState } from './types';
+import type { GmCombat, GmCombatant, GmGift, GmLayout, GmNpcShare, GmState } from './types';
 
 export function uid(): string {
     return 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -27,6 +27,8 @@ export function defaultGmState(): GmState {
         combatFocus: first.gid,
         tableCombat: null,
         tablePcs: {},
+        npcShares: {},
+        gifts: [],
         notes: '',
         noteSheets: [],
         noteFolders: [],
@@ -188,6 +190,8 @@ export function normalizeGmState(raw: unknown): GmState {
         ? r.combatFocus! : s.combats[0].gid;
     s.tableCombat = s.combats.some((c) => c.gid === r.tableCombat) ? r.tableCombat! : null;
     s.tablePcs = r.tablePcs && typeof r.tablePcs === 'object' && !Array.isArray(r.tablePcs) ? r.tablePcs : {};
+    s.npcShares = normalizeNpcShares(r.npcShares, Array.isArray(s.trainerIds) ? s.trainerIds : []);
+    s.gifts = normalizeGifts(r.gifts);
     s.dice = Object.assign({ count: 2, sides: 6, history: [] }, r.dice);
     s.nameOpts = Object.assign({}, DEFAULT_NAME_OPTS, r.nameOpts);
     s.genOpts = normalizeGenOpts(r.genOpts);
@@ -240,6 +244,33 @@ export function normalizeGmState(raw: unknown): GmState {
     s.rosterFolderOf = filed;
     s.layout = normalizeLayout(r.layout, s.combats.map((c) => combatPanelKey(c.gid)));
     return s;
+}
+
+const memberIds = (v: unknown): string[] =>
+    (Array.isArray(v) ? v : []).filter((x): x is string => typeof x === 'string' && /^[A-Z2-7]{16}$/.test(x));
+
+/** Shares of trainers still on the roster, at most MAX_NPC_SHARES. Read by
+    the rolling table as well (npcShare.ts), so it must hold whatever the
+    stored state had. */
+export const MAX_NPC_SHARES = 8;
+export function normalizeNpcShares(raw: unknown, trainerIds: string[]): Record<string, GmNpcShare> {
+    const out: Record<string, GmNpcShare> = {};
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+    for (const [id, v] of Object.entries(raw as Record<string, unknown>)) {
+        if (!trainerIds.includes(id) || !v || typeof v !== 'object') continue;
+        if (Object.keys(out).length >= MAX_NPC_SHARES) break;
+        const share = v as Record<string, unknown>;
+        out[id] = { to: share.to === null ? null : memberIds(share.to), edit: memberIds(share.edit) };
+    }
+    return out;
+}
+
+export function normalizeGifts(raw: unknown): GmGift[] {
+    return (Array.isArray(raw) ? raw : []).filter((g): g is GmGift => !!g && typeof g === 'object'
+        && typeof g.oid === 'string' && typeof g.gid === 'string' && typeof g.dexId === 'string'
+        && typeof g.to === 'string' && /^[A-Z2-7]{16}$/.test(g.to)
+        && !!g.sheet && typeof g.sheet === 'object')
+        .map((g) => ({ ...g, toName: typeof g.toName === 'string' ? g.toName : '', at: Number(g.at) || 0 }));
 }
 
 export function loadGmState(): GmState {

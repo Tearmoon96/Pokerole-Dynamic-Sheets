@@ -1,0 +1,52 @@
+/* The GM's shared trainers in a player's side column (NpcSheets.tsx), and a
+   wild Pokémon the GM gives them (GiftDialog.tsx). The rows are the roster's. */
+
+.npc-sheets { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.npc-card .trainer-name { padding-right: 2.5rem; }
+
+.npc-access {
+    font-size: 0.72rem;
+    opacity: 0.75;
+}
+
+.npc-access.edit { color: var(--grass-color, #4ade80); opacity: 1; }
+
+.gift-dialog {
+    width: min(26rem, 92vw);
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.gift-mon {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+}
+
+.gift-mon .gm-dialog-text { margin: 0; }
+
+.gift-trainer {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    font-size: 0.82rem;
+}
+
+.gift-trainer select {
+    flex: 1;
+    min-width: 0;
+    background: var(--panel-solid);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.3rem 0.45rem;
+    font: inherit;
+}
+
+.gift-trainer select option { background: var(--panel-solid); color: var(--text-primary); }
+
+.gift-full { color: var(--accent); }
+
+html[data-device="phone"] .gift-trainer select { font-size: 16px; }

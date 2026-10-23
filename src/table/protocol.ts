@@ -235,7 +235,32 @@ export type Body =
     | { k: 'enter'; rid: string; chars: { key: CharKey; bonus: number }[] }
     /** Player to host: my turn is over, I delay it, or I spent an action on an
         attack, an Evasion or a Clash. */
-    | { k: 'turn'; op: TurnOp; id: string; after?: string; mv?: string };
+    | { k: 'turn'; op: TurnOp; id: string; after?: string; mv?: string }
+    /** Host only. The GM's trainers shared at the table, by id. A player's
+        copy of any other is dropped. */
+    | { k: 'npcs'; ids: string[] }
+    /** Host only. A shared trainer (npcShare.ts): whole when `full`, else the
+        pieces that changed since `base`. `to` is who may see it (null: the
+        whole table), `edit` who may change it. Each piece is a zpart: `t` the
+        trainer, `m` a team Pokémon by its key in `order`, the six slots. */
+    | {
+        k: 'npc'; id: string; rev: number; base: number; full: boolean; name: string;
+        to: string[] | null; edit: string[]; order: string[]; t?: string; m?: Record<string, string>;
+    }
+    /** Player to host: my changes to a shared trainer I may edit. */
+    | { k: 'npcset'; id: string; oid: string; order?: string[]; t?: string; m?: Record<string, string> }
+    /** Player to host: I missed a piece of this one; all of it again, please. */
+    | { k: 'npcwant'; id: string }
+    /** Host only. The GM gives `to` a wild Pokémon: `z` is its card, packed. */
+    | { k: 'gift'; to: string; oid: string; name: string; z: string }
+    /** Host only. The GM took a gift back before it was answered. */
+    | { k: 'giftoff'; oid: string }
+    /** Player to host: what became of a gift. */
+    | { k: 'giftr'; oid: string; ok: boolean; where: GiftWhere };
+
+/** Where an accepted gift went: the team, a PC box, or nowhere (refused, or
+    no room anywhere). */
+export type GiftWhere = 'team' | 'box' | '';
 
 /** `acc`: an attack rolled. Like an Evasion or a Clash it is an action done:
     the GM screen fills its pip and marks the move (`mv`) used for the Round. */
@@ -307,6 +332,11 @@ export const LIMITS = {
     /** Moves marked used in a Round, per combatant: more than any Pokémon
         knows (Insight + 2 tops out well under it). */
     MAX_USED_MOVES: 16,
+    /** Trainers the GM may share at once, and gifts waiting for an answer. */
+    MAX_NPCS: 8,
+    MAX_GIFTS: 6,
+    /** Slots on a team. */
+    TEAM_SLOTS: 6,
 } as const;
 
 /** The types a shared file may carry, and the only ones a downloaded file is

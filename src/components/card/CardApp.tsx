@@ -29,6 +29,7 @@ import { activeMegaRules } from '../../lib/megaRules';
 import type { CardSheet } from '../../card/types';
 import { readWorking, trainerMonEntry } from '../../card/persistence';
 import { cardStorageKey, WORKING_KEY } from '../../card/cardContext';
+import { npcReadOnly } from '../../state/npcMode';
 import {
     addWildOpen, forgetWildFileHandle, newWildId, readWildOpen, wildUrl, writeWildOpen,
 } from '../../card/wild';
@@ -141,7 +142,7 @@ export function CardApp() {
         Evolution and its revert follow the rules in force (src/card/mega.ts). */
     const transformInto = useCallback((targetId: string, opts: { mega?: boolean; revert?: boolean; ownMoves?: boolean } = {}) => {
         const targetDex = data.pokemon.find((p) => p._id === targetId);
-        if (!targetDex) return;
+        if (!targetDex || npcReadOnly()) return;
         let adjusted: CardSheet;
         if (opts.mega) {
             const r = megaEvolveSheet(src, targetDex, activeMegaRules(), !!opts.ownMoves);

@@ -309,6 +309,50 @@ function idList(raw: unknown, max: number): string[] | null {
     return out;
 }
 
+/** A packed piece of a sheet (zpart.ts): base64url, under the frame's size.
+    What it holds is checked once it is unpacked, which is asynchronous. */
+function zText(v: unknown): string | null {
+    return typeof v === 'string' && v.length <= LIMITS.MAX_WIRE_CHARS && /^[A-Za-z0-9_-]+$/.test(v) ? v : null;
+}
+
+/** A team's six slots: each a Pokémon's key, or '' for an empty one. */
+function slotList(raw: unknown): string[] | null {
+    if (!Array.isArray(raw) || raw.length > LIMITS.TEAM_SLOTS) return null;
+    const out: string[] = [];
+    for (const v of raw) {
+        if (v === '') { out.push(''); continue; }
+        const id = idText(v);
+        if (!id || out.includes(id)) return null;
+        out.push(id);
+    }
+    return out;
+}
+
+/** Pieces by Pokémon key; every key must be on the team's slots. */
+function zMap(raw: unknown, order: string[] | null): Record<string, string> | null {
+    if (!isRecord(raw)) return null;
+    const keys = Object.keys(raw);
+    if (!keys.length || keys.length > LIMITS.TEAM_SLOTS) return null;
+    const out: Record<string, string> = {};
+    for (const k of keys) {
+        const z = zText(raw[k]);
+        if (!idText(k) || !z || (order && !order.includes(k))) return null;
+        out[k] = z;
+    }
+    return out;
+}
+
+function memberList(raw: unknown): string[] | null {
+    if (!Array.isArray(raw) || raw.length > LIMITS.MAX_MEMBERS) return null;
+    const out: string[] = [];
+    for (const v of raw) {
+        const id = fingerprintText(v);
+        if (!id || out.includes(id)) return null;
+        out.push(id);
+    }
+    return out;
+}
+
 function driftValue(v: unknown): number | null | undefined {
     if (v === null) return null;
     const d = int(v, -3_600_000, 3_600_000);
@@ -514,6 +558,74 @@ export function parseBody(raw: unknown): Body | null {
                 ...(raw.after !== undefined ? { after: raw.after as string } : {}),
                 ...(mv ? { mv } : {}),
             };
+        }
+        case 'npcs': {
+            if (!exactly(raw, ['k', 'ids'])) return null;
+            const ids = idList(raw.ids, LIMITS.MAX_NPCS);
+            return ids ? { k: 'npcs', ids } : null;
+        }
+        case 'npc': {
+            if (!exactly(raw, ['k', 'id', 'rev', 'base', 'full', 'name', 'to', 'edit', 'order', 't', 'm'])) return null;
+            const id = idText(raw.id);
+            const rev = int(raw.rev, 1, Number.MAX_SAFE_INTEGER);
+            const base = int(raw.base, 0, Number.MAX_SAFE_INTEGER);
+            const name = cleanText(raw.name, LIMITS.MAX_NAME * 2) || 'Trainer';
+            const to = raw.to === null ? null : memberList(raw.to);
+            const edit = memberList(raw.edit);
+            const order = slotList(raw.order);
+            if (!id || rev === null || base === null || typeof raw.full !== 'boolean') return null;
+            if ((raw.to !== null && !to) || !edit || !order) return null;
+            const t = raw.t === undefined ? undefined : zText(raw.t);
+            const m = raw.m === undefined ? undefined : zMap(raw.m, order);
+            if (t === null || m === null) return null;
+            /* Whole means the trainer is in it. */
+            if (raw.full && t === undefined) return null;
+            return {
+                k: 'npc', id, rev, base, full: raw.full, name, to, edit, order,
+                ...(t !== undefined ? { t } : {}), ...(m !== undefined ? { m } : {}),
+            };
+        }
+        case 'npcset': {
+            if (!exactly(raw, ['k', 'id', 'oid', 'order', 't', 'm'])) return null;
+            const id = idText(raw.id);
+            const oid = idText(raw.oid);
+            const order = raw.order === undefined ? undefined : slotList(raw.order);
+            const t = raw.t === undefined ? undefined : zText(raw.t);
+            const m = raw.m === undefined ? undefined : zMap(raw.m, null);
+            if (!id || !oid || order === null || t === null || m === null) return null;
+            if (order === undefined && t === undefined && m === undefined) return null;
+            return {
+                k: 'npcset', id, oid,
+                ...(order !== undefined ? { order } : {}),
+                ...(t !== undefined ? { t } : {}), ...(m !== undefined ? { m } : {}),
+            };
+        }
+        case 'npcwant': {
+            if (!exactly(raw, ['k', 'id'])) return null;
+            const id = idText(raw.id);
+            return id ? { k: 'npcwant', id } : null;
+        }
+        case 'gift': {
+            if (!exactly(raw, ['k', 'to', 'oid', 'name', 'z'])) return null;
+            const to = fingerprintText(raw.to);
+            const oid = idText(raw.oid);
+            const name = cleanText(raw.name, LIMITS.MAX_NAME * 2) || 'Pokémon';
+            const z = zText(raw.z);
+            return to && oid && z ? { k: 'gift', to, oid, name, z } : null;
+        }
+        case 'giftoff': {
+            if (!exactly(raw, ['k', 'oid'])) return null;
+            const oid = idText(raw.oid);
+            return oid ? { k: 'giftoff', oid } : null;
+        }
+        case 'giftr': {
+            if (!exactly(raw, ['k', 'oid', 'ok', 'where'])) return null;
+            const oid = idText(raw.oid);
+            if (!oid || typeof raw.ok !== 'boolean') return null;
+            if (raw.where !== 'team' && raw.where !== 'box' && raw.where !== '') return null;
+            /* Accepted is somewhere; refused is nowhere. */
+            if (raw.ok !== (raw.where !== '')) return null;
+            return { k: 'giftr', oid, ok: raw.ok, where: raw.where };
         }
         default:
             return null;

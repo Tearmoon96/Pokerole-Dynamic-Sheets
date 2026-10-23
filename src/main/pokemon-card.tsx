@@ -11,6 +11,7 @@ import { readCardContext } from '../card/cardContext';
 import { CardApp } from '../components/card/CardApp';
 import { installTooltips } from '../lib/tooltip';
 import { initDevice } from '../lib/device';
+import { installReadOnlyGuard } from '../state/npcMode';
 import { registerServiceWorker } from '../pwa/register';
 import { UpdatePrompt } from '../pwa/UpdatePrompt';
 import type { AppData, PokedexEntry } from '../data/types';
@@ -79,5 +80,6 @@ createRoot(document.getElementById('root')!).render(
 
 /* Replaces the browser's native title bubble everywhere on the page. */
 installTooltips();
+installReadOnlyGuard();
 
 registerServiceWorker();

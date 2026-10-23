@@ -11,6 +11,8 @@ import { MapStage } from './MapStage';
 import { MapControls } from './MapControls';
 import { MusicPanel } from './MusicPanel';
 import { CharacterPanel } from './CharacterPanel';
+import { NpcSheets } from './NpcSheets';
+import { GiftDialog } from './GiftDialog';
 import { TurnStrip } from './TurnStrip';
 import { CHANNELS } from '../../table/protocol';
 import { useTour } from '../../lib/tour';
@@ -137,6 +139,7 @@ export function TableView() {
                     <Credentials />
                     <MemberList />
                     {!isHost && <CharacterPanel />}
+                    {!isHost && <NpcSheets />}
                     {isHost && <MapControls />}
                     <MusicPanel />
                 </aside>
@@ -183,6 +186,8 @@ export function TableView() {
                     )}
                 </main>
             </div>
+
+            {!isHost && <GiftDialog />}
 
             <GuidedTour
                 id={tourId}

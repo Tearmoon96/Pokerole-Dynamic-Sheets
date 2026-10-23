@@ -1,5 +1,6 @@
 import { useCard } from '../../card/CardContext';
 import { readWorking } from '../../card/persistence';
+import { npcBannerText, useNpcMode } from '../common/NpcBanner';
 
 /* The fixed strip across the top that says what kind of card this is. Both are
    inline-styled exactly as they were: they sit above everything the stylesheet
@@ -24,8 +25,20 @@ const BANNER_STYLE: React.CSSProperties = {
 /** Makes clear this card edits a Pokémon that belongs to a trainer. */
 export function TrainerBanner() {
     const { store } = useCard();
+    const npc = useNpcMode();
     const ctx = store.ctx;
     if (!ctx.inTrainerMode) return null;
+
+    if (npc.on) {
+        return (
+            <div className="card-banner" style={{
+                ...BANNER_STYLE, borderBottom: '1px solid ' + (npc.readOnly ? '#f59e0b88' : '#22c55e88'),
+            }}>
+                <i className={'fa-solid ' + (npc.readOnly ? 'fa-lock' : 'fa-pen-to-square')}></i>
+                {' '}A Pokémon of <strong>{npc.name}</strong> · {npcBannerText(npc.readOnly)}
+            </div>
+        );
+    }
 
     const w = readWorking();
     const t = w && Array.isArray(w.trainers) ? w.trainers.find((x) => x.id === ctx.trainerId) : null;

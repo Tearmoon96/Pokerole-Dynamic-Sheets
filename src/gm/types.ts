@@ -23,6 +23,28 @@ export interface GmWild {
     wid?: string;
 }
 
+/** A roster trainer shared with the rolling table open in this browser
+    (src/table/npcShare.ts). Member ids are the table's. */
+export interface GmNpcShare {
+    /** Who sees it; null for the whole table. */
+    to: string[] | null;
+    /** Who may change it. Read only for everyone else. */
+    edit: string[];
+}
+
+/** A wild Pokémon offered to a player at the table, waiting for an answer.
+    The card goes as it was when it was offered. */
+export interface GmGift {
+    oid: string;
+    /** The roster wild it came from; it leaves the roster once accepted. */
+    gid: string;
+    to: string;
+    toName: string;
+    dexId: string;
+    sheet: CardSheet;
+    at: number;
+}
+
 export interface GmNoteSheet {
     gid: string;
     title: string;
@@ -172,6 +194,10 @@ export interface GmState {
     tableCombat: string | null;
     /** Players' characters in a fight, by table member id. */
     tablePcs: Record<string, GmTablePc>;
+    /** Roster trainers shared with the table, by trainer id. */
+    npcShares: Record<string, GmNpcShare>;
+    /** Wild Pokémon offered to players and not yet answered. */
+    gifts: GmGift[];
     /** legacy single note; migrated into noteSheets */
     notes: string;
     noteSheets: GmNoteSheet[];

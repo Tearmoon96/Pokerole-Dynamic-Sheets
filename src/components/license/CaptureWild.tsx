@@ -2,9 +2,9 @@ import { useRef } from 'react';
 import { useSheetStore } from '../../state/SheetContext';
 import { useAppData } from '../../data/AppDataContext';
 import { useToast } from '../common/Toast';
-import { WILD_MARKER, BOX_CAPACITY } from '../../state/constants';
+import { WILD_MARKER } from '../../state/constants';
 import { genUid } from '../../state/defaults';
-import { activeBoxIdx } from '../../state/boxes';
+import { addMonToTrainer } from '../../state/boxes';
 import type { MonEntry, TrainerState } from '../../state/types';
 import { showAlert } from '../../lib/dialog';
 
@@ -37,29 +37,18 @@ export function CaptureWildButton() {
         let message = '';
         let failure = '';
         store.update((s: TrainerState) => {
-            const idx = s.team.findIndex((t) => !t.dexId);
-            if (idx !== -1) {
-                s.team = s.team.map((t, i) => i === idx ? mon : t);
-                message = '<i class="fa-solid fa-hand-sparkles"></i> Captured ' + escapeHtml(caught) + '!';
-                return;
-            }
             /* Team full: the capture still succeeds, it just goes to storage —
                same as the games, and better than losing it */
-            const start = activeBoxIdx(s);
-            const target = s.boxes[start].mons.length < BOX_CAPACITY
-                ? start : s.boxes.findIndex((b) => b.mons.length < BOX_CAPACITY);
-            if (target === -1) {
+            const put = addMonToTrainer(s, mon);
+            if (!put) {
                 failure = "This trainer's team is full (6 Pokémon) and every PC box is full too.\n\n"
                     + 'Release something, or add a box, before capturing another.';
                 return;
             }
-            /* Where the full-res copy is already on disk the embedded thumbnail
-               is redundant — see shedBoxThumbnail in state/boxes. */
-            const stored = (mon.sheet && mon.sheet.customImage && mon.sheet.customImageFile)
-                ? { ...mon, sheet: { ...mon.sheet, customImage: '' } } : mon;
-            s.boxes = s.boxes.map((b, i) => i === target ? { ...b, mons: [...b.mons, stored] } : b);
-            message = '<i class="fa-solid fa-box-archive"></i> Captured ' + escapeHtml(caught)
-                + ' — team was full, sent to ' + escapeHtml(s.boxes[target].name) + '.';
+            message = put.where === 'team'
+                ? '<i class="fa-solid fa-hand-sparkles"></i> Captured ' + escapeHtml(caught) + '!'
+                : '<i class="fa-solid fa-box-archive"></i> Captured ' + escapeHtml(caught)
+                    + ' — team was full, sent to ' + escapeHtml(put.box) + '.';
         });
 
         if (failure) void showAlert(failure);

@@ -6,6 +6,7 @@ import { dropFolder, groupByFolder, moveFolder, moveWithinGroup } from '../../gm
 import { useFlash } from '../../gm/useFlash';
 import { StatusChips } from './StatusChips';
 import { GmSprite } from './GmSprite';
+import { GiftMenu, NpcShareMenu } from './NpcShareMenu';
 import { useGm } from '../../gm/GmContext';
 import { useGmConfirm } from './ConfirmDialog';
 import { useAppData } from '../../data/AppDataContext';
@@ -21,6 +22,7 @@ import { WILD_MARKER, wildSheetKey } from '../../card/cardContext';
 import { wildUrl } from '../../card/wild';
 import type { GmCombatant } from '../../gm/types';
 import type { PokedexEntry } from '../../data/types';
+import type { CardSheet } from '../../card/types';
 import type { ReactNode } from 'react';
 import type { GmWild } from '../../gm/types';
 
@@ -257,6 +259,7 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                                 >
                                     <i className="fa-solid fa-khanda"></i>
                                 </button>
+                                <NpcShareMenu trainerId={id} name={t.name || 'Trainer'} />
                                 <button
                                     className="icon-btn"
                                     title="Open this trainer's sheet"
@@ -278,6 +281,9 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                                         if (!go) return;
                                         store.update((s) => {
                                             s.trainerIds = s.trainerIds.filter((x) => x !== id);
+                                            const shares = { ...s.npcShares };
+                                            delete shares[id];
+                                            s.npcShares = shares;
                                             const expanded = { ...s.expanded };
                                             delete expanded[id];
                                             s.expanded = expanded;
@@ -387,6 +393,8 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                             buttons={
                                 <>
                                     <span className="wild-tag">wild</span>
+                                    <GiftMenu gid={w.gid} dexId={dexId} sheet={sheet as CardSheet}
+                                        name={monShownName(dexById, dexId, sheet)} />
                                     <button
                                         className="icon-btn"
                                         title={'Add to ' + (focusedCombat ? focusedCombat.name : 'combat')}

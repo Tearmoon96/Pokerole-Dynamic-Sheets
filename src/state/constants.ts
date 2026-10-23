@@ -4,8 +4,25 @@
 
 /** Legacy single-sheet key, migrated on first run. */
 export const STORAGE_KEY = 'pokerole_trainer_license';
-/** Shared working set (this page + Pokémon cards). */
-export const WORKING_KEY = 'pokerole_working';
+/** A GM's trainer shared at the rolling table, as a player's browser keeps it
+    (src/table/npcShare.ts): one working set of its own per trainer, so the
+    License and the card edit it with no code of their own, and nothing they
+    do there can touch the player's own trainers. */
+export const NPC_KEY_PREFIX = 'pokerole_table_npc_';
+
+/** The shared trainer this tab was opened on (`?npc=<id>`), or null. Only the
+    License and the card take it; every other page always works on the
+    browser's own working set. */
+export const NPC_ID: string | null = (() => {
+    if (typeof location === 'undefined') return null;
+    if (!/(trainer-license|pokemon-card)(\.html)?$/.test(location.pathname)) return null;
+    const id = new URLSearchParams(location.search).get('npc') || '';
+    return /^[A-Za-z0-9_-]{1,48}$/.test(id) ? id : null;
+})();
+
+/** Shared working set (this page + Pokémon cards). A tab opened on a shared
+    trainer works on that trainer's own set instead. */
+export const WORKING_KEY = NPC_ID ? NPC_KEY_PREFIX + NPC_ID : 'pokerole_working';
 /** Trainer ids in the order the user arranged them in the picker. */
 export const TRAINER_ORDER_KEY = 'pokerole_trainer_order';
 

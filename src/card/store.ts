@@ -4,6 +4,7 @@ import type { CardContext } from './cardContext';
 import type { CardSheet } from './types';
 import type { PokedexEntry } from '../data/types';
 import type { StatSource } from './pools';
+import { npcReadOnly } from '../state/npcMode';
 
 /* One mutable store behind the card, in the same shape as the trainer sheet's.
 
@@ -69,6 +70,8 @@ export class CardStore {
 
     /** Apply a mutation to the sheet, persist it and re-render. */
     update(mutate: (s: CardSheet) => void): void {
+        /* A Pokémon of a GM's trainer this player may only look at. */
+        if (npcReadOnly()) { this.notify(); return; }
         const next = { ...this.sheet };
         mutate(next);
         this.sheet = next;
@@ -78,6 +81,7 @@ export class CardStore {
 
     /** Swap the species — evolution, mega, or loading another Pokémon. */
     setPokemon(pokemon: PokedexEntry, sheet?: CardSheet): void {
+        if (npcReadOnly()) { this.notify(); return; }
         this.pokemon = pokemon;
         if (sheet) this.sheet = sheet;
         this.save();
@@ -85,6 +89,7 @@ export class CardStore {
     }
 
     save(): void {
+        if (npcReadOnly()) return;
         saveCardSheet(this.pokemon, this.ctx, this.sheet);
         this.remember();
     }

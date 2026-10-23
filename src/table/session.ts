@@ -42,6 +42,7 @@ import { hostUploadKey } from './identity';
 import type { TableApi } from './link';
 import { MapShare } from './mapShare';
 import { CombatShare } from './combatShare';
+import { NpcShare } from './npcShare';
 import { RULES_KEY, readGmMegaRules, writeTableMegaRules } from '../lib/megaRules';
 import { MusicController } from './music/music';
 import type { TransportStatus } from './transport';
@@ -476,6 +477,7 @@ export class TableSession {
     readonly map = new MapShare(this.api);
     readonly music = new MusicController(this.api);
     readonly combat = new CombatShare(this.api);
+    readonly npcs = new NpcShare(this.api);
 
     /* ------------------------------------------------------------- joining */
 
@@ -625,6 +627,7 @@ export class TableSession {
         });
         this.transport.start();
         this.combat.begin(isHost, lobbyId);
+        this.npcs.begin(isHost, lobbyId);
         if (isHost) window.addEventListener('storage', this.onRulesSaved);
 
         this.heartbeat = window.setInterval(() => this.tick(), HEARTBEAT_MS);
@@ -707,6 +710,7 @@ export class TableSession {
         this.map.end(moved);
         this.music.end();
         this.combat.end(moved);
+        this.npcs.end();
         window.removeEventListener('storage', this.onRulesSaved);
         this.publishedRules = '';
         this.clock.stop();
@@ -755,7 +759,7 @@ export class TableSession {
         again later — see identity.ts. */
     leave(): void {
         /* A player's table rules go with the table; a GM's own stay theirs. */
-        if (!this.store.state.isHost) writeTableMegaRules('', null);
+        if (!this.store.state.isHost) { writeTableMegaRules('', null); this.npcs.forgetAll(); }
         else { forgetFeed(); saveLock('', null); }
         this.teardown();
         clearSession();
@@ -868,6 +872,7 @@ export class TableSession {
             this.map.greet();
             this.music.greet();
             this.combat.greet();
+            this.npcs.greet(false);
             this.publishRules(false);
         } else {
             const online = Date.now() - this.hostSeenAt < PRESENCE_TIMEOUT_MS;
@@ -987,6 +992,9 @@ export class TableSession {
             else if (!this.names.has(inner.f) || !this.allowOp()) return;
             else if (body.k === 'pc') this.combat.onPc(inner.f, this.names.get(inner.f)!, body);
             else if (body.k === 'turn') this.combat.onTurn(inner.f, body);
+            else if (body.k === 'npcset') void this.npcs.onSet(inner.f, body);
+            else if (body.k === 'npcwant') this.npcs.onWant(inner.f, body.id);
+            else if (body.k === 'giftr') this.npcs.onGiftReply(inner.f, body, this.names.get(inner.f)!);
             else if (body.k === 'mstat') {
                 this.music.onStat(inner.f, body);
                 if (body.failed.some((id) => this.map.missing(id))) this.map.checkSoon();
@@ -1068,6 +1076,22 @@ export class TableSession {
 
             case 'pcop':
                 this.combat.onPcop(body);
+                break;
+
+            case 'npcs':
+                this.npcs.onList(body.ids);
+                break;
+
+            case 'npc':
+                void this.npcs.onNpc(body);
+                break;
+
+            case 'gift':
+                void this.npcs.onGift(body);
+                break;
+
+            case 'giftoff':
+                this.npcs.onGiftOff(body.oid);
                 break;
 
             case 'rules':
@@ -1188,6 +1212,7 @@ export class TableSession {
         this.map.greet();
         this.music.greet();
         this.combat.greet();
+        this.npcs.greet(true);
         this.publishRules(true);
     }
 

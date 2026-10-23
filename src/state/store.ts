@@ -9,6 +9,7 @@ import {
 import type { WorkingTrainer } from './workingSet';
 import type { StoredSession } from './restore';
 import type { TrainerState } from './types';
+import { npcReadOnly } from './npcMode';
 
 /* One mutable store behind the whole sheet.
 
@@ -74,6 +75,9 @@ export class SheetStore {
         memoised child actually updates — but nested objects are shared until
         the mutator replaces them, exactly as the original code assumed. */
     update(mutate: (s: TrainerState) => void): void {
+        /* A GM's trainer this player may only look at: nothing changes, and
+           the re-render puts back whatever a field had shown. */
+        if (npcReadOnly()) { this.notify(); return; }
         const next = { ...this.sheet };
         mutate(next);
         const entry = this.entry;
@@ -85,6 +89,7 @@ export class SheetStore {
 
     /** Persist without touching the sheet — for handle / selection changes. */
     save(): void {
+        if (npcReadOnly()) return;
         try {
             writeWorkingSet(this.trainers, this.active);
             this.quotaWarned = false;

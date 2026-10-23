@@ -1,4 +1,8 @@
 import type { TrainerState } from '../state/types';
+import { NPC_ID } from '../state/constants';
+
+/** A card opened from a GM's shared trainer stays on that trainer's own set. */
+const npcParam = (): string => (NPC_ID ? '&npc=' + encodeURIComponent(NPC_ID) : '');
 
 /* Links out to the Pokémon card. The card reads and writes its sheet inside
    this trainer's JSON through the shared working set, so the URL only has to
@@ -11,14 +15,14 @@ export function teamCardUrl(sheet: TrainerState, dexId: string, uid: string | un
     return 'pokemon-card.html?pokemon=' + encodeURIComponent(dexId)
         + '&trainer=' + encodeURIComponent(sheet.id)
         + (uid ? '&uid=' + encodeURIComponent(uid) : '')
-        + '&slot=' + slot;
+        + '&slot=' + slot + npcParam();
 }
 
 /** Same, for a Pokémon in a PC box: uid only, since it has no slot to fall back to. */
 export function boxedCardUrl(sheet: TrainerState, dexId: string, uid: string): string {
     return 'pokemon-card.html?pokemon=' + encodeURIComponent(dexId)
         + '&trainer=' + encodeURIComponent(sheet.id)
-        + '&uid=' + encodeURIComponent(uid);
+        + '&uid=' + encodeURIComponent(uid) + npcParam();
 }
 
 export function openCard(url: string): void {
