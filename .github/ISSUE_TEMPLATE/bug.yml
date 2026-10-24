@@ -1,0 +1,43 @@
+name: Bug report
+description: Something broken, wrong or confusing in the tools.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time! Please check the [Contact Center](https://tearmoon96.github.io/Pokerole-Dynamic-Sheets/contact-center.html#bug) first — if someone already reported it, a reply or a 👍 there helps more than a copy.
+  - type: dropdown
+    id: page
+    attributes:
+      label: Page
+      options:
+        - "Trainer's License"
+        - "Pokémon Card"
+        - "GM Screen"
+        - "Map Maker"
+        - "Rolling Table"
+        - "Contact Center"
+        - "Several / all of them"
+        - "Other"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      placeholder: What you saw, and what you expected to see instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the GM Screen
+        2. Add a wild Pokémon
+        3. …
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      placeholder: e.g. Chrome on Windows, Safari on an iPhone

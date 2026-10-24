@@ -1,0 +1,35 @@
+name: Suggestion
+description: An idea to make something that exists better.
+labels: ["suggestion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check the [Contact Center](https://tearmoon96.github.io/Pokerole-Dynamic-Sheets/contact-center.html#suggestion) first — if someone already suggested it, a reply or a 👍 there helps more than a copy.
+  - type: dropdown
+    id: page
+    attributes:
+      label: Page
+      options:
+        - "Trainer's License"
+        - "Pokémon Card"
+        - "GM Screen"
+        - "Map Maker"
+        - "Rolling Table"
+        - "Contact Center"
+        - "Several / all of them"
+        - "Other"
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      placeholder: What would change, and how it would work.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it would help
+      placeholder: The situation at the table where you missed it.

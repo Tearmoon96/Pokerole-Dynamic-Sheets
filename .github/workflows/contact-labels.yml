@@ -1,0 +1,26 @@
+# Posts written in the site's Contact Center cannot set their own label
+# (GitHub drops labels sent by anyone without push access), so the page puts
+# a marker in the body and this turns it into the label.
+name: Contact Center labels
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Label from the marker
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BODY: ${{ github.event.issue.body }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: |
+          kind=$(printf '%s' "$BODY" | grep -oE '<!-- *pds-contact:(bug|suggestion|request) *-->' | head -1 | grep -oE 'bug|suggestion|request' || true)
+          if [ -n "$kind" ]; then
+            gh issue edit "$NUMBER" --repo "$GITHUB_REPOSITORY" --add-label "$kind"
+          fi

@@ -1,0 +1,20 @@
+name: Request
+description: "Something new: a feature, a page, a homebrew option."
+labels: ["request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check the [Contact Center](https://tearmoon96.github.io/Pokerole-Dynamic-Sheets/contact-center.html#request) first — if someone already asked for it, a reply or a 👍 there helps more than a copy.
+  - type: textarea
+    id: want
+    attributes:
+      label: What would you like?
+      placeholder: Describe the feature or the content you are asking for.
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      placeholder: Examples, rules from the book, pictures of how you imagine it…
