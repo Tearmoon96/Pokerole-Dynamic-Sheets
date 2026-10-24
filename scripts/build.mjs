@@ -12,7 +12,7 @@ import { join } from 'node:path';
 const ROOT = process.cwd();
 const OUT = join(ROOT, 'dist-pwa');
 const APP = join(ROOT, 'PDS React Develop');
-const PAGES = ['trainer-license', 'pokemon-card', 'gm-screen', 'rolling-table', 'map-maker'];
+const PAGES = ['trainer-license', 'pokemon-card', 'gm-screen', 'rolling-table', 'map-maker', 'contact-center'];
 
 for (const page of PAGES) {
     process.env.PAGE = page;

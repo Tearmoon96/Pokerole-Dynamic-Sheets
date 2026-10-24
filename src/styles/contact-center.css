@@ -1,0 +1,14 @@
+/* The Contact Center.
+
+   The GM screen's palette and controls, like the rolling table, so the page
+   reads as one more of the tools; it adds only its own layout. */
+@import './gm/base.css';
+@import './gm/shared.css';
+@import './table/join.css';
+@import './contact/layout.css';
+@import './shared/tooltip.css';
+
+@import './responsive/base.css';
+
+@import './shared/update-prompt.css';
+@import './shared/scrollbars.css';

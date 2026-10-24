@@ -22,7 +22,7 @@ const OUT = join(ROOT, 'PDS React Deploy');
    CC BY 3.0 and that file carries its attribution. */
 const TOP_FILES = [
     'index.html', 'trainer-license.html', 'pokemon-card.html', 'gm-screen.html',
-    'rolling-table.html', 'map-maker.html',
+    'rolling-table.html', 'map-maker.html', 'contact-center.html',
     'manifest.webmanifest', 'sw.js',
     'pwa-icon-192.png', 'pwa-icon-512.png',
     'README.md', 'LICENSE', 'NOTICE',

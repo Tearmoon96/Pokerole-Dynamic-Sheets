@@ -107,7 +107,7 @@ function withCsp(html: string, page: string): string {
     return html.replace(/(<meta charset="UTF-8">)/i, '$1\n    ' + meta);
 }
 
-export const PAGES = ['trainer-license', 'pokemon-card', 'gm-screen', 'rolling-table', 'map-maker'];
+export const PAGES = ['trainer-license', 'pokemon-card', 'gm-screen', 'rolling-table', 'map-maker', 'contact-center'];
 const FIRST_PAGE = PAGES[0];
 
 export default defineConfig(({ command }) => {

@@ -1,0 +1,22 @@
+# The Contact Center's sign-in helper.
+#
+# GitHub hands a signed-in user a token only in exchange for the App's client
+# secret, which cannot live in a public page. This Worker holds the secret and
+# makes that one exchange (and the 8-hourly renewal); it stores nothing and
+# never sees a post. Kept apart from the rolling table's relay so nothing here
+# can spend that Worker's daily allowance.
+#
+# Secrets, set once with `npx wrangler secret put <NAME>` (see README.md):
+#   GITHUB_CLIENT_ID      the GitHub App's Client ID (Iv23li…)
+#   GITHUB_CLIENT_SECRET  a client secret generated on the App's page
+
+name = "pokerole-contact"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+
+[vars]
+# The repository every token is limited to: Tearmoon96/Pokerole-Dynamic-Sheets.
+REPOSITORY_ID = "1295354789"
+
+[observability]
+enabled = true

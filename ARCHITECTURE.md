@@ -488,6 +488,35 @@ described under [Guided tours](#guided-tours); its steps are in
 fight steps carry a live line that turns green once the Map Maker or the GM
 screen reaches the table from another tab.
 
+## The Contact Center
+
+`contact-center.html`: bug reports, suggestions and requests, in three tabs.
+The posts are the repository's **GitHub issues** — GitHub keeps them, everyone
+reads them, anyone with an account writes one, and only the owner edits, labels,
+closes or deletes someone else's. There is no database of ours.
+
+- `src/contact/` — `config.ts` (repo, worker URL, the `?ghapi=&ghauth=&cworker=`
+  test seam, inert off localhost), `github.ts` (the REST calls; the list is kept
+  a minute in `pokerole_contact_cache`, since an anonymous reader has 60 calls an
+  hour), `auth.ts` (sign-in), `sanitize.ts` (GitHub's `body_html`, filtered again
+  by allowlist before it reaches the page), `categories.ts` (the three forms).
+- `src/components/contact/` — the list, one post with its replies, the form.
+- **Sign-in** is a GitHub App's web flow with PKCE. The code is traded for a
+  token by `contact-worker/` (a Cloudflare Worker apart from the relay), the one
+  place the App's client secret lives; it asks with `repository_id`, so a token
+  reaches this repository only, and only issues. The token (8 h, renewed with a
+  6-month refresh token) is in `pokerole_contact_auth`. Drafts survive the trip
+  to GitHub and back (`pokerole_contact_draft_*`). Without the worker's secrets,
+  or from `file://`, the page reads and links to GitHub's own forms instead.
+- **Labels.** GitHub drops labels sent by a user without push access, so a post
+  from the page carries `<!-- pds-contact:<kind> -->` in its body and is sorted
+  by it; `.github/workflows/contact-labels.yml` on `main` turns it into the label.
+  Posts from github.com get theirs from `.github/ISSUE_TEMPLATE/` (also `main`),
+  whose questions and headings are the page's own, so both read alike.
+- The owner, signed in, gets Mark resolved / Close, not planned / Reopen.
+
+`contact-worker/README.md` has the App's settings and the harnesses.
+
 ## Guided tours
 
 Every page has a spotlight tour of a minute or so — one part lit, the rest

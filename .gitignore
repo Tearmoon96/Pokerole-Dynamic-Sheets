@@ -79,3 +79,8 @@ dist-pwa/
 worker/.wrangler/
 worker/node_modules/
 worker/.stats-token
+
+# The Contact Center's sign-in worker: local dev state, and the test App's
+# id and secret for `wrangler dev` (the real ones are `wrangler secret`s).
+contact-worker/.wrangler/
+contact-worker/.dev.vars
