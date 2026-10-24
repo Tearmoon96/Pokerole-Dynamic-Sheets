@@ -194,6 +194,55 @@ export async function verify(
     }
 }
 
+/* ------------------------------------------------- one recipient only */
+
+/* Everything above is sealed with the room key, so everyone at the table can
+   read everything. A new password must reach the people at the table and
+   nobody else — not someone kicked who still sits in the old room with the
+   old key. So each member makes an ECDH pair when they join and announces its
+   public half (signed, so it is bound to their fingerprint); the GM seals the
+   password to each of them alone. `info` binds a box to one room and one
+   recipient, so it cannot be moved to another. */
+
+export function generateDhKeys(): Promise<CryptoKeyPair> {
+    return crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']) as Promise<CryptoKeyPair>;
+}
+
+export async function exportDhPublic(pair: CryptoKeyPair): Promise<string> {
+    return toB64u(new Uint8Array(await crypto.subtle.exportKey('raw', pair.publicKey)));
+}
+
+async function boxKey(mine: CryptoKey, theirs: string, info: string): Promise<CryptoKey> {
+    const pub = await crypto.subtle.importKey('raw', fromB64u(theirs), { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+    const bits = await crypto.subtle.deriveBits({ name: 'ECDH', public: pub }, mine, 256);
+    const hk = await crypto.subtle.importKey('raw', bits, 'HKDF', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+        { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: utf8(DOMAIN + '|box|' + info) },
+        hk, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+
+export async function boxSeal(mine: CryptoKey, theirs: string, info: string, text: string): Promise<string> {
+    const key = await boxKey(mine, theirs, info);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, utf8(text)));
+    const out = new Uint8Array(12 + ct.length);
+    out.set(iv, 0);
+    out.set(ct, 12);
+    return toB64u(out);
+}
+
+/** Null for a box that is not this recipient's, or not whole. */
+export async function boxOpen(mine: CryptoKey, theirs: string, info: string, wire: string): Promise<string | null> {
+    try {
+        const raw = fromB64u(wire);
+        if (raw.length < 12 + 16) return null;
+        const key = await boxKey(mine, theirs, info);
+        return fromUtf8(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: raw.slice(0, 12) }, key, raw.slice(12)));
+    } catch {
+        return null;
+    }
+}
+
 /** WebCrypto is only present in a secure context. Localhost and https qualify;
     a page served over plain http from another machine does not, and saying so
     up front beats an undefined-property crash three screens later. */

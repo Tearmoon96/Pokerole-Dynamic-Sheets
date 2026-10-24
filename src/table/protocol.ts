@@ -256,7 +256,16 @@ export type Body =
     /** Host only. The GM took a gift back before it was answered. */
     | { k: 'giftoff'; oid: string }
     /** Player to host: what became of a gift. */
-    | { k: 'giftr'; oid: string; ok: boolean; where: GiftWhere };
+    | { k: 'giftr'; oid: string; ok: boolean; where: GiftWhere }
+    /** Player to host, after its hello: the public half of this page's ECDH
+        pair (crypto.ts), so a new password can be sealed to it alone. A
+        message of its own, not a field on `hello`, so an older GM's page
+        drops it and still lets the player in. */
+    | { k: 'key'; dh: string }
+    /** Host only. The GM changed the password: each member's copy of the new
+        one, sealed to their key with the GM's one-off `dh`. Whoever follows
+        joins the new room; anyone not listed stays behind with the old one. */
+    | { k: 'move'; dh: string; to: { id: string; c: string }[] };
 
 /** Where an accepted gift went: the team, a PC box, or nowhere (refused, or
     no room anywhere). */

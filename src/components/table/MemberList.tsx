@@ -75,7 +75,8 @@ export function MemberList() {
             {open && isHost && members.length > 1 && (
                 <p className="muted">
                     Removing someone disconnects them, but the password is what really
-                    guards the table — change it by starting a new lobby.
+                    guards the table: Change password in the Invite box keeps them out
+                    for good, and everyone still here follows by themselves.
                 </p>
             )}
         </div>

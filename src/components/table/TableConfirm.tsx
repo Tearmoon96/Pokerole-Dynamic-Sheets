@@ -14,6 +14,8 @@ export interface TableAsk {
     /** Red: it throws something away. */
     danger?: boolean;
     onOk: () => void;
+    /** A second way to say yes, beside the first. */
+    also?: { label: string; onClick: () => void };
 }
 
 export function TableConfirm({ ask, onClose }: { ask: TableAsk | null; onClose: () => void }) {
@@ -40,6 +42,12 @@ export function TableConfirm({ ask, onClose }: { ask: TableAsk | null; onClose: 
                         onClick={() => { onClose(); ask.onOk(); }}>
                         {ask.ok}
                     </button>
+                    {ask.also && (
+                        <button className="go" id="table-confirm-also"
+                            onClick={() => { onClose(); ask.also!.onClick(); }}>
+                            {ask.also.label}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

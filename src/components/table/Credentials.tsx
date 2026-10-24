@@ -57,6 +57,21 @@ export function Credentials() {
             {'\n\n'}It does not stop someone who has the password from READING the table: only a new password does that.
         </>,
         onOk: () => session.setLock(true),
+        also: { label: 'Lock & change password', onClick: () => void session.changePassword(true) },
+    });
+
+    /* A new password moves the table to a new room. Everyone at it follows
+       by themselves; the old password stops opening anything after an hour. */
+    const askNewPassword = () => setAsk({
+        title: 'Change the password?', icon: 'fa-key', ok: 'Change password',
+        text: <>
+            {others === 0 ? 'Nobody else is at the table yet.'
+                : 'The ' + (others === 1 ? 'player' : others + ' players') + ' at the table move to the new password by themselves.'}
+            {' '}Someone you removed, who still has the old password, cannot follow and cannot read the table any more.
+            {'\n\n'}Players away right now get the new one when they come back within the hour. Anyone else needs the new invite.
+            {state.locked ? '' : ' Lock the room as well to keep it to the people at the table.'}
+        </>,
+        onOk: () => void session.changePassword(false),
     });
 
     const lockButton = state.isHost && (
@@ -117,6 +132,11 @@ export function Credentials() {
 
                     <button className="accent wide" onClick={(e) => void copy(e.currentTarget, 'Invite', invite)}>
                         <i className={'fa-solid ' + (copied === 'Invite' ? 'fa-check' : 'fa-paper-plane')}></i> Copy the whole invite
+                    </button>
+
+                    <button className="wide" id="change-password" disabled={state.moving} onClick={askNewPassword}>
+                        <i className={'fa-solid ' + (state.moving ? 'fa-circle-notch fa-spin' : 'fa-rotate')}></i>
+                        {state.moving ? ' Moving to the new password…' : ' Change password'}
                     </button>
 
                     <p className="muted">

@@ -297,6 +297,23 @@ let in only on a roster that lists them, never on just any GM message.
 Locking decides who takes part, not who can read: the room key is the
 password's, so only a new password stops a reader.
 
+**The GM can change the password** (Change password in the Invite box, or
+Lock & change password in the lock's warning). A new password is a new room —
+address and key both come from it — so the table moves, and everyone at it
+follows by themselves. Each player's page makes an ECDH pair when it joins
+and announces the public half right after its hello (`key`, a message of its
+own so an older GM's page still lets the player in); the GM's page seals the
+new password to each member alone (`move`, crypto.ts `boxSeal`), so someone
+kicked, still in the old room with the old key, can read nothing of it. A
+player who was away at that moment comes back to the old room on their saved
+session: for an hour the GM's page keeps a door open there
+([`porter.ts`](src/table/porter.ts), `pokerole_table_moved`, kept across a
+GM reload) and hands the current password, sealed the same way, only to the
+members it carried over. The old password no longer makes anyone the GM
+(`hostRoomAddr` moves with the table). Files are in the old room's store, so
+the GM's page puts maps, tracks and pictures up again as they are needed;
+players keep theirs by hash.
+
 **A bad actor at the table is bounded, not trusted.** Anyone with the password
 reads the whole table, by design, and a kick is not a ban — a new table is
 (a kick under the room lock is one until it is unlocked).

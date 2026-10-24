@@ -21,7 +21,7 @@
 import { savedColor } from './colors';
 import { CRIT_MARGIN } from '../gm/constants';
 import { roll } from '../gm/dice';
-import { deriveRoom, fingerprint, seal, sign, unseal, verify } from './crypto';
+import { boxOpen, boxSeal, deriveRoom, exportDhPublic, fingerprint, generateDhKeys, seal, sign, unseal, verify } from './crypto';
 import type { RoomSecrets } from './crypto';
 import { formatLobbyId, fromB64u, generatePassword, normaliseLobbyId, toB64u, utf8 } from './encoding';
 import type { Bytes } from './encoding';
@@ -43,6 +43,7 @@ import type { TableApi } from './link';
 import { MapShare } from './mapShare';
 import { CombatShare } from './combatShare';
 import { NpcShare } from './npcShare';
+import { Porter, dropFromMoved, loadMoved, rememberMove, saveMoved } from './porter';
 import { RULES_KEY, readGmMegaRules, writeTableMegaRules } from '../lib/megaRules';
 import { MusicController } from './music/music';
 import type { TransportStatus } from './transport';
@@ -119,6 +120,8 @@ export interface TableState {
     locked: boolean;
     /** Lock and unlock wait this long after a change (epoch ms). */
     lockBusyUntil: number;
+    /** Changing the password: the table is moving to its new room. */
+    moving: boolean;
     hideMyRolls: boolean;
     scripted: boolean;
     scriptSuccesses: number;
@@ -153,6 +156,7 @@ function initialState(): TableState {
         prep: null,
         locked: false,
         lockBusyUntil: 0,
+        moving: false,
         hideMyRolls: true,
         scripted: false,
         successesFirst: readFlag(SORT_KEY),
@@ -449,6 +453,18 @@ export class TableSession {
        the time the GM came back. */
     private queue: Body[] = [];
 
+    /* A new password reaches each member sealed to them alone (crypto.ts).
+       A player's page makes its ECDH pair on every join and announces the
+       public half after its hello; the GM's keeps them by member, and keeps a
+       door open on every room it left (porter.ts). */
+    private dh: CryptoKeyPair | null = null;
+    private dhPub = '';
+    /** The GM's page session the key was last announced to. */
+    private keySentFor: string | null = null;
+    private dhKeys = new Map<string, string>();
+    private porters: Porter[] = [];
+    private following = false;
+
     private heartbeat: number | null = null;
     private hostSeenAt = 0;
 
@@ -555,6 +571,8 @@ export class TableSession {
         this.teardown();
 
         const room = await deriveRoom(lobbyId, password);
+        const dh = isHost ? null : await generateDhKeys();
+        const dhPub = dh ? await exportDhPublic(dh) : '';
         if (isHost) {
             const addr = await hostRoomAddr(lobbyId);
             if (addr && addr !== room.addr) {
@@ -620,6 +638,11 @@ export class TableSession {
             s.error = '';
         });
 
+        this.dh = dh;
+        this.dhPub = dhPub;
+        this.keySentFor = null;
+        this.dhKeys.clear();
+        if (isHost) this.openDoors(identity, lobbyId);
         this.transport = new RelayTransport(roomUrl(this.room.addr), {
             onMessage: (text) => { void this.receive(text); },
             onStatus: (status, detail) => this.onStatus(status, detail),
@@ -720,6 +743,8 @@ export class TableSession {
         this.identity = null;
         this.files = null;
         this.tabLock.drop();
+        for (const p of this.porters) p.stop();
+        this.porters = [];
     }
 
     /** Only a session that got as far as a room has a record worth keeping;
@@ -760,7 +785,7 @@ export class TableSession {
     leave(): void {
         /* A player's table rules go with the table; a GM's own stay theirs. */
         if (!this.store.state.isHost) { writeTableMegaRules('', null); this.npcs.forgetAll(); }
-        else { forgetFeed(); saveLock('', null); }
+        else { forgetFeed(); saveLock('', null); saveMoved(null); }
         this.teardown();
         clearSession();
         this.store.state = initialState();
@@ -846,7 +871,14 @@ export class TableSession {
     }
 
     private announce(): Promise<boolean> {
-        return this.publish({ k: 'hello', name: this.store.state.myName, color: savedColor() });
+        const hello = this.publish({ k: 'hello', name: this.store.state.myName, color: savedColor() });
+        /* The key once per page of the GM's: on joining, and again when the
+           GM's page starts afresh (a reload knows no keys). */
+        if (!this.store.state.isHost && this.dhPub && this.keySentFor !== this.hostSid) {
+            this.keySentFor = this.hostSid;
+            void this.publish({ k: 'key', dh: this.dhPub });
+        }
+        return hello;
     }
 
     private flushQueue(): void {
@@ -992,6 +1024,7 @@ export class TableSession {
             else if (!this.names.has(inner.f) || !this.allowOp()) return;
             else if (body.k === 'pc') this.combat.onPc(inner.f, this.names.get(inner.f)!, body);
             else if (body.k === 'turn') this.combat.onTurn(inner.f, body);
+            else if (body.k === 'key') this.dhKeys.set(inner.f, body.dh);
             else if (body.k === 'npcset') void this.npcs.onSet(inner.f, body);
             else if (body.k === 'npcwant') this.npcs.onWant(inner.f, body.id);
             else if (body.k === 'giftr') this.npcs.onGiftReply(inner.f, body, this.names.get(inner.f)!);
@@ -1097,6 +1130,10 @@ export class TableSession {
             case 'rules':
                 /* Kept for this browser's cards until the player leaves. */
                 writeTableMegaRules(this.store.state.lobbyId, body.mega);
+                break;
+
+            case 'move':
+                void this.follow(body);
                 break;
 
             case 'kick':
@@ -1514,6 +1551,9 @@ export class TableSession {
         this.combat.forget(id);
         /* Kicked from a locked room is out until it is unlocked. */
         if (this.allowed?.delete(id)) saveLock(this.store.state.lobbyId, this.allowed);
+        /* Nor handed the new password at an old room's door. */
+        this.dhKeys.delete(id);
+        dropFromMoved(this.store.state.lobbyId, id);
         void this.publish({ k: 'kick', id });
         this.publishRoster();
     }
@@ -1533,6 +1573,82 @@ export class TableSession {
             this.lockTimer = null;
             this.store.update((st) => { st.lockBusyUntil = 0; });
         }, LOCK_GAP_MS);
+    }
+
+    /** A new password, and the table moves to the room it makes. Everyone at
+        it follows on their own: each is sent the new password sealed to
+        their key alone, so someone kicked — who still has the old one —
+        cannot read it. `lock` locks the room first, so the people carried
+        over are also the only ones who may come back. Players away at that
+        moment are let through the old room's door for an hour (porter.ts). */
+    async changePassword(lock: boolean): Promise<void> {
+        const s = this.store.state;
+        if (!s.isHost || !this.room || !this.identity || s.moving) return;
+        const identity = this.identity;
+        const { lobbyId, myId, myName } = s;
+        const oldPassword = s.password;
+        const oldAddr = this.room.addr;
+        this.store.update((st) => { st.moving = true; });
+        try {
+            if (lock && !this.allowed) {
+                this.allowed = new Set(this.names.keys());
+                saveLock(lobbyId, this.allowed);
+            }
+            const password = generatePassword();
+            const next = await deriveRoom(lobbyId, password);
+            const members = [...this.names.keys()].filter((id) => id !== myId);
+            const eph = await generateDhKeys();
+            const to: { id: string; c: string }[] = [];
+            for (const id of members) {
+                const dh = this.dhKeys.get(id);
+                if (dh) to.push({ id, c: await boxSeal(eph.privateKey, dh, oldAddr + '|' + id, password) });
+            }
+            if (to.length) await this.publish({ k: 'move', dh: await exportDhPublic(eph), to });
+            /* Who may still be handed it at the old room's door: everyone at
+               the table now, and everyone the lock lets back. */
+            const carry = new Set<string>([...members, ...(this.allowed ?? [])]);
+            carry.delete(myId);
+            rememberMove(lobbyId, oldPassword, carry);
+            await rememberHostRoom(lobbyId, next.addr);
+            saveSession({ lobbyId, password, name: myName, ok: true });
+            /* The move has to leave before this socket closes. */
+            await new Promise((r) => setTimeout(r, 400));
+            await this.begin(identity, lobbyId, password, myName, true, true);
+            this.notify('New password set. The players at the table followed; send newcomers the new invite.');
+        } catch (e) {
+            this.notify('The password could not be changed: ' + describe(e));
+        } finally {
+            this.store.update((st) => { st.moving = false; });
+        }
+    }
+
+    /** The GM's page keeps a door open on each room it left this hour. */
+    private openDoors(identity: Identity, lobbyId: string): void {
+        for (const p of this.porters) p.stop();
+        this.porters = (loadMoved(lobbyId)?.rooms ?? [])
+            .filter((r) => r.password !== this.store.state.password)
+            .map((r) => new Porter(identity, lobbyId, r.password, r.until, () => this.store.state.password));
+        for (const p of this.porters) void p.start();
+    }
+
+    /** The GM changed the password and sealed the new one to this page's
+        key: on to the new room, saving it so a reload goes there too. */
+    private async follow(body: Extract<Body, { k: 'move' }>): Promise<void> {
+        const s = this.store.state;
+        if (s.isHost || !this.dh || !this.room || this.following) return;
+        const mine = body.to.find((e) => e.id === s.myId);
+        if (!mine) return;
+        const password = await boxOpen(this.dh.privateKey, body.dh, this.room.addr + '|' + s.myId, mine.c);
+        if (!password || password.length < 8 || password.length > 128 || password === s.password) return;
+        this.following = true;
+        try {
+            const saved = { lobbyId: s.lobbyId, password, name: s.myName, ok: true };
+            saveSession(saved);
+            await this.joinLobby(s.lobbyId, password, s.myName, saved);
+            this.notify('The GM changed the table\u2019s password: you are at the new one.');
+        } finally {
+            this.following = false;
+        }
     }
 
     /* ------------------------------------------------------------ UI state */

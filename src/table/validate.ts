@@ -342,6 +342,11 @@ function zMap(raw: unknown, order: string[] | null): Record<string, string> | nu
     return out;
 }
 
+/** An uncompressed P-256 point, base64url: 65 bytes, 87 characters. */
+function dhText(v: unknown): boolean {
+    return typeof v === 'string' && /^[A-Za-z0-9_-]{87}$/.test(v);
+}
+
 function memberList(raw: unknown): string[] | null {
     if (!Array.isArray(raw) || raw.length > LIMITS.MAX_MEMBERS) return null;
     const out: string[] = [];
@@ -612,6 +617,23 @@ export function parseBody(raw: unknown): Body | null {
             const name = cleanText(raw.name, LIMITS.MAX_NAME * 2) || 'Pokémon';
             const z = zText(raw.z);
             return to && oid && z ? { k: 'gift', to, oid, name, z } : null;
+        }
+        case 'key': {
+            if (!exactly(raw, ['k', 'dh'])) return null;
+            return dhText(raw.dh) ? { k: 'key', dh: raw.dh as string } : null;
+        }
+        case 'move': {
+            if (!exactly(raw, ['k', 'dh', 'to'])) return null;
+            if (!dhText(raw.dh) || !Array.isArray(raw.to) || !raw.to.length || raw.to.length > LIMITS.MAX_MEMBERS) return null;
+            const to: { id: string; c: string }[] = [];
+            for (const e of raw.to) {
+                if (!isRecord(e) || !exactly(e, ['id', 'c'])) return null;
+                const id = fingerprintText(e.id);
+                if (!id || to.some((x) => x.id === id)) return null;
+                if (typeof e.c !== 'string' || !/^[A-Za-z0-9_-]{40,400}$/.test(e.c)) return null;
+                to.push({ id, c: e.c });
+            }
+            return { k: 'move', dh: raw.dh as string, to };
         }
         case 'giftoff': {
             if (!exactly(raw, ['k', 'oid'])) return null;
