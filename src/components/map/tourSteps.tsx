@@ -60,7 +60,7 @@ export const MAP_STEPS: TourStep[] = [
             <p>Five drawing styles, the background, and the <strong>borders</strong> between terrains: soft
                 blends, ink lines or none, chosen per pair of terrains with the <Btn icon="fa-bezier-curve" /> tool.
                 Then the grid, snapping, the size in cells and what one cell means.</p>
-            <p>Have a map drawn by hand or in another program? The background menu takes a <strong>picture</strong>:
+            <p>Have a map drawn by hand or in another program? <Btn icon="fa-file-import" /> <strong>Picture</strong> puts it under the map:
                 paint, mark and fog it like any map, and show it at the table.</p>
         </>,
     },

@@ -168,6 +168,28 @@ function PictureSection() {
     );
 }
 
+/** The picture has a button of its own: inside the background menu, under
+    a button named after a terrain, nobody found it. */
+export function PictureControl() {
+    const { doc } = useMap();
+    const pop = usePopover();
+    return (
+        <>
+            <button
+                ref={pop.anchor} className={'icon-btn map-picture-btn' + (doc.picture ? ' on' : '')} aria-expanded={pop.open}
+                title={doc.picture ? 'Picture under the map: ' + (doc.picture.name || 'your picture')
+                    : 'Load a map drawn by hand or in another program (PNG, JPEG, WebP…)'}
+                onClick={() => pop.setOpen((o) => !o)}
+            >
+                <i className="fa-solid fa-file-import"></i><span className="map-btn-text"> Picture</span> <i className="fa-solid fa-caret-down"></i>
+            </button>
+            <Popover anchor={pop.anchor} open={pop.open} onClose={pop.close} className="map-picture-pop">
+                <PictureSection />
+            </Popover>
+        </>
+    );
+}
+
 export function BackgroundControl() {
     const { store, doc } = useMap();
     const pop = usePopover();
@@ -177,17 +199,13 @@ export function BackgroundControl() {
         <>
             <button
                 ref={pop.anchor} className="icon-btn map-bg-btn" aria-expanded={pop.open}
-                title={doc.picture ? 'Background: your picture — shows wherever nothing is painted'
-                    : 'Background: ' + bg.name + ' — shows wherever nothing is painted'}
+                title={'Background: ' + bg.name + ' — shows wherever nothing is painted'}
                 onClick={() => pop.setOpen((o) => !o)}
             >
-                {doc.picture
-                    ? <i className="fa-solid fa-image"></i>
-                    : <span className={'map-bg-chip' + (style.pixelated ? ' pixelated' : '')} style={{ background: swatchBackground(style, bg.slug) }}></span>}
-                <span className="map-btn-text"> {doc.picture ? 'Picture' : bg.name}</span> <i className="fa-solid fa-caret-down"></i>
+                <span className={'map-bg-chip' + (style.pixelated ? ' pixelated' : '')} style={{ background: swatchBackground(style, bg.slug) }}></span>
+                <span className="map-btn-text"> {bg.name}</span> <i className="fa-solid fa-caret-down"></i>
             </button>
             <Popover anchor={pop.anchor} open={pop.open} onClose={pop.close} className="map-bg-pop">
-                <PictureSection />
                 <div className="map-popover-title">Background</div>
                 <p className="map-hint">
                     {doc.picture

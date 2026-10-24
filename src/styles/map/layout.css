@@ -39,9 +39,9 @@
 
 /* The words on the bar's buttons go first when the window narrows; the
    glyphs stay, and each button keeps its hint. The bar is exactly full at
-   about 1480px with the words showing; any narrower and .map-settings (which
+   about 1680px with the words showing; any narrower and .map-settings (which
    may shrink, though its buttons cannot) is painted over by the next group. */
-@media (max-width: 1480px) {
+@media (max-width: 1680px) {
     .map-btn-text { display: none; }
 }
 
@@ -190,9 +190,11 @@
 .map-bg-pop { width: 20rem; }
 .map-bg-group-name { font-size: 0.68rem; font-weight: 600; color: var(--text-secondary); margin: 0.55rem 0 0.25rem; }
 
-/* A picture of the GM's own under the map: in the background picker, and
+/* A picture of the GM's own under the map: its own button on the bar, and
    in the new map form. */
-.map-picture { padding-bottom: 0.7rem; margin-bottom: 0.7rem; border-bottom: 1px solid var(--border-color); }
+.map-picture-btn { display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; flex: 0 0 auto; }
+.map-picture-btn.on > .fa-file-import { color: var(--accent); }
+.map-picture-pop { width: 20rem; }
 .map-picture .map-hint { margin: 0 0 0.5rem; }
 .map-picture .map-field { margin-bottom: 0.45rem; }
 .map-picture-name { display: flex; align-items: center; gap: 0.45rem; font-size: 0.8rem; margin-bottom: 0.45rem; min-width: 0; }

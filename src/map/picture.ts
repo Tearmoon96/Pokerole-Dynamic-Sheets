@@ -25,6 +25,9 @@ const MAX_BYTES = 40 * 1024 * 1024;
 /** Wider or taller than this is scaled down on the way in: the players'
     picture is capped at the same size, and a canvas will not take much more. */
 const MAX_SIDE = 8192;
+/** High enough that lines and lettering stay crisp; a map is mostly flat
+    colour, which WebP keeps small at any quality. */
+const WEBP_QUALITY = 0.9;
 /** How long an unnamed picture is kept: another tab may have just chosen it
     and not yet written its map. */
 const SWEEP_AFTER_MS = 10 * 60 * 1000;
@@ -133,18 +136,29 @@ export async function importPicture(file: File): Promise<PictureInfo> {
     } catch {
         throw new Error('The browser could not read that picture.');
     }
+    /* Every picture is re-encoded as WebP on the way in, and the smaller of
+       that and the original is kept: an exported PNG of a map is often ten
+       times the size for no difference anyone can see, and the bytes are
+       carried in IndexedDB, in every map file and up to the table. Too big a
+       picture is scaled down first. */
+    const k = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bmp.width * k);
+    canvas.height = Math.round(bmp.height * k);
+    const ctx = canvas.getContext('2d')!;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    const webp = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/webp', WEBP_QUALITY));
+    canvas.width = canvas.height = 0;
     let blob: Blob = file;
-    if (bmp.width > MAX_SIDE || bmp.height > MAX_SIDE) {
-        const k = MAX_SIDE / Math.max(bmp.width, bmp.height);
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(bmp.width * k);
-        canvas.height = Math.round(bmp.height * k);
-        const ctx = canvas.getContext('2d')!;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    if (k < 1) {
+        if (!webp) throw new Error('The browser could not scale that picture down.');
+        blob = webp;
+    } else if (webp && webp.type === 'image/webp' && webp.size < file.size) {
+        blob = webp;
+    }
+    if (blob !== file) {
         bmp.close();
-        blob = await new Promise<Blob>((res, rej) => canvas.toBlob(
-            (b) => (b ? res(b) : rej(new Error('The browser could not scale that picture down.'))), 'image/webp', 0.92));
         bmp = await createImageBitmap(blob);
     }
     const id = await hashOf(blob);
