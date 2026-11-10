@@ -1,15 +1,28 @@
 /* One post and its replies, with a reply box for a signed-in reader and the
-   owner's close / reopen buttons. */
+   owner's close / reopen buttons.
 
-import { useEffect, useMemo, useState } from 'react';
+   The replies come in by themselves, like a chat (owner's ask, 2026-11-10):
+   while the tab is visible the post is checked every 30 s, and at once when
+   the tab comes back. A check is ONE call (the post); the replies are read
+   again only when the post's `updated_at` or reply count moved. A reader who
+   is not signed in checks every 2 minutes instead: GitHub gives an
+   anonymous address 60 calls an hour, and the list needs some of them. A
+   rate-limit answer pauses the checks until GitHub's reset; other failures
+   are skipped quietly, the next check tries again. */
+
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { categoryOf, categoryById, MAX_BODY } from '../../contact/categories';
 import { canSignIn } from '../../contact/config';
 import {
-    createComment, fetchComments, fetchIssue, setIssueState, type GhComment, type GhIssue,
+    createComment, fetchComments, fetchIssue, GhError, setIssueState, type GhComment, type GhIssue,
 } from '../../contact/github';
 import { sanitizeHtml } from '../../contact/sanitize';
 import { ago, fullDate, readDraft, STATE_ICON, STATE_TEXT, stateOf, writeDraft } from '../../contact/format';
 import type { Account } from './ContactApp';
+
+/** How often an open post is checked for new replies. */
+const POLL_SIGNED_MS = 30_000;
+const POLL_ANON_MS = 120_000;
 
 export function IssueView({ n, listed, account, onBack, onChanged }: {
     n: number;
@@ -27,6 +40,14 @@ export function IssueView({ n, listed, account, onBack, onChanged }: {
 
     const signedToken = account.session?.token ?? null;
 
+    /** What is on screen, as "updated_at|replies": a check that finds the same skips the replies. */
+    const shown = useRef('');
+    /** Bumped by every reply or state change sent from here: a check that
+        started before one must not put back an older list over it. */
+    const edits = useRef(0);
+    const changed = useRef(onChanged);
+    changed.current = onChanged;
+
     useEffect(() => {
         let live = true;
         (async () => {
@@ -38,6 +59,7 @@ export function IssueView({ n, listed, account, onBack, onChanged }: {
                 if (!live) return;
                 setIssue(i);
                 setComments(c);
+                shown.current = i.updated_at + '|' + c.length;
                 /* The list's count may be behind what was just read. */
                 if (listed && listed.comments !== c.length) onChanged({ ...listed, comments: c.length });
             } catch (e) {
@@ -46,6 +68,37 @@ export function IssueView({ n, listed, account, onBack, onChanged }: {
         })();
         return () => { live = false; };
     }, [n]);
+
+    /* New replies, a close or a reopen, picked up by themselves. */
+    useEffect(() => {
+        let live = true, running = false, last = Date.now(), pausedUntil = 0;
+        const check = async () => {
+            if (running || document.visibilityState !== 'visible' || Date.now() < pausedUntil) return;
+            running = true;
+            last = Date.now();
+            const at = edits.current;
+            try {
+                const i = await fetchIssue(n, signedToken);
+                const key = i.updated_at + '|' + i.comments;
+                if (!live || at !== edits.current || key === shown.current) return;
+                const c = await fetchComments(n, signedToken);
+                if (!live || at !== edits.current) return;
+                setIssue(i);
+                setComments(c);
+                shown.current = i.updated_at + '|' + c.length;
+                changed.current({ ...i, comments: c.length });
+            } catch (e) {
+                if (e instanceof GhError && e.resetAt) pausedUntil = e.resetAt;
+            } finally {
+                running = false;
+            }
+        };
+        const timer = window.setInterval(() => void check(), signedToken ? POLL_SIGNED_MS : POLL_ANON_MS);
+        /* Back to the tab: look now, unless a check has only just run. */
+        const onVis = () => { if (document.visibilityState === 'visible' && Date.now() - last > 10_000) void check(); };
+        document.addEventListener('visibilitychange', onVis);
+        return () => { live = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVis); };
+    }, [n, signedToken]);
 
     useEffect(() => { writeDraft('reply_' + n, reply.trim() ? reply : null); }, [n, reply]);
 
@@ -72,7 +125,9 @@ export function IssueView({ n, listed, account, onBack, onChanged }: {
         try {
             const token = await account.token();
             if (!token) return;
+            edits.current++;
             const c = await createComment(token, n, text);
+            edits.current++;
             setComments((list) => [...(list ?? []), c]);
             setReply('');
             onChanged({ ...issue, comments: issue.comments + 1, updated_at: c.created_at });
@@ -89,6 +144,7 @@ export function IssueView({ n, listed, account, onBack, onChanged }: {
         try {
             const token = await account.token();
             if (!token) return;
+            edits.current++;
             /* A reply typed before closing goes first, as on GitHub. */
             if (reply.trim()) {
                 const c = await createComment(token, n, reply.trim());
@@ -96,6 +152,7 @@ export function IssueView({ n, listed, account, onBack, onChanged }: {
                 setReply('');
             }
             const next = await setIssueState(token, n, state, reason);
+            edits.current++;
             const merged: GhIssue = { ...issue, ...next, body_html: next.body_html ?? issue.body_html };
             setIssue(merged);
             onChanged(merged);
