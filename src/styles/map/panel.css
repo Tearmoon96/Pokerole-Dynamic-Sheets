@@ -411,7 +411,7 @@
 .map-type-toggles .map-segmented button { font-size: 0.78rem; padding: 0.32rem 0.2rem; }
 
 /* A colour swatch that opens the page's own picker (ColorField.tsx). */
-.map-swatch {
+.map-color-swatch {
     display: inline-flex;
     flex: 0 0 auto;
     width: 1.9rem;
@@ -422,10 +422,10 @@
     background: var(--panel-solid);
     cursor: pointer;
 }
-.map-swatch:hover, .map-swatch[aria-expanded="true"] { border-color: var(--accent); }
-.map-swatch-fill { flex: 1 1 auto; align-self: stretch; border-radius: 4px; box-shadow: inset 0 0 0 1px #0005; }
-.map-swatch.wide { width: 100%; height: 1.9rem; border-radius: 8px; }
-.map-field-row > .map-swatch { flex: 0 0 2.6rem; height: auto; align-self: stretch; }
+.map-color-swatch:hover, .map-color-swatch[aria-expanded="true"] { border-color: var(--accent); }
+.map-color-swatch-fill { flex: 1 1 auto; align-self: stretch; border-radius: 4px; box-shadow: inset 0 0 0 1px #0005; }
+.map-color-swatch.wide { width: 100%; height: 1.9rem; border-radius: 8px; }
+.map-field-row > .map-color-swatch { flex: 0 0 2.6rem; height: auto; align-self: stretch; }
 
 .map-bend { margin-bottom: 0.55rem; }
 
@@ -494,7 +494,7 @@
     color: #fff;
     text-shadow: 0 0 2px #000;
 }
-.map-swatch.map-color-custom {
+.map-color-swatch.map-color-custom {
     width: 20px;
     height: 20px;
     padding: 0;

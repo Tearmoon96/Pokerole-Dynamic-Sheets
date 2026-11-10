@@ -171,12 +171,12 @@ export function ColorField({ value, onChange, label, className, children, ...res
         <>
             <button
                 ref={btn} type="button" {...rest}
-                className={'map-swatch' + (className ? ' ' + className : '')}
+                className={'map-color-swatch' + (className ? ' ' + className : '')}
                 aria-label={label} aria-haspopup="dialog" aria-expanded={open}
                 data-color={hex}
                 onClick={() => setOpen((o) => !o)}
             >
-                {children ?? <span className="map-swatch-fill" style={{ background: hex }}></span>}
+                {children ?? <span className="map-color-swatch-fill" style={{ background: hex }}></span>}
             </button>
             <Popover anchor={btn} open={open} onClose={() => setOpen(false)} className="map-colorpick-pop">
                 <ColorPanel value={hex} onChange={onChange} />
