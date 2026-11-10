@@ -13,6 +13,7 @@ import {
     tent, torii, trashCan, vending, windmill,
 } from './props2';
 import * as F from './interior';
+import * as G from './garden';
 
 /* What a city can be built from (the World Builder's city builder).
 
@@ -26,7 +27,7 @@ import * as F from './interior';
    rename the display name instead. Colours are slots the GM can change one
    by one in the inspector; their defaults are here. */
 
-export type ItemGroup = 'building' | 'nature' | 'street' | 'furniture' | 'kitchen' | 'shop';
+export type ItemGroup = 'building' | 'nature' | 'garden' | 'street' | 'furniture' | 'kitchen' | 'shop';
 
 export interface ColorSlot { name: string; value: string }
 
@@ -76,7 +77,8 @@ export interface ItemDef {
 /** Where a group is offered: in cities, in interiors, or both. */
 export const ITEM_GROUPS: { key: ItemGroup; label: string; where: ('city' | 'interior')[] }[] = [
     { key: 'building', label: 'Buildings', where: ['city'] },
-    { key: 'nature', label: 'Nature', where: ['city'] },
+    { key: 'nature', label: 'Nature', where: ['city', 'interior'] },
+    { key: 'garden', label: 'Garden', where: ['city', 'interior'] },
     { key: 'street', label: 'Street', where: ['city'] },
     { key: 'furniture', label: 'Furniture', where: ['interior'] },
     { key: 'kitchen', label: 'Kitchen & bath', where: ['interior'] },
@@ -86,6 +88,19 @@ export const ITEM_GROUPS: { key: ItemGroup; label: string; where: ('city' | 'int
 /** The groups a map of this kind offers. */
 export function groupsFor(kind: 'world' | 'city' | 'interior') {
     return ITEM_GROUPS.filter((g) => g.where.includes(kind === 'interior' ? 'interior' : 'city'));
+}
+
+/* Street things that belong in a garden too (2026-11-10: gardens inside
+   interiors). A city keeps them under Street; an interior, which has no
+   Street, offers them under Garden. */
+const GARDEN_TOO = new Set([
+    'lamp', 'bench', 'fence', 'mailbox', 'fountain', 'well', 'statue', 'picnic-table', 'cafe-table', 'planter',
+    'campfire', 'bridge', 'dock', 'woodpile', 'scarecrow', 'beehive', 'stone-wall', 'trough', 'brazier', 'wayside', 'torii',
+]);
+
+/** The group an item is offered under on a map of this kind. */
+export function groupOf(d: ItemDef, kind: 'world' | 'city' | 'interior'): ItemGroup {
+    return kind === 'interior' && GARDEN_TOO.has(d.slug) ? 'garden' : d.group;
 }
 
 const C = (name: string, value: string): ColorSlot => ({ name, value });
@@ -749,7 +764,9 @@ export const ITEMS: ItemDef[] = [
     },
     {
         slug: 'pond', name: 'Pond', group: 'nature', icon: 'fa-water', w: 3, h: 2, sh: 2, floor: true,
-        colors: [C('Water', '#4a98d0'), C('Bank', '#b8a888')], paint: (p, r, c) => pond(p, r, c),
+        colors: [C('Water', '#4a98d0'), C('Bank', '#b8a888')],
+        variants: [V('Oval'), V('Round, stone bank', { w: 2, h: 2, sh: 2 }), V('Kidney', { w: 4, h: 3, sh: 3 }), V('With lilies and reeds', { w: 3, h: 2, sh: 2 })],
+        paint: (p, r, c, _rot, v) => (v ? G.pondShape(p, r, c, v) : pond(p, r, c)),
     },
     {
         slug: 'boulder', name: 'Boulder', group: 'nature', icon: 'fa-mound', w: 2, h: 2, sh: 2,
@@ -1104,6 +1121,89 @@ export const ITEMS: ItemDef[] = [
     {
         slug: 'bin', name: 'Bin', group: 'shop', icon: 'fa-trash-can', w: 1, h: 1, sw: 0.8, sh: 1.1,
         colors: [C('Metal', '#8a9aa8')], paint: (p, r, c) => F.trashBin(p, r, c),
+    },
+
+    /* --------------------------------------------- nature and garden, more
+       (2026-11-10, the owner's request: gardens and ponds in interiors). */
+    {
+        slug: 'lily-pads', name: 'Lily pads', group: 'nature', icon: 'fa-leaf', w: 1, h: 1, sh: 1, floor: true,
+        colors: [C('Leaves', '#4a9a4a'), C('Flower', '#f4a8c8')],
+        variants: [V('With a flower'), V('Leaves only', { skip: [1] }), V('Lotus', { colors: ['', '#f080b0'] })],
+        paint: (p, r, c, rot, v) => G.lilyPads(p, r, c, rot, v),
+    },
+    {
+        slug: 'reeds', name: 'Reeds', group: 'nature', icon: 'fa-wheat-awn', w: 1, h: 1, sh: 1.7,
+        colors: [C('Stems', '#6a9a4a'), C('Heads', '#7a5030')],
+        variants: [V('Cattails'), V('Rushes', { skip: [1] }), V('Papyrus', { skip: [1] })],
+        paint: (p, r, c, rot, v) => G.reeds(p, r, c, rot, v),
+    },
+    {
+        slug: 'koi', name: 'Koi fish', group: 'nature', icon: 'fa-fish', w: 1, h: 1, sh: 1, floor: true,
+        colors: [C('Fish', '#f07a30'), C('Spots', '#ffffff')], paint: (p, r, c) => G.koi(p, r, c),
+    },
+    {
+        slug: 'flower-clump', name: 'Flowers', group: 'nature', icon: 'fa-spa', w: 1, h: 1, sh: 1,
+        colors: [C('Flowers', '#e04860'), C('Leaves', '#4a8a3c')],
+        variants: [V('Tulips'), V('Daisies', { colors: ['#f8f6ee'] }), V('Roses', { colors: ['#d03050', '#3e7a3a'] }), V('Lavender', { colors: ['#9a7ad0', '#6a8a5a'] })],
+        paint: (p, r, c, rot, v) => G.flowerClump(p, r, c, rot, v),
+    },
+    {
+        slug: 'sunflowers', name: 'Sunflowers', group: 'nature', icon: 'fa-sun', w: 1, h: 1, sh: 2.3,
+        colors: [C('Petals', '#f4c020'), C('Leaves', '#4a8a3a')], paint: (p, r, c) => G.sunflowers(p, r, c),
+    },
+    {
+        slug: 'fern', name: 'Fern', group: 'nature', icon: 'fa-leaf', w: 1, h: 1, sw: 1.3, sh: 1.1,
+        colors: [C('Fronds', '#4a9a4a')], paint: (p, r, c) => G.fern(p, r, c),
+    },
+    {
+        slug: 'fruit-tree', name: 'Fruit tree', group: 'nature', icon: 'fa-apple-whole', w: 1, h: 1, sw: 2, sh: 3,
+        colors: [C('Leaves', '#3e8a44'), C('Trunk', '#7a4e2e'), C('Fruit', '#d83a30')],
+        variants: [V('Apples'), V('Oranges', { colors: ['#2e7a3a', '', '#f09020'] }), V('Lemons', { colors: ['#4a9a4a', '', '#f0d838'] }), V('Peaches', { colors: ['', '', '#f4a080'] })],
+        paint: (p, r, c) => G.fruitTree(p, r, c),
+    },
+    {
+        slug: 'sapling', name: 'Young tree', group: 'nature', icon: 'fa-seedling', w: 1, h: 1, sw: 1.3, sh: 2,
+        colors: [C('Leaves', '#5aa04a'), C('Trunk', '#7a5434')], paint: (p, r, c) => G.sapling(p, r, c),
+    },
+    {
+        slug: 'mossy-rock', name: 'Mossy rock', group: 'nature', icon: 'fa-mound', w: 1, h: 1, sh: 1.1,
+        colors: [C('Stone', '#8a8478'), C('Moss', '#6a9a3a')],
+        variants: [V('Rock'), V('Pond rocks'), V('Flat stone')],
+        paint: (p, r, c, rot, v) => G.mossyRock(p, r, c, rot, v),
+    },
+    {
+        slug: 'pebbles', name: 'Pebbles', group: 'nature', icon: 'fa-circle', w: 1, h: 1, sh: 1, floor: true,
+        colors: [C('Stone', '#a8a090')], paint: (p, r, c) => G.pebbles(p, r, c),
+    },
+    {
+        slug: 'stepping-stones', name: 'Stepping stones', group: 'garden', icon: 'fa-shoe-prints', w: 1, h: 1, sh: 1, floor: true,
+        colors: [C('Stone', '#b0a898')],
+        variants: [V('Round'), V('Slabs'), V('Pebble path')],
+        paint: (p, r, c, rot, v) => G.steppingStones(p, r, c, rot, v),
+    },
+    {
+        slug: 'bird-bath', name: 'Bird bath', group: 'garden', icon: 'fa-dove', w: 1, h: 1, sw: 1.1, sh: 1.5,
+        colors: [C('Stone', '#c0b8a8'), C('Water', '#6ab0e0')], paint: (p, r, c) => G.birdBath(p, r, c),
+    },
+    {
+        slug: 'stone-lantern', name: 'Stone lantern', group: 'garden', icon: 'fa-torii-gate', w: 1, h: 1, sh: 1.8,
+        colors: [C('Stone', '#a8a498'), C('Light', '#f8d878')], paint: (p, r, c) => G.stoneLantern(p, r, c),
+    },
+    {
+        slug: 'topiary', name: 'Topiary', group: 'garden', icon: 'fa-tree', w: 1, h: 1, sh: 2,
+        colors: [C('Leaves', '#3e8a44'), C('Pot', '#c0643a')],
+        variants: [V('Ball'), V('Cone'), V('Two balls')],
+        paint: (p, r, c, rot, v) => G.topiary(p, r, c, rot, v),
+    },
+    {
+        slug: 'garden-bridge', name: 'Arched footbridge', group: 'garden', icon: 'fa-archway', w: 3, h: 1, sh: 2,
+        colors: [C('Deck', '#b08050'), C('Rails', '#c83a2a')],
+        variants: [V('Red rails'), V('All wood', { colors: ['', '#8a6038'] })],
+        paint: (p, r, c) => G.gardenBridge(p, r, c),
+    },
+    {
+        slug: 'rose-arch', name: 'Rose arch', group: 'garden', icon: 'fa-archway', w: 2, h: 1, sh: 2.8,
+        colors: [C('Frame', '#f0ece4'), C('Roses', '#e04860')], paint: (p, r, c) => G.roseArch(p, r, c),
     },
 ];
 

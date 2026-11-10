@@ -328,7 +328,7 @@ export function resizeDoc(doc: MapDoc, cols: number, rows: number): MapDoc {
         paths: doc.paths.map((p) => ({ ...p, points: p.points.map(([x, y]) => [cx(x), cy(y)] as [number, number]) })),
         sketches: doc.sketches.map((k) => ({ ...k, points: k.points.map(([x, y]) => [cx(x), cy(y)] as [number, number]) })),
         placed: doc.placed.map((o) => ({ ...o, x: Math.min(o.x, Math.max(0, cols - 1)), y: Math.min(o.y, Math.max(0, rows - 1)) })),
-        room: resizeRoom(doc.room, cols, rows),
+        room: resizeRoom(doc.room, cols, rows, doc.cols, doc.rows),
     };
 }
 

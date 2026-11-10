@@ -1,9 +1,10 @@
-import { memo, useLayoutEffect, useRef } from 'react';
+import { memo, useLayoutEffect, useMemo, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { CELL } from '../../map/render/patterns';
 import { drawRoom } from '../../map/world/room';
 import type { Pt } from '../../map/world/room';
-import { MAX_CORNERS, crossings } from '../../map/world/room';
+import { MAX_CORNERS, crossings, nearestEdge, pieceAt, pieceOutline, regionOf } from '../../map/world/room';
+import type { MapUi } from '../../map/store';
 import type { MapStore } from '../../map/store';
 import type { LookId, MapRoom } from '../../map/types';
 
@@ -145,6 +146,50 @@ export function RoomHandles({ store, room, cols, rows, zoom }: {
                     <title>Drag to move this corner; double-click to remove it</title>
                 </circle>
             ))}
+        </svg>
+    );
+}
+
+/** What a click of the Room tool would change, under the pointer: the piece
+    of wall it draws or rubs out, the cells the floor brush covers, the room
+    a fill would reach, the wall a roller would paper. */
+export function RoomCursor({ room, at, ui, cols, rows, zoom }: {
+    room: MapRoom; at: Pt; ui: MapUi; cols: number; rows: number; zoom: number;
+}) {
+    const k = 1 / (CELL * zoom);
+    const mode = ui.roomMode;
+    const cx = Math.floor(at[0]), cy = Math.floor(at[1]);
+    const fill = mode !== 'walls' && ui.roomFill;
+    /* A fill's reach only changes from cell to cell. */
+    const region = useMemo(() => (fill ? regionOf(room, cols, rows, cx, cy) : null), [fill, room, cols, rows, cx, cy]);
+    let body: JSX.Element | null = null;
+    if (mode === 'walls') {
+        const v: Pt = [Math.round(at[0]), Math.round(at[1])];
+        if (Math.hypot(at[0] - v[0], at[1] - v[1]) <= 0.4) {
+            body = <circle cx={v[0]} cy={v[1]} r={6 * k} strokeWidth={2 * k} className="map-room-cursor-dot" />;
+        } else {
+            const [o, x, y] = nearestEdge(at[0], at[1]);
+            const [x2, y2] = o === 'h' ? [x + 1, y] : [x, y + 1];
+            body = <line x1={x} y1={y} x2={x2} y2={y2} strokeWidth={6 * k} className={'map-room-cursor-line' + (ui.roomErase ? ' erase' : '')} />;
+        }
+    } else if (region) {
+        body = (
+            <path className="map-room-cursor-area" strokeWidth={1.5 * k}
+                d={region.map((i) => { const x = i % cols, y = (i - x) / cols; return `M${x},${y}h1v1h-1z`; }).join('')} />
+        );
+    } else if (mode === 'floor') {
+        const n = ui.roomBrush;
+        const x0 = n % 2 ? cx - (n - 1) / 2 : Math.round(at[0]) - n / 2;
+        const y0 = n % 2 ? cy - (n - 1) / 2 : Math.round(at[1]) - n / 2;
+        body = <rect x={x0} y={y0} width={n} height={n} strokeWidth={2 * k} className="map-room-cursor-area" />;
+    } else {
+        const key = pieceAt(room, at[0], at[1]);
+        const pts = key ? pieceOutline(room, key) : null;
+        if (pts) body = <polygon points={pts.map((p) => p.join(',')).join(' ')} strokeWidth={2 * k} className="map-room-cursor-area" />;
+    }
+    return (
+        <svg className="map-room-cursor" viewBox={`0 0 ${cols} ${rows}`} width={cols * CELL} height={rows * CELL} data-room-cursor={mode}>
+            {body}
         </svg>
     );
 }

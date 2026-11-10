@@ -3,7 +3,8 @@ import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as Reac
 import { linkedDoc } from '../../map/world';
 import { dims, placeAt, spriteBox, variantOf } from '../../map/world/placed';
 import { itemOf } from '../../map/world/catalog';
-import { RoomHandles, RoomLayer } from './RoomLayer';
+import { RoomCursor, RoomHandles, RoomLayer } from './RoomLayer';
+import { edgesBetween, nearestEdge, pieceAt, regionOf, wallsOfRegion, withFloor, withWallpaper, withWalls } from '../../map/world/room';
 import { lookOf } from '../../map/world/looks';
 import { BuildGhost, DepthLayer, resFor } from './PlacedLayer';
 import { useMap } from '../../map/MapContext';
@@ -79,7 +80,10 @@ type Gesture =
     | { kind: 'resize'; sel: Selection; centre: Pt }
     | { kind: 'rotate'; sel: Selection; centre: Pt }
     | { kind: 'vertex'; sel: Selection; index: number }
-    | { kind: 'pinch'; dist: number; mid: Pt; view: View };
+    | { kind: 'pinch'; dist: number; mid: Pt; view: View }
+    /* The Room tool drawing walls (from grid corner to grid corner), or
+       painting floors or wallpaper under the pointer. */
+    | { kind: 'room'; mode: 'walls' | 'floor' | 'wallpaper'; vertex: Pt | null; start: Pt; moved: boolean };
 
 const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
 
@@ -505,6 +509,32 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         };
     };
 
+    /** The Room tool's floor or wallpaper at a point: under the brush, or
+        the whole room it is in (up to its walls). */
+    const roomPaint = (mode: 'floor' | 'wallpaper', at: Pt) => {
+        const ui = store.ui;
+        store.live((d) => {
+            const room = d.room;
+            if (!room) return;
+            const { cols, rows } = d;
+            const cx = Math.floor(at[0]), cy = Math.floor(at[1]);
+            if (mode === 'floor') {
+                let cells: number[] = [];
+                if (ui.roomFill) cells = regionOf(room, cols, rows, cx, cy);
+                else {
+                    const n = ui.roomBrush;
+                    const x0 = n % 2 ? cx - (n - 1) / 2 : Math.round(at[0]) - n / 2;
+                    const y0 = n % 2 ? cy - (n - 1) / 2 : Math.round(at[1]) - n / 2;
+                    for (let y = y0; y < y0 + n; y++) for (let x = x0; x < x0 + n; x++) if (x >= 0 && y >= 0 && x < cols && y < rows) cells.push(y * cols + x);
+                }
+                d.room = withFloor(room, cols, rows, cells, ui.roomFloor);
+            } else {
+                const keys = ui.roomFill ? wallsOfRegion(room, cols, regionOf(room, cols, rows, cx, cy)) : [pieceAt(room, at[0], at[1])].filter((k): k is string => !!k);
+                d.room = withWallpaper(room, keys, ui.roomWall);
+            }
+        });
+    };
+
     const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
         const stage = stageRef.current!;
         pointers.current.set(e.pointerId, local(e));
@@ -626,6 +656,17 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 store.setUi({ selection: [{ kind: 'stamp', id }] });
                 return;
             }
+            case 'room': {
+                const mode = store.ui.roomMode;
+                if (mode === 'shape' || !store.doc.room || !inside(at)) return;
+                e.preventDefault();
+                store.checkpoint();
+                const v: Pt = [Math.round(at[0]), Math.round(at[1])];
+                const g: Extract<Gesture, { kind: 'room' }> = { kind: 'room', mode, vertex: Math.hypot(at[0] - v[0], at[1] - v[1]) <= 0.4 ? v : null, start: at, moved: false };
+                gesture.current = g;
+                if (mode !== 'walls') roomPaint(mode, at);
+                return;
+            }
             case 'build': {
                 if (!inside(at)) return;
                 const item = store.ui.buildItem;
@@ -731,7 +772,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         const at = toCell(e);
         const g = gesture.current;
         if (!g) {
-            if (brushTool(store.ui.tool, store.ui.eraseMode) || store.ui.tool === 'fill' || store.ui.tool === 'build') setHover(at);
+            if (brushTool(store.ui.tool, store.ui.eraseMode) || store.ui.tool === 'fill' || store.ui.tool === 'build' || store.ui.tool === 'room') setHover(at);
             return;
         }
         switch (g.kind) {
@@ -758,6 +799,31 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 paintAlong(g, g.last, at);
                 g.last = at;
                 return;
+            case 'room': {
+                setHover(at);
+                if (g.mode !== 'walls') {
+                    if (!store.ui.roomFill) roomPaint(g.mode, at);
+                    return;
+                }
+                /* A new grid corner only once the pointer is near it, so a
+                   hand wobbling between two corners draws nothing. */
+                const v: Pt = [Math.round(at[0]), Math.round(at[1])];
+                if ((g.vertex && v[0] === g.vertex[0] && v[1] === g.vertex[1]) || Math.hypot(at[0] - v[0], at[1] - v[1]) > 0.4) return;
+                let edges: ReturnType<typeof edgesBetween>;
+                if (g.vertex) edges = edgesBetween(g.vertex, v);
+                else {
+                    /* Pressed along a line, away from its corners: that piece
+                       counts once the drag reaches one of its ends. */
+                    const [o, ex, ey] = nearestEdge(g.start[0], g.start[1]);
+                    const ends = o === 'h' ? [[ex, ey], [ex + 1, ey]] : [[ex, ey], [ex, ey + 1]];
+                    edges = ends.some(([x, y]) => x === v[0] && y === v[1]) ? [[o, ex, ey]] : [];
+                }
+                g.vertex = v;
+                g.moved = true;
+                const on = !store.ui.roomErase;
+                store.live((d) => { if (d.room) d.room = withWalls(d.room, d.cols, d.rows, edges, on); });
+                return;
+            }
             case 'path': {
                 const last = g.pts[g.pts.length - 1];
                 if (Math.hypot(at[0] - last[0], at[1] - last[1]) < 0.12) return;
@@ -916,6 +982,12 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             return;
         }
         if (g.kind === 'paint') publish(g);
+        if (g.kind === 'room' && g.mode === 'walls' && !g.moved) {
+            /* A click: the one piece of wall nearest it. */
+            const edge = nearestEdge(g.start[0], g.start[1]);
+            const on = !store.ui.roomErase;
+            store.live((d) => { if (d.room) d.room = withWalls(d.room, d.cols, d.rows, [edge], on); });
+        }
         if (g.kind === 'shape') {
             g.end = toCell(e);
             if (e.type === 'pointerup') g.even = e.altKey;
@@ -975,7 +1047,10 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 <SketchesLayer doc={doc} selection={ui.selection} draft={sketchDraft} onDown={onObjectDown} />
                 {!city && <TokensLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} />}
                 {(!ui.fogHidden || ui.tool === 'fog' || ui.tool === 'unfog') && <FogLayer doc={doc} />}
-                {doc.room && ui.tool === 'room' && <RoomHandles store={store} room={doc.room} cols={doc.cols} rows={doc.rows} zoom={view.zoom} />}
+                {doc.room && ui.tool === 'room' && ui.roomMode === 'shape' && <RoomHandles store={store} room={doc.room} cols={doc.cols} rows={doc.rows} zoom={view.zoom} />}
+                {doc.room && ui.tool === 'room' && ui.roomMode !== 'shape' && hover && !spaceHeld && (
+                    <RoomCursor room={doc.room} at={hover} ui={ui} cols={doc.cols} rows={doc.rows} zoom={view.zoom} />
+                )}
                 {box && (
                     <div
                         className="map-marquee"

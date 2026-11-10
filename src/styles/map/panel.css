@@ -668,3 +668,11 @@
     position: absolute; top: 3px; right: 3px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px;
     font-size: 0.62rem; line-height: 15px; text-align: center; background: var(--accent); color: #fff;
 }
+
+/* The Room tool's four modes: the icon over the word, so all four fit. */
+.map-room-modes { margin-bottom: 0.55rem; }
+.map-room-modes button { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; padding: 0.35rem 0.1rem; }
+.map-room-modes button i { font-size: 0.85rem; }
+/* Floors and wallpapers: the swatch fills the tile. */
+.map-tile-art.map-finish-art { border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
+.map-finish-current { margin: 0.3rem 0 0.2rem; align-items: center; }

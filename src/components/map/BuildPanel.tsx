@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useMap } from '../../map/MapContext';
-import { ITEMS, groupsFor, itemOf } from '../../map/world/catalog';
+import { ITEMS, groupOf, groupsFor, itemOf } from '../../map/world/catalog';
 import type { ItemGroup } from '../../map/world/catalog';
 import { ColorField } from './ColorField';
 import { clashes, colorsOf, itemThumb, variantOf } from '../../map/world/placed';
 import { panHint } from '../../map/hotkeys';
-import type { MapDoc, MapPlaced, MapRoom } from '../../map/types';
-import { FLOORS, WALLS, crossings, defaultRoom, presetShape } from '../../map/world/room';
+import type { FloorFinish, MapDoc, MapPlaced, MapRoom, WallFinish } from '../../map/types';
+import { FLOORS, WALLS, crossings, defaultRoom, finishThumb, presetShape } from '../../map/world/room';
 
 /* The Build tool's side panel (cities and interiors): the catalogue, drawn in
    the city's own look, and the fields of a placed building or prop. */
@@ -23,7 +23,7 @@ export function BuildPalette() {
     /* Cities have a Modern and a Medieval set; things of neither fit both. */
     const eras = doc.kind !== 'interior';
     const era = eras ? ui.buildEra : 'all';
-    const list = ITEMS.filter((d) => offered.has(d.group) && (g === 'all' || d.group === g) && (!q || d.name.toLowerCase().includes(q))
+    const list = ITEMS.filter((d) => offered.has(groupOf(d, doc.kind)) && (g === 'all' || groupOf(d, doc.kind) === g) && (!q || d.name.toLowerCase().includes(q))
         && (era === 'all' || !d.era || d.era === era));
     const current = itemOf(ui.buildItem);
     const variant = variantOf(current, ui.buildVariant);
@@ -122,10 +122,10 @@ export function PlacedFields({ doc, p, set }: {
                 <select value={p.item} onChange={(e) => set({ item: e.currentTarget.value, colors: undefined, rot: undefined, variant: undefined })}>
                     {groupsFor(doc.kind).map((g) => (
                         <optgroup key={g.key} label={g.label}>
-                            {ITEMS.filter((d) => d.group === g.key).map((d) => <option key={d.slug} value={d.slug}>{d.name}</option>)}
+                            {ITEMS.filter((d) => groupOf(d, doc.kind) === g.key).map((d) => <option key={d.slug} value={d.slug}>{d.name}</option>)}
                         </optgroup>
                     ))}
-                    {!groupsFor(doc.kind).some((g) => g.key === def.group) && <option value={p.item}>{def.name}</option>}
+                    {!groupsFor(doc.kind).some((g) => g.key === groupOf(def, doc.kind)) && <option value={p.item}>{def.name}</option>}
                 </select>
             </label>
             {def.variants && (
@@ -209,10 +209,11 @@ export function PlacedFields({ doc, p, set }: {
     );
 }
 
-/** The Room tool's panel (interiors): the outline's presets, the wall
-    height, the floor and the wallpaper. The corners are dragged on the map. */
+/** The Room tool's panel (interiors), in four modes: the outline and what
+    holds for the whole room; walls drawn inside; floors painted; wallpaper
+    pasted piece by piece. */
 export function RoomPanel() {
-    const { store, doc } = useMap();
+    const { store, ui, doc } = useMap();
     const room = doc.room;
     if (!room) {
         return (
@@ -225,11 +226,36 @@ export function RoomPanel() {
             </section>
         );
     }
-    const set = (patch: Partial<MapRoom>, coalesce?: string) => store.edit((d) => { if (d.room) d.room = { ...d.room, ...patch }; }, coalesce);
-    const shapes = [['rect', 'Rectangle'], ['L', 'L'], ['T', 'T'], ['U', 'U'], ['plus', 'Cross']] as const;
+    const modes = [
+        ['shape', 'Outline', 'fa-vector-square', 'The shape of the house, and what holds for the whole room'],
+        ['walls', 'Walls', 'fa-grip-lines-vertical', 'Draw walls inside: rooms, corridors, a garden fence'],
+        ['floor', 'Floors', 'fa-fill-drip', 'Paint floors room by room, or cell by cell'],
+        ['wallpaper', 'Wallpaper', 'fa-paint-roller', 'Paper single walls, or every wall of one room'],
+    ] as const;
     return (
         <section className="map-section" data-room-panel="">
             <h3>Room</h3>
+            <div className="map-segmented map-room-modes" role="group" aria-label="What the Room tool does" data-room-modes="">
+                {modes.map(([k, label, icon, hint]) => (
+                    <button key={k} aria-pressed={ui.roomMode === k} data-room-mode={k} title={hint} onClick={() => store.setUi({ roomMode: k })}>
+                        <i className={'fa-solid ' + icon}></i> {label}
+                    </button>
+                ))}
+            </div>
+            {ui.roomMode === 'shape' && <RoomOutlineFields room={room} />}
+            {ui.roomMode === 'walls' && <RoomWallsFields room={room} />}
+            {ui.roomMode === 'floor' && <RoomFloorFields />}
+            {ui.roomMode === 'wallpaper' && <RoomWallpaperFields />}
+        </section>
+    );
+}
+
+function RoomOutlineFields({ room }: { room: MapRoom }) {
+    const { store, doc } = useMap();
+    const set = (patch: Partial<MapRoom>, coalesce?: string) => store.edit((d) => { if (d.room) d.room = { ...d.room, ...patch }; }, coalesce);
+    const shapes = [['rect', 'Rectangle'], ['L', 'L'], ['T', 'T'], ['U', 'U'], ['plus', 'Cross']] as const;
+    return (
+        <>
             <p className="map-hint">
                 Drag a corner to move it; drag a <b>+</b> on a wall to add a corner there; double-click a corner to remove it.
                 Only the walls with the room below them stand up, as in a 3/4 view. Walls cannot cross.
@@ -284,9 +310,144 @@ export function RoomPanel() {
                 <span>Wall tops and skirting</span>
                 <ColorField value={room.trim} label="Wall tops and skirting colour" className="wide" data-room-trim="" onChange={(hex) => set({ trim: hex }, 'room-trim')} />
             </div>
+            <label className="map-field">
+                <span>Outside the walls</span>
+                <div className="map-field-row">
+                    <select value={room.outside?.kind ?? ''} data-room-outside="" onChange={(e) => {
+                        const v = e.currentTarget.value;
+                        const f = FLOORS.find((x) => x.id === v);
+                        set({ outside: f ? { kind: f.id, color: f.color } : undefined });
+                    }}>
+                        <option value="">Nothing (dark)</option>
+                        <optgroup label="Outdoors">
+                            {FLOORS.filter((f) => f.outdoor).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                        </optgroup>
+                        <optgroup label="Indoors">
+                            {FLOORS.filter((f) => !f.outdoor).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                        </optgroup>
+                    </select>
+                    {room.outside && (
+                        <ColorField value={room.outside.color} label="Outside colour" data-room-outside-color=""
+                            onChange={(hex) => set({ outside: { ...room.outside!, color: hex } }, 'room-outside-color')} />
+                    )}
+                </div>
+            </label>
+            <p className="map-hint">A ground outside (a lawn, a yard) can be walked, furnished and fenced: a garden round the house.</p>
             <button className="map-chip" data-room-remove="" onClick={() => store.edit((d) => { delete d.room; })}>
                 <i className="fa-solid fa-trash-can"></i> Remove the walls
             </button>
-        </section>
+        </>
+    );
+}
+
+function RoomWallsFields({ room }: { room: MapRoom }) {
+    const { store, ui } = useMap();
+    const count = room.walls?.length ?? 0;
+    return (
+        <>
+            <div className="map-segmented" role="group" aria-label="Draw or rub out walls" data-room-erase="">
+                <button aria-pressed={!ui.roomErase} onClick={() => store.setUi({ roomErase: false })}><i className="fa-solid fa-pen"></i> Draw</button>
+                <button aria-pressed={ui.roomErase} onClick={() => store.setUi({ roomErase: true })}><i className="fa-solid fa-eraser"></i> Rub out</button>
+            </div>
+            <p className="map-hint">
+                Walls run along the grid lines. Click near a line for one piece of wall; hold the button and drag to
+                draw a run of them. Leave a gap for a doorway. A wall running across stands up over the room below it.
+            </p>
+            <p className="map-hint">Hedges and fences are wallpapers: paint them on in Wallpaper.</p>
+            {count > 0 && (
+                <button className="map-chip" data-room-clear-walls="" onClick={() => store.edit((d) => {
+                    if (!d.room) return;
+                    const next = { ...d.room };
+                    delete next.walls;
+                    d.room = next;
+                })}>
+                    <i className="fa-solid fa-trash-can"></i> Remove every inner wall ({count})
+                </button>
+            )}
+        </>
+    );
+}
+
+function FillOrBrush({ fillLabel, brushLabel, sizes }: { fillLabel: string; brushLabel: string; sizes?: boolean }) {
+    const { store, ui } = useMap();
+    return (
+        <>
+            <div className="map-segmented" role="group" aria-label="Paint under the pointer or fill a whole room" data-room-fill="">
+                <button aria-pressed={!ui.roomFill} onClick={() => store.setUi({ roomFill: false })}><i className="fa-solid fa-paintbrush"></i> {brushLabel}</button>
+                <button aria-pressed={ui.roomFill} onClick={() => store.setUi({ roomFill: true })}><i className="fa-solid fa-fill-drip"></i> {fillLabel}</button>
+            </div>
+            {sizes && !ui.roomFill && (
+                <div className="map-field">
+                    <span>Brush</span>
+                    <div className="map-segmented" role="group" aria-label="Brush size" data-room-brush="">
+                        {[1, 2, 3].map((n) => (
+                            <button key={n} aria-pressed={ui.roomBrush === n} onClick={() => store.setUi({ roomBrush: n })}>{n}×{n}</button>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </>
+    );
+}
+
+/** A grid of floors or wallpapers drawn in the room's look, the room's
+    own first, and a colour for the one picked. */
+function FinishPicker({ what }: { what: 'floor' | 'wall' }) {
+    const { store, ui, doc } = useMap();
+    const list = what === 'floor' ? FLOORS : WALLS;
+    const cur = what === 'floor' ? ui.roomFloor : ui.roomWall;
+    const pick = (f: { kind: string; color: string } | null) =>
+        store.setUi(what === 'floor' ? { roomFloor: f as FloorFinish | null } : { roomWall: f as WallFinish | null });
+    const tile = (d: (typeof list)[number]) => (
+        <button key={d.id} className={'map-tile' + (cur?.kind === d.id ? ' on' : '')} aria-pressed={cur?.kind === d.id}
+            data-room-finish={d.id} title={d.name}
+            onClick={() => pick({ kind: d.id, color: cur?.kind === d.id ? cur.color : d.color })}>
+            <img className="map-tile-art map-finish-art" src={finishThumb(what, d.id, cur?.kind === d.id ? cur.color : d.color, doc.look)} alt="" draggable={false} />
+            <span className="map-tile-name">{d.name}</span>
+        </button>
+    );
+    return (
+        <>
+            <div className="map-field-row map-finish-current">
+                <button className="map-chip" aria-pressed={!cur} data-room-finish="own" onClick={() => pick(null)}
+                    title={what === 'floor' ? 'Put back the room’s own floor' : 'Put back the room’s own wallpaper'}>
+                    <i className="fa-solid fa-rotate-left"></i> {what === 'floor' ? 'Room’s own floor' : 'Room’s own walls'}
+                </button>
+                {cur && (
+                    <ColorField value={cur.color} label={what === 'floor' ? 'Floor colour' : 'Wallpaper colour'} data-room-finish-color=""
+                        onChange={(hex) => pick({ ...cur, color: hex })} />
+                )}
+            </div>
+            <div className="map-field"><span>Indoors</span></div>
+            <div className="map-tiles map-finish-tiles">{list.filter((d) => !d.outdoor).map(tile)}</div>
+            <div className="map-field"><span>Outdoors</span></div>
+            <div className="map-tiles map-finish-tiles">{list.filter((d) => d.outdoor).map(tile)}</div>
+        </>
+    );
+}
+
+function RoomFloorFields() {
+    return (
+        <>
+            <FillOrBrush brushLabel="Brush" fillLabel="Whole room" sizes />
+            <p className="map-hint">
+                Paint over the floor, or fill a whole room at once: the fill stops at walls. Grass, soil and water
+                make gardens and ponds.
+            </p>
+            <FinishPicker what="floor" />
+        </>
+    );
+}
+
+function RoomWallpaperFields() {
+    return (
+        <>
+            <FillOrBrush brushLabel="One piece" fillLabel="Whole room" />
+            <p className="map-hint">
+                Click a wall (its face or its top) to paper that piece; drag along a wall for more. Whole room: click a
+                floor to paper every wall around it.
+            </p>
+            <FinishPicker what="wall" />
+        </>
     );
 }

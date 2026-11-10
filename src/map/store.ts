@@ -1,15 +1,15 @@
 import { createDoc, normalizeDoc } from './doc';
 import { createChild, doorOf, linkedDoc } from './world';
-import { groupsFor, itemOf } from './world/catalog';
+import { groupOf, groupsFor, itemOf } from './world/catalog';
 
 /** Whether a map of this kind offers this catalogue item. */
-const offers = (kind: MapDoc['kind'], item: string) => groupsFor(kind).some((g) => g.key === itemOf(item).group);
+const offers = (kind: MapDoc['kind'], item: string) => groupsFor(kind).some((g) => g.key === groupOf(itemOf(item), kind));
 import type { BrushId } from './brushes';
 import type { FogColor } from './fog';
 import type { ShapeFill, ShapeKind } from './shapes';
 import { DEFAULT_SKETCH } from './sketch';
 import type { SketchSettings } from './sketch';
-import type { DocKind, EdgeKind, LabelRole, MapDoc, PathKind, Selection, Tool } from './types';
+import type { DocKind, EdgeKind, FloorFinish, LabelRole, MapDoc, PathKind, Selection, Tool, WallFinish } from './types';
 
 /* One mutable store behind the Map Maker, in the same shape as the GM screen's
    (src/gm/store.ts): components read through useSyncExternalStore and every
@@ -108,6 +108,19 @@ export interface MapUi {
     buildFlip: boolean;
     /** The marker of `singleFiller` a click places. */
     fillerVariant: number;
+    /** The Room tool (interiors): what a drag on the map does — move the
+        outline's corners, draw walls, paint floors, or paper walls. */
+    roomMode: 'shape' | 'walls' | 'floor' | 'wallpaper';
+    /** Walls: rub inner walls out instead of drawing them. */
+    roomErase: boolean;
+    /** The floor and wallpaper laid down; null puts back the room's own. */
+    roomFloor: FloorFinish | null;
+    roomWall: WallFinish | null;
+    /** Floors and wallpaper: fill the whole room clicked (up to its walls)
+        instead of painting under the pointer. */
+    roomFill: boolean;
+    /** The floor brush's side, in cells. */
+    roomBrush: number;
     pathKind: PathKind;
     /** The look of the next freehand sketch. */
     sketch: SketchSettings;
@@ -167,7 +180,8 @@ export class MapStore {
         paintEdge: 'map', edgeKind: 'soft', eraseMode: 'terrain',
         smartPaint: false, lockedTerrains: [], stayOnStart: false,
         fogColor: 'dark', fogStrength: 100, fogHidden: false,
-        landmark: 'mountain', buildItem: 'house', buildRot: undefined, buildVariant: 0, buildEra: 'all', buildFlip: false, fillerVariant: 0, pathKind: 'road', labelRole: 'town', sketch: DEFAULT_SKETCH, sketchErase: false, sketchShape: false, token: null, selection: [],
+        landmark: 'mountain', buildItem: 'house', buildRot: undefined, buildVariant: 0, buildEra: 'all', buildFlip: false, fillerVariant: 0,
+        roomMode: 'shape', roomErase: false, roomFloor: { kind: 'grass', color: '#6aa84a' }, roomWall: { kind: 'brick', color: '#b0644a' }, roomFill: false, roomBrush: 1, pathKind: 'road', labelRole: 'town', sketch: DEFAULT_SKETCH, sketchErase: false, sketchShape: false, token: null, selection: [],
     };
 
     /** Change one brush's shape or size. */

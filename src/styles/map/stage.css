@@ -372,3 +372,9 @@ img.pixelated { image-rendering: pixelated; }
 .map-room-add circle { fill: var(--accent); opacity: 0.75; }
 .map-room-add path { stroke: #fff; }
 .map-room-add:hover circle { opacity: 1; }
+.map-stage[data-tool="room"] { cursor: crosshair; }
+.map-room-cursor { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.map-room-cursor-dot { fill: #fff; stroke: var(--accent); }
+.map-room-cursor-line { stroke: var(--accent); stroke-linecap: round; opacity: 0.85; }
+.map-room-cursor-line.erase { stroke: #e04848; }
+.map-room-cursor-area { fill: var(--accent); fill-opacity: 0.18; stroke: var(--accent); stroke-dasharray: 0.15 0.1; }

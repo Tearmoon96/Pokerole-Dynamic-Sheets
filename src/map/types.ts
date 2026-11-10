@@ -132,7 +132,25 @@ export interface MapRoom {
     wallColor: string;
     /** The tops of the walls and the skirting. */
     trim: string;
+    /** Walls drawn inside (owner's request, 2026-11-10): unit edges of the
+        grid, `h<x>,<y>` from (x,y) to (x+1,y) and `v<x>,<y>` from (x,y) to
+        (x,y+1). A horizontal one stands like a back wall over the room below it. */
+    walls?: string[];
+    /** Floors painted over parts of the map: `cols * rows` characters, row
+        by row; '.' keeps the room's own floor (or the outside's), any other
+        is an index into `floorPaints` (room.ts FINISH_CHARS). */
+    floorGrid?: string;
+    floorPaints?: FloorFinish[];
+    /** The wallpaper of single wall pieces, by piece key (the keys of
+        `walls`, and the outline's own pieces); the rest use `wall`. */
+    wallPaints?: Record<string, WallFinish>;
+    /** What lies outside the walls: a ground (a garden, a yard) people can
+        walk and build on; absent, nothing (dark). */
+    outside?: FloorFinish;
 }
+
+export interface FloorFinish { kind: import('./world/room').FloorKind; color: string }
+export interface WallFinish { kind: import('./world/room').WallKind; color: string }
 
 /** How a city or interior's buildings are coloured — see world/looks.ts. */
 export type LookId = 'colorful' | 'ancient' | 'pastel' | 'night';

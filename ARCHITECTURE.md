@@ -158,14 +158,18 @@ tokens are drawn in one layer back to front by the footprint's bottom edge
 (`depthOrder`), in the editor (`PlacedLayer.tsx`, one canvas each, redrawn
 per zoom step) and in the picture (`exportPng`). All the art is vector:
 painters ([`buildings.ts`](src/map/world/buildings.ts), `props.ts`, `props2.ts`,
-`interior.ts`, `medieval.ts`, `modern.ts`) draw through a `Pen` that applies the map's LOOK
+`interior.ts`, `medieval.ts`, `modern.ts`, `garden.ts`) draw through a `Pen` that applies the map's LOOK
 ([`looks.ts`](src/map/world/looks.ts): Colorful, Ancient, Pastel, Night),
 which also filters the ground under them. A building can open an interior
 like a landmark (`link`/`parent`). Overlaps are allowed and shown in red.
 An interior also has a floor plan, `MapDoc.room` ([`room.ts`](src/map/world/room.ts)):
 an outline of corners on the grid, edited with the Room tool's handles
 (`RoomLayer.tsx`); the edges with the room below them stand as wallpapered back
-walls, the rest is floor, and outside it is dark.
+walls, the rest is floor, and outside it is dark — or a ground of its own
+(`room.outside`: a lawn, a yard). The Room tool's other modes draw walls inside
+(`room.walls`, unit edges of the grid; a horizontal one stands over the room
+below it), paint floors cell by cell (`floorGrid` + `floorPaints`) and paper
+single wall pieces (`wallPaints`), with a brush or a fill that stops at walls.
 
 `map-maker.html` edits maps of any scale on one square grid: a cell means
 whatever the map's scale label says. A map is one `MapDoc`

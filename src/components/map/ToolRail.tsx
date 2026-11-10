@@ -24,7 +24,7 @@ export const TOOL_GROUPS: { tool: Tool; icon: string; name: string }[][] = [
     [
         { tool: 'stamp', icon: 'fa-mountain-city', name: 'Place a landmark' },
         { tool: 'build', icon: 'fa-house-chimney', name: 'Build: houses, trees, lamps and benches (cities and interiors)' },
-        { tool: 'room', icon: 'fa-vector-square', name: 'Room: the shape of the walls, the floor and the wallpaper (interiors)' },
+        { tool: 'room', icon: 'fa-vector-square', name: 'Room: the outline, walls inside, floors and wallpaper (interiors)' },
         { tool: 'token', icon: 'fa-chess-pawn', name: 'Place a token' },
     ],
     [
