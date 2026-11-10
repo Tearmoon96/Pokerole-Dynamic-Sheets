@@ -10,10 +10,10 @@ import { darken, lighten } from './looks';
    The sprite rectangle `r` is the whole picture: its bottom edge is the
    front of the footprint, where the wall meets the ground. */
 
-export type WallMat = 'plaster' | 'brick' | 'stone' | 'timber' | 'planks' | 'logs' | 'glass' | 'siding';
-export type RoofMat = 'shingle' | 'tile' | 'slate' | 'thatch' | 'metal';
+export type WallMat = 'plaster' | 'brick' | 'stone' | 'timber' | 'planks' | 'logs' | 'glass' | 'siding' | 'metal' | 'panels';
+export type RoofMat = 'shingle' | 'tile' | 'slate' | 'thatch' | 'metal' | 'tarp';
 export type WindowKind = 'square' | 'arched' | 'leaded' | 'round' | 'tall' | 'wide' | 'slit';
-export type HangIcon = 'mug' | 'bread' | 'anvil' | 'potion' | 'bed' | 'key' | 'book' | 'none';
+export type HangIcon = 'mug' | 'bread' | 'anvil' | 'potion' | 'bed' | 'key' | 'book' | 'candle' | 'none';
 
 export interface BuildingSpec {
     roof: string;
@@ -72,6 +72,8 @@ export interface BuildingSpec {
     columns?: number;
     /** A second chimney, at the other end. */
     chimney2?: boolean;
+    /** A derelict house's windows: smashed (dark, shards left) or boarded over. */
+    ruin?: 'broken' | 'boarded';
 }
 
 export function building(p: Pen, r0: Rect, s: BuildingSpec): void {
@@ -213,6 +215,10 @@ export function building(p: Pen, r0: Rect, s: BuildingSpec): void {
         if (doorKind !== 'gate') p.ell(dx + doorW * (doorKind === 'double' ? 0.42 : 0.74), dy + dh * 0.58, 0.05 * u, 0.05 * u).fill('#2a2420');
     }
 
+    if (s.ruin === 'boarded' && doorKind !== 'none') {
+        for (const t of [0.3, 0.65]) p.rect(dx - 0.1 * u, dy + dh * t, doorW + 0.2 * u, 0.15 * u).paint('#9a7a54', 0.5);
+    }
+
     if (s.garage) {
         const gx = r.x + r.w - inset - garageW - 0.12 * u, gh = 1.15 * u, gy = ground - 0.26 * u - gh;
         p.rect(gx, gy, garageW, gh).shadeFill(s.garage, 0, gy, 0, gy + gh, 0.2).stroke();
@@ -250,6 +256,25 @@ function win(p: Pen, x: number, y: number, w: number, h: number, kind: WindowKin
             p.rect(sx, y, w * 0.42, h).fill(s.shutters).stroke(0.5);
             for (let ly = y + h * 0.2; ly < y + h; ly += h * 0.2) p.line([[sx + 0.03 * u, ly], [sx + w * 0.42 - 0.03 * u, ly]], null, 0.35, 0.6);
         }
+    }
+    if (s.ruin) {
+        /* No glass to light: a dark hole with shards, or boards nailed across. */
+        const hole = () => (kind === 'arched' || kind === 'slit' ? p.rr(x, y, w, h, [w / 2, w / 2, 0, 0]) : kind === 'round' ? p.ell(x + w / 2, y + h / 2, w / 2, h / 2) : p.rect(x, y, w, h));
+        hole().fill('#2a2420').stroke(0.8);
+        if (s.ruin === 'broken') {
+            p.ctx.save();
+            hole();
+            p.ctx.clip();
+            p.poly([[x, y], [x + w * 0.45, y], [x, y + h * 0.55]]).fill('#8aa4b0');
+            p.poly([[x + w, y + h], [x + w * 0.7, y + h], [x + w, y + h * 0.6]]).fill('#8aa4b0');
+            p.ctx.restore();
+        } else {
+            const wood = '#9a7a54';
+            for (const t of [0.25, 0.6]) p.rect(x - 0.06 * u, y + h * t, w + 0.12 * u, 0.13 * u).paint(wood, 0.5);
+            p.line([[x - 0.04 * u, y + h * 0.1], [x + w + 0.04 * u, y + h * 0.95]], wood, 2.2);
+        }
+        if (kind !== 'slit' && kind !== 'round') p.rect(x - 0.05 * u, y + h, w + 0.1 * u, 0.09 * u).fill(s.trim ?? '#7a5a3a').stroke(0.5);
+        return;
     }
     if (kind === 'arched' || kind === 'slit') {
         p.rr(x, y, w, h, [w / 2, w / 2, 0, 0]);
@@ -351,6 +376,15 @@ function texture(p: Pen, b: Rect, mat: WallMat, hex: string, trim: string): void
             p.rr(b.x - 0.1 * u, y, b.w + 0.2 * u, 0.3 * u, 0.15 * u).fill(p.rnd() < 0.5 ? hex : darken(hex, 0.06));
             p.rr(b.x - 0.1 * u, y, b.w + 0.2 * u, 0.3 * u, 0.15 * u).stroke(0.45);
         }
+    } else if (mat === 'metal') {
+        /* Corrugated sheets: close ribs, a seam now and then. */
+        for (let x = b.x + 0.12 * u; x < b.x + b.w; x += 0.12 * u) p.line([[x, b.y], [x, b.y + b.h]], null, 0.4, 0.4);
+        for (let x = b.x + 0.15 * u; x < b.x + b.w; x += 0.24 * u) p.line([[x, b.y], [x, b.y + b.h]], '#ffffff', 0.5, 0.2);
+        for (let x = b.x + 1.1 * u; x < b.x + b.w; x += 1.1 * u) p.line([[x, b.y], [x, b.y + b.h]], null, 0.8, 0.7);
+    } else if (mat === 'panels') {
+        /* Precast concrete: a joint at every storey and every bay. */
+        for (let y = b.y + b.h - 1.4 * u; y > b.y + 0.1 * u; y -= 1.4 * u) p.line([[b.x, y], [b.x + b.w, y]], darken(hex, 0.25), 0.7, 0.7);
+        for (let x = b.x + 1.3 * u; x < b.x + b.w; x += 1.3 * u) p.line([[x, b.y], [x, b.y + b.h]], darken(hex, 0.2), 0.6, 0.6);
     } else if (mat === 'glass') {
         /* A curtain wall: panes in a grid of mullions. */
         for (let y = b.y + 0.1 * u; y < b.y + b.h - 0.2 * u; y += 0.7 * u) {
@@ -500,6 +534,14 @@ function roofSlope(p: Pen, slope: [number, number][], roofTop: number, eave: num
             }
         }
         for (let y = roofTop + 0.6 * u; y < eave - 0.2 * u; y += 0.6 * u) p.line([[r.x, y], [r.x + r.w, y]], darken(s.roof, 0.3), 0.7, 0.4);
+    } else if (mat === 'tarp') {
+        /* A sheet tied down: creases and two ropes. */
+        p.reseed(Math.round(r.w * 5 + r.x));
+        for (let i = 0; i < 6; i++) {
+            const x = r.x + p.rnd() * r.w, y = roofTop + p.rnd() * (eave - roofTop);
+            p.line([[x, y], [x + (p.rnd() - 0.5) * 0.8 * u, y + 0.3 * u]], null, 0.5, 0.45);
+        }
+        for (const t of [0.3, 0.7]) p.line([[r.x + r.w * t, roofTop], [r.x + r.w * t + 0.1 * u, eave]], '#d8c8a0', 0.9);
     } else if (mat === 'metal') {
         for (let x = r.x + 0.35 * u; x < r.x + r.w; x += 0.35 * u) p.line([[x, roofTop], [x, eave]], null, 0.5, 0.45);
         for (let x = r.x + 0.4 * u; x < r.x + r.w; x += 0.35 * u) p.line([[x, roofTop], [x, eave]], '#ffffff', 0.5, 0.25);
@@ -565,6 +607,9 @@ function hanging(p: Pen, x: number, y: number, hex: string, icon: HangIcon): voi
         p.ell(cx - k * 0.7, cy, k * 0.45, k * 0.45).stroke(0.8);
         p.line([[cx - k * 0.25, cy], [cx + k * 1.1, cy]], ink, 0.9);
         p.line([[cx + k * 0.8, cy], [cx + k * 0.8, cy + k * 0.4]], ink, 0.8);
+    } else if (icon === 'candle') {
+        p.rect(cx - k * 0.35, cy - k * 0.4, k * 0.7, k * 1.4).paint('#f4ecd8', 0.5);
+        p.ell(cx, cy - k * 0.75, k * 0.22, k * 0.38).fill('#f0a030');
     } else if (icon === 'book') {
         p.rect(cx - k, cy - k * 0.8, k * 2, k * 1.6).paint('#8a3a3a', 0.5);
         p.line([[cx, cy - k * 0.8], [cx, cy + k * 0.8]], '#f0e0c0', 0.8);

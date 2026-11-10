@@ -150,7 +150,7 @@ live follows the scene by id, so moving around never changes what players see.
 
 **The city builder** ([`src/map/world/`](src/map/world/)). Cities and interiors
 hold `MapDoc.placed`: catalogue items ([`catalog.ts`](src/map/world/catalog.ts),
-~170 of them: buildings, nature, street, furniture, kitchen & bath, shops;
+~200 of them: buildings, walls & fences, nature, street, furniture, kitchen & bath, shops;
 every building in 2-3 `variants`, and an `era` for the Modern / Medieval sets) that
 stand on a FOOTPRINT of whole cells and are drawn as a taller SPRITE anchored
 to its bottom edge ([`placed.ts`](src/map/world/placed.ts)). Placed things and
@@ -158,10 +158,16 @@ tokens are drawn in one layer back to front by the footprint's bottom edge
 (`depthOrder`), in the editor (`PlacedLayer.tsx`, one canvas each, redrawn
 per zoom step) and in the picture (`exportPng`). All the art is vector:
 painters ([`buildings.ts`](src/map/world/buildings.ts), `props.ts`, `props2.ts`,
-`interior.ts`, `medieval.ts`, `modern.ts`, `garden.ts`) draw through a `Pen` that applies the map's LOOK
+`interior.ts`, `medieval.ts`, `modern.ts`, `garden.ts`, `estates.ts` and `housing.ts` for homes of
+every class, `damage.ts` for ruined and burned ones) draw through a `Pen` that applies the map's LOOK
 ([`looks.ts`](src/map/world/looks.ts): Colorful, Ancient, Pastel, Night),
 which also filters the ground under them. A building can open an interior
 like a landmark (`link`/`parent`). Overlaps are allowed and shown in red.
+Walls and fences can be dragged as a line, a rectangle, a circle or an ellipse
+([`walls.ts`](src/map/world/walls.ts)): the run is stored as cell-long pieces,
+each a placed thing with a `seg` (its line on the ground) and a shared `run`
+id, so depth, pictures and undo treat them like any building; gates are one
+piece and take out the wall they are drawn across.
 An interior also has a floor plan, `MapDoc.room` ([`room.ts`](src/map/world/room.ts)):
 an outline of corners on the grid, edited with the Room tool's handles
 (`RoomLayer.tsx`); the edges with the room below them stand as wallpapered back

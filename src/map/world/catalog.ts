@@ -14,6 +14,10 @@ import {
 } from './props2';
 import * as F from './interior';
 import * as G from './garden';
+import * as E from './estates';
+import * as H from './housing';
+import * as W from './walls';
+import type { RunPainter, RunShape } from './walls';
 
 /* What a city can be built from (the World Builder's city builder).
 
@@ -27,7 +31,7 @@ import * as G from './garden';
    rename the display name instead. Colours are slots the GM can change one
    by one in the inspector; their defaults are here. */
 
-export type ItemGroup = 'building' | 'nature' | 'garden' | 'street' | 'furniture' | 'kitchen' | 'shop';
+export type ItemGroup = 'building' | 'wall' | 'nature' | 'garden' | 'street' | 'furniture' | 'kitchen' | 'shop';
 
 export interface ColorSlot { name: string; value: string }
 
@@ -72,11 +76,23 @@ export interface ItemDef {
     /** A building: it can open an interior of its own. */
     enterable?: boolean;
     paint: Painter;
+    /** Drawn as a run (walls.ts): dragged as a line, a rectangle, a circle or
+        an ellipse and stored as short pieces, each with its `seg`. `thick`
+        and `h` are the wall's thickness and the height its sprite needs, in
+        cells. `gate`: one piece over the whole drag, `gate` cells long when
+        clicked, and it takes out the wall it is drawn across. `only`: the
+        item has no single piece to click down. */
+    wall?: { thick: number; h: number; gate?: number; only?: boolean };
+    /** Its painter erases parts of what it drew (destination-out): drawn on
+        its own canvas before it goes into a picture. */
+    cutout?: boolean;
+    run?: RunPainter;
 }
 
 /** Where a group is offered: in cities, in interiors, or both. */
 export const ITEM_GROUPS: { key: ItemGroup; label: string; where: ('city' | 'interior')[] }[] = [
     { key: 'building', label: 'Buildings', where: ['city'] },
+    { key: 'wall', label: 'Walls & fences', where: ['city'] },
     { key: 'nature', label: 'Nature', where: ['city', 'interior'] },
     { key: 'garden', label: 'Garden', where: ['city', 'interior'] },
     { key: 'street', label: 'Street', where: ['city'] },
@@ -96,6 +112,7 @@ export function groupsFor(kind: 'world' | 'city' | 'interior') {
 const GARDEN_TOO = new Set([
     'lamp', 'bench', 'fence', 'mailbox', 'fountain', 'well', 'statue', 'picnic-table', 'cafe-table', 'planter',
     'campfire', 'bridge', 'dock', 'woodpile', 'scarecrow', 'beehive', 'stone-wall', 'trough', 'brazier', 'wayside', 'torii',
+    'rail-fence', 'board-fence', 'garden-wall', 'railings', 'metal-gate', 'wood-gate',
 ]);
 
 /** The group an item is offered under on a map of this kind. */
@@ -108,6 +125,10 @@ const V = (name: string, more: Omit<Variant, 'name'> = {}): Variant => ({ name, 
 /** A building drawn by `building()`, one spec per variant. */
 const specs = (...fs: ((c: string[]) => BuildingSpec)[]): Painter => (p, r, c, _rot, v) => building(p, r, (fs[v] ?? fs[0])(c));
 const ROOF = (v: string) => C('Roof', v);
+/** A wall or fence that only comes as drawn runs; its palette picture is a straight piece. */
+const runOnly = (thick: number, h: number, run: RunPainter, gate?: number) => ({
+    wall: { thick, h, only: true, ...(gate ? { gate } : {}) }, run, paint: W.sampleRun(run, thick),
+});
 const WALL = (v: string) => C('Walls', v);
 
 export const ITEMS: ItemDef[] = [
@@ -597,17 +618,20 @@ export const ITEMS: ItemDef[] = [
         paint: (p, r, c, rot, v) => M.keep(p, r, c, rot, v),
     },
     {
-        slug: 'castle-wall', name: 'Castle wall', group: 'building', icon: 'fa-dungeon', w: 4, h: 1, sh: 3.4, era: 'medieval',
+        slug: 'castle-wall', name: 'Castle wall', group: 'wall', icon: 'fa-dungeon', w: 4, h: 1, sh: 3.4, era: 'medieval',
         turned: { w: 1, h: 4, sw: 1.4, sh: 6.4 },
         colors: [C('Stone', '#b0a898')],
         variants: [V('Battlements'), V('With torch'), V('Ruined')],
         paint: (p, r, c, rot, v) => M.castleWall(p, r, c, rot, v),
+        cutout: true,
+        wall: { thick: 0.9, h: 2.8 }, run: W.castleRun,
     },
     {
         slug: 'castle-tower', name: 'Wall tower', group: 'building', icon: 'fa-chess-rook', w: 3, h: 3, sh: 6.4, enterable: true, era: 'medieval',
         colors: [C('Stone', '#b0a898'), ROOF('#4a4a5a')],
         variants: [V('Round', { skip: [1] }), V('Square'), V('Ruined', { skip: [1] })],
         paint: (p, r, c, rot, v) => M.castleTower(p, r, c, rot, v),
+        cutout: true,
     },
     {
         slug: 'gatehouse', name: 'Gatehouse', group: 'building', icon: 'fa-archway', w: 6, h: 3, sh: 6.8, enterable: true, era: 'medieval',
@@ -667,6 +691,7 @@ export const ITEMS: ItemDef[] = [
         slug: 'hedge', name: 'Hedge', group: 'nature', icon: 'fa-grip-lines', w: 3, h: 1, sh: 1.3,
         turned: { w: 1, h: 3, sh: 3.3 },
         colors: [C('Leaves', '#3e8a44')], paint: (p, r, c, rot) => hedge(p, r, c, rot),
+        wall: { thick: 0.75, h: 1.2 }, run: W.hedgeRun,
     },
     {
         slug: 'flower-bed', name: 'Flower bed', group: 'nature', icon: 'fa-spa', w: 2, h: 1, sh: 1, floor: true,
@@ -688,9 +713,10 @@ export const ITEMS: ItemDef[] = [
         colors: [C('Wood', '#a87444'), C('Metal', '#3a4048')], paint: (p, r, c, rot) => bench(p, r, c, rot),
     },
     {
-        slug: 'fence', name: 'Fence', group: 'street', icon: 'fa-bars', w: 3, h: 1, sh: 1.25,
+        slug: 'fence', name: 'Picket fence', group: 'wall', icon: 'fa-bars', w: 3, h: 1, sh: 1.25,
         turned: { w: 1, h: 3, sh: 3.4 },
         colors: [C('Wood', '#e8dcc0')], paint: (p, r, c, rot) => fence(p, r, c, rot),
+        wall: { thick: 0.2, h: 1.3 }, run: W.picketRun,
     },
     {
         slug: 'sign', name: 'Sign', group: 'street', icon: 'fa-signs-post', w: 1, h: 1, sw: 1.2, sh: 1.7,
@@ -896,11 +922,12 @@ export const ITEMS: ItemDef[] = [
         paint: (p, r, c, rot, v) => M.crops(p, r, c, rot, v),
     },
     {
-        slug: 'stone-wall', name: 'Low stone wall', group: 'street', icon: 'fa-grip-lines', w: 3, h: 1, sh: 1.3, era: 'medieval',
+        slug: 'stone-wall', name: 'Low stone wall', group: 'wall', icon: 'fa-grip-lines', w: 3, h: 1, sh: 1.3, era: 'medieval',
         turned: { w: 1, h: 3, sh: 3.4 },
         colors: [C('Stone', '#a8a090')],
         variants: [V('Fieldstone'), V('Palisade', { sh: 2.2, colors: ['#8a6040'] })],
         paint: (p, r, c, rot, v) => M.lowWall(p, r, c, rot, v),
+        wall: { thick: 0.5, h: 1.5 }, run: W.lowRun,
     },
     {
         slug: 'wayside', name: 'Wayside shrine', group: 'street', icon: 'fa-place-of-worship', w: 1, h: 1, sw: 1.2, sh: 2.2, era: 'medieval',
@@ -1205,6 +1232,192 @@ export const ITEMS: ItemDef[] = [
         slug: 'rose-arch', name: 'Rose arch', group: 'garden', icon: 'fa-archway', w: 2, h: 1, sh: 2.8,
         colors: [C('Frame', '#f0ece4'), C('Roses', '#e04860')], paint: (p, r, c) => G.roseArch(p, r, c),
     },
+
+    /* --------------------------------------- walls and fences, 2026-11-10
+       Drawn as runs (walls.ts): the owner's ask for walls in a circle, fences
+       for the modern town, palisades, town walls and gates for the medieval. */
+    {
+        slug: 'chain-link', name: 'Chain-link fence', group: 'wall', icon: 'fa-border-all', w: 3, h: 1, sh: 2.4, era: 'modern',
+        colors: [C('Mesh', '#9aa4ac'), C('Posts', '#6a747c')],
+        variants: [V('Plain'), V('Barbed wire on top'), V('Green coated', { colors: ['#4a7a4a', '#3a5a3a'] })],
+        ...runOnly(0.15, 2.2, W.chainRun),
+    },
+    {
+        slug: 'rail-fence', name: 'Wooden rail fence', group: 'wall', icon: 'fa-grip-lines', w: 3, h: 1, sh: 1.8,
+        colors: [C('Rails', '#a87a50'), C('Posts', '#7a5434')],
+        variants: [V('Two rails'), V('Three rails'), V('Crossed rails')],
+        ...runOnly(0.22, 1.4, W.railRun),
+    },
+    {
+        slug: 'board-fence', name: 'Board fence', group: 'wall', icon: 'fa-bars', w: 3, h: 1, sh: 2.3, era: 'modern',
+        colors: [C('Wood', '#b08458')],
+        variants: [V('Upright boards'), V('Slats across'), V('Weathered')],
+        ...runOnly(0.2, 1.9, W.boardRun),
+    },
+    {
+        slug: 'barbed-wire', name: 'Barbed wire', group: 'wall', icon: 'fa-xmarks-lines', w: 3, h: 1, sh: 2, era: 'modern',
+        colors: [C('Wire', '#8a8a8a'), C('Posts', '#7a5a3a')],
+        variants: [V('Wooden posts'), V('Metal posts', { colors: ['', '#6a6e74'] }), V('Razor coil')],
+        ...runOnly(0.2, 1.5, W.barbedRun),
+    },
+    {
+        slug: 'railings', name: 'Iron railings', group: 'wall', icon: 'fa-grip-lines-vertical', w: 3, h: 1, sh: 2.2, era: 'modern',
+        colors: [C('Iron', '#2a2e34'), C('Base', '#b0603e')],
+        variants: [V('Spear tops', { skip: [1] }), V('On a low wall'), V('Scrolls & gilt tips', { skip: [1] })],
+        ...runOnly(0.36, 1.85, W.railingsRun),
+    },
+    {
+        slug: 'garden-wall', name: 'Garden wall', group: 'wall', icon: 'fa-road-barrier', w: 3, h: 1, sh: 2, era: 'modern',
+        colors: [WALL('#b0603e'), C('Coping', '#d8d0c0')],
+        variants: [V('Brick'), V('Concrete', { colors: ['#a8a8a4', '#c8c8c4'] }), V('Rendered', { colors: ['#ece0c4', '#b8a888'] })],
+        ...runOnly(0.45, 1.5, W.gardenRun),
+    },
+    {
+        slug: 'metal-gate', name: 'Metal gate', group: 'wall', icon: 'fa-dungeon', w: 3, h: 1, sh: 2.8, era: 'modern',
+        colors: [C('Metal', '#2a2e34'), C('Pillars', '#b0603e')],
+        variants: [V('Iron double gate'), V('Chain-link gate', { colors: ['#8a949c', '#6a747c'] }), V('Barrier arm', { colors: ['#d04040', '#e8e4dc'] })],
+        ...runOnly(0.45, 2.4, W.metalGateRun, 3),
+    },
+    {
+        slug: 'palisade', name: 'Wooden palisade', group: 'wall', icon: 'fa-bars', w: 3, h: 1, sh: 3.2, era: 'medieval',
+        colors: [C('Logs', '#8a6a48')],
+        variants: [V('Sharpened logs'), V('Bound with beams'), V('Plank wall')],
+        ...runOnly(0.4, 2.7, W.palisadeRun),
+    },
+    {
+        slug: 'town-wall', name: 'Stone town wall', group: 'wall', icon: 'fa-dungeon', w: 3, h: 1, sh: 3.1, era: 'medieval',
+        colors: [C('Stone', '#9a968e')],
+        variants: [V('Granite blocks'), V('Fieldstone', { colors: ['#a8a090'] }), V('Old and mossy', { colors: ['#8a8a80'] })],
+        ...runOnly(0.95, 2.6, W.townRun),
+    },
+    {
+        slug: 'wood-gate', name: 'Wooden gate', group: 'wall', icon: 'fa-door-closed', w: 3, h: 1, sh: 3.8, era: 'medieval',
+        colors: [C('Wood', '#7a5434'), C('Iron', '#3a3430')],
+        variants: [V('Plank doors'), V('Palisade gate'), V('Farm gate', { skip: [1] })],
+        ...runOnly(0.45, 3.2, W.woodGateRun, 3),
+    },
+    {
+        slug: 'stone-gate', name: 'Stone gate', group: 'wall', icon: 'fa-archway', w: 4, h: 1, sh: 4.6, era: 'medieval',
+        colors: [C('Stone', '#9a968e'), C('Doors', '#6a4a2a'), C('Banner', '#c83a3a')],
+        variants: [V('Wooden doors'), V('Portcullis'), V('Open arch', { skip: [1] })],
+        ...runOnly(1.1, 3.9, W.stoneGateRun, 4),
+    },
+
+    /* ------------------------------------- medieval homes, 2026-11-10
+       The owner's ask: the castle as one structure, a noble's palace, and
+       houses for every walk of life — poor, middling, rich, ruined, burned. */
+    {
+        slug: 'castle', name: 'Castle', group: 'building', icon: 'fa-chess-rook', w: 14, h: 10, sh: 13, enterable: true, era: 'medieval',
+        colors: [C('Stone', '#b0a898'), ROOF('#4a4a5a'), C('Flag', '#c83a3a')],
+        variants: [V('Keep and curtain walls'), V('Tall roofs', { colors: ['', '#3a5a9a'] }), V('Ruined', { skip: [1, 2] })],
+        paint: (p, r, c, rot, v) => E.castle(p, r, c, rot, v),
+    },
+    {
+        slug: 'palace', name: 'Noble palace', group: 'building', icon: 'fa-crown', w: 10, h: 5, sh: 7.8, enterable: true, era: 'medieval',
+        colors: [ROOF('#a8603a'), WALL('#ece0c4'), C('Trim', '#c8a050')],
+        variants: [V('Palazzo'), V('With towers', { w: 12, sh: 10.4, colors: ['#3a4a5a'] }), V('Forecourt and railings', { h: 7, sh: 9.4, colors: ['#3a4a5a'] })],
+        paint: (p, r, c, rot, v) => E.palace(p, r, c, rot, v),
+    },
+    {
+        slug: 'hovel', name: 'Hovel', group: 'building', icon: 'fa-house-crack', w: 3, h: 2, sh: 3.2, enterable: true, era: 'medieval',
+        colors: [ROOF('#a89060'), WALL('#8a6a48'), C('Door', '#5a4028')],
+        variants: [V('Patched planks'), V('Lean-to shack', { sh: 2.8, colors: ['', '', '#a89878'] }), V('Wattle and daub', { colors: ['', '#a88a64'] })],
+        paint: (p, r, c, rot, v) => E.hovel(p, r, c, rot, v),
+    },
+    {
+        slug: 'farmhouse', name: 'Farmhouse', group: 'building', icon: 'fa-wheat-awn', w: 7, h: 3, sh: 5, enterable: true, era: 'medieval',
+        colors: [ROOF('#c8a860'), WALL('#efe2c4'), C('Door', '#6a4428')],
+        variants: [V('Longhouse'), V('Stone farmhouse', { colors: ['#4a4a58', '#b8ac98'] }), V('With hayloft', { sh: 6.2 })],
+        paint: specs(
+            ([roof, wall, door]) => ({ roof, wall, door, floors: 1, roofKind: 'gable', roofMat: 'thatch', wallMat: 'timber', windowKind: 'leaded', windows: 3, door_: 'arched', chimney: true, annex: { side: 'right', w: 2.8, wallMat: 'planks', door_: 'barn', windows: 0, wallH: 1.9 } }),
+            ([roof, wall, door]) => ({ roof, wall, door, floors: 1, roofKind: 'gable', roofMat: 'slate', wallMat: 'stone', windowKind: 'square', shutters: '#5a7a4a', windows: 3, door_: 'wood', chimney: true, chimney2: true, annex: { side: 'left', w: 2.6, door_: 'barn', windows: 0, wallH: 1.9 } }),
+            ([roof, wall, door]) => ({ roof, wall, door, floors: 2, roofKind: 'gable', roofMat: 'shingle', wallMat: 'timber', windowKind: 'leaded', windows: 3, door_: 'arched', chimney: true, boxes: '#e0a030', annex: { side: 'right', w: 3, wallMat: 'planks', door_: 'barn', windows: 1, windowKind: 'square', wallH: 2.6 } }),
+        ),
+    },
+    {
+        slug: 'artisan-house', name: "Artisan's house", group: 'building', icon: 'fa-screwdriver-wrench', w: 4, h: 3, sh: 6.2, enterable: true, era: 'medieval',
+        colors: [ROOF('#6a4a3a'), WALL('#efe2c4'), C('Sign', '#c8a060')],
+        variants: [V('Workshop below'), V('Scribe'), V('Chandler', { colors: ['#8a4a3a'] })],
+        paint: specs(
+            ([roof, wall, sign]) => ({ roof, wall, floors: 2, roofKind: 'gable', roofMat: 'shingle', wallMat: 'timber', lowerMat: 'planks', lowerWall: '#a87a50', jetty: true, awning: sign, windowKind: 'leaded', windows: 2, door_: 'arched', hangSign: sign, hangIcon: 'key', chimney: true }),
+            ([roof, wall, sign]) => ({ roof, wall, floors: 2, roofKind: 'cross', roofMat: 'tile', wallMat: 'timber', windowKind: 'leaded', windows: 2, door_: 'arched', hangSign: sign, hangIcon: 'book', boxes: '#a868c8' }),
+            ([roof, wall, sign]) => ({ roof, wall, floors: 2, roofKind: 'gable', roofMat: 'tile', wallMat: 'timber', lowerMat: 'stone', lowerWall: '#b8ac98', windowKind: 'leaded', windows: 2, door_: 'arched', hangSign: sign, hangIcon: 'candle', chimney: true }),
+        ),
+    },
+    {
+        slug: 'burgher-house', name: "Burgher's house", group: 'building', icon: 'fa-gem', w: 4, h: 3, sh: 7.6, enterable: true, era: 'medieval',
+        colors: [ROOF('#4a4a58'), WALL('#d8ccb4'), C('Trim', '#8a3a3a')],
+        variants: [V('Stepped gable'), V('Painted, with oriel', { colors: ['#a8503a', '#e8c8a0'] }), V('With a tower')],
+        paint: (p, r, c, rot, v) => E.burgherHouse(p, r, c, rot, v),
+    },
+    {
+        slug: 'row-houses', name: 'Row of houses', group: 'building', icon: 'fa-city', w: 8, h: 3, sh: 6.8, enterable: true, era: 'medieval',
+        colors: [ROOF('#8a4a3a'), WALL('#efe2c4'), C('Beams', '#4a3020')],
+        variants: [V('Three houses'), V('Four narrow houses', { sh: 5.6 }), V('Archway between')],
+        paint: (p, r, c, rot, v) => E.rowHouses(p, r, c, rot, v),
+    },
+    {
+        slug: 'ruined-house', name: 'Ruined house', group: 'building', icon: 'fa-house-crack', w: 4, h: 3, sh: 4.8, enterable: true, era: 'medieval',
+        colors: [WALL('#b8ac98'), ROOF('#5a5a68')],
+        variants: [V('Roof fallen in'), V('Only walls left'), V('Heap of rubble', { sh: 3.4 })],
+        paint: (p, r, c, rot, v) => E.ruinedHouse(p, r, c, rot, v),
+    },
+    {
+        slug: 'burned-house', name: 'Burned house', group: 'building', icon: 'fa-fire', w: 4, h: 3, sh: 5.4, enterable: true, era: 'medieval',
+        colors: [WALL('#8a7a64'), C('Embers', '#f07a20')],
+        variants: [V('Charred frame'), V('Still smouldering'), V('Gutted stone shell', { skip: [1], colors: ['#a8a090'] })],
+        paint: (p, r, c, rot, v) => E.burnedHouse(p, r, c, rot, v),
+    },
+
+    /* --------------------------------------- modern homes, 2026-11-10 */
+    {
+        slug: 'shack', name: 'Shack', group: 'building', icon: 'fa-house-crack', w: 3, h: 2, sh: 3.2, enterable: true, era: 'modern',
+        colors: [ROOF('#9aa0a4'), WALL('#a0a4a8'), C('Patches', '#b8643a')],
+        variants: [V('Corrugated iron'), V('Plywood and tarp', { colors: ['#3a6ab0', '#c8a878', '#e0c040'] }), V('Two shacks', { w: 4 })],
+        paint: (p, r, c, rot, v) => H.shack(p, r, c, rot, v),
+    },
+    {
+        slug: 'trailer', name: 'Mobile home', group: 'building', icon: 'fa-caravan', w: 5, h: 2, sh: 3, enterable: true, era: 'modern',
+        colors: [C('Body', '#f0ece0'), C('Stripe', '#3a8ac0'), C('Skirt', '#8a8a8a')],
+        variants: [V('Single-wide'), V('Double-wide', { w: 6, h: 3, sh: 3.8 }), V('Vintage camper', { w: 3, sh: 2.8, colors: ['#d8dce0'], skip: [2] })],
+        paint: (p, r, c, rot, v) => H.trailer(p, r, c, rot, v),
+    },
+    {
+        slug: 'terrace', name: 'Terraced houses', group: 'building', icon: 'fa-house-chimney-window', w: 9, h: 3, sh: 6.2, enterable: true, era: 'modern',
+        colors: [ROOF('#5a5a62'), WALL('#b0603e'), C('Door', '#2a4a6a')],
+        variants: [V('Brick terrace'), V('Painted row', { colors: ['', '#f4ecdc'] }), V('Semi-detached pair', { w: 8 })],
+        paint: (p, r, c, rot, v) => H.terrace(p, r, c, rot, v),
+    },
+    {
+        slug: 'housing-block', name: 'Housing block', group: 'building', icon: 'fa-building', w: 8, h: 4, sh: 10.6, enterable: true, era: 'modern',
+        colors: [WALL('#c8c4b8'), ROOF('#7a7a80'), C('Balconies', '#d8a040')],
+        variants: [V('Concrete slab'), V('Galleries', { sh: 9.4 }), V('Brick tenement', { sh: 9.4, colors: ['#a85a3e', '', '#3a3a40'] })],
+        paint: (p, r, c, rot, v) => H.housingBlock(p, r, c, rot, v),
+    },
+    {
+        slug: 'mansion', name: 'Mansion', group: 'building', icon: 'fa-landmark-dome', w: 10, h: 5, sh: 8, enterable: true, era: 'modern',
+        colors: [ROOF('#3a3a48'), WALL('#f4f0e6'), C('Door', '#2a3a2a')],
+        variants: [V('Colonial'), V('Georgian brick', { sh: 9, colors: ['', '#a8503a'] }), V('Château', { w: 12, sh: 9, colors: ['#3a4a5a', '#ece4d4'] })],
+        paint: (p, r, c, rot, v) => H.mansion(p, r, c, rot, v),
+    },
+    {
+        slug: 'luxury-villa', name: 'Luxury villa', group: 'building', icon: 'fa-water-ladder', w: 9, h: 5, sh: 5.4, enterable: true, era: 'modern',
+        colors: [WALL('#f6f6f2'), C('Glass', '#7ab4d8'), C('Pool', '#4ac0e0')],
+        variants: [V('Glass and concrete', { skip: [2] }), V('With a pool', { h: 6, sh: 6.4 }), V('Mediterranean', { sh: 6.4, colors: ['#f4ecdc'] })],
+        paint: (p, r, c, rot, v) => H.luxuryVilla(p, r, c, rot, v),
+    },
+    {
+        slug: 'ruined-building', name: 'Ruined house (modern)', group: 'building', icon: 'fa-house-crack', w: 4, h: 3, sh: 5.4, enterable: true, era: 'modern',
+        colors: [WALL('#c8c0b0'), ROOF('#6a6a70')],
+        variants: [V('Roof fallen in'), V('Bombed-out shell', { skip: [1] }), V('Abandoned, boarded up', { colors: ['#a8b0a8'] })],
+        paint: (p, r, c, rot, v) => H.ruinedBuilding(p, r, c, rot, v),
+    },
+    {
+        slug: 'burned-building', name: 'Burned house (modern)', group: 'building', icon: 'fa-fire', w: 4, h: 3, sh: 5.6, enterable: true, era: 'modern',
+        colors: [WALL('#9a948c'), C('Embers', '#f07a20')],
+        variants: [V('Burnt out'), V('Still smouldering'), V('Burned flats', { w: 5, sh: 7.4, skip: [1], colors: ['#a8644a'] })],
+        paint: (p, r, c, rot, v) => H.burnedBuilding(p, r, c, rot, v),
+    },
 ];
 
 export const ITEM_BY_SLUG = new Map(ITEMS.map((d) => [d.slug, d]));
@@ -1215,4 +1428,14 @@ export function itemOf(slug: string): ItemDef {
         slug, name: slug, group: 'street', icon: 'fa-question', w: 1, h: 1, sh: 1.5, colors: [C('Colour', '#8a8a8a')],
         paint: (p, r, [c]) => { p.rr(r.x + 2, r.y + 2, r.w - 4, r.h - 4, p.u * 0.1).paint(c); },
     };
+}
+
+/** The run the Build tool drags for this item, or null for a single piece
+    clicked down: gates always draw a line, items that only come as runs
+    take a line for "one piece". */
+export function runShapeOf(def: ItemDef, shape: 'piece' | RunShape): RunShape | null {
+    if (!def.run || !def.wall) return null;
+    if (def.wall.gate) return 'line';
+    if (shape === 'piece') return def.wall.only ? 'line' : null;
+    return shape;
 }

@@ -2,7 +2,7 @@ import { memo, useLayoutEffect, useRef } from 'react';
 import { CELL } from '../../map/render/patterns';
 import type { MapStyle } from '../../map/styles';
 import type { LookId, MapDoc, MapPlaced, Selection } from '../../map/types';
-import { PAD, clashes, depthOrder, dims, footprint, renderSprite, spriteBox, variantOf } from '../../map/world/placed';
+import { PAD, clashes, depthOrder, dims, footprint, renderSprite, segOutline, spriteBox, variantOf } from '../../map/world/placed';
 import { itemOf } from '../../map/world/catalog';
 import { linkedDoc } from '../../map/world';
 import { TokenView } from './MapObjects';
@@ -54,15 +54,19 @@ export const PlacedView = memo(function PlacedView({ p, look, res, selected, cla
     }, [p, u, look]);
 
     const sel = { kind: 'placed' as const, id: p.id };
+    /* A wall piece takes presses on the wall itself, not on its whole box,
+       or a slanting piece would cover its neighbours. */
+    const hull = segOutline(p);
+    const clip = hull ? `polygon(${hull.map(([x, y]) => `${((x - b.x) * CELL).toFixed(1)}px ${((y - b.y) * CELL).toFixed(1)}px`).join(', ')})` : undefined;
     return (
         <div
-            className={'map-placed' + (selected ? ' selected' : '') + (ghost ? ' ghost' : '') + (clash ? ' clash' : '')
+            className={'map-placed' + (selected ? ' selected' : '') + (hull ? ' piece' : '') + (ghost ? ' ghost' : '') + (clash ? ' clash' : '')
                 + (p.label && p.labelShow === 'hover' ? ' label-hover' : '')}
             style={{ left: ox, top: oy, width: W, height: H }}
             data-placed={p.id}
         >
             <canvas ref={canvas} className="map-placed-art" style={{ width: W, height: H }} />
-            {(selected || ghost || clash) && (
+            {(selected || ghost || clash) && !hull && (
                 <span className="map-placed-foot" style={{
                     left: (f.x - b.x + PAD) * CELL, top: (f.y - b.y + PAD) * CELL, width: f.w * CELL, height: f.h * CELL,
                 }} />
@@ -71,7 +75,7 @@ export const PlacedView = memo(function PlacedView({ p, look, res, selected, cla
                 <div
                     className="map-obj map-placed-hit"
                     data-obj={'placed:' + p.id}
-                    style={{ left: PAD * CELL, top: PAD * CELL, width: b.w * CELL, height: b.h * CELL }}
+                    style={{ left: PAD * CELL, top: PAD * CELL, width: b.w * CELL, height: b.h * CELL, clipPath: clip }}
                     onPointerDown={onDown ? (e) => onDown(e, sel, 'move') : undefined}
                 />
             )}

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactElement } from 'react';
 import { linkedDoc } from '../../map/world';
-import { dims, placeAt, spriteBox, variantOf } from '../../map/world/placed';
-import { itemOf } from '../../map/world/catalog';
+import { footprint, pieceOf, placeAt, segEnds, spriteBox, variantOf } from '../../map/world/placed';
+import { itemOf, runShapeOf } from '../../map/world/catalog';
+import { runPath, splitRun, underGate } from '../../map/world/walls';
+import type { RunShape } from '../../map/world/walls';
 import { RoomCursor, RoomHandles, RoomLayer } from './RoomLayer';
 import { edgesBetween, nearestEdge, pieceAt, regionOf, wallsOfRegion, withFloor, withWallpaper, withWalls } from '../../map/world/room';
 import { lookOf } from '../../map/world/looks';
@@ -75,7 +77,7 @@ type Gesture =
     | { kind: 'erase' }
     /* Everything selected moves together; `anchor` is the one under the
        pointer, the one whose snapping decides the step for all of them. */
-    | { kind: 'move'; items: { sel: Selection; orig: Pt[] }[]; anchor: number; start: Pt; moved: boolean }
+    | { kind: 'move'; items: { sel: Selection; orig: Pt[] }[]; anchor: number; start: Pt; moved: boolean; narrow?: Selection }
     | { kind: 'box'; start: Pt; add: boolean; base: Selection[] }
     | { kind: 'resize'; sel: Selection; centre: Pt }
     | { kind: 'rotate'; sel: Selection; centre: Pt }
@@ -83,7 +85,9 @@ type Gesture =
     | { kind: 'pinch'; dist: number; mid: Pt; view: View }
     /* The Room tool drawing walls (from grid corner to grid corner), or
        painting floors or wallpaper under the pointer. */
-    | { kind: 'room'; mode: 'walls' | 'floor' | 'wallpaper'; vertex: Pt | null; start: Pt; moved: boolean };
+    | { kind: 'room'; mode: 'walls' | 'floor' | 'wallpaper'; vertex: Pt | null; start: Pt; moved: boolean }
+    /* A wall or fence dragged as a line, a rectangle, a circle or an ellipse. */
+    | { kind: 'wall'; shape: RunShape; item: string; start: Pt; end: Pt };
 
 const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
 
@@ -203,7 +207,7 @@ function objectsInBox(d: MapDoc, a: Pt, b: Pt): Selection[] {
         ...d.stamps.filter((o) => inBox(o.x, o.y)).map((o) => ({ kind: 'stamp' as const, id: o.id })),
         ...d.labels.filter((o) => inBox(o.x, o.y)).map((o) => ({ kind: 'label' as const, id: o.id })),
         ...d.tokens.filter((o) => inBox(o.x, o.y)).map((o) => ({ kind: 'token' as const, id: o.id })),
-        ...d.placed.filter((o) => { const { w, h } = dims(o); return inBox(o.x + w / 2, o.y + h / 2); })
+        ...d.placed.filter((o) => { const f = footprint(o); return inBox(f.x + f.w / 2, f.y + f.h / 2); })
             .map((o) => ({ kind: 'placed' as const, id: o.id })),
     ];
 }
@@ -238,6 +242,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     const [draft, setDraft] = useState<Pt[] | null>(null);
     const [sketchDraft, setSketchDraft] = useState<MapSketch | null>(null);
     const [shapeDraft, setShapeDraft] = useState<ShapeGeometry | null>(null);
+    const [runDraft, setRunDraft] = useState<{ pts: Pt[]; closed: boolean; thick: number } | null>(null);
     /* The drag box of a Select drag on empty ground, corners in cell units. */
     const [box, setBox] = useState<[Pt, Pt] | null>(null);
     const gesture = useRef<Gesture | null>(null);
@@ -670,6 +675,14 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             case 'build': {
                 if (!inside(at)) return;
                 const item = store.ui.buildItem;
+                const runShape = runShapeOf(itemOf(item), store.ui.buildShape);
+                if (runShape) {
+                    e.preventDefault();
+                    const p0 = wallPoint(at);
+                    gesture.current = { kind: 'wall', shape: runShape, item, start: p0, end: p0 };
+                    setRunDraft(null);
+                    return;
+                }
                 const rot = store.ui.buildRot;
                 const variant = variantOf(itemOf(item), store.ui.buildVariant);
                 const [x, y] = placeAt(item, rot, variant, at, store.doc.grid.snap);
@@ -721,6 +734,46 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         }
     };
 
+    const wallPoint = (at: Pt): Pt => snapRun(at, store.doc.grid.snap);
+
+    /** Lays a dragged wall down as pieces of one run; a gate takes out the
+        wall it is drawn across. A click (no drag) on a line lays a straight
+        stretch, or a gate, centred on it. */
+    const commitRun = (g: Extract<Gesture, { kind: 'wall' }>) => {
+        const def = itemOf(g.item);
+        const wall = def.wall;
+        if (!wall) return;
+        let path = runPath(g.shape, g.start, g.end);
+        if (!path) {
+            if (g.shape !== 'line') return;
+            const half = (wall.gate ?? 3) / 2, [x, y] = g.start;
+            path = store.ui.buildRot
+                ? { pts: [[x, y - half], [x, y + half]], closed: false }
+                : { pts: [[x - half, y], [x + half, y]], closed: false };
+        }
+        const d0 = store.doc;
+        const onMap = ([x, y]: Pt) => x >= 0 && y >= 0 && x <= d0.cols && y <= d0.rows;
+        const pieces = (wall.gate
+            ? [[path.pts[0], path.pts[path.pts.length - 1]] as [Pt, Pt]]
+            : splitRun(path.pts, path.closed, 1)).filter(([a, b]) => onMap(a) || onMap(b));
+        if (!pieces.length) return;
+        const variant = variantOf(def, store.ui.buildVariant);
+        const run = uid();
+        const made = pieces.map(([a, b]) => pieceOf(uid(), g.item, a, b, run, variant));
+        store.edit((d) => {
+            let placed = d.placed;
+            if (wall.gate) {
+                const [g0, g1] = pieces[0];
+                placed = placed.filter((o) => {
+                    const ends = segEnds(o), w = itemOf(o.item).wall;
+                    return !(ends && w && !w.gate && underGate(ends[0], ends[1], g0, g1, Math.max(0.6, (wall.thick + w.thick) / 2 + 0.2)));
+                });
+            }
+            d.placed = [...placed, ...made];
+        });
+        store.setUi({ selection: made.map((m) => ({ kind: 'placed' as const, id: m.id })) });
+    };
+
     const startObjectGesture = (e: ReactPointerEvent, sel: Selection, grab: Grab) => {
         const d = store.doc;
         const current = store.ui.selection;
@@ -736,7 +789,10 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         if (grab === 'move') {
             /* Pressing one of several selected things drags them all; pressing
                anything else selects just that. */
-            const group = picked ? current : [sel];
+            /* A piece of a wall drawn as a run brings the whole run with it. */
+            const run = sel.kind === 'placed' ? d.placed.find((o) => o.id === sel.id)?.run : undefined;
+            const whole: Selection[] = run ? d.placed.filter((o) => o.run === run).map((o) => ({ kind: 'placed' as const, id: o.id })) : [sel];
+            const group = picked ? current : whole;
             if (!picked) store.setUi({ selection: group });
             gesture.current = {
                 kind: 'move',
@@ -744,6 +800,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 anchor: Math.max(0, group.findIndex((x) => sameSel(x, sel))),
                 start: toCell(e),
                 moved: false,
+                narrow: picked && run && current.length > 1 && current.length === whole.length ? sel : undefined,
             };
             return;
         }
@@ -794,6 +851,13 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 g.even = e.altKey;
                 shapeSoon(g);
                 return;
+            case 'wall': {
+                setHover(at);
+                g.end = wallPoint(at);
+                const path = runPath(g.shape, g.start, g.end);
+                setRunDraft(path ? { ...path, thick: itemOf(g.item).wall?.thick ?? 0.5 } : null);
+                return;
+            }
             case 'paint':
                 setHover(at);
                 paintAlong(g, g.last, at);
@@ -900,7 +964,11 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         if (lead && lead.sel.kind === 'placed') {
             /* A building's footprint sits on whole cells. */
             const o = d0.placed.find((x) => x.id === lead.sel.id);
-            if (o && snapsFor(d0, o)) {
+            if (o && o.seg && snapsFor(d0, o)) {
+                /* A wall keeps its shape on the half cells it was drawn on. */
+                dx = Math.round(dx * 2) / 2;
+                dy = Math.round(dy * 2) / 2;
+            } else if (o && snapsFor(d0, o)) {
                 dx = Math.round(lead.orig[0][0] + dx) - lead.orig[0][0];
                 dy = Math.round(lead.orig[0][1] + dy) - lead.orig[0][1];
             }
@@ -981,6 +1049,15 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             store.setUi({ selection: [{ kind: 'path', id }] });
             return;
         }
+        if (g.kind === 'wall') {
+            setRunDraft(null);
+            commitRun(g);
+            return;
+        }
+        if (g.kind === 'move' && !g.moved && g.narrow) {
+            /* A second click on a wall already selected whole: just that piece. */
+            store.setUi({ selection: [g.narrow] });
+        }
         if (g.kind === 'paint') publish(g);
         if (g.kind === 'room' && g.mode === 'walls' && !g.moved) {
             /* A click: the one piece of wall nearest it. */
@@ -1040,9 +1117,13 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 <StampsLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} maps={store.maps} />
                 {/* A city or interior: buildings and tokens in one layer, back to front, under the labels. */}
                 {city && <DepthLayer doc={doc} style={style} selection={ui.selection} res={res} maps={store.maps} onDown={onObjectDown} />}
-                {city && ui.tool === 'build' && hover && !spaceHeld && (
+                {city && ui.tool === 'build' && hover && !spaceHeld && !runShapeOf(itemOf(ui.buildItem), ui.buildShape) && (
                     <BuildGhost doc={doc} item={ui.buildItem} rot={ui.buildRot} variant={ui.buildVariant} flip={ui.buildFlip} at={hover} res={res} />
                 )}
+                {city && ui.tool === 'build' && hover && !spaceHeld && runShapeOf(itemOf(ui.buildItem), ui.buildShape) && (
+                    <RunCursor at={snapRun(hover, doc.grid.snap)} zoom={view.zoom} />
+                )}
+                {runDraft && <RunDraft draft={runDraft} zoom={view.zoom} />}
                 <LabelsLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} />
                 <SketchesLayer doc={doc} selection={ui.selection} draft={sketchDraft} onDown={onObjectDown} />
                 {!city && <TokensLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} />}
@@ -1106,6 +1187,35 @@ function brushTool(tool: string, eraseMode: string): boolean {
    brush will take — or, for the noisy brushes, a dashed circle, since their
    edge is decided by the noise under it. The fill tool shows the sample. */
 /** The shape being dragged, outlined exactly where it lands. */
+/** Where a wall's end goes: on the half cells when the map snaps. */
+function snapRun(at: Pt, snap: boolean): Pt {
+    return snap ? [Math.round(at[0] * 2) / 2, Math.round(at[1] * 2) / 2] : [at[0], at[1]];
+}
+
+/** The run being dragged: its band as wide as the wall, its pieces ticked. */
+function RunDraft({ draft, zoom }: { draft: { pts: Pt[]; closed: boolean; thick: number }; zoom: number }) {
+    const points = draft.pts.map(([x, y]) => x * CELL + ',' + y * CELL).join(' ');
+    const Tag = draft.closed ? 'polygon' : 'polyline';
+    const sw = 1.5 / zoom;
+    return (
+        <svg className="map-svg map-brush-outline map-run-draft" style={{ overflow: 'visible' }} width={1} height={1} data-run-draft={draft.pts.length}>
+            <Tag points={points} fill="none" stroke="#fff6" strokeWidth={Math.max(draft.thick * CELL, 4 / zoom)} strokeLinejoin="round" />
+            <Tag points={points} fill="none" stroke="#000a" strokeWidth={sw * 2.2} strokeLinejoin="round" />
+            <Tag points={points} fill="none" stroke="#fff" strokeWidth={sw} strokeDasharray={`${5 / zoom} ${4 / zoom}`} />
+        </svg>
+    );
+}
+
+/** The point a wall would start from, under the Build tool. */
+function RunCursor({ at, zoom }: { at: Pt; zoom: number }) {
+    const r = 5 / zoom;
+    return (
+        <svg className="map-svg map-brush-outline" style={{ overflow: 'visible' }} width={1} height={1} data-run-cursor="">
+            <circle cx={at[0] * CELL} cy={at[1] * CELL} r={r} fill="#fff" stroke="#000a" strokeWidth={1.5 / zoom} />
+        </svg>
+    );
+}
+
 function ShapeOutline({ geom, zoom }: { geom: ShapeGeometry; zoom: number }) {
     const points = geom.pts.map(([x, y]) => x * CELL + ',' + y * CELL).join(' ');
     const sw = 1.5 / zoom;

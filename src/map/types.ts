@@ -118,6 +118,13 @@ export interface MapPlaced {
     /** The map it opens, like a landmark's — an interior. */
     link?: string;
     snap?: boolean;
+    /** A piece of a wall or fence drawn as a run (world/walls.ts): its line
+        on the ground from (x + seg[0], y + seg[1]) to (x + seg[2], y + seg[3]),
+        in cells. x/y are then the smaller ends of that line, not a corner of
+        the footprint (which is the line widened by the wall's thickness). */
+    seg?: [number, number, number, number];
+    /** The pieces drawn in one drag share it: a click selects them all. */
+    run?: string;
 }
 
 /** An interior's floor plan (world/room.ts): an outline of corners on whole

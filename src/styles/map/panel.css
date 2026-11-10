@@ -363,6 +363,18 @@
     font-weight: 600;
 }
 
+/* The Build tool's wall shapes: five of them, so the icon sits over its word. */
+.map-run-shapes button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.35rem 0.1rem;
+    font-size: 0.66rem;
+    line-height: 1.1;
+}
+.map-run-shapes button i { font-size: 0.85rem; }
+
 /* The eraser's two modes, and the edge look a brush lays down. */
 .map-erase-mode { margin-bottom: 0.55rem; }
 .map-paint-layer { margin-bottom: 0.55rem; }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMap } from '../../map/MapContext';
-import { ITEMS, groupOf, groupsFor, itemOf } from '../../map/world/catalog';
+import { ITEMS, groupOf, groupsFor, itemOf, runShapeOf } from '../../map/world/catalog';
 import type { ItemGroup } from '../../map/world/catalog';
 import { ColorField } from './ColorField';
 import { clashes, colorsOf, itemThumb, variantOf } from '../../map/world/placed';
@@ -58,18 +58,19 @@ export function BuildPalette() {
                         ))}
                     </div>
                 )}
+                {current.run && current.wall && <RunShapePicker />}
                 <div className="map-field-row">
-                    {current.turned && (
+                    {current.turned && (!runShapeOf(current, ui.buildShape) || (runShapeOf(current, ui.buildShape) === 'line')) && (
                         <button className="map-chip" aria-pressed={!!ui.buildRot} data-build-turn=""
                             onClick={() => store.setUi({ buildRot: ui.buildRot ? undefined : 1 })}
                             title="Place it turned a quarter: running up and down the map">
                             <i className="fa-solid fa-rotate-right"></i> Turned
                         </button>
                     )}
-                    <button className="map-chip" aria-pressed={ui.buildFlip} data-build-flip=""
+                    {!runShapeOf(current, ui.buildShape) && <button className="map-chip" aria-pressed={ui.buildFlip} data-build-flip=""
                         onClick={() => store.setUi({ buildFlip: !ui.buildFlip })} title="Place it mirrored left to right">
                         <i className="fa-solid fa-left-right"></i> Mirrored
-                    </button>
+                    </button>}
                 </div>
             </div>
             <div className="map-chips">
@@ -100,10 +101,51 @@ export function BuildPalette() {
                 {!list.length && <p className="map-hint">Nothing matches.</p>}
             </div>
             <p className="map-hint">
-                Click the map to build. The dashed outline is the ground it stands on; it turns red over
+                Click the map to build; walls and fences can also be dragged as lines, rectangles and circles. The dashed outline is the ground it stands on; it turns red over
                 something else, which is allowed. Things nearer the bottom of the map stand in front. {panHint()}
             </p>
         </section>
+    );
+}
+
+const RUN_SHAPES = [
+    ['piece', 'One piece', 'fa-arrow-pointer', 'Click to put down one straight piece'],
+    ['line', 'Line', 'fa-slash', 'Drag from one end to the other'],
+    ['rect', 'Box', 'fa-vector-square', 'Drag from corner to corner: a rectangle'],
+    ['circle', 'Circle', 'fa-circle', 'Drag from the centre out to the wall'],
+    ['ellipse', 'Ellipse', 'fa-egg', 'Drag the box the ellipse fits in'],
+] as const;
+
+/** How a wall or fence goes down: one piece, or a run of a shape. */
+function RunShapePicker() {
+    const { store, ui } = useMap();
+    const def = itemOf(ui.buildItem);
+    const shape = runShapeOf(def, ui.buildShape) ?? 'piece';
+    if (def.wall?.gate) {
+        return (
+            <p className="map-hint" data-run-hint="gate">
+                <i className="fa-solid fa-door-open"></i> Drag across a wall to put the gate in it: the wall under it makes way. A click puts down
+                one {def.wall.gate} cells wide.
+            </p>
+        );
+    }
+    const offered = RUN_SHAPES.filter(([k]) => k !== 'piece' || !def.wall?.only);
+    const hint = RUN_SHAPES.find(([k]) => k === shape)?.[3];
+    return (
+        <div className="map-field" data-run-shapes="">
+            <span>Draw it as</span>
+            <div className="map-segmented map-run-shapes" role="group" aria-label="Draw it as">
+                {offered.map(([k, label, icon, tip]) => (
+                    <button key={k} aria-pressed={shape === k} data-run-shape={k} title={tip}
+                        onClick={() => store.setUi({ buildShape: k, tool: 'build' })}>
+                        <i className={'fa-solid ' + icon}></i> {label}
+                    </button>
+                ))}
+            </div>
+            <span className="map-hint">
+                {hint}. {shape !== 'piece' && 'The wall is laid in pieces about a cell long; click it to select it whole, click again for one piece.'}
+            </span>
+        </div>
     );
 }
 
@@ -115,17 +157,20 @@ export function PlacedFields({ doc, p, set }: {
     const colors = colorsOf(p);
     const skip = def.variants?.[variantOf(def, p.variant)]?.skip ?? [];
     const custom = !!p.colors?.some((c) => c);
+    /* A piece of a drawn wall can only become another wall of the same sort. */
+    const piece = !!(p.seg && def.wall);
     return (
         <>
             <label className="map-field">
                 <span>What it is</span>
                 <select value={p.item} onChange={(e) => set({ item: e.currentTarget.value, colors: undefined, rot: undefined, variant: undefined })}>
-                    {groupsFor(doc.kind).map((g) => (
+                    {piece && ITEMS.filter((d) => d.run && d.wall && !d.wall.gate === !def.wall!.gate).map((d) => <option key={d.slug} value={d.slug}>{d.name}</option>)}
+                    {!piece && groupsFor(doc.kind).map((g) => (
                         <optgroup key={g.key} label={g.label}>
                             {ITEMS.filter((d) => groupOf(d, doc.kind) === g.key).map((d) => <option key={d.slug} value={d.slug}>{d.name}</option>)}
                         </optgroup>
                     ))}
-                    {!groupsFor(doc.kind).some((g) => g.key === groupOf(def, doc.kind)) && <option value={p.item}>{def.name}</option>}
+                    {!piece && !groupsFor(doc.kind).some((g) => g.key === groupOf(def, doc.kind)) && <option value={p.item}>{def.name}</option>}
                 </select>
             </label>
             {def.variants && (
@@ -142,7 +187,7 @@ export function PlacedFields({ doc, p, set }: {
                     </div>
                 </div>
             )}
-            <label className="map-field">
+            {!piece && <label className="map-field">
                 <span>Label</span>
                 <textarea
                     className="map-stamp-label-field"
@@ -151,8 +196,8 @@ export function PlacedFields({ doc, p, set }: {
                     placeholder={'Shown under it.\nEnter starts a new line.'}
                     onChange={(e) => set({ label: e.currentTarget.value })}
                 />
-            </label>
-            {p.label && (
+            </label>}
+            {!piece && p.label && (
                 <div className="map-field">
                     <span>Show the label</span>
                     <div className="map-segmented map-label-show" role="group" aria-label="When the label shows">
@@ -189,7 +234,7 @@ export function PlacedFields({ doc, p, set }: {
                     )}
                 </div>
             </div>
-            <div className="map-field-row">
+            {!piece && <div className="map-field-row">
                 <label className="map-check">
                     <input type="checkbox" checked={!!p.flip} onChange={(e) => set({ flip: e.currentTarget.checked || undefined })} /> Mirror
                 </label>
@@ -198,7 +243,7 @@ export function PlacedFields({ doc, p, set }: {
                         <input type="checkbox" checked={!!p.rot} onChange={(e) => set({ rot: e.currentTarget.checked ? 1 : undefined })} /> Turned
                     </label>
                 )}
-            </div>
+            </div>}
             {clashes(doc, p) && (
                 <p className="map-hint map-warn" data-placed-clash="">
                     <i className="fa-solid fa-triangle-exclamation"></i> Its ground overlaps something else, or runs off the map.

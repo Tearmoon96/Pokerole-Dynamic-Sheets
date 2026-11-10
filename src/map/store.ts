@@ -106,6 +106,9 @@ export interface MapUi {
     /** The palette's filter: one kind of town's buildings, or all. */
     buildEra: 'all' | 'modern' | 'medieval';
     buildFlip: boolean;
+    /** How a wall or fence goes down (world/walls.ts): one piece clicked, or
+        a run dragged as a line, a rectangle, a circle or an ellipse. */
+    buildShape: 'piece' | 'line' | 'rect' | 'circle' | 'ellipse';
     /** The marker of `singleFiller` a click places. */
     fillerVariant: number;
     /** The Room tool (interiors): what a drag on the map does — move the
@@ -180,7 +183,7 @@ export class MapStore {
         paintEdge: 'map', edgeKind: 'soft', eraseMode: 'terrain',
         smartPaint: false, lockedTerrains: [], stayOnStart: false,
         fogColor: 'dark', fogStrength: 100, fogHidden: false,
-        landmark: 'mountain', buildItem: 'house', buildRot: undefined, buildVariant: 0, buildEra: 'all', buildFlip: false, fillerVariant: 0,
+        landmark: 'mountain', buildItem: 'house', buildRot: undefined, buildVariant: 0, buildEra: 'all', buildFlip: false, buildShape: 'piece', fillerVariant: 0,
         roomMode: 'shape', roomErase: false, roomFloor: { kind: 'grass', color: '#6aa84a' }, roomWall: { kind: 'brick', color: '#b0644a' }, roomFill: false, roomBrush: 1, pathKind: 'road', labelRole: 'town', sketch: DEFAULT_SKETCH, sketchErase: false, sketchShape: false, token: null, selection: [],
     };
 

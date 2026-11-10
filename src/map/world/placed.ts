@@ -4,6 +4,8 @@ import { Pen, lookOf } from './looks';
 import { onFloor } from './room';
 import type { Rect } from './looks';
 import type { LookId, MapDoc, MapPlaced, MapToken } from '../types';
+import { pieceHull } from './walls';
+import type { Pt } from './walls';
 
 /* Placed things in a city: where they stand, what they cover, in what order
    they are drawn — the model the owner chose from the Stardew Valley notes
@@ -21,14 +23,21 @@ import type { LookId, MapDoc, MapPlaced, MapToken } from '../types';
 
 export interface Box { x: number; y: number; w: number; h: number }
 
-/** Width and depth of an item's footprint, and its sprite, as placed. */
-export function dims(p: Pick<MapPlaced, 'item' | 'rot' | 'variant'>): { def: ItemDef; w: number; h: number; sw: number; sh: number } {
+/** Width and depth of an item's footprint, and its sprite, as placed; `ox`
+    and `oy` place the footprint against x/y (a wall piece's line runs
+    through the middle of its footprint, so that starts half a wall early). */
+export function dims(p: Pick<MapPlaced, 'item' | 'rot' | 'variant' | 'seg'>): { def: ItemDef; w: number; h: number; sw: number; sh: number; ox: number; oy: number } {
     const def = itemOf(p.item);
+    if (p.seg && def.wall) {
+        const t = def.wall.thick;
+        const w = Math.abs(p.seg[2] - p.seg[0]) + t, h = Math.abs(p.seg[3] - p.seg[1]) + t;
+        return { def, w, h, sw: w + 0.3, sh: h + def.wall.h, ox: -t / 2, oy: -t / 2 };
+    }
     const t = p.rot && def.turned ? def.turned : null;
-    if (t) return { def, w: t.w, h: t.h, sw: t.sw ?? t.w, sh: t.sh };
+    if (t) return { def, w: t.w, h: t.h, sw: t.sw ?? t.w, sh: t.sh, ox: 0, oy: 0 };
     const v = def.variants?.[variantOf(def, p.variant)];
     const w = v?.w ?? def.w, h = v?.h ?? def.h;
-    return { def, w, h, sw: v?.sw ?? (v?.w !== undefined ? undefined : def.sw) ?? w, sh: v?.sh ?? def.sh };
+    return { def, w, h, sw: v?.sw ?? (v?.w !== undefined ? undefined : def.sw) ?? w, sh: v?.sh ?? def.sh, ox: 0, oy: 0 };
 }
 
 /** A saved variant number made safe for this item: 0 when it has none. */
@@ -38,21 +47,44 @@ export function variantOf(def: ItemDef, v: number | undefined): number {
 }
 
 export function footprint(p: MapPlaced): Box {
-    const { w, h } = dims(p);
-    return { x: p.x, y: p.y, w, h };
+    const { w, h, ox, oy } = dims(p);
+    return { x: p.x + ox, y: p.y + oy, w, h };
 }
 
 /** The sprite's rectangle in cells. */
 export function spriteBox(p: MapPlaced): Box {
-    const { w, h, sw, sh } = dims(p);
-    return { x: p.x + (w - sw) / 2, y: p.y + h - sh, w: sw, h: sh };
+    const { w, h, sw, sh, ox, oy } = dims(p);
+    return { x: p.x + ox + (w - sw) / 2, y: p.y + oy + h - sh, w: sw, h: sh };
 }
 
 /** The point a placed thing is "at" for fog and the table's lists: the
     middle of its footprint's front edge. */
 export function anchorOf(p: MapPlaced): [number, number] {
-    const { w, h } = dims(p);
-    return [p.x + w / 2, p.y + h - 0.01];
+    const f = footprint(p);
+    return [f.x + f.w / 2, f.y + f.h - 0.01];
+}
+
+/** A wall piece's two ends on the ground, in cells; null for anything else. */
+export function segEnds(p: MapPlaced): [Pt, Pt] | null {
+    if (!p.seg || !itemOf(p.item).wall) return null;
+    return [[p.x + p.seg[0], p.y + p.seg[1]], [p.x + p.seg[2], p.y + p.seg[3]]];
+}
+
+/** The outline a wall piece is drawn inside, in cells — what a press must hit. */
+export function segOutline(p: MapPlaced): Pt[] | null {
+    const ends = segEnds(p);
+    const wall = itemOf(p.item).wall;
+    return ends && wall ? pieceHull(ends[0], ends[1], wall.thick, wall.h) : null;
+}
+
+/** A piece of a run from a to b (cells), stored with its smaller ends as x/y. */
+export function pieceOf(id: string, item: string, a: Pt, b: Pt, run: string, variant: number): MapPlaced {
+    const r3 = (v: number) => Math.round(v * 1000) / 1000;
+    const x = r3(Math.min(a[0], b[0])), y = r3(Math.min(a[1], b[1]));
+    return {
+        id, item, x, y, seg: [r3(a[0] - x), r3(a[1] - y), r3(b[0] - x), r3(b[1] - y)], run,
+        ...(variant ? { variant } : {}),
+    };
 }
 
 export type DepthEntry = { kind: 'placed'; obj: MapPlaced } | { kind: 'token'; obj: MapToken };
@@ -62,8 +94,8 @@ export type DepthEntry = { kind: 'placed'; obj: MapPlaced } | { kind: 'token'; o
 export function depthOrder(placed: MapPlaced[], tokens: MapToken[]): DepthEntry[] {
     const all: { e: DepthEntry; flat: number; bottom: number; x: number; i: number }[] = [];
     placed.forEach((p, i) => {
-        const { def, w, h } = dims(p);
-        all.push({ e: { kind: 'placed', obj: p }, flat: def.floor ? 0 : 1, bottom: p.y + h, x: p.x + w / 2, i });
+        const { def, w, h, ox, oy } = dims(p);
+        all.push({ e: { kind: 'placed', obj: p }, flat: def.floor ? 0 : 1, bottom: p.y + oy + h, x: p.x + ox + w / 2, i });
     });
     tokens.forEach((t, i) => {
         all.push({ e: { kind: 'token', obj: t }, flat: 1, bottom: t.y + t.size / 2, x: t.x, i: placed.length + i });
@@ -76,11 +108,13 @@ export function depthOrder(placed: MapPlaced[], tokens: MapToken[]): DepthEntry[
 export function clashes(doc: MapDoc, p: MapPlaced): boolean {
     const f = footprint(p);
     if (f.x < -0.001 || f.y < -0.001 || f.x + f.w > doc.cols + 0.001 || f.y + f.h > doc.rows + 0.001) return true;
+    /* A wall piece meets its neighbours and the houses it runs past: never a clash. */
+    if (segEnds(p)) return false;
     /* In a room, every cell of it must be floor: not outside, not a wall's face. */
     if (doc.room && !onFloor(doc.room, f)) return true;
     if (itemOf(p.item).floor) return false;
     return doc.placed.some((o) => {
-        if (o.id === p.id || itemOf(o.item).floor) return false;
+        if (o.id === p.id || itemOf(o.item).floor || segEnds(o)) return false;
         const g = footprint(o);
         return f.x < g.x + g.w - 0.001 && g.x < f.x + f.w - 0.001 && f.y < g.y + g.h - 0.001 && g.y < f.y + f.h - 0.001;
     });
@@ -107,9 +141,27 @@ export const PAD = 0.6;
 
 /** Draws one placed thing on `ctx`, whose origin is the map's (0,0) and
     whose scale is `u` px per cell. */
-export function drawPlaced(ctx: CanvasRenderingContext2D, p: MapPlaced, u: number, look: LookId | undefined): void {
+export function drawPlaced(ctx: CanvasRenderingContext2D, p: MapPlaced, u: number, look: LookId | undefined, alone = false): void {
     const { def } = dims(p);
     const b = spriteBox(p);
+    if (def.cutout && !alone && typeof document !== 'undefined') {
+        /* It erases parts of itself (a ruin's broken top): on the shared
+           picture that would erase the ground under it too, so it is drawn
+           on a canvas of its own first. */
+        const c = document.createElement('canvas');
+        renderSprite(c, p, u, look);
+        ctx.drawImage(c, (b.x - PAD) * u, (b.y - PAD) * u);
+        return;
+    }
+    const ends = segEnds(p);
+    if (ends && def.run) {
+        const pen = new Pen(ctx, u, lookOf(look));
+        pen.reseed(p.id.length * 131 + p.id.charCodeAt(0));
+        ctx.save();
+        def.run(pen, [ends[0][0] * u, ends[0][1] * u], [ends[1][0] * u, ends[1][1] * u], colorsOf(p), variantOf(def, p.variant));
+        ctx.restore();
+        return;
+    }
     const r: Rect = { x: b.x * u, y: b.y * u, w: b.w * u, h: b.h * u };
     ctx.save();
     if (p.flip) {
@@ -134,7 +186,7 @@ export function renderSprite(canvas: HTMLCanvasElement, p: MapPlaced, u: number,
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, w, h);
     ctx.translate((PAD - b.x) * u, (PAD - b.y) * u);
-    drawPlaced(ctx, p, u, look);
+    drawPlaced(ctx, p, u, look, true);
 }
 
 const thumbs = new Map<string, string>();
@@ -178,5 +230,9 @@ export function normalizePlaced(raw: unknown): MapPlaced | null {
     if (r.labelShow === 'hover') out.labelShow = 'hover';
     if (typeof r.link === 'string' && ID_RE.test(r.link)) out.link = r.link;
     if (typeof r.snap === 'boolean') out.snap = r.snap;
+    if (Array.isArray(r.seg) && r.seg.length === 4 && r.seg.every((v) => typeof v === 'number' && isFinite(v) && Math.abs(v) <= 64)) {
+        out.seg = r.seg.slice() as [number, number, number, number];
+    }
+    if (typeof r.run === 'string' && ID_RE.test(r.run)) out.run = r.run;
     return out;
 }

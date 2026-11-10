@@ -11,7 +11,7 @@ import type { BuildingSpec } from './buildings';
 /* ------------------------------------------------------------- helpers */
 
 /** Rough stone courses over a rectangle already filled. */
-function courses(p: Pen, x: number, y: number, w: number, h: number, hex: string): void {
+export function courses(p: Pen, x: number, y: number, w: number, h: number, hex: string): void {
     const u = p.u, ctx = p.ctx;
     ctx.save();
     p.rect(x, y, w, h);
@@ -30,7 +30,7 @@ function courses(p: Pen, x: number, y: number, w: number, h: number, hex: string
     ctx.restore();
 }
 
-function battlements(p: Pen, x: number, w: number, y: number, hex: string): void {
+export function battlements(p: Pen, x: number, w: number, y: number, hex: string): void {
     const u = p.u, mw = 0.4 * u, gap = 0.28 * u, mh = 0.4 * u;
     const n = Math.max(2, Math.floor((w + gap) / (mw + gap)));
     const step = (w - mw) / Math.max(1, n - 1);
@@ -40,13 +40,13 @@ function battlements(p: Pen, x: number, w: number, y: number, hex: string): void
     }
 }
 
-function slitWindow(p: Pen, cx: number, y: number, h = 0.7): void {
+export function slitWindow(p: Pen, cx: number, y: number, h = 0.7): void {
     const u = p.u;
     p.rr(cx - 0.09 * u, y, 0.18 * u, h * u, [0.09 * u, 0.09 * u, 0, 0]).fill('#2a2420').stroke(0.5);
     if (p.look.night) p.rr(cx - 0.05 * u, y + 0.1 * u, 0.1 * u, (h - 0.2) * u, 0.04 * u).fill('#ffc870');
 }
 
-function banner(p: Pen, cx: number, y: number, hex: string, h = 1.1): void {
+export function banner(p: Pen, cx: number, y: number, hex: string, h = 1.1): void {
     const u = p.u;
     p.rect(cx - 0.3 * u, y - 0.05 * u, 0.6 * u, 0.08 * u).fill('#5a3a24');
     p.poly([[cx - 0.26 * u, y], [cx + 0.26 * u, y], [cx + 0.26 * u, y + h * u], [cx, y + (h - 0.25) * u], [cx - 0.26 * u, y + h * u]])
@@ -55,7 +55,7 @@ function banner(p: Pen, cx: number, y: number, hex: string, h = 1.1): void {
 }
 
 /** A round tower with a cone roof or battlements, standing in `r`. */
-function roundTower(p: Pen, r: Rect, wall: string, roof: string | null, bodyTop: number): void {
+export function roundTower(p: Pen, r: Rect, wall: string, roof: string | null, bodyTop: number): void {
     const u = p.u, ground = r.y + r.h, cx = r.x + r.w / 2, bw = r.w * 0.86;
     p.rr(cx - bw / 2, bodyTop, bw, ground - bodyTop - 0.05 * u, [0, 0, bw * 0.22, bw * 0.22]).shadeFill(wall, cx - bw / 2, 0, cx + bw / 2, 0, 0.38);
     courses(p, cx - bw / 2, bodyTop, bw, ground - bodyTop - 0.05 * u, wall);

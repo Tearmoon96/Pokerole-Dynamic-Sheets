@@ -714,14 +714,20 @@ export function duplicateSelection(store: MapStore): void {
     const ids = selectedIds(store);
     const off = store.doc.grid.snap ? 1 : 0.6;
     const made: Selection[] = [];
+    /* A copied wall is a run of its own. */
+    const runs = new Map<string, string>();
     const copy = <T extends { id: string; x: number; y: number }>(list: T[], kind: Selection['kind']): T[] => [
         ...list,
         ...list.filter((o) => ids[kind].has(o.id)).map((o) => {
             const id = uid();
             made.push({ kind, id });
             /* A copy opens nothing: one way in to each city or interior. */
-            const copied = { ...o, id, x: o.x + off, y: o.y + off } as T & { link?: string };
+            const copied = { ...o, id, x: o.x + off, y: o.y + off } as T & { link?: string; run?: string };
             delete copied.link;
+            if (copied.run) {
+                if (!runs.has(copied.run)) runs.set(copied.run, uid());
+                copied.run = runs.get(copied.run);
+            }
             return copied;
         }),
     ];
@@ -799,6 +805,36 @@ function GroupInspector({ selection }: { selection: Selection[] }) {
                 {[...counts].map(([k, n]) => n + ' ' + KIND_NAMES[k][n === 1 ? 0 : 1]).join(', ')}.
                 {' '}Drag any of them to move them together. Ctrl-click to add or remove one.
             </p>
+            <GroupActions />
+        </section>
+    );
+}
+
+/** The one run that every selected thing is a piece of, if they all are. */
+function runOfSelection(doc: MapDoc, selection: Selection[]): MapPlaced[] | null {
+    if (!selection.every((s) => s.kind === 'placed')) return null;
+    const ids = new Set(selection.map((s) => s.id));
+    const pieces = doc.placed.filter((o) => ids.has(o.id));
+    const run = pieces[0]?.run;
+    return run && pieces.length === selection.length && pieces.every((o) => o.run === run) ? pieces : null;
+}
+
+/** A wall drawn as a run, selected whole: its fields, for every piece at once. */
+function RunInspector({ doc, pieces }: { doc: MapDoc; pieces: MapPlaced[] }) {
+    const { store } = useMap();
+    const first = pieces[0];
+    const def = itemOf(first.item);
+    const ids = new Set(pieces.map((o) => o.id));
+    const set = (patch: Record<string, unknown>) => store.edit((d) => {
+        d.placed = d.placed.map((o) => (ids.has(o.id) ? { ...o, ...patch } as MapPlaced : o));
+    }, 'run:' + first.run + ':' + Object.keys(patch).join(','));
+    return (
+        <section className="map-section map-inspector" data-run-inspector={pieces.length}>
+            <h3>{def.name}</h3>
+            <p className="map-hint">
+                {pieces.length} pieces drawn together. Click a piece again to pick just that one — to recolour it, or delete it for a gap.
+            </p>
+            <PlacedFields doc={doc} p={first} set={set} />
             <GroupActions />
         </section>
     );
@@ -1052,7 +1088,10 @@ export function SidePanel() {
         <aside className="map-side">
             {palette}
             {ui.selection.length === 1 && <Inspector key={ui.selection[0].kind + ':' + ui.selection[0].id} doc={doc} sel={ui.selection[0]} />}
-            {ui.selection.length > 1 && <GroupInspector selection={ui.selection} />}
+            {ui.selection.length > 1 && (() => {
+                const run = runOfSelection(doc, ui.selection);
+                return run ? <RunInspector key={run[0].run} doc={doc} pieces={run} /> : <GroupInspector selection={ui.selection} />;
+            })()}
         </aside>
     );
 }

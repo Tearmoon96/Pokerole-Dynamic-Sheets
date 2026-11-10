@@ -329,6 +329,8 @@ img.pixelated { image-rendering: pixelated; }
 .map-placed-art { position: absolute; left: 0; top: 0; pointer-events: none; }
 .map-placed-hit { position: absolute; border-radius: 4px; }
 .map-placed.selected .map-placed-hit { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* A wall piece drawn as a run: its clipped press area tinted, since an outline would be clipped away. */
+.map-placed.piece.selected .map-placed-hit { outline: none; background: color-mix(in srgb, var(--accent) 32%, transparent); }
 .map-placed-foot {
     position: absolute;
     border: 2px dashed #ffffffd0;
