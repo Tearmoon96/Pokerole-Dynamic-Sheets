@@ -1,4 +1,5 @@
-import { GmQuotaError, loadGmState, writeGmState } from './state';
+import { GmQuotaError, loadGmState, readGmState, writeGmState } from './state';
+import { GM_KEY } from './constants';
 import { invalidateWorking } from './workingSet';
 import type { GmState } from './types';
 
@@ -21,8 +22,20 @@ export class GmStore {
     private quotaWarned = false;
     onToast: ((html: string) => void) | null = null;
 
+    /* The stored text as this tab last read or wrote it. Each tab holds the
+       whole board and writes the whole board, so with the GM screen open in
+       two tabs the one that changed something last wrote its copy over the
+       other's — notes typed there, a fight advanced there, gone without a
+       sign. A stored text that is not this one is another tab's write, and
+       is taken in (syncFromStorage) instead of being written over. */
+    private lastRaw: string | null = null;
+    /** The last write was refused: this tab is ahead of storage, and reading
+        storage back would undo what is on screen. */
+    private behind = false;
+
     constructor(state?: GmState) {
         this.state = state ?? loadGmState();
+        try { this.lastRaw = localStorage.getItem(GM_KEY); } catch { /* private mode */ }
     }
 
     subscribe = (cb: Listener): (() => void) => {
@@ -55,16 +68,33 @@ export class GmStore {
 
     save(): void {
         try {
-            writeGmState(this.state);
+            this.lastRaw = writeGmState(this.state);
             this.quotaWarned = false;
+            this.behind = false;
         } catch (e) {
             if (!(e instanceof GmQuotaError)) throw e;
+            this.behind = true;
             if (!this.quotaWarned) {
                 this.quotaWarned = true;
                 this.onToast?.('<i class="fa-solid fa-triangle-exclamation"></i> Browser storage is full '
                     + '&mdash; GM screen changes are NOT being kept.');
             }
         }
+    }
+
+    /** Takes in the board another tab stored. True when it did. */
+    syncFromStorage(): boolean {
+        if (this.behind) return false;
+        let raw: string | null = null;
+        try { raw = localStorage.getItem(GM_KEY); } catch { return false; }
+        if (raw === null || raw === this.lastRaw) return false;
+        const stored = readGmState();
+        if (!stored) return false;
+        this.lastRaw = stored.raw;
+        this.state = stored.state;
+        invalidateWorking();
+        this.notify();
+        return true;
     }
 
     /** Replace everything — loading a session file. */

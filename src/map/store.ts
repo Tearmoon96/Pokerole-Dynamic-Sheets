@@ -186,6 +186,9 @@ export class MapStore {
     private indexDirty = false;
 
     maps: MapDoc[];
+    /** Ids of stored maps that would not load (see loadSaved): kept in the
+        list as it is written, shown nowhere. */
+    unreadable: string[] = [];
     activeId: string;
     undoStack: MapDoc[] = [];
     redoStack: MapDoc[] = [];
@@ -224,6 +227,7 @@ export class MapStore {
     constructor() {
         const saved = loadSaved();
         this.maps = saved.maps;
+        this.unreadable = saved.unreadable;
         this.activeId = saved.activeId;
         /* A first visit (or a list that no longer names every map) writes the
            list back on the first save, or the starting map would never be in it. */
@@ -531,6 +535,17 @@ export class MapStore {
         this.notify();
     }
 
+    /** The unreadable maps have been handed over as files: they leave the
+        list and the browser's storage. */
+    forgetUnreadable(): void {
+        for (const id of this.unreadable) {
+            try { localStorage.removeItem(MAP_PREFIX + id); } catch { /* gone anyway */ }
+        }
+        this.unreadable = [];
+        this.indexDirty = true;
+        this.save();
+    }
+
     /* ----------------------------------------------------------- persistence */
 
     /** Written a moment later rather than on the spot, so a burst of edits is
@@ -554,7 +569,7 @@ export class MapStore {
             }
             this.dirty.clear();
             if (this.indexDirty) {
-                const index: SavedIndex = { activeId: this.activeId, ids: this.maps.map((m) => m.id) };
+                const index: SavedIndex = { activeId: this.activeId, ids: [...this.maps.map((m) => m.id), ...this.unreadable] };
                 writeKey(MAPS_KEY, JSON.stringify(index));
                 this.indexDirty = false;
             }
@@ -633,14 +648,31 @@ function readMap(id: string): MapDoc | null {
     }
 }
 
-function loadSaved(): { activeId: string; maps: MapDoc[]; fresh: boolean } {
+function loadSaved(): { activeId: string; maps: MapDoc[]; fresh: boolean; unreadable: string[] } {
     const index = readIndex();
-    const maps = (index?.ids ?? []).map(readMap).filter((m): m is MapDoc => !!m);
+    const maps: MapDoc[] = [];
+    /* A map that is stored but will not load is not a map that is gone. It
+       used to be left out of the list and the list written back without it,
+       so its data stayed in storage where nothing could reach it. Its id is
+       kept in the list instead (`unreadable`), and the page says so. */
+    const unreadable: string[] = [];
+    for (const id of index?.ids ?? []) {
+        const doc = readMap(id);
+        if (doc) { maps.push(doc); continue; }
+        let stored: string | null = null;
+        try { stored = localStorage.getItem(MAP_PREFIX + id); } catch { /* private mode */ }
+        if (stored) unreadable.push(id);
+    }
     let activeId = index?.activeId ?? '';
-    const fresh = !index || !maps.length || maps.length !== index.ids.length;
+    const fresh = !index || !maps.length || maps.length + unreadable.length !== index.ids.length;
     if (!maps.length) maps.push(createDoc({ name: 'My first map' }));
     if (!maps.some((m) => m.id === activeId)) activeId = maps[0].id;
-    return { activeId, maps, fresh };
+    return { activeId, maps, fresh, unreadable };
+}
+
+/** The stored text of a map that would not load, to hand to its owner. */
+export function rawMapText(id: string): string | null {
+    try { return localStorage.getItem(MAP_PREFIX + id); } catch { return null; }
 }
 
 function writeKey(key: string, value: string): void {

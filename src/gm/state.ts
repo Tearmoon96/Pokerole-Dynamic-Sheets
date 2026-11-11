@@ -335,10 +335,24 @@ export function loadGmState(): GmState {
 /** Thrown when localStorage refuses the write, so the caller can say so once. */
 export class GmQuotaError extends Error {}
 
-export function writeGmState(state: GmState): void {
+/** Returns the text it stored, which is how a tab tells its own write from
+    another tab's (GmStore.syncFromStorage). */
+export function writeGmState(state: GmState): string {
+    const text = JSON.stringify(state);
     try {
-        localStorage.setItem(GM_KEY, JSON.stringify(state));
+        localStorage.setItem(GM_KEY, text);
     } catch {
         throw new GmQuotaError('Browser storage is full');
     }
+    return text;
+}
+
+/** The board as stored, text and all; null when there is none to read. */
+export function readGmState(): { raw: string; state: GmState } | null {
+    try {
+        const raw = localStorage.getItem(GM_KEY);
+        const saved = raw ? JSON.parse(raw) : null;
+        if (raw && saved && typeof saved === 'object') return { raw, state: normalizeGmState(saved) };
+    } catch { /* corrupt or private mode */ }
+    return null;
 }

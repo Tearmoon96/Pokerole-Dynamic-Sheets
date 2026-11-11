@@ -19,7 +19,7 @@ import { useGiftResults } from '../../gm/useGiftResults';
 import { WORKING_KEY } from '../../state/constants';
 import { WILD_OPEN_KEY } from '../../card/cardContext';
 import { ActivePanelCtx, panelTabs } from '../../gm/phoneBoard';
-import { combatGidOf, isCombatPanelKey } from '../../gm/constants';
+import { GM_KEY, combatGidOf, isCombatPanelKey } from '../../gm/constants';
 import { useDeviceClass } from '../../lib/device';
 import type { PokedexEntry } from '../../data/types';
 import { useTour } from '../../lib/tour';
@@ -90,18 +90,22 @@ export function GmApp({ dataOk }: { dataOk: boolean }) {
         let lastSeen = localStorage.getItem(WORKING_KEY);
         const refresh = () => store.refresh();
         const onStorage = (e: StorageEvent) => {
+            /* The board itself, changed in another GM screen tab. */
+            if (e.key === GM_KEY) { store.syncFromStorage(); return; }
             if (e.key === WORKING_KEY || e.key === WILD_OPEN_KEY || (e.key || '').indexOf('pokerole_wild_') === 0) refresh();
         };
         const poll = window.setInterval(() => {
             const now = localStorage.getItem(WORKING_KEY);
             if (now !== lastSeen) { lastSeen = now; refresh(); }
+            store.syncFromStorage();
         }, 1000);
         window.addEventListener('storage', onStorage);
-        window.addEventListener('focus', refresh);
+        const onFocus = () => { if (!store.syncFromStorage()) refresh(); };
+        window.addEventListener('focus', onFocus);
         return () => {
             clearInterval(poll);
             window.removeEventListener('storage', onStorage);
-            window.removeEventListener('focus', refresh);
+            window.removeEventListener('focus', onFocus);
         };
     }, [store]);
 

@@ -310,6 +310,11 @@ button.wide {
 
 .member-list li.me { background: var(--primary-faint); }
 
+/* Removed by the GM, listed under the roster with the way back. */
+.member-list .removed-list { margin-top: 0.5rem; }
+.member-list .removed-list p { margin: 0 0 0.2rem; }
+.member-list .removed-list .who { opacity: 0.65; text-decoration: line-through; }
+
 .member-list .who {
     display: flex;
     align-items: center;

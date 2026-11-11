@@ -122,6 +122,8 @@ export interface TableState {
     lockBusyUntil: number;
     /** Changing the password: the table is moving to its new room. */
     moving: boolean;
+    /** Removed by the GM and not let back in: kept out whatever they send. */
+    removed: { id: string; name: string }[];
     hideMyRolls: boolean;
     scripted: boolean;
     scriptSuccesses: number;
@@ -157,6 +159,7 @@ function initialState(): TableState {
         locked: false,
         lockBusyUntil: 0,
         moving: false,
+        removed: [],
         hideMyRolls: true,
         scripted: false,
         successesFirst: readFlag(SORT_KEY),
@@ -295,6 +298,35 @@ function loadLock(lobbyId: string): Set<string> | null {
     } catch {
         return null;
     }
+}
+
+/* Who the GM removed. A kick used to be undone by the page it was sent to
+   simply saying hello again — an honest page leaves, an altered one does not
+   have to — and "Lock & change password" then carried that person along with
+   everyone else on the roster. So a removed key stays removed, on this table,
+   until the GM lets it back; kept like the lock, so a GM reload keeps it. */
+const REMOVED_KEY = 'pokerole_table_removed';
+const MAX_REMOVED = 64;
+
+function saveRemoved(lobbyId: string, removed: Map<string, string>): void {
+    try {
+        if (removed.size) localStorage.setItem(REMOVED_KEY, JSON.stringify({ lobbyId, list: [...removed] }));
+        else localStorage.removeItem(REMOVED_KEY);
+    } catch { /* full, or private mode */ }
+}
+
+function loadRemoved(lobbyId: string): Map<string, string> {
+    const out = new Map<string, string>();
+    try {
+        const raw = JSON.parse(localStorage.getItem(REMOVED_KEY) || 'null');
+        if (!raw || raw.lobbyId !== lobbyId || !Array.isArray(raw.list)) return out;
+        for (const e of raw.list.slice(-MAX_REMOVED)) {
+            if (Array.isArray(e) && typeof e[0] === 'string' && /^[A-Z2-7]{16}$/.test(e[0])) {
+                out.set(e[0], cleanText(e[1], LIMITS.MAX_NAME) || 'Someone');
+            }
+        }
+    } catch { /* unreadable: nobody removed */ }
+    return out;
 }
 
 /* The replay record (`seen`) outlives a reload, a rejoin and the table moving
@@ -445,6 +477,8 @@ export class TableSession {
     private allowed: Set<string> | null = null;
     private refusedAt = 0;
     private refusedNoticeAt = 0;
+    /** Removed by the GM: key fingerprint -> the name they went by. */
+    private removed = new Map<string, string>();
     private lockTimer: number | null = null;
 
     /* Requests made while the socket was down. Held as bodies, not as sealed
@@ -613,6 +647,7 @@ export class TableSession {
             this.colors.set(identity.id, savedColor());
         }
         this.allowed = isHost ? loadLock(lobbyId) : null;
+        this.removed = isHost ? loadRemoved(lobbyId) : new Map();
 
         const wait = !isHost && !trusted;
         if (wait) {
@@ -635,6 +670,7 @@ export class TableSession {
             s.pending = [];
             s.hostOnline = isHost;
             s.locked = this.allowed !== null;
+            s.removed = [...this.removed].map(([id, name]) => ({ id, name }));
             s.error = '';
         });
 
@@ -785,7 +821,7 @@ export class TableSession {
     leave(): void {
         /* A player's table rules go with the table; a GM's own stay theirs. */
         if (!this.store.state.isHost) { writeTableMegaRules('', null); this.npcs.forgetAll(); }
-        else { forgetFeed(); saveLock('', null); saveMoved(null); }
+        else { forgetFeed(); saveLock('', null); saveMoved(null); saveRemoved('', new Map()); }
         this.teardown();
         clearSession();
         this.store.state = initialState();
@@ -1156,6 +1192,16 @@ export class TableSession {
     /* -------------------------------------------------------- host duties */
 
     private onHello(id: string, name: string, sid: string, color: number | undefined): void {
+        /* Removed by the GM: told so again (an honest page then leaves), at
+           most once every REFUSE_GAP_MS whoever knocks, and given no seat. */
+        if (this.removed.has(id)) {
+            const now = Date.now();
+            if (now - this.refusedAt >= REFUSE_GAP_MS) {
+                this.refusedAt = now;
+                void this.publish({ k: 'kick', id });
+            }
+            return;
+        }
         /* The roster every player's page accepts holds 16 people. Past that a
            newcomer stays outside, so a stream of made-up keys can neither
            push the roster past what players take nor grow the GM's page. */
@@ -1543,6 +1589,11 @@ export class TableSession {
 
     kick(id: string): void {
         if (!this.store.state.isHost || id === this.store.state.myId) return;
+        /* Out, and kept out: see REMOVED_KEY. */
+        this.removed.delete(id);
+        this.removed.set(id, this.names.get(id) || 'Someone');
+        while (this.removed.size > MAX_REMOVED) this.removed.delete(this.removed.keys().next().value!);
+        this.syncRemoved();
         this.names.delete(id);
         this.lastSeenAt.delete(id);
         this.greeted.delete(id);
@@ -1556,6 +1607,22 @@ export class TableSession {
         dropFromMoved(this.store.state.lobbyId, id);
         void this.publish({ k: 'kick', id });
         this.publishRoster();
+    }
+
+    private syncRemoved(): void {
+        saveRemoved(this.store.state.lobbyId, this.removed);
+        this.store.update((s) => { s.removed = [...this.removed].map(([id, name]) => ({ id, name })); });
+    }
+
+    /** Lets someone the GM removed join again. In a locked room they are put
+        on the list of who may come back, or the lock would still refuse them. */
+    letBack(id: string): void {
+        if (!this.store.state.isHost || !this.removed.delete(id)) return;
+        if (this.allowed) {
+            this.allowed.add(id);
+            saveLock(this.store.state.lobbyId, this.allowed);
+        }
+        this.syncRemoved();
     }
 
     /** Locks the room — whoever is at the table now (and anyone dropped in
@@ -1603,11 +1670,18 @@ export class TableSession {
                 const dh = this.dhKeys.get(id);
                 if (dh) to.push({ id, c: await boxSeal(eph.privateKey, dh, oldAddr + '|' + id, password) });
             }
+            /* The new room's file store is taken BEFORE anyone is told the
+               password that leads to it: the first claim wins, and a member
+               with an altered page could otherwise claim it in the moment
+               between hearing the password and this page arriving there —
+               after which no map or music could be shared in that room. */
+            await new BlobChannel(next.key, next.addr, await hostUploadKey(lobbyId)).claim();
             if (to.length) await this.publish({ k: 'move', dh: await exportDhPublic(eph), to });
             /* Who may still be handed it at the old room's door: everyone at
                the table now, and everyone the lock lets back. */
             const carry = new Set<string>([...members, ...(this.allowed ?? [])]);
             carry.delete(myId);
+            for (const id of this.removed.keys()) carry.delete(id);
             rememberMove(lobbyId, oldPassword, carry);
             await rememberHostRoom(lobbyId, next.addr);
             saveSession({ lobbyId, password, name: myName, ok: true });

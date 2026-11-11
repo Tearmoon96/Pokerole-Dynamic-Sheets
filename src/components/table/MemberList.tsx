@@ -26,7 +26,7 @@ function syncDot(stat: MemberMusic | undefined, playing: boolean): { cls: string
 
 export function MemberList() {
     const { session, state } = useTable();
-    const { members, myId, isHost } = state;
+    const { members, myId, isHost, removed } = state;
     const music = session.music.view;
     const playing = isHost && CHANNELS.some((c) => music.decks[c].playing);
     const [open, toggle] = useFold('members');
@@ -72,11 +72,31 @@ export function MemberList() {
                 ))}
             </ul>}
 
-            {open && isHost && members.length > 1 && (
+            {open && isHost && removed.length > 0 && (
+                <div className="removed-list">
+                    <p className="muted">Removed, and kept out:</p>
+                    <ul>
+                        {removed.map((r) => (
+                            <li key={r.id}>
+                                <span className="who">{r.name}</span>
+                                <button
+                                    className="mini-btn"
+                                    title={'Let ' + r.name + ' join the table again'}
+                                    onClick={() => session.letBack(r.id)}
+                                >
+                                    Let back in
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {open && isHost && (members.length > 1 || removed.length > 0) && (
                 <p className="muted">
-                    Removing someone disconnects them, but the password is what really
-                    guards the table: Change password in the Invite box keeps them out
-                    for good, and everyone still here follows by themselves.
+                    Someone removed cannot sit at the table again until you let them back in. They
+                    can still read it while they have the password: Change password in the Invite
+                    box ends that, and everyone still here follows by themselves.
                 </p>
             )}
         </div>

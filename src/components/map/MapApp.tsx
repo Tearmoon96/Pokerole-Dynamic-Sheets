@@ -20,6 +20,9 @@ import { WorldStrip } from './WorldStrip';
 import { GuidedTour, useFirstTimeTour } from '../common/Tour';
 import { MAP_STEPS, MAP_TOUR_INTRO } from './tourSteps';
 import { sweepPictures } from '../../map/picture';
+import { useGmConfirm } from '../gm/ConfirmDialog';
+import { rawMapText } from '../../map/store';
+import { downloadMap } from '../../map/files';
 
 /* The Map Maker: top bar, tool rail, the map, and the side panel. */
 
@@ -47,6 +50,29 @@ export function MapApp({ dataOk, tableLink }: { dataOk: boolean; tableLink: Tabl
     }, [doc.name]);
 
     useEffect(() => { store.onToast = toast; }, [store, toast]);
+
+    /* Maps that are stored but would not load: said once, with their data
+       offered as files, since nothing on the page can show them. */
+    const confirm = useGmConfirm();
+    useEffect(() => {
+        const ids = store.unreadable;
+        if (!ids.length) return;
+        void confirm({
+            title: ids.length === 1 ? 'A map could not be read' : ids.length + ' maps could not be read',
+            text: 'Its stored data is damaged, so it is not in the list. Nothing was deleted: the data is still in '
+                + 'this browser. Download it to keep a copy (it may be repairable by hand); the damaged entry '
+                + 'is then cleared from this browser.',
+            icon: 'fa-triangle-exclamation', confirmLabel: 'Download the data', cancelLabel: 'Not now',
+        }).then((yes) => {
+            if (!yes) return;
+            for (const id of ids) {
+                const text = rawMapText(id);
+                if (text) downloadMap(text, 'unreadable-map-' + id + '.json');
+            }
+            store.forgetUnreadable();
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [store]);
 
     /* The store writes a moment after a change; a tab closed inside that
        moment would lose it. */
