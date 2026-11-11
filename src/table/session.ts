@@ -1466,7 +1466,7 @@ export class TableSession {
             vals,
             total,
             succ,
-            net: succ === null ? null : Math.max(0, succ - (extras.pain ?? 0)),
+            net: succ === null ? null : Math.max(0, succ - (extras.pain ?? 0) - (extras.low ?? 0)),
             t: Date.now(),
             who,
             note: note || undefined,
@@ -1783,16 +1783,18 @@ function extrasOf(r: RollExtras): RollExtras {
     const out: RollExtras = {};
     if (r.bonus !== undefined) out.bonus = r.bonus;
     if (r.pain !== undefined) out.pain = r.pain;
+    if (r.low !== undefined) out.low = r.low;
     if (r.need !== undefined) out.need = r.need;
     if (r.crit !== undefined) out.crit = r.crit;
     return out;
 }
 
-/** Clamped to what the validator accepts; a zero pain is left off the wire. */
+/** Clamped to what the validator accepts; a zero pain or Low Accuracy is left off the wire. */
 function cleanExtras(e: RollExtras): RollExtras {
     if (e.bonus !== undefined) return { bonus: clamp(e.bonus, LIMITS.MIN_BONUS, LIMITS.MAX_BONUS) };
     const out: RollExtras = {};
     if (e.pain) out.pain = clamp(e.pain, 0, LIMITS.MAX_PAIN);
+    if (e.low) out.low = clamp(e.low, 0, LIMITS.MAX_LOW);
     if (e.need !== undefined) out.need = clamp(e.need, 1, LIMITS.MAX_NEED);
     /* The usual margin stays off the wire, so an ordinary attack still reads
        on a page from before the margin travelled. */
@@ -1803,7 +1805,7 @@ function cleanExtras(e: RollExtras): RollExtras {
 }
 
 function hasExtras(r: WireRoll): boolean {
-    return r.bonus !== undefined || r.pain !== undefined || r.need !== undefined || r.crit !== undefined;
+    return r.bonus !== undefined || r.pain !== undefined || r.low !== undefined || r.need !== undefined || r.crit !== undefined;
 }
 
 function signed(n: number): string {

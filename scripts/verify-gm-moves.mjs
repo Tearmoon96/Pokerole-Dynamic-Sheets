@@ -91,9 +91,18 @@ for (const name of SPECIES) {
                 const move = ALL_MOVES.find((m) => m.Name === mn);
                 if (!move) continue;
                 checked++;
-                const la = legacy.computeMoveTotals(dex, sheet, legacy.applyMoveOverrides(sheet, move));
+                /* Low Accuracy is where the port departs on purpose: the
+                   original took it off the pool, so fewer dice were rolled;
+                   the rule is that the whole pool is rolled and it comes off
+                   the successes. So the original is asked about the same move
+                   without it, and the port must report it apart, as `low`. */
+                const red = Math.abs((move.Attributes && move.Attributes.AccuracyReduction) || 0);
+                const plain = red
+                    ? { ...move, Attributes: { ...move.Attributes, AccuracyReduction: 0 } } : move;
+                const la = legacy.computeMoveTotals(dex, sheet, legacy.applyMoveOverrides(sheet, plain));
                 const pa = ported.computeMoveTotals(dex, sheet,
                     ported.applyMoveOverrides(sheet, move), itemByName);
+                if (pa.low !== red) { bad++; console.log(`MISMATCH low ${name} / ${mn}: ${pa.low} vs ${red}`); }
                 /* The port adds fields the original never had (the combat
                    offsets' share, the crit margin): compare what both have. */
                 const a = JSON.stringify(la);

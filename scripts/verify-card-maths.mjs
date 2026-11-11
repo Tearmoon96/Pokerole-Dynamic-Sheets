@@ -111,7 +111,14 @@ for (const name of SPECIES) {
             const base = ALL_MOVES.find((m) => m.Name === mn);
             if (!base) continue;
             checked++;
-            const a = JSON.stringify(legacy.computeMoveTotals(legacy.applyMoveOverrides(base)));
+            /* Low Accuracy is where the port departs on purpose: the original
+               took it off the pool, so fewer dice were rolled; the rule is
+               that the whole pool is rolled and it comes off the successes.
+               So the original is asked about the same move without it, and
+               the port must still report it, apart, as `movePenalty`. */
+            const red = Math.abs((base.Attributes && base.Attributes.AccuracyReduction) || 0);
+            const plain = red ? { ...base, Attributes: { ...base.Attributes, AccuracyReduction: 0 } } : base;
+            const a = JSON.stringify({ ...legacy.computeMoveTotals(legacy.applyMoveOverrides(plain)), movePenalty: -red || 0 });
             /* `bonus` (STAB and a type item) is new on the card, and only
                filled when an item lookup is passed — which this call does not. */
             const { bonus: _bonus, ...totals } = ported.computeMoveTotals(src, ported.applyMoveOverrides(sheet, base));

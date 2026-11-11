@@ -1,7 +1,7 @@
 import { Panel } from './Panel';
 import { useGm } from '../../gm/GmContext';
 import { CRIT_DAMAGE, CRIT_MARGIN } from '../../gm/constants';
-import { HISTORY_LIMIT, VERDICTS, faceOrder, painStruck, roll } from '../../gm/dice';
+import { HISTORY_LIMIT, VERDICTS, faceOrder, painStruck, roll, struckOff, struckText } from '../../gm/dice';
 import type { RollEntry, RollMeta } from '../../gm/dice';
 import { spendRoll } from '../../gm/turns';
 
@@ -35,7 +35,8 @@ export function DicePanel({ onReorder }: {
     /* A hit rolls its damage from here rather than sending the GM back to the
        move panel; a critical rolls it already boosted. Everything the damage
        roll needs rode along on the accuracy entry — the pool, who rolled it
-       and the pain penalty, which strikes damage successes just the same. */
+       and the pain penalty, which strikes damage successes just the same.
+       The move's Low Accuracy stays behind: it is about the accuracy roll. */
     const rollDamage = (from: RollEntry, extra: number) => {
         const d = from.dmg;
         if (!d || !(d.dice + extra > 0)) return;
@@ -144,6 +145,7 @@ export function DicePanel({ onReorder }: {
                             {[prep.who, prep.what].filter(Boolean).join(' · ') || 'Roll set up'}
                             {prep.need != null && <> · needs {prep.need}</>}
                             {prep.need != null && prep.crit != null && <> · crit at +{prep.crit}</>}
+                            {!!prep.low && <> · low accuracy −{prep.low}</>}
                             {!!prep.pain && <> · pain −{prep.pain}</>}
                         </span>
                         <button
@@ -172,7 +174,7 @@ export function DicePanel({ onReorder }: {
                             <span className="h-total">
                                 = {e.total}
                                 {e.succ != null && (
-                                    <> · {e.net != null ? e.net : e.succ}✓{e.pain ? ' (−' + e.pain + ')' : ''}</>
+                                    <> · {e.net != null ? e.net : e.succ}✓{struckOff(e) ? ' (−' + struckOff(e) + ')' : ''}</>
                                 )}
                             </span>
                             {e.verdict && (
@@ -197,7 +199,7 @@ function RollOutput({ entry, sorted, onRollDamage }: {
     onRollDamage: (from: RollEntry, extra: number) => void;
 }) {
     const sides = parseInt(entry.label.split('d')[1], 10);
-    const struck = painStruck(entry.vals, entry.pain);
+    const struck = painStruck(entry.vals, struckOff(entry));
     const time = new Date(entry.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const v = entry.verdict ? VERDICTS[entry.verdict] : null;
     /* After a hit — or after an accuracy roll with no target number to judge
@@ -231,7 +233,7 @@ function RollOutput({ entry, sorted, onRollDamage }: {
                         <span
                             key={i}
                             className={'die-face ' + cls + out}
-                            title={out ? 'Struck out by the pain penalty' : undefined}
+                            title={out ? 'Struck out by ' + (entry.low ? (entry.pain ? 'Low Accuracy or the pain penalty' : 'Low Accuracy') : 'the pain penalty') : undefined}
                         >
                             {val}
                         </span>
@@ -248,8 +250,8 @@ function RollOutput({ entry, sorted, onRollDamage }: {
                 {entry.succ != null && (
                     <span className="succ">
                         Successes <strong>{entry.net}</strong>
-                        {!!entry.pain && (
-                            <> <span className="pain-sub">({entry.succ} − {entry.pain} pain)</span></>
+                        {!!struckOff(entry) && (
+                            <> <span className="pain-sub">{struckText(entry)}</span></>
                         )}
                     </span>
                 )}

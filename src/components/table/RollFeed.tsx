@@ -9,7 +9,7 @@ import type { CSSProperties } from 'react';
 import type { LocalRoll } from '../../table/session';
 import type { WireMember } from '../../table/protocol';
 import { CRIT_MARGIN } from '../../gm/constants';
-import { VERDICTS, accuracyVerdict, faceOrder, painStruck } from '../../gm/dice';
+import { VERDICTS, accuracyVerdict, faceOrder, painStruck, struckOff, struckText } from '../../gm/dice';
 import { colorVars } from '../../table/colors';
 
 /** How long a roll that just came in stays lit. */
@@ -52,7 +52,7 @@ function FeedRow({ roll, mine, color, sorted }: {
     const [fresh] = useState(() => !!roll.seenAt && Date.now() - roll.seenAt < FRESH_MS);
     const sides = parseInt(roll.label.split('d')[1], 10);
     const time = new Date(roll.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const struck = painStruck(roll.vals, roll.pain);
+    const struck = painStruck(roll.vals, struckOff(roll));
     /* Worked out here from the net successes rather than sent: a receiver
        recomputes `net` from the faces, so the verdict follows from those. */
     const verdict = roll.need != null && roll.net != null
@@ -100,8 +100,8 @@ function FeedRow({ roll, mine, color, sorted }: {
                 {roll.net != null && (
                     <span className="succ">
                         {roll.net === 1 ? 'Success' : 'Successes'} <strong>{roll.net}</strong>
-                        {!!roll.pain && (
-                            <> <span className="pain-sub">({roll.succ} − {roll.pain} pain)</span></>
+                        {!!struckOff(roll) && (
+                            <> <span className="pain-sub">{struckText(roll)}</span></>
                         )}
                     </span>
                 )}

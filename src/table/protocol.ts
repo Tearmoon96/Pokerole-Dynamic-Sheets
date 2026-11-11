@@ -46,6 +46,9 @@ export interface WireRoll {
     bonus?: number;
     /** Successes the pain penalty strikes off; `net` is what is left. */
     pain?: number;
+    /** Successes a move's Low Accuracy strikes off its accuracy roll, on top
+        of pain. The pool is rolled in full either way. */
+    low?: number;
     /** The successes an accuracy roll needed: its action number this round. */
     need?: number;
     /** Successes over `need` that make it a critical, when not the usual 3
@@ -58,6 +61,7 @@ export interface WireRoll {
 export interface RollExtras {
     bonus?: number;
     pain?: number;
+    low?: number;
     need?: number;
     crit?: number;
 }
@@ -311,6 +315,8 @@ export const LIMITS = {
     MIN_BONUS: -99,
     MAX_BONUS: 99,
     MAX_PAIN: 5,
+    /* The dataset's largest Low Accuracy is 5. */
+    MAX_LOW: 5,
     MAX_NEED: 5,
     /** The usual critical margin, the most a roll may say it needs. */
     MAX_CRIT: 3,

@@ -1,15 +1,16 @@
-import { painFlagTitle } from '../../card/moves';
+import { lowAccuracyTitle, painFlagTitle } from '../../card/moves';
 import { signed } from '../../card/moves';
 import type { MoveTotals } from '../../card/moves';
 
-/* The glyphs after a total, one per reason it is not the bare pool: the move's
-   own modifier, the offset you typed in the editor, and Pain.
+/* The glyphs after a total, one per thing that bears on it: the move's own Low
+   Accuracy and Pain, which both come off the successes once the dice are read,
+   and the offset you typed in the editor, which is in the number itself.
 
    Each carries its own title, which is the point of splitting them up — hovering
    one says what that one means, where a single worded chip could only restate
    the whole sum. */
 
-/** Three stacked chevrons: the move's own built-in accuracy modifier. */
+/** Three stacked chevrons: the move's own Low Accuracy. */
 function FlagArrows() {
     return (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -33,8 +34,8 @@ export function TotalFlags({ totals, kind }: { totals: MoveTotals; kind: 'acc' |
         <span className="total-flags">
             {kind === 'acc' && !!totals.movePenalty && (
                 <span
-                    className={'total-flag ' + (totals.movePenalty < 0 ? 'nerfed' : 'buffed flag-up')}
-                    title={'Default offset: ' + signed(totals.movePenalty)}
+                    className="total-flag nerfed"
+                    title={lowAccuracyTitle(totals.movePenalty)}
                 >
                     <FlagArrows />
                 </span>

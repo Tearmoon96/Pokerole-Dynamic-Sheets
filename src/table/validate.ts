@@ -105,6 +105,11 @@ function parseExtras(raw: Record<string, unknown>): RollExtras | undefined {
         if (p === null) return undefined;
         out.pain = p;
     }
+    if (raw.low !== undefined) {
+        const l = int(raw.low, 0, LIMITS.MAX_LOW);
+        if (l === null) return undefined;
+        out.low = l;
+    }
     if (raw.need !== undefined) {
         const n = int(raw.need, 1, LIMITS.MAX_NEED);
         if (n === null) return undefined;
@@ -117,13 +122,14 @@ function parseExtras(raw: Record<string, unknown>): RollExtras | undefined {
     }
     /* A sum roll counts no successes, so there is nothing for pain to strike
        or a target to be measured against. */
-    if (out.bonus !== undefined && (out.pain !== undefined || out.need !== undefined)) return undefined;
+    if (out.bonus !== undefined
+        && (out.pain !== undefined || out.low !== undefined || out.need !== undefined)) return undefined;
     return out;
 }
 
 export function parseRoll(raw: unknown): WireRoll | null {
     if (!isRecord(raw)) return null;
-    if (!exactly(raw, ['id', 'label', 'vals', 'total', 'succ', 'net', 't', 'who', 'note', 'bonus', 'pain', 'need', 'crit'])) return null;
+    if (!exactly(raw, ['id', 'label', 'vals', 'total', 'succ', 'net', 't', 'who', 'note', 'bonus', 'pain', 'low', 'need', 'crit'])) return null;
 
     const id = idText(raw.id);
     if (!id) return null;
@@ -158,10 +164,11 @@ export function parseRoll(raw: unknown): WireRoll | null {
 
     /* Pokerole counts 4, 5 and 6 as successes; other dice only have a total.
        The same rule as src/gm/dice.ts, applied to the faces we were handed:
-       a bonus makes it a sum, and pain comes off the successes. */
+       a bonus makes it a sum, and pain and Low Accuracy come off the
+       successes. */
     const total = vals.reduce((a, b) => a + b, 0) + (extras.bonus ?? 0);
     const succ = sides === 6 && extras.bonus === undefined ? vals.filter((v) => v >= 4).length : null;
-    const net = succ === null ? null : Math.max(0, succ - (extras.pain ?? 0));
+    const net = succ === null ? null : Math.max(0, succ - (extras.pain ?? 0) - (extras.low ?? 0));
 
     return { id, label: raw.label, vals, total, succ, net, t, who, note, ...extras };
 }
@@ -388,7 +395,7 @@ export function parseBody(raw: unknown): Body | null {
             return { k: 'roster', members };
         }
         case 'request': {
-            if (!exactly(raw, ['k', 'rid', 'count', 'sides', 'note', 'bonus', 'pain', 'need', 'crit'])) return null;
+            if (!exactly(raw, ['k', 'rid', 'count', 'sides', 'note', 'bonus', 'pain', 'low', 'need', 'crit'])) return null;
             const rid = idText(raw.rid);
             const count = int(raw.count, LIMITS.MIN_COUNT, LIMITS.MAX_COUNT);
             const sides = int(raw.sides, LIMITS.MIN_SIDES, LIMITS.MAX_SIDES);

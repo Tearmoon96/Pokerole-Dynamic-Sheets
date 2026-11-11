@@ -83,10 +83,11 @@ export function computeMoveTotals(
        the same two the GM screen's move panel adds. */
     itemByName?: (name: string) => ItemEntry | null,
 ): MoveTotals {
-    /* Two separate things that both move the accuracy, and they stack: the
-       move's own Low Accuracy, and whatever the user typed into the move editor.
-       Kept apart in the return value so the card can say which is which — the
-       sum is all the arithmetic needs. */
+    /* Two separate things, and only one of them is in the pool. What the user
+       typed into the move editor adds or removes dice. The move's own Low
+       Accuracy does not: the whole pool is rolled, and it then takes that many
+       successes off the result — exactly as Pain does. So it travels as a flag
+       beside the total, like Pain, and never inside it. */
     const movePenalty = moveAccuracyPenalty(move);
     const userOffset = move.AccuracyOffset || 0;
     /* Pain is NOT in the totals. It takes a success off the result of the roll,
@@ -94,7 +95,7 @@ export function computeMoveTotals(
        are. So it travels with the totals only as a flag, to be drawn beside them
        and subtracted from the successes once the dice are read. */
     const pain = -painPenalty(src);
-    const accOffset = movePenalty + userOffset;
+    const accOffset = userOffset;
     const powOffset = move.PowerOffset || 0;
 
     let acc: string | null = null;
@@ -171,6 +172,13 @@ export function getOrderedMoves(
     return ordered;
 }
 
+/** The Low Accuracy glyph's own words. `penalty` is negative. */
+export function lowAccuracyTitle(penalty: number): string {
+    const n = Math.abs(penalty);
+    return 'Low Accuracy ' + n + ': \u2212' + n + (n === 1 ? ' success' : ' successes')
+        + ' after the roll. The pool is rolled in full.';
+}
+
 export function painFlagTitle(pain: number): string {
     return pain < -1 ? 'Severe Pain: \u22122 successes' : 'Pain: \u22121 success';
 }
@@ -181,17 +189,16 @@ export function painFlagTitle(pain: number): string {
    you get the arithmetic. */
 export function totalTitle(totals: MoveTotals, kind: 'acc' | 'pow'): string {
     const acc = kind === 'acc';
-    const own = acc ? totals.movePenalty : 0;
     const manual = acc ? totals.userOffset : totals.powOffset;
     const extras = acc ? [] : totals.bonus.parts;
-    if (!own && !manual && !extras.length) return '';
+    if (!manual && !extras.length) return '';
     const base = acc ? totals.accBase : totals.powBase;
     const bits = [(acc ? 'Accuracy pool ' : 'Power ') + base];
-    if (own) bits.push('default offset ' + signed(own));
     if (manual) bits.push('manual offset ' + signed(manual));
     extras.forEach((b) => bits.push(b.label + ' ' + signed(b.value)));
-    /* Pain is absent on purpose: it is not part of this sum. Its own glyph says
-       what it costs, off the successes rather than the pool. */
+    /* Pain and the move's Low Accuracy are absent on purpose: neither is part
+       of this sum. Each has its own glyph saying what it costs, off the
+       successes rather than the pool. */
     const extra = extras.reduce((a, b) => a + b.value, 0);
-    return bits.join(' \u00b7 ') + ' = ' + (base + own + manual + extra);
+    return bits.join(' \u00b7 ') + ' = ' + (base + manual + extra);
 }

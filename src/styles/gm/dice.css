@@ -181,15 +181,19 @@
    red and a top face would read the same as a rolled 1 */
 .die-face.max { border-color: var(--crit); color: var(--crit); box-shadow: 0 0 6px var(--crit-glow); }
 
-/* A success cancelled by the pain penalty: still shown, because the
-   roll happened, but struck through and dimmed so the arithmetic on
-   the successes line can be followed die by die. */
+/* A success cancelled by Low Accuracy or the pain penalty: still shown,
+   because the roll happened, but in a red box where a success that
+   counts has a green one, and struck through, so the arithmetic on the
+   successes line can be followed die by die. Not dimmed: a faded green
+   box read as a weaker success, not as one taken away. */
 .die-face.struck {
+    border-color: var(--danger);
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 14%, var(--panel-solid));
+    box-shadow: none;
     text-decoration: line-through;
     text-decoration-thickness: 2px;
     text-decoration-color: var(--danger);
-    opacity: 0.45;
-    border-style: dashed;
 }
 
 /* The flat part of a sum roll — Initiative's Dexterity + Alert. Dashed

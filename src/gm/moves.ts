@@ -104,6 +104,9 @@ export interface GmMoveTotals {
     /** The rollable numbers, when the pool resolved to one. */
     accN: number | null;
     powN: number | null;
+    /** Successes the move's own Low Accuracy takes off the accuracy roll, once
+        the whole pool has been rolled. Not in `acc` or `accN`. */
+    low: number;
     bonus: DamageBonus;
     /** How much of each pool is the sheet's temporary combat offsets — its
         own Accuracy / Damage offset plus those on the attributes the pool
@@ -121,7 +124,10 @@ export function computeMoveTotals(
     itemByName: (name: string) => ItemEntry | null,
 ): GmMoveTotals {
     const mods = modsOfSheet(sheet);
-    const accOffset = moveAccuracyPenalty(move) + (move.AccuracyOffset || 0) + modOf(mods, 'accuracy');
+    /* The move's own Low Accuracy is NOT a pool offset: every die is rolled,
+       then it strikes that many successes, as Pain does. It goes out as `low`. */
+    const low = -moveAccuracyPenalty(move);
+    const accOffset = (move.AccuracyOffset || 0) + modOf(mods, 'accuracy');
     const powOffset = (move.PowerOffset || 0) + modOf(mods, 'damage');
     /* The same sheet without its offsets, to say how much of a pool they are. */
     const bare = sheet && sheet.combatMods ? { ...sheet, combatMods: undefined } : sheet;
@@ -129,7 +135,7 @@ export function computeMoveTotals(
 
     let acc: string | null = null, accN: number | null = null;
     const accParts = [move.Accuracy1, move.Accuracy2, move.Accuracy3].filter(Boolean) as string[];
-    if (accParts.length > 0 || accOffset) {
+    if (accParts.length > 0 || accOffset || low) {
         const r = resolvePoolString(dex, sheet, accParts.join(' + '));
         acc = formatPoolTotal(r, accOffset);
         accN = r.total + accOffset;
@@ -146,7 +152,7 @@ export function computeMoveTotals(
         powN = r.total + flat;
         powMod = modOf(mods, 'damage') + r.total - resolvePoolString(dex, bare, pool).total;
     }
-    return { acc, pow, accN, powN, bonus, accMod, powMod, crit: critMargin(move, mods) };
+    return { acc, pow, accN, powN, low, bonus, accMod, powMod, crit: critMargin(move, mods) };
 }
 
 export function painPenalty(dex: PokedexEntry | null, sheet: Partial<CardSheet> | null): number {

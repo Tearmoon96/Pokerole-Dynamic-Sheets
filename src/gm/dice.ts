@@ -11,7 +11,7 @@ export interface RollEntry {
     total: number;
     /** Raw successes, null for anything that is not d6. */
     succ: number | null;
-    /** Successes after pain. */
+    /** Successes after pain and Low Accuracy. */
     net: number | null;
     t: number;
     who?: string;
@@ -24,6 +24,9 @@ export interface RollEntry {
         presence is what says so, and it leaves `succ` null. */
     bonus?: number | null;
     pain?: number;
+    /** Successes the move's Low Accuracy strikes off an accuracy roll. Like
+        pain it acts on the result, never on how many dice are rolled. */
+    low?: number;
     verdict?: string;
     /** The successes over `need` that make a critical, when not the usual
         three: 2 for a High Critical move, less with a crit offset, 0 for a
@@ -80,11 +83,11 @@ export function roll(count: number, sides: number, meta: RollMeta, critMargin: n
     const entry: RollEntry = Object.assign(
         { label, vals, total, succ, net: null as number | null, t: Date.now() },
         meta);
-    /* Pain comes off the successes, not the pool: the dice are all rolled, then
-       the weakest of the ones that landed are struck out. `succ` stays the raw
-       count — the ailment rolls read it and are not subject to pain — and `net`
-       is what actually counts. */
-    entry.net = succ == null ? null : Math.max(0, succ - (entry.pain || 0));
+    /* Pain and a move's Low Accuracy come off the successes, not the pool: the
+       dice are all rolled, then the weakest of the ones that landed are struck
+       out. `succ` stays the raw count — the ailment rolls read it and are not
+       subject to either — and `net` is what actually counts. */
+    entry.net = succ == null ? null : Math.max(0, succ - struckOff(entry));
     /* An Accuracy roll made against a target number carries its verdict with it,
        so the history still reads as a hit or a miss later. */
     if (entry.need != null && succ != null) {
@@ -93,7 +96,21 @@ export function roll(count: number, sides: number, meta: RollMeta, critMargin: n
     return entry;
 }
 
-/** Which dice the pain penalty strikes out. The weakest successes go first — a 4
+/** How many successes a roll loses once read: pain plus Low Accuracy. */
+export function struckOff(r: { pain?: number; low?: number }): number {
+    return (r.pain || 0) + (r.low || 0);
+}
+
+/** "(4 − 1 low accuracy − 1 pain)": how the net successes came about, or ''
+    when nothing was taken off. */
+export function struckText(r: { succ: number | null; pain?: number; low?: number }): string {
+    if (r.succ == null || !struckOff(r)) return '';
+    return '(' + r.succ + (r.low ? ' \u2212 ' + r.low + ' low accuracy' : '')
+        + (r.pain ? ' \u2212 ' + r.pain + ' pain' : '') + ')';
+}
+
+/** Which dice the penalties strike out (`pain` here is the whole count, see
+    `struckOff`). The weakest successes go first — a 4
     before a 5 before a 6 — so the same roll always strikes the same dice and the
     result can be checked by eye. Worked out from the faces rather than stored,
     so an old history entry renders too. */

@@ -92,6 +92,11 @@
 
 .tip-roll:active { transform: translateY(1px); }
 
+.tip-low {
+    border-color: var(--danger) !important;
+    color: #fca5a5 !important;
+}
+
 .tip-pain {
     border-color: var(--danger) !important;
     color: #fca5a5 !important;

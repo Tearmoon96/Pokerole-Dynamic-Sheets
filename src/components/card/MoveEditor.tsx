@@ -186,7 +186,7 @@ export function MoveEditor({ moveName, speciesMoves, onClose }: {
                     label="Accuracy Offset"
                     value={draft.accOffset}
                     onChange={(v) => set('accOffset', v)}
-                    hint={penalty ? `This move already has Low Accuracy ${Math.abs(penalty)}, counted separately.` : undefined}
+                    hint={penalty ? `This move already has Low Accuracy ${Math.abs(penalty)}, taken off the successes after the roll, not off these dice.` : undefined}
                 />
                 <OffsetField
                     id="edit-move-power-offset"

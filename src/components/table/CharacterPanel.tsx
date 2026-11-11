@@ -227,6 +227,7 @@ function CharacterBody() {
             extras: {
                 ...(meta.bonus != null ? { bonus: meta.bonus } : {}),
                 ...(meta.pain ? { pain: meta.pain } : {}),
+                ...(meta.low ? { low: meta.low } : {}),
                 ...(meta.need != null ? { need: meta.need } : {}),
                 ...(meta.need != null && meta.crit != null ? { crit: meta.crit } : {}),
             },

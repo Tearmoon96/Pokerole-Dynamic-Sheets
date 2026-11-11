@@ -420,6 +420,9 @@ export function MonTipBody({ token, dex, sheet, who, owner, value, pain, act, do
                                     className="tip-pool acc"
                                     onClick={() => doRoll(totals.accN!, {
                                         who, what: move.Name + ' accuracy', need, pain,
+                                        /* Low Accuracy: the pool above is rolled
+                                           whole, this comes off its successes. */
+                                        ...(totals.low ? { low: totals.low } : {}),
                                         /* High Critical and the crit offset: the
                                            verdict is measured against this. */
                                         ...(totals.crit !== BASE_CRIT_MARGIN ? { crit: totals.crit } : {}),
@@ -447,6 +450,16 @@ export function MonTipBody({ token, dex, sheet, who, owner, value, pain, act, do
                             ) : (
                                 <span className="tip-pool dmg">
                                     DMG <strong>{totals.pow == null ? '—' : totals.pow}</strong>
+                                </span>
+                            )}
+                            {!!totals.low && (
+                                <span
+                                    className="tip-bonus tip-low"
+                                    title={'Low Accuracy ' + totals.low + ': the accuracy pool is rolled in full, then '
+                                        + totals.low + (totals.low === 1 ? ' success is' : ' successes are')
+                                        + ' taken off. Already taken off rolls made here.'}
+                                >
+                                    LOW ACC −{totals.low}
                                 </span>
                             )}
                             {totals.bonus.parts.map((b) => (
