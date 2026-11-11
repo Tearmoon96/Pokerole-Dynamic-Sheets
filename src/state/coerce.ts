@@ -350,7 +350,7 @@ export function coerceTrainer<T>(raw: T): T {
 // eslint-disable-next-line no-control-regex
 const UNSAFE = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u2029\u202a-\u202e\u2066-\u2069\ufeff]/g;
 
-const SHORT = 200;
+const SHORT = 400;
 const LONG = 20_000;
 const MAX_LIST = 64;
 const MAX_KEYS = 64;
@@ -360,7 +360,7 @@ const SHEET_KNOWN = new Set<string>([
     'categoryEnabled', 'status', 'specialties', 'moveOverrides', 'spriteOffsets', 'combatMods', 'disabledMove',
     'megaStash', 'megaPinned',
 ]);
-const LONG_TEXT = new Set(['notes', 'otherMeds', 'effect']);
+const LONG_TEXT = new Set(['notes', 'otherMeds', 'effect', 'text']);
 
 /** Text cleaned and cut, lists and records cut, to any depth. Numbers,
     booleans and null pass; anything else (there is nothing else in JSON) goes. */
@@ -414,6 +414,9 @@ export function strictTrainerFields(raw: unknown, allowed: (key: string) => bool
     if (!isRec(raw)) return out;
     for (const k of Object.keys(raw)) {
         if (!allowed(k)) continue;
+        /* Text of the wrong kind is left out, so the trainer keeps what it
+           had: here, unlike in a stored trainer, there is something to keep. */
+        if ((TRAINER_TEXT as readonly string[]).includes(k) && asStr(raw[k]) === undefined) continue;
         const v = bound(raw[k], k, 0);
         if (v !== undefined) out[k] = v;
     }

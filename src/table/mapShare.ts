@@ -155,6 +155,21 @@ export async function prepareImage(file: Blob): Promise<{ blob: Blob; w: number;
     return { blob, w, h };
 }
 
+/** Whether a picture's real width and height are within what a shared map
+    may be. Reads the size off a detached image, which the browser sizes from
+    the file's header: nothing is decoded or drawn for it. */
+function withinMapSide(blob: Blob): Promise<boolean> {
+    return new Promise((resolve) => {
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        const done = (ok: boolean) => { URL.revokeObjectURL(url); resolve(ok); };
+        img.onload = () => done(img.naturalWidth >= 1 && img.naturalHeight >= 1
+            && img.naturalWidth <= LIMITS.MAX_MAP_SIDE && img.naturalHeight <= LIMITS.MAX_MAP_SIDE);
+        img.onerror = () => done(false);
+        img.src = url;
+    });
+}
+
 export class MapShare {
     view: MapView = emptyMapView();
 
@@ -632,6 +647,12 @@ export class MapShare {
         this.set(this.view.url ? { loading: 0, error: '' } : { loading: 0, error: '', title, live });
         try {
             const blob = await files.download(file, (f) => this.set({ loading: f }), abort.signal);
+            if (abort.signal.aborted || this.fetching !== file.id) return;
+            /* The message says how large the picture is; the picture itself
+               may say otherwise, and a small file can unpack to one far too
+               large for a phone to hold. Its header is read before any of it
+               is drawn. */
+            if (!await withinMapSide(blob)) throw new Error('the picture is larger than a shared map may be');
             if (abort.signal.aborted || this.fetching !== file.id) return;
             if (this.view.url) URL.revokeObjectURL(this.view.url);
             this.currentFile = file.id;

@@ -56,6 +56,7 @@ import type { Body, GiftWhere, WireFile } from './protocol';
 import { DEX_ID_RE } from './slim';
 import { parseFile } from './validate';
 import { packPart, unpackPart } from './zpart';
+import { strictPreview, strictSheet, strictTrainerFields } from '../state/coerce';
 
 /** No further change for this long, and the change goes. */
 const QUIET_MS = 1500;
@@ -122,12 +123,39 @@ function piecesOf(t: TrainerState): Pieces {
     return { t: JSON.stringify(trainerPiece(t)), order: JSON.stringify(orderOf(t)), m };
 }
 
+/* What arrives in a piece is another browser's word, and it is written into
+   THIS browser's trainers: a player's change into the GM's own set, the GM's
+   into every player's copy, a gift into a player's own trainer. It used to be
+   taken with its fields named but their values unchecked, and one value of
+   the wrong kind — a name that was an object — blanked the GM screen for good
+   (it could be done from the developer tools, with no altered page). So a
+   piece is rebuilt from the fields this app knows, each of its own kind and
+   within bounds (state/coerce.ts), and never carries a picture: those come
+   through the file store alone, by `_img`. */
+
+/** The most a shared trainer may come to as text, pictures apart: far more
+    than a full sheet with long notes, and far less than would fill the GM's
+    storage (a piece may unpack to 96,000 characters, and there are seven). */
+const MAX_SHARED_CHARS = 200_000;
+
+/** The trainer's own fields from a piece. */
+function trainerFields(piece: Rec): Rec {
+    return strictTrainerFields(piece, (k) => TRAINER_FIELDS.has(k) && !KEEP_HOME.has(k));
+}
+
 /** A Pokémon piece as it arrives, checked. */
 function parseMonPiece(v: unknown): { dexId: string; sheet: Rec | null; preview: Rec | null } | null {
     if (!isRec(v) || typeof v.dexId !== 'string' || !DEX_ID_RE.test(v.dexId)) return null;
     if (v.sheet !== null && !isRec(v.sheet)) return null;
     if (v.preview !== null && v.preview !== undefined && !isRec(v.preview)) return null;
-    return { dexId: v.dexId, sheet: v.sheet as Rec | null, preview: (v.preview as Rec | null) ?? null };
+    return { dexId: v.dexId, sheet: strictSheet(v.sheet), preview: strictPreview(v.preview) };
+}
+
+function sharedSize(t: TrainerState): number {
+    const p = piecesOf(t);
+    let n = p.t.length;
+    for (const text of p.m.values()) n += text.length;
+    return n;
 }
 
 /* ============================================================ pictures */
@@ -525,13 +553,11 @@ export class NpcShare {
             mons.set(k, piece);
         }
 
+        let tooBig = false;
         mutateWorkingTrainer(body.id, (stored) => {
             let data = normalizeState(stored);
-            if (t) {
-                const next: Rec = { ...data };
-                for (const [k, v] of Object.entries(t)) if (TRAINER_FIELDS.has(k) && !KEEP_HOME.has(k)) next[k] = v;
-                data = normalizeState(next);
-            }
+            const before = sharedSize(data);
+            if (isRec(t)) data = normalizeState({ ...data, ...trainerFields(t) });
             const team = data.team.slice();
             const keys = team.map(monKey);
             for (const [k, piece] of mons) {
@@ -566,9 +592,14 @@ export class NpcShare {
                 }
             }
             data.team = team;
+            /* Larger than any sheet, and larger than it was: not taken. (One
+               the GM already made that long may still be edited down.) */
+            const after = sharedSize(data);
+            if (after > MAX_SHARED_CHARS && after > before) { tooBig = true; return; }
             for (const k of Object.keys(stored)) delete (stored as unknown as Rec)[k];
             Object.assign(stored, data);
         });
+        if (tooBig) this.api.notify('A change to a shared trainer was too large to take.');
         this.urgent.add(body.id);
         void this.tick();
     }
@@ -748,9 +779,7 @@ export class NpcShare {
                 const img = piece._img === null ? null : parseFile(piece._img);
                 delete piece._img;
                 if (fresh || body.full || !mine('t')) {
-                    const next: Rec = { ...data };
-                    for (const [k, v] of Object.entries(piece)) if (TRAINER_FIELDS.has(k) && !KEEP_HOME.has(k)) next[k] = v;
-                    data = normalizeState(next);
+                    data = normalizeState({ ...data, ...trainerFields(piece) });
                     data.id = body.id;
                 }
                 pictures.push({ part: '', ref: img });
@@ -869,7 +898,7 @@ export class NpcShare {
         if (this.view.gifts.some((g) => g.oid === body.oid)) return;
         const raw = await unpackPart(body.z);
         if (!isRec(raw) || typeof raw.dexId !== 'string' || !DEX_ID_RE.test(raw.dexId)) return;
-        const sheet = isRec(raw.sheet) ? { ...raw.sheet } : null;
+        const sheet = strictSheet(raw.sheet);
         const img = raw._img === null ? null : parseFile(raw._img);
         if (img && sheet) {
             const files = this.api.files();
