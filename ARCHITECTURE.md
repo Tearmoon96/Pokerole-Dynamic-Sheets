@@ -387,8 +387,11 @@ the GM's page puts maps, tracks and pictures up again as they are needed;
 players keep theirs by hash.
 
 **A bad actor at the table is bounded, not trusted.** Anyone with the password
-reads the whole table, by design, and a kick is not a ban — a new table is
-(a kick under the room lock is one until it is unlocked).
+reads the whole table, by design. Someone the GM removes is kept out by
+their key until the GM lets them back (`removed` in session.ts, shown under
+the roster), so saying hello again does not undo a kick; they can still READ
+while they hold the password, which only a new password ends, and a new key
+is a new person (the room lock stops those).
 Within that, a patched page cannot: take someone's name (the host numbers a
 name already in use, its own above all, and rolls carry that name); push the
 roster past the 16 every page accepts, however many keys it makes; turn hellos
@@ -423,8 +426,12 @@ additional data (so the store cannot reorder, drop or swap them), and only a
 reference — id, size and SHA-256 — travels on the socket, signed by the GM. The
 store is still blind. Only the GM writes to it: the host's page claims the room
 with a random upload key on connect, and the relay keeps only that key's hash.
-An idle room's files are wiped after six hours, but the claim is kept for 90
-days more, so nobody else can take the store between two sessions.
+An idle room's files are wiped after six hours, but the claim of a table that
+has had two people at it is kept for 90 days more, so nobody else can take
+the store between two sessions. A read never creates a room's storage, and
+every room that holds anything is on the clock for the idle wipe. On a
+password change the GM's page claims the new room before it tells anyone
+the password that leads there.
 Parts travel eight to a request, both ways, and the GM checks what survived with
 one request for the whole room: the relay's free plan counts requests, not
 bytes. A player keeps every file it has verified, by its SHA-256, in IndexedDB
@@ -706,6 +713,44 @@ Three things it fixes that no amount of narrowing does on its own:
   say so. On a phone the board becomes one panel behind a tab bar
   ([`src/gm/phoneBoard.ts`](src/gm/phoneBoard.ts)); panels stay mounted and
   hidden so none loses its scroll position or a half-typed field.
+
+## Stored data, checked and kept
+
+Everything the app remembers is in the browser until it is written to a file,
+and what is stored comes from places that promise nothing: files edited by
+hand, session files from someone else, the rolling table.
+
+- **Kinds are checked on load** ([`src/state/coerce.ts`](src/state/coerce.ts)).
+  `normalizeState`, `normalizeCardSheet`, `normalizeGmState` and the GM
+  screen's reading of the working set put every value the pages read to the
+  kind they expect: a sound value is left exactly as it is, a convertible one
+  converted, anything else dropped for the default. A sheet that was fine
+  comes out identical, which keeps a loaded trainer equal to its own file.
+  Data from another browser (a shared trainer's pieces, a gift) goes through
+  the stricter `strictSheet` / `strictTrainerFields`: known fields only,
+  bounded, and never a picture's address.
+- **A page that cannot be drawn says so**
+  ([`PageBoundary.tsx`](src/components/common/PageBoundary.tsx), around every
+  page's root): a copy of the browser's data to download, a repair of the
+  stored sheets, and the stored entries one by one. Before it, one bad value
+  was an empty page on every reload.
+- **A full storage is said out loud** ([`src/lib/storageUse.ts`](src/lib/storageUse.ts)).
+  The stores' warnings reach a dialog on the License, the GM screen and the
+  card. While the last write was refused, nothing is read back from storage
+  (`storageBehind`), so Save All writes what is on screen. Custom art is
+  embedded as WebP. `navigator.storage.persist()` is asked for once there is
+  a trainer.
+- **One file a trainer** ([`trainerIO.ts`](src/state/trainerIO.ts)). A new
+  trainer cannot take a name already in the folder, and Save All never
+  writes over a file that holds another trainer; two trainers found on one
+  file are parted.
+- **Opening a folder asks first** when the browser holds changes the files do
+  not (`adopt` in [`SessionContext.tsx`](src/state/SessionContext.tsx)). Each
+  stored trainer carries a mark of its last saved text (`StoredTrainer.saved`),
+  which the cards, the GM screen and the table leave alone when they change
+  its data — so "changed since its last save" can be told on any later visit.
+- **The GM screen follows its other tabs** (`GmStore.syncFromStorage`): a
+  stored board that is not this tab's own write is taken in, not written over.
 
 ## The store pattern
 
