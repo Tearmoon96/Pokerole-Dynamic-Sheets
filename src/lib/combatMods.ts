@@ -17,14 +17,22 @@
 export const ATTR_MOD_KEYS = ['strength', 'dexterity', 'vitality', 'special', 'insight'] as const;
 export const DICE_MOD_KEYS = ['accuracy', 'damage', 'evasion', 'clash', 'init'] as const;
 
+/* Not offsets, but the same kind of thing — what a fight did to a character,
+   kept on its sheet — and so carried here, where every page and the table's
+   copies already read and write: the pain tiers bought off with Will, and
+   the switch that ignores Pain Penalization for this one (lib/pain.ts). */
+export const PAIN_MOD_KEYS = ['painOff', 'noPain'] as const;
+export type PainModKey = typeof PAIN_MOD_KEYS[number];
+
 export type AttrModKey = typeof ATTR_MOD_KEYS[number];
 export type ModKey = AttrModKey | typeof DICE_MOD_KEYS[number]
-    | 'def' | 'spDef' | 'crit' | 'extraEva' | 'extraClash';
+    | 'def' | 'spDef' | 'crit' | 'extraEva' | 'extraClash' | PainModKey;
 
 export type CombatMods = Partial<Record<ModKey, number>>;
 
 export const MOD_KEYS: readonly ModKey[] = [
     ...ATTR_MOD_KEYS, ...DICE_MOD_KEYS, 'def', 'spDef', 'crit', 'extraEva', 'extraClash',
+    ...PAIN_MOD_KEYS,
 ];
 
 /** Each offset's range. The card's own defence offsets stop at ±10, and so
@@ -37,6 +45,7 @@ export const MOD_RANGE: Record<ModKey, [number, number]> = {
     def: [-10, 10], spDef: [-10, 10],
     crit: [0, 2],
     extraEva: [0, 4], extraClash: [0, 4],
+    painOff: [0, 2], noPain: [0, 1],
 };
 
 export function clampMod(key: ModKey, v: number): number {
@@ -61,6 +70,28 @@ export function normalizeMods(raw: unknown): CombatMods {
 
 export function isEmptyMods(m: CombatMods | null | undefined): boolean {
     return !m || MOD_KEYS.every((k) => !m[k]);
+}
+
+/** Any real offset on: what the stats button lights up for, and what Reset
+    all takes off. The pain keys are not offsets and are left alone by both. */
+export function hasOffsets(m: CombatMods | null | undefined): boolean {
+    return !!m && MOD_KEYS.some((k) => !!m[k] && !(PAIN_MOD_KEYS as readonly string[]).includes(k));
+}
+
+/** Only the pain keys of `m`: what a reset of the offsets keeps. */
+export function painModsOf(m: CombatMods | null | undefined): CombatMods {
+    const out: CombatMods = {};
+    for (const k of PAIN_MOD_KEYS) if (m && m[k]) out[k] = m[k];
+    return out;
+}
+
+/** `raw` with one key set (0 takes it off), ready to store: undefined when
+    nothing is left, so the sheet carries no empty field. */
+export function withMod(raw: unknown, key: ModKey, v: number): CombatMods | undefined {
+    const m = normalizeMods(raw);
+    const n = clampMod(key, v);
+    if (n) m[key] = n; else delete m[key];
+    return isEmptyMods(m) ? undefined : m;
 }
 
 export function modOf(m: CombatMods | null | undefined, key: ModKey): number {

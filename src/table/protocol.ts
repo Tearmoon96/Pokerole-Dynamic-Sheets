@@ -55,6 +55,14 @@ export interface WireRoll {
         (High Critical, a crit offset, a move that always crits). Only with
         `need`. */
     crit?: number;
+    /** Pushing Fate: automatic successes bought with Will, added after pain
+        and Low Accuracy have struck theirs. */
+    fate?: number;
+    /** Take Your Chances was on: one failed die may be rolled again. */
+    tyc?: true;
+    /** That reroll, once the GM's page has made it: the die's index and the
+        face it had. `vals` already holds the new face. */
+    rr?: [number, number];
 }
 
 /** The optional extras a roll request can carry, as they travel. */
@@ -64,6 +72,8 @@ export interface RollExtras {
     low?: number;
     need?: number;
     crit?: number;
+    fate?: number;
+    tyc?: true;
 }
 
 export interface WireMember {
@@ -193,8 +203,11 @@ export type Body =
     | { k: 'roster'; members: WireMember[] }
     /** Player to host: please roll this. */
     | ({ k: 'request'; rid: string; count: number; sides: number; note?: string } & RollExtras)
-    /** Host only. The result, for everyone. */
+    /** Host only. The result, for everyone. A roll already in the feed comes
+        again, under the same id, once its Take Your Chances die is rerolled. */
     | { k: 'result'; rid?: string; roll: WireRoll }
+    /** Player to host: Take Your Chances on my roll `id`, die `i`. */
+    | { k: 'reroll'; id: string; i: number }
     /** Host only. Recent public rolls, sent to someone who just joined. */
     | { k: 'sync'; rolls: WireRoll[] }
     /** Host only. */
@@ -226,7 +239,7 @@ export type Body =
     | { k: 'turns'; rev: number; turns: WireTurns | null }
     /** Host only. The Mega-Evolution rules the GM set (src/lib/megaRules.ts):
         players' cards and character panels Mega Evolve by them. */
-    | { k: 'rules'; mega: MegaRules }
+    | { k: 'rules'; mega: MegaRules; noPain?: true }
     /** Host only. The GM changed one of `to`'s characters in the fight: the
         HP, Will, status or combat offsets it now has. Values, not steps, so a
         resend is harmless. */
@@ -317,6 +330,8 @@ export const LIMITS = {
     MAX_PAIN: 5,
     /* The dataset's largest Low Accuracy is 5. */
     MAX_LOW: 5,
+    /** Pushing Fates on one roll. */
+    MAX_FATE: 5,
     MAX_NEED: 5,
     /** The usual critical margin, the most a roll may say it needs. */
     MAX_CRIT: 3,

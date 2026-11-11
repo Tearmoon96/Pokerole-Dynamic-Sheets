@@ -2,6 +2,8 @@ import { formatPoolTotal, monPoolCur, monPoolMax, resolvePoolString } from './po
 import type { PokedexEntry, ItemEntry, MoveEntry } from '../data/types';
 import type { CardSheet } from '../card/types';
 import { critMargin, modOf, modsOfSheet } from '../lib/combatMods';
+import type { CombatMods } from '../lib/combatMods';
+import { painView } from '../lib/pain';
 
 /* Move totals for the board's move panel.
 
@@ -155,17 +157,18 @@ export function computeMoveTotals(
     return { acc, pow, accN, powN, low, bonus, accMod, powMod, crit: critMargin(move, mods) };
 }
 
+/** Successes a wounded Pokémon loses on a roll: −1 at half HP, 2 more at 1 HP,
+    less what Will has bought off, nothing when the rule is off (lib/pain.ts). */
 export function painPenalty(dex: PokedexEntry | null, sheet: Partial<CardSheet> | null): number {
-    return painFromHp(monPoolCur(dex, sheet, 'hp'), monPoolMax(dex, sheet, 'hp'));
+    return painView(monPoolCur(dex, sheet, 'hp'), monPoolMax(dex, sheet, 'hp'), modsOfSheet(sheet)).penalty;
 }
 
 /** The same rule off a bare pool, for a trainer — who has HP and takes the
     penalty exactly as a Pokemon does, but whose maximum comes from
-    `trainerPoolMax` and not from any species. */
-export function painFromHp(cur: number, max: number): number {
-    if (cur <= 1) return 2;
-    if (cur <= Math.floor(max / 2)) return 1;
-    return 0;
+    `trainerPoolMax` and not from any species. `mods` is where what they
+    bought off with Will is kept. */
+export function painFromHp(cur: number, max: number, mods?: CombatMods | null): number {
+    return painView(cur, max, mods).penalty;
 }
 
 /** Every move this Pokémon knows: its learnset plus anything added by hand. */

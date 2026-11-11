@@ -20,7 +20,10 @@ import { StatusChips } from '../gm/StatusChips';
 import { MonTipBody, MoveTipShell, TrainerTipBody, useTipButtonState } from '../gm/MoveTip';
 import type { DoRoll, QuickSpent } from '../gm/MoveTip';
 import { normalizeStatus } from '../../gm/ailments';
-import { adjustPool, bareValue, cycleStatus, entityPool, entityRef, writeMods } from '../../gm/entities';
+import { adjustPool, bareValue, cycleStatus, entityPool, entityRef, setPainOff, writeMods } from '../../gm/entities';
+import { PainMarks } from '../common/PainMarks';
+import { FREE } from '../../lib/willRound';
+import { painView } from '../../lib/pain';
 import { StatTipBody, StatsButton, splitTipKey, statsKey } from '../gm/StatTip';
 import { modOf, modsOfTrainer } from '../../lib/combatMods';
 import type { CombatMods } from '../../lib/combatMods';
@@ -175,6 +178,11 @@ function CharacterBody() {
         writeMods(solo, token, next, () => {});
         refresh();
     };
+    /* Power Through the Pain, from the mark beside a health bar. */
+    const pain = (token: string) => (off: number, cost: number) => {
+        setPainOff(solo, dexById, token, off, cost, () => {});
+        refresh();
+    };
     const toggleTip = (key: string) => setTip(tip === key ? null : key);
 
     /* Where a character stands in the fight on the table, if it is in it. */
@@ -223,7 +231,16 @@ function CharacterBody() {
         if (quick === 'init') { prepInit(token, meta.bonus ?? 0, meta.who || ''); return; }
         const note = [meta.who, meta.what].filter(Boolean).join(' · ');
         const s = seat(token);
+        /* Whose Will the buttons beside Roll spend, and in which Round: the
+           fight's, for a character seated in it. A damage roll takes neither
+           Pushing Fate nor Take Your Chances. */
+        const ref = quick === 'dmg' ? null : entityRef(solo, dexById, token);
+        const wp = ref ? entityPool(ref, 'will') : null;
         session.prepare(dice, 6, note, {
+            will: wp ? {
+                trainerId, token, have: wp.cur, key: 'tb:' + trainerId + ':' + token,
+                stamp: s && turns ? turns.name + ':' + turns.round : FREE,
+            } : null,
             extras: {
                 ...(meta.bonus != null ? { bonus: meta.bonus } : {}),
                 ...(meta.pain ? { pain: meta.pain } : {}),
@@ -231,7 +248,8 @@ function CharacterBody() {
                 ...(meta.need != null ? { need: meta.need } : {}),
                 ...(meta.need != null && meta.crit != null ? { crit: meta.crit } : {}),
             },
-            quick: quick && s ? { op: quick, id: s.id, ...(quick === 'acc' && move ? { move } : {}) } : null,
+            quick: s && (quick === 'acc' || quick === 'eva' || quick === 'clash')
+                ? { op: quick, id: s.id, ...(quick === 'acc' && move ? { move } : {}) } : null,
             enter: null,
         });
     };
@@ -307,7 +325,7 @@ function CharacterBody() {
                 <TrainerTipBody
                     mods={ref.mods} bare={bareValue(ref)}
                     name={ref.name} rank={ref.rank} value={ref.value}
-                    pain={hp ? painFromHp(hp.cur, hp.max) : 0}
+                    pain={hp ? painFromHp(hp.cur, hp.max, ref.mods) : 0}
                     act={s ? s.act : null} spent={s?.spent} doRoll={rollFrom(tip)} noInit
                 />
             );
@@ -368,7 +386,9 @@ function CharacterBody() {
                         </div>
                         <div className="pool-bars">
                             <PoolBar tag="HP" cls="hp" cur={t.hp || 0} max={trainerPoolMax(t, 'hp')}
-                                onStep={(d, e) => step(TRAINER_TOKEN)('hp', d, e)} />
+                                onStep={(d, e) => step(TRAINER_TOKEN)('hp', d, e)}
+                                marks={<PainMarks view={painView(t.hp || 0, trainerPoolMax(t, 'hp'), modsOfTrainer(t))}
+                                    will={t.will || 0} onSet={pain(TRAINER_TOKEN)} />} />
                             <PoolBar tag="WILL" cls="will" cur={t.will || 0} max={trainerPoolMax(t, 'will')}
                                 onStep={(d, e) => step(TRAINER_TOKEN)('will', d, e)} />
                         </div>
@@ -416,6 +436,7 @@ function CharacterBody() {
                                 sheet={sheet}
                                 token={token}
                                 onStep={step(token)}
+                                onPain={pain(token)}
                                 onCycleStatus={onCycle(token)}
                                 onOpenTip={() => toggleTip(token)}
                                 onOpenStats={() => toggleTip(statsKey(token))}

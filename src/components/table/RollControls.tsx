@@ -8,6 +8,9 @@ import { useTable } from '../../table/TableContext';
 import { LIMITS } from '../../table/protocol';
 import { totalRange } from '../../table/scripted';
 import { saveSuccessesFirst } from '../../table/session';
+import { charWill, spendCharWill, useWorkingSet } from '../../table/character';
+import { FREE, notePushedFate, roundWill, setTakeChances, useRoundWillVersion } from '../../lib/willRound';
+import { WillSpend } from '../gm/WillSpend';
 
 const QUICK_DICE = [4, 6, 8, 10, 12, 20, 100];
 
@@ -26,6 +29,35 @@ export function RollControls() {
     const prep = isHost ? null : state.prep;
     const fixed = !!prep?.enter;
     const bonus = prep?.extras.bonus;
+    /* The Will buttons: for a pool set up from a character's sheet, never a
+       damage roll or an initiative (CharacterPanel leaves `will` out). */
+    const [, refreshSheets] = useWorkingSet();
+    useRoundWillVersion();
+    const w = prep && sides === 6 && bonus === undefined ? prep.will || null : null;
+    const will = w ? charWill(w.trainerId, w.token, w.have) : 0;
+    const spent = w ? roundWill(w.key, w.stamp) : { tyc: false, fate: 0 };
+    const fate = w ? Math.max(0, Math.min(prep!.extras.fate || 0, will)) : 0;
+
+    /* Pushing Fate is paid as the roll is asked for; Take Your Chances, if
+       it is on, rides along so the GM's page lets one failed die go again. */
+    const throwIt = () => {
+        if (waiting) return;
+        if (w && prep) {
+            const extras = { ...prep.extras };
+            delete extras.fate;
+            delete extras.tyc;
+            if (fate > 0) {
+                extras.fate = fate;
+                spendCharWill(w.trainerId, w.token, fate, w.have);
+                notePushedFate(w.key, w.stamp, fate);
+                refreshSheets();
+            }
+            if (spent.tyc) extras.tyc = true;
+            session.set('prep', { ...prep, extras });
+        }
+        session.requestRoll();
+    };
+
     const setBonus = (v: number) => {
         if (!prep) return;
         session.set('prep', { ...prep, extras: { ...prep.extras, bonus: Math.max(LIMITS.MIN_BONUS, Math.min(LIMITS.MAX_BONUS, v)) } });
@@ -89,7 +121,7 @@ export function RollControls() {
                 maxLength={LIMITS.MAX_NOTE}
                 value={state.note}
                 onChange={(e) => session.set('note', e.currentTarget.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !waiting) session.requestRoll(); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') throwIt(); }}
             />
 
             {isHost ? <HostOptions /> : (
@@ -107,6 +139,8 @@ export function RollControls() {
                         {prep.extras.crit !== undefined && <> · crit at +{prep.extras.crit}</>}
                         {!!prep.extras.low && <> · low accuracy −{prep.extras.low}</>}
                         {!!prep.extras.pain && <> · pain −{prep.extras.pain}</>}
+                        {fate > 0 && <> · fate +{fate}</>}
+                        {!!w && spent.tyc && <> · reroll 1</>}
                     </span>
                     {bonus !== undefined && (
                         <div className="stepper prep-bonus" title="Dexterity + Alert, plus or minus any modifier">
@@ -125,12 +159,24 @@ export function RollControls() {
                 </div>
             )}
 
+            {w && prep && (
+                <WillSpend
+                    will={will} fate={fate} roundFate={spent.fate} tyc={spent.tyc}
+                    inFight={w.stamp !== FREE}
+                    onFate={(n) => session.set('prep', { ...prep, extras: { ...prep.extras, fate: n } })}
+                    onTyc={(on) => {
+                        if (on) { spendCharWill(w.trainerId, w.token, 1, w.have); refreshSheets(); }
+                        setTakeChances(w.key, w.stamp, on);
+                    }}
+                />
+            )}
+
             <button
                 id="roll-btn"
                 className={prep ? 'primed' : ''}
                 disabled={waiting}
                 title={waiting ? 'The GM is not connected right now' : undefined}
-                onClick={() => session.requestRoll()}
+                onClick={throwIt}
             >
                 <i className="fa-solid fa-dice"></i>{' '}
                 {isHost ? 'Roll' : 'Ask to roll'} {count}d{sides}
@@ -208,6 +254,15 @@ function HostOptions() {
                 </label>
 
                 <SuccessesFirst />
+
+                <label className="check" title="Pain Penalization is ignored by everybody at the table: no successes lost at half HP or at 1 HP, on your GM screen too.">
+                    <input
+                        type="checkbox" data-pain-rule=""
+                        checked={state.painOff}
+                        onChange={(e) => session.setPainOff(e.currentTarget.checked)}
+                    />
+                    <span><i className="fa-solid fa-heart-crack"></i> Ignore pain</span>
+                </label>
             </div>
 
             {state.scripted && (

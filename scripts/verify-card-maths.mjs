@@ -77,6 +77,9 @@ function sheetFor(p, variant) {
 }
 
 let checked = 0, bad = 0;
+/** The original's pain at 1 HP (2) as the rule now has it (3). */
+const worse = (n) => (n === 2 ? 3 : n);
+
 for (const name of SPECIES) {
     const p = ALL_POKEMON.find((x) => x.Name === name);
     if (!p) { console.log('missing species ' + name); bad++; continue; }
@@ -98,7 +101,10 @@ for (const name of SPECIES) {
             if (a !== b) { bad++; console.log(`MISMATCH ${name} v${variant} defence ${key}: ${a} vs ${b}`); }
         }
         checked++;
-        if (legacy.painPenalty() !== ported.painPenalty(src)) {
+        /* Pain is where the port departs on purpose: the original took 2
+           successes at 1 HP; the rule is 1 at half HP and 2 MORE at 1 HP,
+           3 in all. Its 2 is read as the port's 3. */
+        if (worse(legacy.painPenalty()) !== ported.painPenalty(src)) {
             bad++; console.log(`MISMATCH ${name} v${variant} painPenalty`);
         }
 
@@ -118,7 +124,8 @@ for (const name of SPECIES) {
                the port must still report it, apart, as `movePenalty`. */
             const red = Math.abs((base.Attributes && base.Attributes.AccuracyReduction) || 0);
             const plain = red ? { ...base, Attributes: { ...base.Attributes, AccuracyReduction: 0 } } : base;
-            const a = JSON.stringify({ ...legacy.computeMoveTotals(legacy.applyMoveOverrides(plain)), movePenalty: -red || 0 });
+            const lt = legacy.computeMoveTotals(legacy.applyMoveOverrides(plain));
+            const a = JSON.stringify({ ...lt, pain: -worse(-lt.pain) || 0, movePenalty: -red || 0 });
             /* `bonus` (STAB and a type item) is new on the card, and only
                filled when an item lookup is passed — which this call does not. */
             const { bonus: _bonus, ...totals } = ported.computeMoveTotals(src, ported.applyMoveOverrides(sheet, base));

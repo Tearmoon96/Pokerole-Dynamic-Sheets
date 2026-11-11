@@ -80,7 +80,9 @@ for (const name of SPECIES) {
                the original read it as 0 HP and charged the full pain
                penalty; the port reads it as the card does, at Base HP. */
             const legacyPain = legacy.painPenalty(dex, sheet.hp == null ? { ...sheet, hp: dex.BaseHP } : sheet);
-            if (legacyPain !== ported.painPenalty(dex, sheet)) {
+            /* And pain at 1 HP: the original took 2 successes, the rule is 1
+               at half HP and 2 MORE at 1 HP, 3 in all. */
+            if ((legacyPain === 2 ? 3 : legacyPain) !== ported.painPenalty(dex, sheet)) {
                 bad++; console.log('MISMATCH painPenalty ' + name);
             }
             /* This species' learnset plus a fixed spread of others. */

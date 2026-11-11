@@ -1,5 +1,5 @@
 import { PoolBar } from './RosterBits';
-import { MOD_RANGE, BASE_CRIT_MARGIN, clampMod, isEmptyMods, modOf, signed } from '../../lib/combatMods';
+import { MOD_RANGE, BASE_CRIT_MARGIN, clampMod, hasOffsets, modOf, painModsOf, signed } from '../../lib/combatMods';
 import type { CombatMods, ModKey } from '../../lib/combatMods';
 import type { EntityRef } from '../../gm/entities';
 
@@ -37,7 +37,7 @@ export function StatsButton({ token, mods, onOpen, className = 'icon-btn' }: {
     onOpen: () => void;
     className?: string;
 }) {
-    const on = !isEmptyMods(mods);
+    const on = hasOffsets(mods);
     return (
         <button
             className={className + ' tip-btn stats-btn' + (on ? ' has-mods' : '')}
@@ -163,7 +163,7 @@ export function StatTipBody({ subject, bare, sub, hp, will, onPool, onMods }: {
         );
     };
 
-    const empty = isEmptyMods(mods);
+    const empty = !hasOffsets(mods);
     return (
         <div className="stat-tip">
             <div className="tip-head">{subject.name}</div>
@@ -201,7 +201,7 @@ export function StatTipBody({ subject, bare, sub, hp, will, onPool, onMods }: {
                 <span className="stat-note">
                     {empty ? 'No offsets on.' : 'Offsets stay until taken off.'}
                 </span>
-                <button className="stat-reset" disabled={empty} onClick={() => onMods({})}>
+                <button className="stat-reset" disabled={empty} onClick={() => onMods(painModsOf(mods))}>
                     <i className="fa-solid fa-rotate-left"></i> Reset all
                 </button>
             </div>

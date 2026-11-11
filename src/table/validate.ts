@@ -120,16 +120,26 @@ function parseExtras(raw: Record<string, unknown>): RollExtras | undefined {
         if (c === null || out.need === undefined) return undefined;
         out.crit = c;
     }
+    if (raw.fate !== undefined) {
+        const f = int(raw.fate, 1, LIMITS.MAX_FATE);
+        if (f === null) return undefined;
+        out.fate = f;
+    }
+    if (raw.tyc !== undefined) {
+        if (raw.tyc !== true) return undefined;
+        out.tyc = true;
+    }
     /* A sum roll counts no successes, so there is nothing for pain to strike
-       or a target to be measured against. */
+       or a target to be measured against, and no failed die to throw again. */
     if (out.bonus !== undefined
-        && (out.pain !== undefined || out.low !== undefined || out.need !== undefined)) return undefined;
+        && (out.pain !== undefined || out.low !== undefined || out.need !== undefined
+            || out.fate !== undefined || out.tyc !== undefined)) return undefined;
     return out;
 }
 
 export function parseRoll(raw: unknown): WireRoll | null {
     if (!isRecord(raw)) return null;
-    if (!exactly(raw, ['id', 'label', 'vals', 'total', 'succ', 'net', 't', 'who', 'note', 'bonus', 'pain', 'low', 'need', 'crit'])) return null;
+    if (!exactly(raw, ['id', 'label', 'vals', 'total', 'succ', 'net', 't', 'who', 'note', 'bonus', 'pain', 'low', 'need', 'crit', 'fate', 'tyc', 'rr'])) return null;
 
     const id = idText(raw.id);
     if (!id) return null;
@@ -168,9 +178,21 @@ export function parseRoll(raw: unknown): WireRoll | null {
        successes. */
     const total = vals.reduce((a, b) => a + b, 0) + (extras.bonus ?? 0);
     const succ = sides === 6 && extras.bonus === undefined ? vals.filter((v) => v >= 4).length : null;
-    const net = succ === null ? null : Math.max(0, succ - (extras.pain ?? 0) - (extras.low ?? 0));
+    /* Pushing Fate's successes come after the striking: nothing removes them. */
+    const net = succ === null ? null
+        : Math.max(0, succ - (extras.pain ?? 0) - (extras.low ?? 0)) + (extras.fate ?? 0);
 
-    return { id, label: raw.label, vals, total, succ, net, t, who, note, ...extras };
+    /* The reroll: only on a pool that had Take Your Chances, a die that is
+       there, and a face that had failed. */
+    let rr: [number, number] | undefined;
+    if (raw.rr !== undefined) {
+        if (!Array.isArray(raw.rr) || raw.rr.length !== 2 || succ === null || !extras.tyc) return null;
+        const i = int(raw.rr[0], 0, vals.length - 1), was = int(raw.rr[1], 1, 3);
+        if (i === null || was === null) return null;
+        rr = [i, was];
+    }
+
+    return { id, label: raw.label, vals, total, succ, net, t, who, note, ...extras, ...(rr ? { rr } : {}) };
 }
 
 function parseMember(raw: unknown): WireMember | null {
@@ -395,7 +417,7 @@ export function parseBody(raw: unknown): Body | null {
             return { k: 'roster', members };
         }
         case 'request': {
-            if (!exactly(raw, ['k', 'rid', 'count', 'sides', 'note', 'bonus', 'pain', 'low', 'need', 'crit'])) return null;
+            if (!exactly(raw, ['k', 'rid', 'count', 'sides', 'note', 'bonus', 'pain', 'low', 'need', 'crit', 'fate', 'tyc'])) return null;
             const rid = idText(raw.rid);
             const count = int(raw.count, LIMITS.MIN_COUNT, LIMITS.MAX_COUNT);
             const sides = int(raw.sides, LIMITS.MIN_SIDES, LIMITS.MAX_SIDES);
@@ -413,6 +435,13 @@ export function parseBody(raw: unknown): Body | null {
             if (!roll) return null;
             if (raw.rid !== undefined && !idText(raw.rid)) return null;
             return { k: 'result', rid: raw.rid as string | undefined, roll };
+        }
+        case 'reroll': {
+            if (!exactly(raw, ['k', 'id', 'i'])) return null;
+            const id = idText(raw.id);
+            const i = int(raw.i, 0, LIMITS.MAX_COUNT - 1);
+            if (!id || i === null) return null;
+            return { k: 'reroll', id, i };
         }
         case 'sync': {
             if (!exactly(raw, ['k', 'rolls'])) return null;
@@ -506,9 +535,10 @@ export function parseBody(raw: unknown): Body | null {
             return { k: 'turns', rev, turns };
         }
         case 'rules': {
-            if (!exactly(raw, ['k', 'mega'])) return null;
+            if (!exactly(raw, ['k', 'mega', 'noPain'])) return null;
             const mega = parseMegaRules(raw.mega);
-            return mega ? { k: 'rules', mega } : null;
+            if (raw.noPain !== undefined && raw.noPain !== true) return null;
+            return mega ? { k: 'rules', mega, ...(raw.noPain ? { noPain: true as const } : {}) } : null;
         }
         case 'pcop': {
             if (!exactly(raw, ['k', 'to', 'key', 'oid', 'hp', 'will', 'status', 'mods'])) return null;

@@ -1,0 +1,64 @@
+/* The pain marks beside a health bar (components/common/PainMarks.tsx): a red
+   chip per tier in force, a blue struck-through one per tier bought off with
+   Will. Colours are spelled out with fallbacks: the card's palette and the
+   GM screen's do not name them alike. */
+
+.pain-marks {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    flex: 0 0 auto;
+}
+
+.pain-mark {
+    display: inline-flex;
+    align-items: center;
+    height: 1.15rem;
+    padding: 0 0.22rem;
+    border-radius: 5px;
+    border: 1px solid var(--danger, #ef4444);
+    background: #ef444426;
+    color: #fca5a5;
+    font: 700 0.62rem/1 'Fira Code', monospace;
+    white-space: nowrap;
+}
+
+button.pain-mark { cursor: pointer; }
+button.pain-mark:hover { background: #ef444447; color: #fff; }
+
+.pain-marks-ico { font-size: 0.62rem; color: #f87171; }
+.pain-marks.all-off .pain-marks-ico { color: #7d9bff; }
+
+/* Bought off: the penalty is there and ignored. */
+.pain-mark.purged {
+    border-color: var(--will-color, #3c6cf8);
+    background: #3c6cf826;
+    color: #a9c0ff;
+}
+
+.pain-mark.purged .pain-mark-n {
+    text-decoration: line-through;
+    text-decoration-thickness: 1.5px;
+}
+
+button.pain-mark.purged:hover { background: #3c6cf847; color: #fff; }
+
+/* Not enough Will to buy it off. */
+.pain-mark.short { cursor: default; }
+button.pain-mark.short:hover { background: #ef444426; color: #fca5a5; }
+
+:where(:root.light-theme) .pain-mark { color: #b91c1c; background: #ef44441f; }
+:where(:root.light-theme) .pain-mark.purged { color: #1d4ed8; background: #3c6cf81f; }
+:where(:root.light-theme) button.pain-mark:hover { color: #7f1d1d; }
+:where(:root.light-theme) button.pain-mark.purged:hover { color: #1e3a8a; }
+
+/* In a roster or combat row the health bar shares its line with a tag, the
+   steps and the number, none of which can shrink. Where that line is too
+   short for the marks as well, they drop under it rather than push the
+   steps out of the card (a panel resizes down to 260px). */
+.pool-bars:has(.pain-marks) { container-type: inline-size; }
+
+@container (max-width: 15.5rem) {
+    .pool-bar:has(.pain-marks) { flex-wrap: wrap; row-gap: 3px; }
+    .pool-bar .pain-marks { order: 5; margin-left: 2.4rem; }
+}

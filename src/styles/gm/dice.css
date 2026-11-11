@@ -297,3 +297,157 @@
 .roll-history-entry .h-vals { flex: 1; word-break: break-all; }
 .roll-history-entry .h-total { flex: 0 0 auto; }
 
+
+/* ---- Will beside Roll: Take Your Chances and Pushing Fate (WillSpend.tsx).
+   A wrapping row of small buttons in the Will colour, so it reads as that
+   character's Will being spent and not as another dice setting. */
+.will-spend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.72rem;
+}
+
+.will-have {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0 0.15rem;
+    font: 700 0.74rem/1 'Fira Code', monospace;
+    color: #a9c0ff;
+    flex: none;
+}
+
+.will-have i { font-size: 0.62rem; }
+
+button.will-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.45rem;
+    font-size: 0.72rem;
+    line-height: 1;
+    white-space: nowrap;
+    border-color: #3c6cf873;
+    background: #3c6cf81a;
+    color: #c5d4ff;
+    flex: none;
+}
+
+button.will-btn:hover { border-color: var(--will-color); background: #3c6cf83d; color: #fff; }
+
+button.will-btn[aria-disabled="true"],
+button.will-btn[aria-disabled="true"]:hover {
+    opacity: 0.45;
+    cursor: default;
+    border-color: #3c6cf873;
+    background: #3c6cf81a;
+    color: #c5d4ff;
+}
+
+/* On: Take Your Chances for the Round, or a Pushing Fate set on this roll. */
+button.will-btn.on,
+button.will-btn.on[aria-disabled="true"] {
+    opacity: 1;
+    border-color: var(--will-color);
+    background: #3c6cf859;
+    color: #fff;
+    box-shadow: 0 0 7px var(--will-glow);
+}
+
+.will-cost,
+.will-count {
+    font: 700 0.66rem/1 'Fira Code', monospace;
+    padding: 0.1rem 0.25rem;
+    border-radius: 4px;
+    background: #00000059;
+}
+
+.will-cost::before { content: '\2605\00a0'; font-size: 0.56rem; }
+.will-count { background: var(--crit); color: #1a1205; }
+
+.will-fate { display: inline-flex; align-items: center; gap: 0.15rem; flex: none; }
+button.will-btn.will-less { padding: 0.25rem 0.35rem; }
+
+/* The GM's switch in the Dice panel's head: Pain Penalization off. */
+button.icon-btn.pain-rule { color: #fca5a5; }
+
+/* ---- Take Your Chances on a roll's dice (DieFaces.tsx).
+   While the reroll is unused, each failed die is ringed in the Will colour
+   and breathes; the chip after the row says there is one, and only one. */
+.die-face.reroll {
+    border: 1px dashed var(--will-color);
+    color: #c5d4ff;
+    animation: die-reroll 1.6s ease-in-out infinite;
+}
+
+button.die-face.reroll {
+    cursor: pointer;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: inherit;
+}
+
+button.die-face.reroll:hover {
+    border-style: solid;
+    background: #3c6cf859;
+    color: #fff;
+    animation: none;
+    box-shadow: 0 0 8px var(--will-glow);
+}
+
+@keyframes die-reroll {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    50% { box-shadow: 0 0 7px 1px var(--will-glow); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .die-face.reroll { animation: none; }
+}
+
+.reroll-cue {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    align-self: center;
+    padding: 0.15rem 0.4rem;
+    border-radius: 999px;
+    border: 1px solid var(--will-color);
+    background: #3c6cf826;
+    color: #c5d4ff;
+    font-size: 0.66rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* Used: what the die was, an arrow, what it became. */
+.die-rerolled {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0 0.2rem 0 0;
+    border-radius: 9px;
+    background: #3c6cf81f;
+    outline: 1px solid #3c6cf873;
+}
+
+.die-rerolled > i { font-size: 0.6rem; color: #a9c0ff; }
+
+.die-face.was {
+    min-width: 1.3rem;
+    font-size: 0.7rem;
+    opacity: 0.6;
+    border-style: dashed;
+    text-decoration: line-through;
+}
+
+/* Pushing Fate: a success that was bought, not rolled. */
+.die-face.fate {
+    border-color: var(--crit);
+    color: var(--crit);
+    background: color-mix(in srgb, var(--crit) 16%, var(--panel-solid));
+}
+
+.die-face.fate i { font-size: 0.7rem; }

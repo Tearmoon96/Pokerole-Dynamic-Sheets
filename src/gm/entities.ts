@@ -11,6 +11,8 @@ import { emitPcEdit, parsePcToken } from './tablePcs';
 import { readWildOpen } from '../card/wild';
 import { megaShownName } from '../card/mega';
 import { modsOfSheet, modsOfTrainer, putSheetMods, putTrainerMods } from '../lib/combatMods';
+import { painView, settledPainOff } from '../lib/pain';
+import type { PainView } from '../lib/pain';
 import type { CombatMods } from '../lib/combatMods';
 
 /* One way to reach any subject on the screen.
@@ -493,7 +495,7 @@ export function cureProgress(
 /** Nudge an HP or Will pool, clamped to its own maximum. Trainers and team
     Pokémon go through the shared working set so an open sheet sees the change;
     a wild goes back wherever its sheet came from. */
-export function adjustPool(
+function stepPool(
     state: GmState,
     dexById: (id: string) => PokedexEntry | null,
     target: string,
@@ -563,4 +565,45 @@ export function adjustPool(
         if (after !== before) emitPcEdit(pc.member, pc.key, key === 'hp' ? { hp: after } : { will: after });
         onWildChanged();
     }
+}
+
+/** A step on HP or Will. An HP that climbs back out of a pain tier takes the
+    Will that bought that tier off with it: pain that comes back later is new
+    pain (lib/pain.ts). */
+export function adjustPool(
+    state: GmState,
+    dexById: (id: string) => PokedexEntry | null,
+    target: string,
+    key: 'hp' | 'will',
+    delta: number,
+    onWildChanged: () => void,
+): void {
+    stepPool(state, dexById, target, key, delta, onWildChanged);
+    if (key !== 'hp') return;
+    const ref = entityRef(state, dexById, target);
+    const hp = ref ? entityPool(ref, 'hp') : null;
+    if (!ref || !hp || !ref.mods.painOff) return;
+    const off = settledPainOff(ref.mods, hp.cur, hp.max);
+    if (off !== ref.mods.painOff) writeMods(state, target, { ...ref.mods, painOff: off }, onWildChanged);
+}
+
+/** Where a character stands with Pain Penalization, or null for one with no HP. */
+export function entityPain(ref: EntityRef | null): PainView | null {
+    const hp = ref ? entityPool(ref, 'hp') : null;
+    return ref && hp ? painView(hp.cur, hp.max, ref.mods) : null;
+}
+
+/** Power Through the Pain, or taking it back: `off` tiers are bought off from
+    now on, and `cost` Will is taken (negative: returned). */
+export function setPainOff(
+    state: GmState,
+    dexById: (id: string) => PokedexEntry | null,
+    target: string,
+    off: number,
+    cost: number,
+    onWildChanged: () => void,
+): void {
+    if (cost) stepPool(state, dexById, target, 'will', -cost, onWildChanged);
+    const ref = entityRef(state, dexById, target);
+    if (ref) writeMods(state, target, { ...ref.mods, painOff: off }, onWildChanged);
 }

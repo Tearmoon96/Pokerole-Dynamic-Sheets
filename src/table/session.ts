@@ -20,7 +20,7 @@
 
 import { savedColor } from './colors';
 import { CRIT_MARGIN } from '../gm/constants';
-import { roll } from '../gm/dice';
+import { canReroll, face, netOf, roll } from '../gm/dice';
 import { boxOpen, boxSeal, deriveRoom, exportDhPublic, fingerprint, generateDhKeys, seal, sign, unseal, verify } from './crypto';
 import type { RoomSecrets } from './crypto';
 import { formatLobbyId, fromB64u, generatePassword, normaliseLobbyId, toB64u, utf8 } from './encoding';
@@ -45,6 +45,7 @@ import { CombatShare } from './combatShare';
 import { NpcShare } from './npcShare';
 import { Porter, dropFromMoved, loadMoved, rememberMove, saveMoved } from './porter';
 import { RULES_KEY, readGmMegaRules, writeTableMegaRules } from '../lib/megaRules';
+import { PAIN_OFF_KEY, painRuleOff, readGmPainOff, writeGmPainOff, writeTablePainOff } from '../lib/pain';
 import { MusicController } from './music/music';
 import type { TransportStatus } from './transport';
 import { TabLock } from './tabLock';
@@ -78,6 +79,11 @@ export interface PreparedRoll {
     quick: { op: 'acc' | 'eva' | 'clash'; id: string; move?: string } | null;
     /** Initiative into the fight on the table: the GM rolls 1d6 + the bonus. */
     enter: { trainerId: string; key: CharKey; slot: number | null } | null;
+    /** Whose Will the buttons beside Roll spend (Pushing Fate, Take Your
+        Chances): the character, the Will it had when the roll was set up —
+        for a sheet that never stored one — and its Round (lib/willRound.ts).
+        Absent for a damage roll or an initiative, which take neither. */
+    will?: { trainerId: string; token: string; have: number; key: string; stamp: string } | null;
 }
 
 export interface TableState {
@@ -109,6 +115,9 @@ export interface TableState {
     sides: number;
     note: string;
     prep: PreparedRoll | null;
+    /** Pain Penalization is off for the whole table: the GM's switch, and
+        for a player what the GM's page last said. */
+    painOff: boolean;
     /** The feed shows a pool's successes before its other dice, as the GM
         screen's Dice panel can. The GM's and each player's own choice:
         display only, this browser only, never sent. */
@@ -156,6 +165,7 @@ function initialState(): TableState {
            checkbox starts in. Making it opt-in would mean the first roll of
            every session leaks by accident. */
         prep: null,
+        painOff: painRuleOff(),
         locked: false,
         lockBusyUntil: 0,
         moving: false,
@@ -665,6 +675,7 @@ export class TableSession {
             s.myId = identity.id;
             s.myName = name;
             s.isHost = isHost;
+            s.painOff = isHost ? readGmPainOff() : painRuleOff();
             s.members = isHost ? [{ id: identity.id, name, host: true }] : [];
             s.rolls = isHost ? loadFeed(lobbyId) : [];
             s.pending = [];
@@ -820,7 +831,7 @@ export class TableSession {
         again later — see identity.ts. */
     leave(): void {
         /* A player's table rules go with the table; a GM's own stay theirs. */
-        if (!this.store.state.isHost) { writeTableMegaRules('', null); this.npcs.forgetAll(); }
+        if (!this.store.state.isHost) { writeTableMegaRules('', null); writeTablePainOff(null); this.npcs.forgetAll(); }
         else { forgetFeed(); saveLock('', null); saveMoved(null); saveRemoved('', new Map()); }
         this.teardown();
         clearSession();
@@ -1056,6 +1067,7 @@ export class TableSession {
                and this is it. */
             if (body.k === 'hello') this.onHello(inner.f, body.name, inner.sid, body.color);
             else if (body.k === 'request') this.onRequest(inner.f, body);
+            else if (body.k === 'reroll') this.onReroll(inner.f, body);
             else if (body.k === 'enter') this.onEnter(inner.f, body);
             else if (!this.names.has(inner.f) || !this.allowOp()) return;
             else if (body.k === 'pc') this.combat.onPc(inner.f, this.names.get(inner.f)!, body);
@@ -1102,7 +1114,15 @@ export class TableSession {
 
             case 'result':
                 this.store.update((s) => {
-                    if (s.rolls.some((r) => r.id === body.roll.id)) return;
+                    const at = s.rolls.findIndex((r) => r.id === body.roll.id);
+                    if (at >= 0) {
+                        /* The same roll again: its Take Your Chances die was
+                           rerolled. It keeps its place in the feed. */
+                        if (body.roll.rr && !s.rolls[at].rr) {
+                            s.rolls = s.rolls.map((r, i) => (i === at ? { ...body.roll, seenAt: r.seenAt } : r));
+                        }
+                        return;
+                    }
                     s.rolls = [{ ...body.roll, seenAt: Date.now() }, ...s.rolls].slice(0, LIMITS.HISTORY);
                     if (body.rid) s.pending = s.pending.filter((p) => p.rid !== body.rid);
                     s.hostOnline = true;
@@ -1115,7 +1135,10 @@ export class TableSession {
                    is in the middle of reading. */
                 this.store.update((s) => {
                     const byId = new Map(s.rolls.map((r) => [r.id, r] as const));
-                    for (const r of body.rolls) if (!byId.has(r.id)) byId.set(r.id, r);
+                    for (const r of body.rolls) {
+                        const have = byId.get(r.id);
+                        if (!have || (r.rr && !have.rr)) byId.set(r.id, r);
+                    }
                     s.rolls = [...byId.values()]
                         .sort((a, b) => b.t - a.t)
                         .slice(0, LIMITS.HISTORY);
@@ -1166,6 +1189,10 @@ export class TableSession {
             case 'rules':
                 /* Kept for this browser's cards until the player leaves. */
                 writeTableMegaRules(this.store.state.lobbyId, body.mega);
+                writeTablePainOff(!!body.noPain);
+                if (this.store.state.painOff !== !!body.noPain) {
+                    this.store.update((s) => { s.painOff = !!body.noPain; });
+                }
                 break;
 
             case 'move':
@@ -1306,15 +1333,58 @@ export class TableSession {
     private publishRules(force: boolean): void {
         if (!this.store.state.isHost || !this.room) return;
         const mega = readGmMegaRules();
-        const text = JSON.stringify(mega);
+        const noPain = readGmPainOff();
+        const text = JSON.stringify(mega) + (noPain ? '!' : '');
         if (!force && text === this.publishedRules) return;
         this.publishedRules = text;
-        void this.publish({ k: 'rules', mega });
+        void this.publish({ k: 'rules', mega, ...(noPain ? { noPain: true as const } : {}) });
     }
 
     private onRulesSaved = (e: StorageEvent): void => {
         if (e.key === RULES_KEY) this.publishRules(false);
+        /* The GM screen's own switch, in another tab of this browser. */
+        if (e.key === PAIN_OFF_KEY) {
+            this.store.update((s) => { s.painOff = readGmPainOff(); });
+            this.publishRules(false);
+        }
     };
+
+    /** The GM's switch: Pain Penalization off (or back on) for the table. */
+    setPainOff(off: boolean): void {
+        if (!this.store.state.isHost) return;
+        writeGmPainOff(off);
+        this.store.update((s) => { s.painOff = off; });
+        this.publishRules(false);
+    }
+
+    /** Take Your Chances: a player throws one failed die of their own roll
+        again. Rolled here like every die, once, and published under the
+        roll's own id so it changes in everyone's feed. */
+    private onReroll(id: string, body: Extract<Body, { k: 'reroll' }>): void {
+        const who = this.names.get(id);
+        if (!who || !this.allow(id)) return;
+        const r = this.store.state.rolls.find((x) => x.id === body.id);
+        /* Names are unique at the table (`uniqueName`), so the name on a roll
+           says whose it is — and still does after this page reloads. */
+        if (!r || r.hidden || r.who !== who || !canReroll(r) || !(r.vals[body.i] < 4)) return;
+        const vals = r.vals.slice();
+        const was = vals[body.i];
+        vals[body.i] = face(6);
+        const succ = vals.filter((v) => v >= 4).length;
+        const next: LocalRoll = {
+            ...r, vals, succ, total: vals.reduce((a, b) => a + b, 0), rr: [body.i, was],
+        };
+        next.net = netOf(succ, next);
+        this.store.update((s) => { s.rolls = s.rolls.map((x) => (x.id === next.id ? next : x)); });
+        saveFeed(this.store.state.lobbyId, this.store.state.rolls);
+        void this.publish({ k: 'result', roll: stripLocal(next) });
+    }
+
+    /** A player asks for that reroll. */
+    reroll(id: string, i: number): void {
+        if (this.store.state.isHost) return;
+        void this.publish({ k: 'reroll', id, i });
+    }
 
     private onRequest(
         id: string, body: Extract<Body, { k: 'request' }>,
@@ -1466,7 +1536,7 @@ export class TableSession {
             vals,
             total,
             succ,
-            net: succ === null ? null : Math.max(0, succ - (extras.pain ?? 0) - (extras.low ?? 0)),
+            net: succ === null ? null : netOf(succ, extras),
             t: Date.now(),
             who,
             note: note || undefined,
@@ -1773,6 +1843,7 @@ function stripLocal(r: LocalRoll): WireRoll {
         id: r.id, label: r.label, vals: r.vals, total: r.total,
         succ: r.succ, net: r.net, t: r.t, who: r.who, note: r.note,
         ...extrasOf(r),
+        ...(r.rr ? { rr: r.rr } : {}),
     };
 }
 
@@ -1786,6 +1857,8 @@ function extrasOf(r: RollExtras): RollExtras {
     if (r.low !== undefined) out.low = r.low;
     if (r.need !== undefined) out.need = r.need;
     if (r.crit !== undefined) out.crit = r.crit;
+    if (r.fate !== undefined) out.fate = r.fate;
+    if (r.tyc) out.tyc = true;
     return out;
 }
 
@@ -1801,11 +1874,14 @@ function cleanExtras(e: RollExtras): RollExtras {
     if (out.need !== undefined && e.crit !== undefined && e.crit !== LIMITS.MAX_CRIT) {
         out.crit = clamp(e.crit, 0, LIMITS.MAX_CRIT);
     }
+    if (e.fate) out.fate = clamp(e.fate, 1, LIMITS.MAX_FATE);
+    if (e.tyc) out.tyc = true;
     return out;
 }
 
 function hasExtras(r: WireRoll): boolean {
-    return r.bonus !== undefined || r.pain !== undefined || r.low !== undefined || r.need !== undefined || r.crit !== undefined;
+    return r.bonus !== undefined || r.pain !== undefined || r.low !== undefined || r.need !== undefined
+        || r.crit !== undefined || r.fate !== undefined || r.tyc !== undefined || r.rr !== undefined;
 }
 
 function signed(n: number): string {

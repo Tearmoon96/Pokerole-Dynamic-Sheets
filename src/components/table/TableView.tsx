@@ -52,7 +52,10 @@ export function TableView() {
        while a map takes the middle, and has the middle to itself otherwise. */
     const feed = (
         <div className="feed-scroll" data-tour="feed">
-            <RollFeed rolls={state.rolls} myName={shownName} members={state.members} sorted={state.successesFirst} />
+            <RollFeed
+                rolls={state.rolls} myName={shownName} members={state.members} sorted={state.successesFirst}
+                onReroll={state.isHost ? undefined : (id, i) => session.reroll(id, i)}
+            />
         </div>
     );
 

@@ -324,3 +324,46 @@
     color: var(--text-primary);
 }
 
+
+/* After the Health label: the switch that ignores Pain Penalization for
+   this Pokémon and the pain marks (shared/pain-marks.css). The label may
+   grow past its column for them — with both marks up it does, by a few
+   pixels the bar gives back. */
+.tracker-label.has-pain { width: auto; min-width: 125px; }
+
+.pain-slot {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    flex: 0 0 auto;
+}
+
+.pain-rule-btn {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid #ffffff1a;
+    background: #ffffff0d;
+    color: var(--text-secondary);
+    font-size: 0.56rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.55;
+    transition: all 0.2s;
+}
+
+.pain-rule-btn:hover { opacity: 1; border-color: #ef4444; color: #fca5a5; }
+
+/* Off for this Pokémon: lit, so it is not forgotten. */
+.pain-rule-btn.off {
+    opacity: 1;
+    border-color: #3aa593;
+    background: #3aa59333;
+    color: #7fe0cf;
+}
+
+:where(:root.light-theme) .pain-rule-btn { border-color: #0000002e; background: #0000000d; }
+:where(:root.light-theme) .pain-rule-btn.off { color: #0f766e; }

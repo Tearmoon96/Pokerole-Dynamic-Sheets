@@ -15,10 +15,12 @@ import {
     MAX_ACTIONS, initOffset, roundFlags, syncRoundState,
 } from '../../gm/combat';
 import {
-    adjustPool, entityPool, entityRef, participantLook, participantToken as sharedParticipantToken, resolveToken,
+    adjustPool, entityPool, entityRef, participantLook, participantToken as sharedParticipantToken, resolveToken, setPainOff,
     writeStatus,
 } from '../../gm/entities';
 import { PoolBar } from './RosterBits';
+import { PainMarks } from '../common/PainMarks';
+import { painView } from '../../lib/pain';
 import { StatsButton, statsKey } from './StatTip';
 import { canActIn } from '../../gm/tableCombat';
 import { parsePcToken, pruneTablePcs } from '../../gm/tablePcs';
@@ -476,6 +478,11 @@ export function CombatPanel({ combat, onReorder, onOpenTip, cycleStatus }: {
                             cycleStatus={cycleStatus}
                             onDeal={applyRoundDamage}
                             onPool={stepPool(resolveToken(state, participantToken(p)) || participantToken(p))}
+                            onPain={(off, cost) => {
+                                setPainOff(state, dexById, resolveToken(state, participantToken(p)) || participantToken(p),
+                                    off, cost, () => store.save());
+                                store.refresh();
+                            }}
                         />
                     ))}
                 </div>
@@ -524,7 +531,7 @@ const USED_MARKS: { key: 'usedClash' | 'usedEva'; label: string; icon: string; t
     },
 ];
 
-function CombatRow({ p, moved, current, idx, total, round, token, dexById, onPip, onInit, onUsed, onRollInit, onMove, onRemove, onOpenTip, cycleStatus, onDeal, onPool }: {
+function CombatRow({ p, moved, current, idx, total, round, token, dexById, onPip, onInit, onUsed, onRollInit, onMove, onRemove, onOpenTip, cycleStatus, onDeal, onPool, onPain }: {
     p: GmCombatant;
     /** Whose turn it is. */
     current: boolean;
@@ -545,6 +552,7 @@ function CombatRow({ p, moved, current, idx, total, round, token, dexById, onPip
     cycleStatus: (token: string, key: string, e: React.MouseEvent) => void;
     onDeal: (token: string, ailKey: string, dmg: number, e: React.MouseEvent) => void;
     onPool: (key: 'hp' | 'will', delta: number, e: React.MouseEvent) => void;
+    onPain: (off: number, cost: number) => void;
 }) {
     const { state } = useGm();
     const rec = p as unknown as Record<string, unknown>;
@@ -641,7 +649,8 @@ function CombatRow({ p, moved, current, idx, total, round, token, dexById, onPip
                 {hp && will && (
                     <div className="pool-bars c-pools">
                         <PoolBar tag="HP" cls="hp" cur={hp.cur} max={hp.max}
-                            onStep={(d, e) => onPool('hp', d, e)} />
+                            onStep={(d, e) => onPool('hp', d, e)}
+                            marks={<PainMarks view={painView(hp.cur, hp.max, ref?.mods)} will={will.cur} onSet={onPain} />} />
                         <PoolBar tag="WILL" cls="will" cur={will.cur} max={will.max}
                             onStep={(d, e) => onPool('will', d, e)} />
                     </div>

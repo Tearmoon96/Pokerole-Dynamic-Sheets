@@ -305,7 +305,7 @@ export function MovesPanel({ speciesMoves, onEditMove, onDeleteMove }: {
                         <div
                             className={'quick-move pain-quick' + (pain > 0 ? ' on' : '') + (pain > 1 ? ' severe' : '')}
                             id="pain-quick"
-                            title="Pain penalty. At half HP or less (rounded down) you lose 1 success on Skill, Accuracy and Damage rolls; at 1 HP you lose 2."
+                            title="Pain penalty. At half HP or less (rounded down) you lose 1 success on Skill, Accuracy and Damage rolls; at 1 HP you lose 2 more, 3 in all. Will can buy it off: the marks beside Health."
                         >
                             <span className="quick-move-name">
                                 <i className="fa-solid fa-heart-crack"></i> Pain

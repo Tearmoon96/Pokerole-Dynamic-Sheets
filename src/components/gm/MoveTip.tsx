@@ -22,8 +22,9 @@ const CAT_COLORS: Record<string, string> = {
 /** `quick` says what kind of roll it is, where that matters: an Evasion or a
     Clash (once a Round, and an action in a fight with turns), an attack's
     accuracy (the GM screen flags the action), or the initiative (which the
-    rolling table turns into a way into the fight). */
-export type RollKind = 'eva' | 'clash' | 'acc' | 'init';
+    rolling table turns into a way into the fight), or a damage roll (which
+    takes neither Pushing Fate nor Take Your Chances). */
+export type RollKind = 'eva' | 'clash' | 'acc' | 'init' | 'dmg';
 /** `move`: the move an Accuracy is for, so the fight can mark it used. */
 export type DoRoll = (dice: number, meta: RollMeta, quick?: RollKind, move?: string) => void;
 
@@ -171,7 +172,7 @@ export function PainChip({ pain }: { pain: number }) {
     return (
         <span
             className="tip-pain"
-            title="Half HP or less: −1 success on every roll, −2 at 1 HP. Already taken off rolls made here."
+            title="Half HP or less: −1 success on every roll, and 2 more at 1 HP. Already taken off rolls made here."
         >
             PAIN −{pain}
         </span>
@@ -248,6 +249,10 @@ export function MoveTipShell({ token, onClose, children, id = 'mon-tooltip', swi
         const onClick = (e: MouseEvent) => {
             const el = e.target as HTMLElement;
             if (!el.closest) return;
+            /* Something that left the page on its own click — a die thrown
+               again turns from a button into a plain face — has no ancestors
+               left to say where it was. It was not a click elsewhere. */
+            if (!el.isConnected) return;
             if (el.closest('.mon-tooltip') || el.closest('.tip-btn') || el.closest('[data-keeps-tip]')) return;
             onClose();
         };
@@ -443,7 +448,7 @@ export function MonTipBody({ token, dex, sheet, who, owner, value, pain, act, do
                                     className="tip-pool dmg"
                                     onClick={() => doRoll(totals.powN!, {
                                         who, what: move.Name + ' damage', pain,
-                                    })}
+                                    }, 'dmg')}
                                 >
                                     DMG <ModText text={totals.pow || ''} delta={totals.powMod} />
                                 </button>

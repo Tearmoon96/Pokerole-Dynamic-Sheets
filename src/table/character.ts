@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { WORKING_KEY } from '../state/constants';
 import { defaultGmState } from '../gm/state';
-import { invalidateWorking, readWorking } from '../gm/workingSet';
+import { invalidateWorking, mutateWorkingTrainer, readWorking, workingTrainerData } from '../gm/workingSet';
 import type { GmState } from '../gm/types';
 
 /** Which trainer this browser plays at the table. Its own key: the License's
@@ -84,4 +84,35 @@ export function useWorkingSet(): [number, () => void] {
         };
     }, [refresh]);
     return [version, refresh];
+}
+
+/* A character's Will, for the buttons beside Roll (Pushing Fate, Take Your
+   Chances), which sit outside the character panel and have no species data.
+   A Pokémon whose sheet never stored a Will reads as `fallback`: what the
+   panel worked out when it set the roll up. */
+
+function slotSheet(t: { team?: unknown } | null, token: string): Record<string, unknown> | null {
+    const team = t && Array.isArray(t.team) ? t.team : [];
+    const slot = team[+token.split(':')[2]] as { sheet?: Record<string, unknown> | null } | undefined;
+    if (!slot) return null;
+    if (!slot.sheet) slot.sheet = {};
+    return slot.sheet;
+}
+
+export function charWill(trainerId: string, token: string, fallback: number): number {
+    const t = workingTrainerData(trainerId);
+    if (!t) return 0;
+    if (token === TRAINER_TOKEN) return t.will || 0;
+    const sheet = slotSheet(t, token);
+    const v = sheet ? sheet.will : undefined;
+    return typeof v === 'number' && isFinite(v) ? v : fallback;
+}
+
+export function spendCharWill(trainerId: string, token: string, n: number, fallback: number): void {
+    const now = charWill(trainerId, token, fallback);
+    mutateWorkingTrainer(trainerId, (t) => {
+        if (token === TRAINER_TOKEN) { t.will = Math.max(0, now - n); return; }
+        const sheet = slotSheet(t, token);
+        if (sheet) sheet.will = Math.max(0, now - n);
+    });
 }

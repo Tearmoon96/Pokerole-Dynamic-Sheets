@@ -14,9 +14,11 @@ import { useToast } from '../common/Toast';
 import { uid } from '../../gm/state';
 import { normalizeStatus } from '../../gm/ailments';
 import { trainerPoolMax } from '../../gm/pools';
-import { adjustPool, monShownName, wildDexId, wildKey, wildLiveSheet } from '../../gm/entities';
+import { adjustPool, monShownName, setPainOff, wildDexId, wildKey, wildLiveSheet } from '../../gm/entities';
 import { readWorking, upsertWorkingTrainer, workingTrainerData } from '../../gm/workingSet';
-import { isEmptyMods, modsOfTrainer } from '../../lib/combatMods';
+import { hasOffsets, modsOfTrainer } from '../../lib/combatMods';
+import { PainMarks } from '../common/PainMarks';
+import { painView } from '../../lib/pain';
 import { TRAINER_MARKER } from '../../state/constants';
 import { WILD_MARKER, wildSheetKey } from '../../card/cardContext';
 import { HOMEBREW_FIELD, adoptHomebrew } from '../../data/homebrew';
@@ -52,6 +54,12 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
     const step = (token: string) => (key: 'hp' | 'will', delta: number, e: React.MouseEvent) => {
         e.stopPropagation();
         adjustPool(state, dexById, token, key, e.shiftKey ? delta * 5 : delta, () => store.save());
+        store.refresh();
+    };
+
+    /* Power Through the Pain, from the mark beside a health bar. */
+    const pain = (token: string) => (off: number, cost: number) => {
+        setPainOff(state, dexById, token, off, cost, () => store.save());
         store.refresh();
     };
 
@@ -225,7 +233,9 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                                 </div>
                                 <div className="pool-bars">
                                     <PoolBar tag="HP" cls="hp" cur={t.hp || 0}
-                                        max={trainerPoolMax(t, 'hp')} onStep={(d, e) => step(tToken)('hp', d, e)} />
+                                        max={trainerPoolMax(t, 'hp')} onStep={(d, e) => step(tToken)('hp', d, e)}
+                                        marks={<PainMarks view={painView(t.hp || 0, trainerPoolMax(t, 'hp'), modsOfTrainer(t))}
+                                            will={t.will || 0} onSet={pain(tToken)} />} />
                                     <PoolBar tag="WILL" cls="will" cur={t.will || 0}
                                         max={trainerPoolMax(t, 'will')} onStep={(d, e) => step(tToken)('will', d, e)} />
                                 </div>
@@ -241,9 +251,9 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                                     the trainer holding them had nowhere to roll
                                     from. */}
                                 <button
-                                    className={'icon-btn tip-btn' + (isEmptyMods(modsOfTrainer(t)) ? '' : ' has-mods')}
+                                    className={'icon-btn tip-btn' + (hasOffsets(modsOfTrainer(t)) ? ' has-mods' : '')}
                                     data-tip-for={tToken}
-                                    title={isEmptyMods(modsOfTrainer(t))
+                                    title={!hasOffsets(modsOfTrainer(t))
                                         ? 'Initiative, evasion and clash rolls'
                                         : 'Initiative, evasion and clash rolls — combat offsets are on'}
                                     onClick={() => onOpenTip(tToken)}
@@ -329,6 +339,7 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                                             sheet={x.slot.sheet as never}
                                             token={mToken}
                                             onStep={step(mToken)}
+                                            onPain={pain(mToken)}
                                             onCycleStatus={(key, e) => cycleStatus(mToken, key, e)}
                                             onOpenTip={() => onOpenTip(mToken)}
                                             buttons={
@@ -391,6 +402,7 @@ export function RosterPanel({ onReorder, onOpenTip, cycleStatus }: {
                             sheet={sheet}
                             token={wToken}
                             onStep={step(wToken)}
+                            onPain={pain(wToken)}
                             onCycleStatus={(key, e) => cycleStatus(wToken, key, e)}
                             onOpenTip={() => onOpenTip(wToken)}
                             buttons={

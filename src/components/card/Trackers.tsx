@@ -3,12 +3,72 @@ import { PoolBar } from '../common/PoolBar';
 import { StatusTracker } from './StatusTracker';
 import { RankInput } from '../common/RankInput';
 import {
-    DEFENCE_BONUS_CAP, defenceValue, derivedPoolMax, getPoolMax,
+    DEFENCE_BONUS_CAP, defenceValue, derivedPoolMax, getPoolMax, painOf,
 } from '../../card/pools';
+import { PainMarks } from '../common/PainMarks';
+import { modOf, normalizeMods, withMod } from '../../lib/combatMods';
+import type { ModKey } from '../../lib/combatMods';
+import { painRuleOff, settledPainOff } from '../../lib/pain';
+import type { CardSheet } from '../../card/types';
+import type { PokedexEntry } from '../../data/types';
 
 /* Health, Willpower, the two defences, Rank, EXP and the status icons. */
 
 type PoolKey = 'hp' | 'will';
+
+function setMod(s: CardSheet, key: ModKey, v: number): void {
+    const m = withMod(s.combatMods, key, v);
+    if (m) s.combatMods = m; else delete s.combatMods;
+}
+
+/* An HP that climbs back out of a pain tier takes the Will that bought the
+   tier off with it: pain that comes back later is new pain (lib/pain.ts). */
+function settlePain(s: CardSheet, pokemon: PokedexEntry): void {
+    const mods = normalizeMods(s.combatMods);
+    if (!mods.painOff) return;
+    const off = settledPainOff(mods, s.hp, getPoolMax({ pokemon, sheet: s }, 'hp'));
+    if (off !== mods.painOff) setMod(s, 'painOff', off);
+}
+
+/* Beside the health bar, after its label: the switch that ignores Pain
+   Penalization for this one Pokémon — a small heart — and the pain marks,
+   one per tier the HP is in, red while it costs successes, blue once Will
+   has bought it off.
+
+   In the label and not in the bar's own track: the track has no room to
+   give, and the marks there squeezed the health bar to a stub beside a
+   full-width Willpower bar. */
+function PainSlot() {
+    const { sheet, src, store } = useCard();
+    const view = painOf(src);
+    const own = !!modOf(normalizeMods(sheet.combatMods), 'noPain');
+    const table = !own && painRuleOff();
+    return (
+        <span className="pain-slot">
+            <button
+                type="button" id="pain-rule-btn"
+                className={'pain-rule-btn' + (own ? ' off' : '')}
+                aria-pressed={own}
+                title={own
+                    ? 'Pain Penalization is ignored for this Pokémon. Click to bring it back.'
+                    : 'Pain Penalization: −1 success at half HP, 2 more at 1 HP.'
+                        + (table ? ' Switched off for the whole table right now.' : '')
+                        + ' Click to ignore it for this Pokémon.'}
+                onClick={() => store.update((s) => { setMod(s, 'noPain', own ? 0 : 1); })}
+            >
+                <i className={'fa-solid ' + (own ? 'fa-heart' : 'fa-heart-crack')}></i>
+            </button>
+            <PainMarks
+                view={view} will={sheet.will} noIcon
+                onSet={(off, cost) => store.update((s) => {
+                    const max = getPoolMax({ pokemon: store.pokemon, sheet: s }, 'will');
+                    s.will = Math.max(0, Math.min(max, s.will - cost));
+                    setMod(s, 'painOff', off);
+                })}
+            />
+        </span>
+    );
+}
 
 function Pool({ poolKey, colorClass }: { poolKey: PoolKey; colorClass: string }) {
     const { sheet, src, store } = useCard();
@@ -22,12 +82,14 @@ function Pool({ poolKey, colorClass }: { poolKey: PoolKey; colorClass: string })
                 readCurrent={() => store.sheet[poolKey]}
                 onSetCurrent={(value) => store.update((s) => {
                     s[poolKey] = Math.max(0, Math.min(getPoolMax({ pokemon: store.pokemon, sheet: s }, poolKey), value));
+                    if (poolKey === 'hp') settlePain(s, store.pokemon);
                 })}
                 onSetMax={(value) => store.update((s) => {
                     const src2 = { pokemon: store.pokemon, sheet: s };
                     const bonus = Math.max(1, value) - derivedPoolMax(src2, poolKey);
                     if (poolKey === 'hp') s.hpMaxBonus = bonus; else s.willMaxBonus = bonus;
                     s[poolKey] = Math.min(s[poolKey], getPoolMax(src2, poolKey));
+                    if (poolKey === 'hp') settlePain(s, store.pokemon);
                 })}
             />
         </div>
@@ -95,8 +157,9 @@ export function PoolsPanel() {
     return (
         <div className="tracker-panel pools">
             <div className="tracker-row">
-                <span className="tracker-label">
+                <span className="tracker-label has-pain">
                     <i className="fa-solid fa-heart-pulse pool-ink-hp"></i> Health
+                    <PainSlot />
                 </span>
                 <Pool poolKey="hp" colorClass="health" />
             </div>

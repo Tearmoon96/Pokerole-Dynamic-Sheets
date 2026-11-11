@@ -11,7 +11,7 @@ export interface RollEntry {
     total: number;
     /** Raw successes, null for anything that is not d6. */
     succ: number | null;
-    /** Successes after pain and Low Accuracy. */
+    /** Successes after pain and Low Accuracy, plus any Pushing Fate. */
     net: number | null;
     t: number;
     who?: string;
@@ -35,6 +35,19 @@ export interface RollEntry {
     /** Carried so a hit can roll the damage in one more click. `what` names
         the damage roll; older entries without it fall back to the accuracy's. */
     dmg?: { token: string; mi: number; dice: number; what?: string } | null;
+    /** Pushing Fate: automatic successes bought with Will, one each. Added
+        after pain and Low Accuracy have struck theirs, so nothing removes
+        them. Never on a damage roll. */
+    fate?: number;
+    /** Take Your Chances was on: ONE die that failed may be rolled again. */
+    tyc?: boolean;
+    /** That reroll, once made: the die's index and the face it had. */
+    rr?: [number, number];
+    /** Whose roll it is, as an entity token, so the Will buttons beside Roll
+        know whose Will to spend. Absent on plain dice. */
+    src?: string;
+    /** A damage roll: no Pushing Fate, no Take Your Chances. */
+    isDmg?: boolean;
 }
 
 export type RollMeta = Partial<Omit<RollEntry, 'label' | 'vals' | 'total' | 'succ' | 'net' | 't'>>;
@@ -59,7 +72,7 @@ export function accuracyVerdict(succ: number, need: number, critMargin: number, 
     top of the 32-bit range that does not divide evenly is thrown back, so no
     face comes up more often than another. Low numbers make low faces, as
     Math.random's did, so a harness can still force a roll. */
-function face(sides: number): number {
+export function face(sides: number): number {
     const n = Math.max(1, Math.floor(sides));
     const limit = 0x100000000 - (0x100000000 % n);
     const buf = new Uint32Array(1);
@@ -87,7 +100,7 @@ export function roll(count: number, sides: number, meta: RollMeta, critMargin: n
        dice are all rolled, then the weakest of the ones that landed are struck
        out. `succ` stays the raw count — the ailment rolls read it and are not
        subject to either — and `net` is what actually counts. */
-    entry.net = succ == null ? null : Math.max(0, succ - struckOff(entry));
+    entry.net = succ == null ? null : netOf(succ, entry);
     /* An Accuracy roll made against a target number carries its verdict with it,
        so the history still reads as a hit or a miss later. */
     if (entry.need != null && succ != null) {
@@ -101,12 +114,43 @@ export function struckOff(r: { pain?: number; low?: number }): number {
     return (r.pain || 0) + (r.low || 0);
 }
 
-/** "(4 − 1 low accuracy − 1 pain)": how the net successes came about, or ''
-    when nothing was taken off. */
-export function struckText(r: { succ: number | null; pain?: number; low?: number }): string {
-    if (r.succ == null || !struckOff(r)) return '';
+/** What counts: the successes rolled, less what pain and Low Accuracy strike
+    (never below none), plus Pushing Fate's, which nothing strikes. */
+export function netOf(succ: number, r: { pain?: number; low?: number; fate?: number }): number {
+    return Math.max(0, succ - struckOff(r)) + (r.fate || 0);
+}
+
+/** "(4 − 1 low accuracy − 1 pain + 1 fate)": how the net successes came
+    about, or '' when nothing was taken off or added. */
+export function struckText(r: { succ: number | null; pain?: number; low?: number; fate?: number }): string {
+    if (r.succ == null || (!struckOff(r) && !r.fate)) return '';
     return '(' + r.succ + (r.low ? ' \u2212 ' + r.low + ' low accuracy' : '')
-        + (r.pain ? ' \u2212 ' + r.pain + ' pain' : '') + ')';
+        + (r.pain ? ' \u2212 ' + r.pain + ' pain' : '')
+        + (r.fate ? ' + ' + r.fate + ' fate' : '') + ')';
+}
+
+/** Take Your Chances still has its reroll on this roll: it was on, nothing
+    has been rerolled yet, and at least one die failed. */
+export function canReroll(r: { tyc?: boolean; rr?: [number, number]; succ: number | null; vals: number[] }): boolean {
+    return !!r.tyc && !r.rr && r.succ != null && r.vals.some((v) => v < 4);
+}
+
+/** The roll with its die `i` thrown again, or null when that is not allowed:
+    only a d6 pool with Take Your Chances on, only once, only a die that
+    failed. Everything that follows from the faces is worked out again. */
+export function rerollEntry(e: RollEntry, i: number, critMargin: number): RollEntry | null {
+    if (!canReroll(e) || !(e.vals[i] < 4)) return null;
+    const vals = e.vals.slice();
+    const was = vals[i];
+    vals[i] = face(6);
+    const succ = vals.filter((v) => v >= 4).length;
+    const next: RollEntry = {
+        ...e, vals, succ, rr: [i, was],
+        total: vals.reduce((a, b) => a + b, 0),
+    };
+    next.net = netOf(succ, next);
+    if (next.need != null) next.verdict = accuracyVerdict(next.net, next.need, next.crit ?? critMargin, critMargin);
+    return next;
 }
 
 /** Which dice the penalties strike out (`pain` here is the whole count, see

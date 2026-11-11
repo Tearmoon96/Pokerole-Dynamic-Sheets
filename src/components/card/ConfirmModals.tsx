@@ -227,7 +227,10 @@ export function HealModal({ open, onClose }: { open: boolean; onClose: () => voi
                             s.disabledMove = null;
                             s.defBonus = 0;
                             s.spDefBonus = 0;
-                            delete s.combatMods;
+                            /* The offsets go; "ignore Pain for this Pokémon"
+                               is a setting, not a wound, and stays. */
+                            if (s.combatMods && s.combatMods.noPain) s.combatMods = { noPain: 1 };
+                            else delete s.combatMods;
                         });
                         onClose();
                     }}

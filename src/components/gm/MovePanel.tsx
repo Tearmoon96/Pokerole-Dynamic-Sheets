@@ -96,7 +96,8 @@ export function MovePanel({ token, onClose, onStats }: {
         if (!(dice > 0)) return;
         store.update((s) => {
             s.dice = {
-                ...s.dice, count: dice, sides: 6, prep: { ...meta },
+                /* `src`: whose Will the buttons beside Roll spend. */
+                ...s.dice, count: dice, sides: 6, prep: { ...meta, src: token, ...(quick === 'dmg' ? { isDmg: true } : {}) },
                 /* Rolling it is the action: Roll fills the pip. */
                 prepUse: pid && (quick === 'acc' || quick === 'eva' || quick === 'clash')
                     ? { pid, op: quick, ...(quick === 'acc' && move ? { move } : {}) } : null,
@@ -124,7 +125,7 @@ export function MovePanel({ token, onClose, onStats }: {
                     name={asTrainer.name}
                     rank={asTrainer.rank}
                     value={asTrainer.value}
-                    pain={hp ? painFromHp(hp.cur, hp.max) : 0}
+                    pain={hp ? painFromHp(hp.cur, hp.max, asTrainer.mods) : 0}
                     act={act}
                     spent={spent}
                     doRoll={doRoll}

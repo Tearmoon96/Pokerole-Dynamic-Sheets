@@ -180,7 +180,8 @@ export function lowAccuracyTitle(penalty: number): string {
 }
 
 export function painFlagTitle(pain: number): string {
-    return pain < -1 ? 'Severe Pain: \u22122 successes' : 'Pain: \u22121 success';
+    const n = Math.abs(pain);
+    return (n > 1 ? 'Severe Pain: ' : 'Pain: ') + '\u2212' + n + (n === 1 ? ' success' : ' successes');
 }
 
 /* Spells the sum out on hover of the badge itself, so no glyph has to carry the

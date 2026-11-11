@@ -21,6 +21,7 @@
 @import './table/character.css';
 @import './table/turns.css';
 @import './table/npc.css';
+@import './shared/pain-marks.css';
 @import './shared/tooltip.css';
 
 /* The mobile / tablet wrapper, last so it settles ties against the desktop

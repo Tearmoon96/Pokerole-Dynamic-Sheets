@@ -1,6 +1,9 @@
 import type { PokedexEntry } from '../data/types';
 import { SOCIAL_STAT_KEYS, defaultStats } from './defaults';
 import type { CardSheet, StatDefault } from './types';
+import { normalizeMods } from '../lib/combatMods';
+import { painView } from '../lib/pain';
+import type { PainView } from '../lib/pain';
 
 /* Resolving a written pool like "Dexterity + Brawl" into a number.
 
@@ -128,9 +131,13 @@ export function defenceValue(src: StatSource, key: 'def' | 'spDef'): Defence {
 /** +-10 is far past anything the rules produce, and stops a stuck key running away. */
 export const DEFENCE_BONUS_CAP = 10;
 
-/** A wounded Pokémon takes a success off the result of a roll. */
+/** A wounded Pokémon takes successes off the result of a roll: 1 at half HP
+    or less, 2 more at 1 HP — less what Will has bought off, and nothing when
+    Pain is switched off for it or for the table (lib/pain.ts). */
 export function painPenalty(src: StatSource): number {
-    if (src.sheet.hp <= 1) return 2;
-    if (src.sheet.hp <= Math.floor(getPoolMax(src, 'hp') / 2)) return 1;
-    return 0;
+    return painOf(src).penalty;
+}
+
+export function painOf(src: StatSource): PainView {
+    return painView(src.sheet.hp, getPoolMax(src, 'hp'), normalizeMods(src.sheet.combatMods));
 }

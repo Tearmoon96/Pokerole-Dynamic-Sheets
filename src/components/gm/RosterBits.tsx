@@ -1,6 +1,8 @@
 import { StatusChips } from './StatusChips';
 import { GmSprite } from './GmSprite';
-import { monPoolMax } from '../../gm/pools';
+import { monPoolCur, monPoolMax } from '../../gm/pools';
+import { painView } from '../../lib/pain';
+import { PainMarks } from '../common/PainMarks';
 import { normalizeStatus } from '../../gm/ailments';
 import { monShownName } from '../../gm/entities';
 import { TYPE_ICONS, typeColors } from '../../lib/themeTables';
@@ -8,13 +10,15 @@ import { mixHex } from '../../lib/color';
 import type { PokedexEntry } from '../../data/types';
 import type { CardSheet } from '../../card/types';
 import type { ReactNode } from 'react';
-import { isEmptyMods, modsOfSheet } from '../../lib/combatMods';
+import { hasOffsets, modsOfSheet } from '../../lib/combatMods';
 import { StatsButton } from './StatTip';
 
 /* The pieces a roster row is built from: a pool bar with its ±1 buttons, the
    type chips, and the Pokémon row that carries all of it. */
 
-export function PoolBar({ tag, cls, cur, max, onStep }: {
+export function PoolBar({ tag, cls, cur, max, onStep, marks }: {
+    /** Drawn between the tag and the bar: the pain marks, on a health bar. */
+    marks?: ReactNode;
     tag: string;
     cls: 'hp' | 'will';
     cur: number;
@@ -38,6 +42,7 @@ export function PoolBar({ tag, cls, cur, max, onStep }: {
     return (
         <div className="pool-bar">
             <span className="pool-tag">{tag}</span>
+            {marks}
             <span className="pool-track">
                 <span className={'pool-fill ' + cls} style={{ width: pct + '%' }}></span>
             </span>
@@ -75,7 +80,7 @@ export function TypeChips({ p }: { p: PokedexEntry | null }) {
     );
 }
 
-export function MonRow({ dex, dexId, sheet, token, buttons, onStep, onCycleStatus, onOpenTip, onOpenStats }: {
+export function MonRow({ dex, dexId, sheet, token, buttons, onStep, onCycleStatus, onOpenTip, onOpenStats, onPain }: {
     dex: PokedexEntry | null;
     dexId: string;
     sheet: Partial<CardSheet> | null;
@@ -89,6 +94,9 @@ export function MonRow({ dex, dexId, sheet, token, buttons, onStep, onCycleStatu
         move panel's corner opens it, and the move button says when offsets
         are on. */
     onOpenStats?: () => void;
+    /** Power Through the Pain from the mark beside the health bar: tiers
+        bought off after the click, and the Will it takes (PainMarks). */
+    onPain?: (off: number, cost: number) => void;
 }) {
     const hpMax = monPoolMax(dex, sheet, 'hp');
     const mods = modsOfSheet(sheet);
@@ -107,6 +115,12 @@ export function MonRow({ dex, dexId, sheet, token, buttons, onStep, onCycleStatu
                     <PoolBar
                         tag="HP" cls="hp" cur={(sheet && sheet.hp) || 0} max={hpMax}
                         onStep={onStep && ((d, e) => onStep('hp', d, e))}
+                        marks={sheet && (
+                            <PainMarks
+                                view={painView(monPoolCur(dex, sheet, 'hp'), hpMax, mods)}
+                                will={monPoolCur(dex, sheet, 'will')} onSet={onPain}
+                            />
+                        )}
                     />
                     <PoolBar
                         tag="WILL" cls="will" cur={(sheet && sheet.will) || 0} max={willMax}
@@ -120,9 +134,9 @@ export function MonRow({ dex, dexId, sheet, token, buttons, onStep, onCycleStatu
             <div className="mon-actions">
                 {token && onOpenTip && (
                     <button
-                        className={'icon-btn tip-btn' + (!onOpenStats && !isEmptyMods(mods) ? ' has-mods' : '')}
+                        className={'icon-btn tip-btn' + (!onOpenStats && hasOffsets(mods) ? ' has-mods' : '')}
                         data-tip-for={token}
-                        title={!onOpenStats && !isEmptyMods(mods)
+                        title={!onOpenStats && hasOffsets(mods)
                             ? 'Pinned moves, accuracy and damage — combat offsets are on'
                             : 'Pinned moves, accuracy and damage'}
                         onClick={onOpenTip}
