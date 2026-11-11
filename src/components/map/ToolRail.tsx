@@ -30,6 +30,7 @@ export const TOOL_GROUPS: { tool: Tool; icon: string; name: string }[][] = [
     [
         { tool: 'label', icon: 'fa-font', name: 'Add a label' },
         { tool: 'sketch', icon: 'fa-pen-fancy', name: 'Sketch: draw freehand over the map' },
+        { tool: 'note', icon: 'fa-note-sticky', name: 'GM notes: descriptions only you can see. Click a place or a thing, or drag an area' },
     ],
     [
         { tool: 'fog', icon: 'fa-smog', name: 'Fog of war: paint fog over the map' },

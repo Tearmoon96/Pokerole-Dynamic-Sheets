@@ -232,6 +232,14 @@ zoom or grid setting ever moves anything.
   other — selectable, movable, erasable — and the sketch tool has its own
   "rub out" mode that removes whole lines, and a Shape mode that draws the
   Shapes tool's shapes as sketches (`straight`: corners kept).
+- **GM notes** ([`src/map/notes.ts`](src/map/notes.ts),
+  [`NotesLayer.tsx`](src/components/map/NotesLayer.tsx)): descriptions for
+  the GM alone, in one list `MapDoc.notes` — attached to a landmark, a placed
+  thing or a whole wall run (`on`), or free over an area or a spot. The
+  editor shows a marker on hover (or always, or never: a per-browser choice),
+  found by geometry under every tool; a click opens the note. DOM only:
+  the PNG export and the players' view never read them, and the live link
+  does not resend a picture when only notes changed (`sameButNotes`).
 - **The background** is a layer under the painting: a bare sample (stored as
   `_`) shows the map's `background` terrain, whatever it is at the time. The
   eraser paints bare samples, so rubbing out uncovers it, and swapping the

@@ -36,7 +36,11 @@ import { LabelsLayer, PathsLayer, SketchesLayer, StampsLayer, TokensLayer } from
 import { cleanSketchWidth, finishTrack, shapeTrack } from '../../map/sketch';
 import type { Grab, ObjectDown } from './MapObjects';
 import { useToast } from '../common/Toast';
-import type { MapDoc, MapSketch, Selection, Tool } from '../../map/types';
+import { NOTE_PIN_PX, NotesLayer, closeNote } from './NotesLayer';
+import { NOTE_MIN_AREA_SIDE, freeBox, noteAt, noteFor, objectsAt } from '../../map/notes';
+import type { NoteHit } from '../../map/notes';
+import type { Box } from '../../map/world/placed';
+import type { MapDoc, MapNote, MapSketch, NoteTarget, Selection, Tool } from '../../map/types';
 import { sameSel } from '../../map/store';
 
 /* The map itself: a canvas for the ground, and the world layer on top of it
@@ -87,7 +91,12 @@ type Gesture =
        painting floors or wallpaper under the pointer. */
     | { kind: 'room'; mode: 'walls' | 'floor' | 'wallpaper'; vertex: Pt | null; start: Pt; moved: boolean }
     /* A wall or fence dragged as a line, a rectangle, a circle or an ellipse. */
-    | { kind: 'wall'; shape: RunShape; item: string; start: Pt; end: Pt };
+    | { kind: 'wall'; shape: RunShape; item: string; start: Pt; end: Pt }
+    /* The Note tool: a press that opens the note of what is under it, or
+       drags out a new area. `on` is the topmost object there. */
+    | { kind: 'noteNew'; start: Pt; end: Pt; on: NoteTarget | null }
+    /* A free note's marker dragged (moves it) or its corner (resizes it). */
+    | { kind: 'noteMove'; id: string; grab: 'move' | 'resize'; start: Pt; orig: Box; moved: boolean };
 
 const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
 
@@ -243,6 +252,12 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     const [sketchDraft, setSketchDraft] = useState<MapSketch | null>(null);
     const [shapeDraft, setShapeDraft] = useState<ShapeGeometry | null>(null);
     const [runDraft, setRunDraft] = useState<{ pts: Pt[]; closed: boolean; thick: number } | null>(null);
+    /* The GM note under the pointer (any tool), and an area being dragged
+       out with the Note tool. Set only when it changes: the pointer moves
+       far more often than it crosses from one thing to another. */
+    const [noteHover, setNoteHover] = useState<NoteHit | null>(null);
+    const noteHoverRef = useRef<NoteHit | null>(null);
+    const [noteDraft, setNoteDraft] = useState<Box | null>(null);
     /* The drag box of a Select drag on empty ground, corners in cell units. */
     const [box, setBox] = useState<[Pt, Pt] | null>(null);
     const gesture = useRef<Gesture | null>(null);
@@ -558,6 +573,8 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         }
         if (e.button !== 0) return;
         const at = toCell(e);
+        /* A touch has no hover: a tap shows the marker of what it lands on. */
+        if (e.pointerType !== 'mouse') hoverNote(at);
 
         switch (tool) {
             case 'paint':
@@ -714,6 +731,13 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 store.setUi({ selection: [{ kind: 'label', id }], focusLabel: id });
                 return;
             }
+            case 'note': {
+                if (!inside(at)) return;
+                e.preventDefault();
+                const top = objectsAt(store.doc, at[0], at[1])[0];
+                gesture.current = { kind: 'noteNew', start: at, end: at, on: top ? top.on : null };
+                return;
+            }
             case 'select': {
                 /* Nothing took the press: paths are hit on their stroke only, so
                    try a looser distance test before calling it empty ground. */
@@ -774,6 +798,44 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         store.setUi({ selection: made.map((m) => ({ kind: 'placed' as const, id: m.id })) });
     };
 
+    /** The area between two corners of a Note drag, on whole cells when snapping. */
+    const noteArea = (a: Pt, b: Pt): Box | null => {
+        const d = store.doc;
+        let x0 = Math.max(0, Math.min(a[0], b[0])), y0 = Math.max(0, Math.min(a[1], b[1]));
+        let x1 = Math.min(d.cols, Math.max(a[0], b[0])), y1 = Math.min(d.rows, Math.max(a[1], b[1]));
+        if (d.grid.snap) { x0 = Math.floor(x0); y0 = Math.floor(y0); x1 = Math.ceil(x1); y1 = Math.ceil(y1); }
+        if (x1 - x0 < NOTE_MIN_AREA_SIDE && y1 - y0 < NOTE_MIN_AREA_SIDE) return null;
+        return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    };
+
+    /** The end of a Note tool press. A drag makes a new area; a click opens
+        the note of the thing under it (or starts one), or of the free note
+        there, or starts a note on that spot. A new note is a draft until
+        something is typed into it, so a click that leads nowhere leaves
+        nothing behind. */
+    const finishNoteNew = (g: Extract<Gesture, { kind: 'noteNew' }>, end: Pt) => {
+        const d = store.doc;
+        const dragged = Math.hypot(end[0] - g.start[0], end[1] - g.start[1]) > 0.25;
+        const area = dragged ? noteArea(g.start, end) : null;
+        if (area && area.w >= NOTE_MIN_AREA_SIDE && area.h >= NOTE_MIN_AREA_SIDE) {
+            const draft: MapNote = { id: uid(), title: '', text: '', ...area };
+            store.setUi({ noteOpen: { doc: d.id, id: draft.id, edit: true, draft } });
+            return;
+        }
+        if (dragged) return;
+        if (g.on) {
+            const had = noteFor(d, g.on);
+            if (had) { store.setUi({ noteOpen: { doc: d.id, id: had.id, edit: false } }); return; }
+            const draft: MapNote = { id: uid(), title: '', text: '', on: g.on };
+            store.setUi({ noteOpen: { doc: d.id, id: draft.id, edit: true, draft } });
+            return;
+        }
+        const free = noteAt(d, g.start, NOTE_PIN_PX / (viewRef.current.zoom * CELL));
+        if (free) { store.setUi({ noteOpen: { doc: d.id, id: free.id, edit: false } }); return; }
+        const draft: MapNote = { id: uid(), title: '', text: '', x: g.start[0], y: g.start[1], w: 0, h: 0 };
+        store.setUi({ noteOpen: { doc: d.id, id: draft.id, edit: true, draft } });
+    };
+
     const startObjectGesture = (e: ReactPointerEvent, sel: Selection, grab: Grab) => {
         const d = store.doc;
         const current = store.ui.selection;
@@ -829,6 +891,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         const at = toCell(e);
         const g = gesture.current;
         if (!g) {
+            hoverNote(at);
             if (brushTool(store.ui.tool, store.ui.eraseMode) || store.ui.tool === 'fill' || store.ui.tool === 'build' || store.ui.tool === 'room') setHover(at);
             return;
         }
@@ -914,6 +977,31 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             case 'erase':
                 eraseAt(e);
                 return;
+            case 'noteNew': {
+                g.end = at;
+                const b = noteArea(g.start, at);
+                setNoteDraft(b && b.w >= NOTE_MIN_AREA_SIDE && b.h >= NOTE_MIN_AREA_SIDE ? b : null);
+                return;
+            }
+            case 'noteMove': {
+                const dx = at[0] - g.start[0], dy = at[1] - g.start[1];
+                if (!g.moved && Math.hypot(dx, dy) < 0.08) return;
+                g.moved = true;
+                const d0 = store.doc, o = g.orig;
+                const snap = d0.grid.snap && o.w > 0;
+                let next: Partial<MapNote>;
+                if (g.grab === 'move') {
+                    let x = o.x + dx, y = o.y + dy;
+                    if (snap) { x = Math.round(x); y = Math.round(y); }
+                    next = { x: Math.max(-o.w / 2, Math.min(d0.cols - o.w / 2, x)), y: Math.max(-o.h / 2, Math.min(d0.rows - o.h / 2, y)) };
+                } else {
+                    let w = o.w + dx, h = o.h + dy;
+                    if (snap) { w = Math.round(w); h = Math.round(h); }
+                    next = { w: Math.max(0.5, Math.min(d0.cols - o.x, w)), h: Math.max(0.5, Math.min(d0.rows - o.y, h)) };
+                }
+                store.live((d) => { d.notes = (d.notes ?? []).map((n) => (n.id === g.id ? { ...n, ...next } : n)); });
+                return;
+            }
             case 'move': {
                 const dx = at[0] - g.start[0], dy = at[1] - g.start[1];
                 if (!g.moved && Math.hypot(dx, dy) < 0.05) return;
@@ -1054,6 +1142,17 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             commitRun(g);
             return;
         }
+        if (g.kind === 'noteNew') {
+            setNoteDraft(null);
+            finishNoteNew(g, toCell(e));
+            return;
+        }
+        if (g.kind === 'noteMove' && !g.moved) {
+            /* A click on the marker: open the note, or close it. */
+            const open = store.ui.noteOpen;
+            if (open && open.doc === store.doc.id && open.id === g.id) closeNote(store, store.doc, g.id);
+            else store.setUi({ noteOpen: { doc: store.doc.id, id: g.id, edit: false } });
+        }
         if (g.kind === 'move' && !g.moved && g.narrow) {
             /* A second click on a wall already selected whole: just that piece. */
             store.setUi({ selection: [g.narrow] });
@@ -1074,7 +1173,35 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         if (g.kind !== 'pan') store.settle();
     };
 
-    const onPointerLeave = () => { if (!gesture.current) setHover(null); };
+    const onPointerLeave = () => { if (!gesture.current) { setHover(null); hoverNote(null); } };
+
+    /** Which note the pointer is over, worked out by geometry so it works
+        under every tool. Nothing to do with markers hidden. */
+    const hoverNote = (at: Pt | null) => {
+        const ui = store.ui, d = store.doc;
+        const look = at && d.notes?.length && (ui.notesShow !== 'hidden' || ui.tool === 'note');
+        const hit = look ? noteAt(d, at, NOTE_PIN_PX / (viewRef.current.zoom * CELL), noteHoverRef.current) : null;
+        const was = noteHoverRef.current;
+        if (hit === was || (hit && was && hit.id === was.id && hit.box.x === was.box.x && hit.box.y === was.box.y
+            && hit.box.w === was.box.w && hit.box.h === was.box.h)) return;
+        noteHoverRef.current = hit;
+        setNoteHover(hit);
+    };
+
+    /** A press on a free note's marker (move) or corner (resize), Note tool. */
+    const onNoteGrab = (e: ReactPointerEvent, note: MapNote, grab: 'move' | 'resize') => {
+        if (pointers.current.size) return;
+        if (!store.doc.notes?.some((n) => n.id === note.id)) {
+            /* Not made yet (nothing typed): there is nothing to move. */
+            store.setUi({ noteOpen: null });
+            return;
+        }
+        const stage = stageRef.current!;
+        pointers.current.set(e.pointerId, local(e));
+        capture(stage, e.pointerId);
+        store.checkpoint();
+        gesture.current = { kind: 'noteMove', id: note.id, grab, start: toCell(e), orig: freeBox(note), moved: false };
+    };
 
     /* ---------------------------------------------------------------- render */
 
@@ -1128,6 +1255,8 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 <SketchesLayer doc={doc} selection={ui.selection} draft={sketchDraft} onDown={onObjectDown} />
                 {!city && <TokensLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} />}
                 {(!ui.fogHidden || ui.tool === 'fog' || ui.tool === 'unfog') && <FogLayer doc={doc} />}
+                {/* The GM's notes: over the fog, in the editor only — never in a picture. */}
+                <NotesLayer doc={doc} zoom={view.zoom} hover={noteHover} draft={noteDraft} onGrab={onNoteGrab} />
                 {doc.room && ui.tool === 'room' && ui.roomMode === 'shape' && <RoomHandles store={store} room={doc.room} cols={doc.cols} rows={doc.rows} zoom={view.zoom} />}
                 {doc.room && ui.tool === 'room' && ui.roomMode !== 'shape' && hover && !spaceHeld && (
                     <RoomCursor room={doc.room} at={hover} ui={ui} cols={doc.cols} rows={doc.rows} zoom={view.zoom} />

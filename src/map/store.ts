@@ -9,7 +9,8 @@ import type { FogColor } from './fog';
 import type { ShapeFill, ShapeKind } from './shapes';
 import { DEFAULT_SKETCH } from './sketch';
 import type { SketchSettings } from './sketch';
-import type { DocKind, EdgeKind, FloorFinish, LabelRole, MapDoc, PathKind, Selection, Tool, WallFinish } from './types';
+import type { DocKind, EdgeKind, FloorFinish, LabelRole, MapDoc, MapNote, PathKind, Selection, Tool, WallFinish } from './types';
+import { NOTE_TEXT_MAX, NOTE_TITLE_MAX, isEmptyNote } from './notes';
 
 /* One mutable store behind the Map Maker, in the same shape as the GM screen's
    (src/gm/store.ts): components read through useSyncExternalStore and every
@@ -31,6 +32,28 @@ import type { DocKind, EdgeKind, FloorFinish, LabelRole, MapDoc, PathKind, Selec
    actually changed. */
 
 export const MAPS_KEY = 'pokerole_maps';
+/** Whether the GM's note markers show always, on hover, or never: this
+    browser's choice, for every map. */
+export const NOTES_SHOW_KEY = 'pokerole_map_notes_show';
+export type NotesShow = 'always' | 'hover' | 'hidden';
+
+function readNotesShow(): NotesShow {
+    try {
+        const v = localStorage.getItem(NOTES_SHOW_KEY);
+        if (v === 'always' || v === 'hover' || v === 'hidden') return v;
+    } catch { /* private mode */ }
+    return 'hover';
+}
+
+/** The note whose window is open: on which map, whether it is being edited,
+    and — for a note not made yet (a new area, an object with no note) —
+    the note it will be once something is typed. */
+export interface NoteOpen {
+    doc: string;
+    id: string;
+    edit: boolean;
+    draft?: MapNote;
+}
 export const MAP_PREFIX = 'pokerole_map_';
 const HISTORY_MAX = 100;
 const COALESCE_MS = 1500;
@@ -142,6 +165,9 @@ export interface MapUi {
     /** A label just placed from the map, whose text field should take the
         caret as soon as its inspector mounts. */
     focusLabel?: string;
+    /** The GM's note markers: always shown, on hover, or never. */
+    notesShow: NotesShow;
+    noteOpen: NoteOpen | null;
 }
 
 interface SavedIndex { activeId: string; ids: string[] }
@@ -185,6 +211,7 @@ export class MapStore {
         fogColor: 'dark', fogStrength: 100, fogHidden: false,
         landmark: 'mountain', buildItem: 'house', buildRot: undefined, buildVariant: 0, buildEra: 'all', buildFlip: false, buildShape: 'piece', fillerVariant: 0,
         roomMode: 'shape', roomErase: false, roomFloor: { kind: 'grass', color: '#6aa84a' }, roomWall: { kind: 'brick', color: '#b0644a' }, roomFill: false, roomBrush: 1, pathKind: 'road', labelRole: 'town', sketch: DEFAULT_SKETCH, sketchErase: false, sketchShape: false, token: null, selection: [],
+        notesShow: readNotesShow(), noteOpen: null,
     };
 
     /** Change one brush's shape or size. */
@@ -327,6 +354,33 @@ export class MapStore {
         this.notify();
     }
 
+    setNotesShow(v: NotesShow): void {
+        try { localStorage.setItem(NOTES_SHOW_KEY, v); } catch { /* private mode: this session only */ }
+        this.setUi({ notesShow: v });
+    }
+
+    /** Change a GM note — or make it, the first time something is typed into
+        `base`, a note not on the map yet. A burst of typing is one undo step.
+        A note on an object emptied of words is taken off. */
+    putNote(base: MapNote, patch: Partial<Pick<MapNote, 'title' | 'text' | 'x' | 'y' | 'w' | 'h'>>): void {
+        const list = this.doc.notes ?? [];
+        const cur = list.find((n) => n.id === base.id);
+        const next: MapNote = { ...(cur ?? base), ...patch };
+        next.title = next.title.replace(/[\r\n]+/g, ' ').slice(0, NOTE_TITLE_MAX);
+        next.text = next.text.slice(0, NOTE_TEXT_MAX);
+        const drop = !!next.on && isEmptyNote(next);
+        if (drop && !cur) return;
+        this.edit((d) => {
+            const notes = (d.notes ?? []).filter((n) => n.id !== base.id);
+            d.notes = drop ? notes : cur ? (d.notes ?? []).map((n) => (n.id === base.id ? next : n)) : [...notes, next];
+        }, 'note:' + base.id);
+    }
+
+    removeNote(id: string): void {
+        if (!this.doc.notes?.some((n) => n.id === id)) return;
+        this.edit((d) => { d.notes = (d.notes ?? []).filter((n) => n.id !== id); });
+    }
+
     /* ---------------------------------------------------------------- maps */
 
     switchTo(id: string, select: Selection[] = []): void {
@@ -340,7 +394,7 @@ export class MapStore {
         this.redoStack = kept?.redo ?? [];
         this.lastEdit = null;
         this.ui = {
-            ...this.ui, selection: select.filter((sel) => findObject(this.doc, sel)),
+            ...this.ui, selection: select.filter((sel) => findObject(this.doc, sel)), noteOpen: null,
             /* A world map has nothing to build with. */
             tool: (this.ui.tool === 'build' && this.doc.kind === 'world') || (this.ui.tool === 'room' && this.doc.kind !== 'interior') ? 'select' : this.ui.tool,
             /* The thing picked to build must be one this kind of map offers. */
@@ -560,7 +614,7 @@ export function findObject(doc: MapDoc, sel: Selection): { id: string } | undefi
 function sameDoc(a: MapDoc, b: MapDoc): boolean {
     return a.terrain === b.terrain && a.edges === b.edges && a.fog === b.fog && a.fillers === b.fillers && a.stamps === b.stamps && a.tokens === b.tokens
         && a.labels === b.labels && a.paths === b.paths && a.sketches === b.sketches && a.picture === b.picture
-        && a.placed === b.placed && a.look === b.look && a.room === b.room;
+        && a.placed === b.placed && a.look === b.look && a.room === b.room && a.notes === b.notes;
 }
 
 function readIndex(): SavedIndex | null {

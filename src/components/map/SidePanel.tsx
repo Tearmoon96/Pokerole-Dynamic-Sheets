@@ -1,3 +1,5 @@
+import { NoteFields, NotesShowChoice } from './NotesLayer';
+import { liveNotes, targetOfPlaced } from '../../map/notes';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import { useMap } from '../../map/MapContext';
@@ -835,6 +837,7 @@ function RunInspector({ doc, pieces }: { doc: MapDoc; pieces: MapPlaced[] }) {
                 {pieces.length} pieces drawn together. Click a piece again to pick just that one — to recolour it, or delete it for a gap.
             </p>
             <PlacedFields doc={doc} p={first} set={set} />
+            {first.run && <NoteFields doc={doc} on={{ kind: 'run', id: first.run }} />}
             <GroupActions />
         </section>
     );
@@ -977,6 +980,7 @@ function Inspector({ doc, sel }: { doc: MapDoc; sel: Selection }) {
                 </div>
                 <SnapChoice value={s.snap} mapSnap={doc.grid.snap} onChange={(v) => set(snapPatch(doc, s, v))} />
                 {!filler && <InsideSection doc={doc} stamp={s} />}
+                <NoteFields doc={doc} on={{ kind: 'stamp', id: s.id }} />
             </>
         );
     } else if (sel.kind === 'placed') {
@@ -988,6 +992,7 @@ function Inspector({ doc, sel }: { doc: MapDoc; sel: Selection }) {
             <>
                 <PlacedFields doc={doc} p={o} set={set} />
                 {def.enterable && <InsideSection doc={doc} stamp={o} />}
+                <NoteFields doc={doc} on={targetOfPlaced(o)} />
             </>
         );
     } else if (sel.kind === 'token') {
@@ -1064,6 +1069,30 @@ function Inspector({ doc, sel }: { doc: MapDoc; sel: Selection }) {
     );
 }
 
+/** The Note tool's panel: how it works, and when the markers show. */
+function NotePalette() {
+    const { doc } = useMap();
+    const count = liveNotes(doc).length;
+    return (
+        <section className="map-section map-note-panel">
+            <h3>GM notes</h3>
+            <p className="map-hint">
+                Descriptions for your eyes only: players never see them, at the table or in a picture of the map.
+            </p>
+            <ul className="map-hint map-note-help">
+                <li><b>Click a landmark or a building</b> to write its note.</li>
+                <li><b>Drag</b> to mark out an area (a forest, a district, a room), or <b>click</b> empty ground for a spot.</li>
+                <li>Drag a marker to move a free note; drag an area's corner to resize it.</li>
+            </ul>
+            <div className="map-field">
+                <span>Show the markers</span>
+                <NotesShowChoice />
+            </div>
+            <p className="map-hint">{count === 0 ? 'No notes on this map yet.' : count === 1 ? 'One note on this map.' : count + ' notes on this map.'}</p>
+        </section>
+    );
+}
+
 export function SidePanel() {
     const { doc, ui } = useMap();
     useHotkeys();
@@ -1078,6 +1107,7 @@ export function SidePanel() {
         case 'token': palette = <TokenPalette style={style} />; break;
         case 'label': palette = <LabelPalette />; break;
         case 'sketch': palette = <SketchPalette />; break;
+        case 'note': palette = <NotePalette />; break;
         case 'select': palette = !ui.selection.length ? <p className="map-hint map-section">Click something on the map to select it. Drag to move; drag a landmark's corner to resize it or its knob to turn it. Ctrl-click to select several, or drag a box round them.</p> : null; break;
         case 'erase': palette = <ErasePalette />; break;
         case 'edge': palette = <EdgePalette />; break;

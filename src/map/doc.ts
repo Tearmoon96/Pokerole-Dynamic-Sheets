@@ -11,6 +11,7 @@ import { normalizeSketch } from './sketch';
 import { normalizePlaced } from './world/placed';
 import { isLookId } from './world/looks';
 import { normalizeRoom, resizeRoom } from './world/room';
+import { clampFree, normalizeNotes } from './notes';
 import type {
     DocKind, DocParent, EdgeKind, LookId, MapRoom, LabelRole, MapBorders, MapDoc, MapLabel, MapPath, MapPicture, MapStamp, MapToken, StyleId,
 } from './types';
@@ -60,6 +61,7 @@ export function createDoc(opts: {
         labels: [],
         sketches: [],
         placed: [],
+        notes: [],
         updatedAt: new Date().toISOString(),
     };
     if (opts.picture) doc.picture = opts.picture;
@@ -192,6 +194,8 @@ export function normalizeDoc(raw: unknown): MapDoc | null {
         sketches: arr<unknown>(r.sketches).map(normalizeSketch).filter((k): k is NonNullable<typeof k> => !!k),
         placed: arr<unknown>(r.placed).map(normalizePlaced).filter((o): o is NonNullable<typeof o> => !!o)
             .map((o) => (o.id ? o : { ...o, id: uid() })),
+        /* Filled in below, once the objects they may be attached to are in. */
+        notes: [],
         updatedAt: str(r.updatedAt, new Date().toISOString()),
     };
     if (picture) out.picture = picture;
@@ -200,6 +204,8 @@ export function normalizeDoc(raw: unknown): MapDoc | null {
     if (room) out.room = room;
     const parent = normalizeParent(r.parent);
     if (parent && parent.doc !== out.id) out.parent = parent;
+    /* Last: a note on an object that is not on the map is dropped. */
+    out.notes = normalizeNotes(r.notes, out);
     return out;
 }
 
@@ -329,6 +335,7 @@ export function resizeDoc(doc: MapDoc, cols: number, rows: number): MapDoc {
         sketches: doc.sketches.map((k) => ({ ...k, points: k.points.map(([x, y]) => [cx(x), cy(y)] as [number, number]) })),
         placed: doc.placed.map((o) => ({ ...o, x: Math.min(o.x, Math.max(0, cols - 1)), y: Math.min(o.y, Math.max(0, rows - 1)) })),
         room: resizeRoom(doc.room, cols, rows, doc.cols, doc.rows),
+        ...(doc.notes ? { notes: doc.notes.map((n) => clampFree(n, cols, rows)).filter((n): n is NonNullable<typeof n> => !!n) } : {}),
     };
 }
 

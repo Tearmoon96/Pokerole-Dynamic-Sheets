@@ -5,7 +5,7 @@ import { useToast } from '../common/Toast';
 import { useGmConfirm } from '../gm/ConfirmDialog';
 import { HomeButton } from '../common/HomeButton';
 import { TourButton } from '../common/Tour';
-import { BackgroundControl, BordersControl, ExportControl, GridControl, LookControl, PictureControl, ScaleControl, SizeControl, SnapToggle, StyleControl } from './TopBarControls';
+import { BackgroundControl, BordersControl, ExportControl, GridControl, LookControl, NotesControl, PictureControl, ScaleControl, SizeControl, SnapToggle, StyleControl } from './TopBarControls';
 import {
     downloadMap, ensureWritable, forgetMapHandle, mapFileName, mapJson, parseMapFile,
     readMapHandle, rememberMapHandle, writeMapFile,
@@ -153,6 +153,7 @@ export function MapTopBar({ onMaps, onSprites, onHotkeys, onRecipe, tableLink }:
             <div className="map-settings" role="group" aria-label="Map settings">
                 <GridControl />
                 <SnapToggle />
+                <NotesControl />
                 <SizeControl />
                 <ScaleControl />
             </div>

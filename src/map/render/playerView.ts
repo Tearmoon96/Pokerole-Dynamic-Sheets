@@ -25,7 +25,10 @@ import { itemOf } from '../world/catalog';
    - a landmark, token or label the GM chose to keep off the table (from the
      table's own map list) is not drawn either, wherever it stands;
    - and the MapDoc itself — terrain, everything under the fog, the GM's
-     notes in a label — is never sent. Players get pixels.
+     notes in a label — is never sent. Players get pixels;
+   - the GM's own notes (`doc.notes`, notes.ts) are not read here at all, and
+     `mapObjects` names things by label or catalogue name, never by a note.
+     Keep it that way: they are for the GM's eyes only.
 
    The reveal guard below is the other half: the live link holds an update
    that uncovers a lot at once until the GM says yes. */

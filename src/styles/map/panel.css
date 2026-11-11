@@ -688,3 +688,41 @@
 /* Floors and wallpapers: the swatch fills the tile. */
 .map-tile-art.map-finish-art { border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
 .map-finish-current { margin: 0.3rem 0 0.2rem; align-items: center; }
+
+/* ---------------- GM notes: the window, the inspector's fields ---------------- */
+
+.map-note-pop { width: min(22rem, calc(100vw - 16px)); }
+.map-note-window { display: flex; flex-direction: column; gap: 0.5rem; }
+.map-note-private { font-size: 0.7rem; color: var(--text-muted); }
+.map-note-private > i { margin-right: 0.25rem; }
+.map-note-title { font-size: 0.95rem; font-weight: 700; overflow-wrap: anywhere; }
+.map-note-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+    max-height: 50dvh;
+    overflow-y: auto;
+}
+.map-note-text.empty { color: var(--text-muted); font-style: italic; }
+.map-note-title-field, .map-note-text-field { width: 100%; box-sizing: border-box; }
+.map-note-text-field { resize: vertical; min-height: 7rem; font: inherit; line-height: 1.4; }
+.map-note-actions { display: flex; justify-content: space-between; gap: 0.5rem; }
+
+.map-note-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-top: 0.4rem;
+    padding: 0.55rem;
+    border: 1px solid #f6c94555;
+    border-radius: 9px;
+    background: #f6c9450a;
+}
+.map-note-fields-title { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
+.map-note-fields-title > i { color: #f6c945; margin-right: 0.25rem; }
+.map-note-fields-title .map-hint { font-weight: 400; }
+.map-note-fields input, .map-note-fields textarea { width: 100%; box-sizing: border-box; }
+.map-note-fields textarea { resize: vertical; font: inherit; line-height: 1.4; }
+.map-note-help { margin: 0.2rem 0 0.4rem; padding-left: 1.1rem; }
+.map-note-help li { margin: 0.15rem 0; }
+.map-notes-show { flex-wrap: wrap; }

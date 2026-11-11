@@ -1,3 +1,4 @@
+import { NotesShowChoice } from './NotesLayer';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMap } from '../../map/MapContext';
 import { useToast } from '../common/Toast';
@@ -402,6 +403,33 @@ export function GridControl() {
                 </label>
             </Popover>
         </span>
+    );
+}
+
+/* ------------------------------------------------------------- GM notes */
+
+/** When the GM's note markers show: Always, On hover, Hidden — this
+    browser's choice for every map. */
+export function NotesControl() {
+    const { ui } = useMap();
+    const pop = usePopover();
+    const icon = ui.notesShow === 'hidden' ? 'fa-eye-slash' : 'fa-note-sticky';
+    return (
+        <>
+            <button
+                ref={pop.anchor} className="icon-btn" aria-expanded={pop.open} data-notes-control=""
+                aria-pressed={ui.notesShow !== 'hidden'}
+                title="GM notes: when their markers show on the map (only you ever see them)"
+                onClick={() => pop.setOpen((o) => !o)}
+            >
+                <i className={'fa-solid ' + icon}></i><span className="map-btn-text"> Notes</span>
+            </button>
+            <Popover anchor={pop.anchor} open={pop.open} onClose={pop.close}>
+                <div className="map-popover-title">GM notes</div>
+                <p className="map-hint">Only you see them: never the players, never a picture of the map.</p>
+                <NotesShowChoice />
+            </Popover>
+        </>
     );
 }
 

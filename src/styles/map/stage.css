@@ -380,3 +380,60 @@ img.pixelated { image-rendering: pixelated; }
 .map-room-cursor-line { stroke: var(--accent); stroke-linecap: round; opacity: 0.85; }
 .map-room-cursor-line.erase { stroke: #e04848; }
 .map-room-cursor-area { fill: var(--accent); fill-opacity: 0.18; stroke: var(--accent); stroke-dasharray: 0.15 0.1; }
+
+/* ---------------- GM notes (notes.ts, NotesLayer) ---------------- */
+
+/* Over everything, the fog included: the GM's own view. DOM only, so no
+   picture of the map ever has them. Only the markers take the pointer. */
+.map-notes { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 6; pointer-events: none; }
+.map-note-pin {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    min-height: 0;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #3b2a00;
+    background: #f6c945;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 5px #0008;
+    pointer-events: auto;
+    cursor: pointer;
+    transform-origin: 50% 50%;
+    animation: map-note-pop 0.12s ease-out;
+}
+.map-note-pin:hover, .map-note-pin.open { background: #ffd95e; box-shadow: 0 0 0 3px #f6c94566, 0 1px 5px #0008; }
+@keyframes map-note-pop { from { opacity: 0; } to { opacity: 1; } }
+/* The eraser rubs out what is under the pointer: a marker must not hide it. */
+.map-stage[data-tool="erase"] .map-note-pin { pointer-events: none; }
+.map-stage[data-tool="note"] { cursor: crosshair; }
+.map-stage[data-tool="note"] .map-note-pin { cursor: move; }
+
+/* A free note's area: shown with the Note tool out, or while hovered. */
+.map-note-area {
+    position: absolute;
+    border: 1.5px dashed #f6c945cc;
+    background: #f6c94512;
+    border-radius: 3px;
+    pointer-events: none;
+}
+.map-note-area.tool { background: #f6c9451f; }
+.map-note-area.draft { border-color: #f6c945; background: #f6c94528; }
+.map-note-corner {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    background: #f6c945;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px #0008;
+    pointer-events: auto;
+    cursor: nwse-resize;
+    transform-origin: 100% 100%;
+}

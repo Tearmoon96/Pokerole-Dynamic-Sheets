@@ -1,3 +1,4 @@
+import { sameButNotes } from './notes';
 import { HOST_BEAT_MS, HOST_LOST_MS, openLink, parseLink } from '../lib/tableLink';
 import type { LinkMessage, PlayerHide } from '../lib/tableLink';
 import { exportLoader } from './render/exportImages';
@@ -280,6 +281,10 @@ export class TableLiveLink {
     private changed(): void {
         const doc = this.scene();
         if (!doc) return;
+        /* Only the GM's notes changed: players' picture would be the same
+           pixels (notes are never drawn into it), so there is nothing to send.
+           Taking it as what players have keeps every check below by identity. */
+        if (this.publishedDoc && doc !== this.publishedDoc && sameButNotes(doc, this.publishedDoc)) this.publishedDoc = doc;
         const pending = doc !== this.publishedDoc;
         if (pending !== this.state.pending) this.set({ pending });
         if (!pending) { this.clearHold(); this.set({ dueAt: null }); return; }

@@ -127,6 +127,29 @@ export interface MapPlaced {
     run?: string;
 }
 
+/** What a GM note is attached to: a landmark, a placed thing, or a whole
+    wall or fence drawn as a run (every piece of it). */
+export interface NoteTarget {
+    kind: 'stamp' | 'placed' | 'run';
+    id: string;
+}
+
+/** A note for the GM's eyes only (owner's request, 2026-11-11): the
+    description of a place prepared before the session. Either attached to
+    an object (`on`), or free over an area of the map (`x/y/w/h`, a point
+    when `w` and `h` are 0). Drawn by the editor alone — never in a picture
+    of the map, never sent to the table. See notes.ts. */
+export interface MapNote {
+    id: string;
+    title: string;
+    text: string;
+    on?: NoteTarget;
+    x?: number;
+    y?: number;
+    w?: number;
+    h?: number;
+}
+
 /** An interior's floor plan (world/room.ts): an outline of corners on whole
     cells; outside it is nothing, the edges with the room below them stand as
     back walls `wallH` cells tall. */
@@ -303,6 +326,9 @@ export interface MapDoc {
     look?: LookId;
     /** An interior's floor plan: walls, floor and wallpaper (world/room.ts). */
     room?: MapRoom;
+    /** The GM's notes (notes.ts). Absent on a map from before them. Never
+        drawn into a picture and never sent to the table. */
+    notes?: MapNote[];
     /** ISO time of the last change, for the map list. */
     updatedAt: string;
 }
@@ -313,4 +339,4 @@ export interface Selection {
     id: string;
 }
 
-export type Tool = 'select' | 'paint' | 'fill' | 'shape' | 'erase' | 'edge' | 'fog' | 'unfog' | 'path' | 'stamp' | 'build' | 'room' | 'token' | 'label' | 'sketch' | 'pan';
+export type Tool = 'select' | 'paint' | 'fill' | 'shape' | 'erase' | 'edge' | 'fog' | 'unfog' | 'path' | 'stamp' | 'build' | 'room' | 'token' | 'label' | 'sketch' | 'note' | 'pan';
