@@ -16,6 +16,7 @@ import { UpdatePrompt } from '../pwa/UpdatePrompt';
 import type { AppData } from '../data/types';
 
 import '../styles/map-maker.css';
+import { PageBoundary } from '../components/common/PageBoundary';
 
 /* Built before React mounts, like the other pages' stores, so the first render
    already has the saved maps. */
@@ -69,7 +70,7 @@ initDevice();
 /* UpdatePrompt sits OUTSIDE Root: it has to render while the page is still
    booting, and it reads its own store rather than any provider. */
 createRoot(document.getElementById('root')!).render(
-    <StrictMode><Root /><UpdatePrompt /></StrictMode>,
+    <StrictMode><PageBoundary page="The World Builder"><Root /></PageBoundary><UpdatePrompt /></StrictMode>,
 );
 
 installTooltips();

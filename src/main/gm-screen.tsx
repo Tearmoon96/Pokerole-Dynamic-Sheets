@@ -15,6 +15,7 @@ import { UpdatePrompt } from '../pwa/UpdatePrompt';
 import type { AppData } from '../data/types';
 
 import '../styles/gm-screen.css';
+import { PageBoundary } from '../components/common/PageBoundary';
 
 const store = new GmStore();
 
@@ -60,7 +61,7 @@ initDevice();
 /* UpdatePrompt sits OUTSIDE Root: it has to render while the page is still
    booting, and it reads its own store rather than any provider. */
 createRoot(document.getElementById('root')!).render(
-    <StrictMode><Root /><UpdatePrompt /></StrictMode>,
+    <StrictMode><PageBoundary page="The GM Screen"><Root /></PageBoundary><UpdatePrompt /></StrictMode>,
 );
 
 installTooltips();

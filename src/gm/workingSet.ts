@@ -1,5 +1,6 @@
 import { WORKING_KEY } from '../state/constants';
 import type { TrainerState } from '../state/types';
+import { coerceTrainer, isRec } from '../state/coerce';
 
 /* The shared working set, as the GM screen sees it.
 
@@ -28,6 +29,17 @@ export function readWorking(): WorkingSet | null {
     cachedRaw = raw;
     try { cachedParsed = raw ? JSON.parse(raw) : null; }
     catch { cachedParsed = null; }
+    /* The GM screen and the table draw these trainers as stored, so their
+       values are put to the right kinds here, once per stored text
+       (state/coerce.ts). */
+    if (!isRec(cachedParsed)) cachedParsed = null;
+    else if (Array.isArray(cachedParsed.trainers)) {
+        cachedParsed.trainers = cachedParsed.trainers.filter((t) => isRec(t) && typeof t.id === 'string' && isRec(t.data));
+        for (const t of cachedParsed.trainers) {
+            if (typeof t.name !== 'string') t.name = '';
+            coerceTrainer(t.data);
+        }
+    }
     return cachedParsed;
 }
 

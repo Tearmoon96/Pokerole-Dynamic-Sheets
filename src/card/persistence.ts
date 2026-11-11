@@ -6,6 +6,7 @@ import { derivedPoolMax } from './pools';
 import type { CardSheet, Specialty } from './types';
 import type { PokedexEntry } from '../data/types';
 import type { MonEntry, TrainerState } from '../state/types';
+import { coerceSheet } from '../state/coerce';
 
 /* Where a card sheet is read from and written to: inside the trainer's working
    set when the card was opened from a licence, else its own localStorage key. */
@@ -16,8 +17,14 @@ interface WorkingSetShape {
 }
 
 export function readWorking(): WorkingSetShape | null {
-    try { return JSON.parse(localStorage.getItem(WORKING_KEY) || 'null') || null; }
-    catch { return null; }
+    try {
+        const w = JSON.parse(localStorage.getItem(WORKING_KEY) || 'null');
+        if (!w || typeof w !== 'object' || !Array.isArray(w.trainers)) return null;
+        /* Entries that are not trainers at all are no entries. The sheets
+           inside are checked where they are read (normalizeCardSheet). */
+        w.trainers = w.trainers.filter((t: unknown) => !!t && typeof t === 'object' && !Array.isArray(t));
+        return w;
+    } catch { return null; }
 }
 
 function workingTrainer(w: WorkingSetShape | null, trainerId: string | null) {
@@ -52,6 +59,9 @@ export function trainerMonEntry(w: WorkingSetShape | null, ctx: CardContext): Mo
     has accumulated. */
 export function normalizeCardSheet(p: PokedexEntry, parsed: Partial<CardSheet> | null): CardSheet {
     const base = defaultCardSheet(p);
+    /* A value of the wrong kind goes, and the default below takes its place
+       (state/coerce.ts). */
+    parsed = coerceSheet(parsed);
     if (!parsed) return base;
 
     const sheet: CardSheet = { ...base, ...parsed };

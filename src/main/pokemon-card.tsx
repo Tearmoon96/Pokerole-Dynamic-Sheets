@@ -17,6 +17,7 @@ import { UpdatePrompt } from '../pwa/UpdatePrompt';
 import type { AppData, PokedexEntry } from '../data/types';
 
 import '../styles/pokemon-card.css';
+import { PageBoundary } from '../components/common/PageBoundary';
 
 /* Which species this card is for. Matched by id first, then by name, so a
    hand-typed ?pokemon=Pikachu works as well as the id the app links with.
@@ -104,7 +105,7 @@ initDevice();
 /* UpdatePrompt sits OUTSIDE Root: it has to render while the page is still
    booting, and it reads its own store rather than any provider. */
 createRoot(document.getElementById('root')!).render(
-    <StrictMode><Root /><UpdatePrompt /></StrictMode>,
+    <StrictMode><PageBoundary page="The Pokémon card"><Root /></PageBoundary><UpdatePrompt /></StrictMode>,
 );
 
 /* Replaces the browser's native title bubble everywhere on the page. */

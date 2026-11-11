@@ -7,11 +7,12 @@ import { registerServiceWorker } from '../pwa/register';
 import { UpdatePrompt } from '../pwa/UpdatePrompt';
 
 import '../styles/contact-center.css';
+import { PageBoundary } from '../components/common/PageBoundary';
 
 initDevice();
 
 createRoot(document.getElementById('root')!).render(
-    <StrictMode><ContactApp /><UpdatePrompt /></StrictMode>,
+    <StrictMode><PageBoundary page="The Contact Center"><ContactApp /></PageBoundary><UpdatePrompt /></StrictMode>,
 );
 
 installTooltips();

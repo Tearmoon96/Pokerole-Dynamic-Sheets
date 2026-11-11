@@ -74,6 +74,9 @@ export function SpritePanel({ onUpload }: { onUpload: () => void }) {
        than show a blank tab or the wrong Pokémon. */
     let type = sheet.spriteType || 'Home';
     if (type === 'Custom' && !hasCustom) type = 'Home';
+    /* A set this app does not have (a file from elsewhere, a set since
+       withdrawn): Home, not a lookup of nothing. */
+    if (type !== 'Custom' && !SETS.some((x) => x.type === type)) type = 'Home';
     if (blocked(type)) type = SETS.map((x) => x.type as string).find((t) => !blocked(t)) || 'Home';
 
     const showingCustom = type === 'Custom';

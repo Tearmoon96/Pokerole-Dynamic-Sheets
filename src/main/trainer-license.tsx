@@ -18,6 +18,7 @@ import { installReadOnlyGuard } from '../state/npcMode';
 import type { AppData } from '../data/types';
 
 import '../styles/trainer-license.css';
+import { PageBoundary } from '../components/common/PageBoundary';
 
 const store = createBlankStore();
 
@@ -67,7 +68,7 @@ initDevice();
 /* UpdatePrompt sits OUTSIDE Root: it has to render while the page is still
    booting, and it reads its own store rather than any provider. */
 createRoot(document.getElementById('root')!).render(
-    <StrictMode><Root /><UpdatePrompt /></StrictMode>,
+    <StrictMode><PageBoundary page="The Trainer&apos;s License"><Root /></PageBoundary><UpdatePrompt /></StrictMode>,
 );
 
 /* Replaces the browser's native title bubble everywhere on the page. DOM-level,

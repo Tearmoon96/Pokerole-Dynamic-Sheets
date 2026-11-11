@@ -23,8 +23,22 @@ interface StoredWorkingSet {
 }
 
 export function readWorkingSet(): StoredWorkingSet | null {
-    try { return JSON.parse(localStorage.getItem(WORKING_KEY) || 'null') || null; }
-    catch { return null; }
+    try {
+        const w = JSON.parse(localStorage.getItem(WORKING_KEY) || 'null');
+        if (!w || typeof w !== 'object' || Array.isArray(w)) return null;
+        /* An entry that is not a trainer at all is no entry; what is inside
+           one is normalizeState's to check. */
+        if (Array.isArray(w.trainers)) {
+            w.trainers = w.trainers.filter((t: unknown) => !!t && typeof t === 'object' && !Array.isArray(t)
+                && !!(t as { data?: unknown }).data && typeof (t as { data?: unknown }).data === 'object');
+            for (const t of w.trainers) {
+                if (typeof t.id !== 'string') t.id = '';
+                if (typeof t.name !== 'string') t.name = '';
+                if (typeof t.fileName !== 'string') t.fileName = null;
+            }
+        }
+        return w;
+    } catch { return null; }
 }
 
 /** Thrown when localStorage refuses the write, so the caller can say so. The

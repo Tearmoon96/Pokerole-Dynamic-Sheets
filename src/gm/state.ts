@@ -3,6 +3,7 @@ import {
     combatPanelKey, expandPanelKeys,
 } from './constants';
 import { normalizeFolders } from './folders';
+import { coerceSheet, isRec } from '../state/coerce';
 import { DEFAULT_GEN_OPTS, RECENT_ROLLS } from './generator';
 import type { GmGenOpts } from './generator';
 import type { GmCombat, GmCombatant, GmGift, GmLayout, GmNpcShare, GmState } from './types';
@@ -97,7 +98,24 @@ function normalizeCombat(raw: unknown, fallbackName: string): GmCombat {
     const round = Number(r.round);
     const pass = Number(r.pass);
     const ids = (v: unknown) => (Array.isArray(v) ? v : []).filter((x): x is string => typeof x === 'string');
-    let participants = (Array.isArray(r.participants) ? r.participants : []) as GmCombatant[];
+    /* Combatants of the right shape only: a row that is not one, or whose
+       name or target is of the wrong kind, cannot be drawn. */
+    let participants = ((Array.isArray(r.participants) ? r.participants : []) as unknown[])
+        .filter((p): p is GmCombatant => isRec(p))
+        .map((p) => {
+            /* As RosterPanel's addParticipant makes one: pid, label, kind,
+               dexId, src, init, acted. Sound values are left as they are. */
+            const q = { ...p } as Record<string, unknown>;
+            if (typeof q.pid !== 'string' || !q.pid) q.pid = uid();
+            if (typeof q.label !== 'string') q.label = '?';
+            if (typeof q.kind !== 'string') q.kind = 'custom';
+            for (const k of ['dexId', 'src', 'pc']) if (q[k] !== undefined && q[k] !== null && typeof q[k] !== 'string') q[k] = null;
+            if (q.init !== undefined && q.init !== null && (typeof q.init !== 'number' || !isFinite(q.init))) q.init = null;
+            if (q.acted !== undefined && (typeof q.acted !== 'number' || !isFinite(q.acted))) q.acted = 0;
+            if (q.usedMoves !== undefined) q.usedMoves = Array.isArray(q.usedMoves) ? q.usedMoves.filter((m) => typeof m === 'string') : [];
+            if (q.actLog !== undefined) q.actLog = Array.isArray(q.actLog) ? q.actLog.filter((e) => isRec(e) && typeof e.k === 'string') : [];
+            return q as GmCombatant;
+        });
     const turn = typeof r.turn === 'string' ? r.turn : null;
     /* Saved while a pip filled as a turn STARTED: the combatant on turn has
        one pip too many under the rule now (pips are actions done), and would
@@ -209,6 +227,39 @@ export function normalizeGmState(raw: unknown): GmState {
     (['trainerIds', 'wilds', 'npcs', 'noteSheets', 'generated'] as const).forEach((k) => {
         if (!Array.isArray(s[k])) (s as unknown as Record<string, unknown>)[k] = [];
     });
+    /* What is IN those lists, entry by entry: a session file from someone
+       else, or one edited by hand, can hold anything, and an entry of the
+       wrong kind took the whole board down when it was drawn. A wild's sheet
+       is checked like any other sheet (state/coerce.ts). */
+    const text = (v: unknown): string => (typeof v === 'string' ? v : typeof v === 'number' && isFinite(v) ? String(v) : '');
+    s.trainerIds = s.trainerIds.filter((id) => typeof id === 'string' && id);
+    const wild = (w: unknown): w is GmState['wilds'][number] => isRec(w) && typeof w.gid === 'string' && typeof w.dexId === 'string';
+    s.wilds = s.wilds.filter(wild);
+    s.generated = s.generated.filter(wild);
+    for (const w of [...s.wilds, ...s.generated]) w.sheet = (coerceSheet(w.sheet) ?? {}) as typeof w.sheet;
+    s.npcs = s.npcs.filter(isRec).map((n) => ({
+        ...n, gid: typeof n.gid === 'string' && n.gid ? n.gid : uid(),
+        name: text(n.name), gender: text(n.gender), region: text(n.region), note: text(n.note),
+        ...(n.nature !== undefined ? { nature: text(n.nature) } : {}),
+    })) as GmState['npcs'];
+    s.noteSheets = s.noteSheets.filter(isRec).map((n) => ({
+        ...n, gid: typeof n.gid === 'string' && n.gid ? n.gid : uid(),
+        title: text(n.title), body: text(n.body), open: !!n.open,
+        folder: typeof n.folder === 'string' ? n.folder : null,
+    })) as GmState['noteSheets'];
+    for (const g of s.gifts) g.sheet = (coerceSheet(g.sheet) ?? {}) as typeof g.sheet;
+    if (typeof s.notes !== 'string') s.notes = '';
+    if (!isRec(s.dice)) s.dice = { count: 2, sides: 6, history: [] };
+    if (typeof s.dice.count !== 'number' || !isFinite(s.dice.count)) s.dice.count = 2;
+    if (typeof s.dice.sides !== 'number' || !isFinite(s.dice.sides)) s.dice.sides = 6;
+    if (Array.isArray(s.dice.history)) {
+        s.dice.history = s.dice.history.filter((e) => isRec(e) && Array.isArray(e.vals) && e.vals.every((v) => typeof v === 'number'));
+    }
+    for (const k of Object.keys(s.tablePcs)) {
+        const pc = s.tablePcs[k] as unknown;
+        if (!isRec(pc) || !isRec(pc.mons) || (pc.trainer !== null && !isRec(pc.trainer))) delete s.tablePcs[k];
+    }
+    for (const k of ['region', 'gender', 'letter'] as const) if (typeof s.nameOpts[k] !== 'string') s.nameOpts[k] = DEFAULT_NAME_OPTS[k];
     if (!Array.isArray(s.dice.history)) s.dice.history = [];
     if (!s.expanded || typeof s.expanded !== 'object') s.expanded = {};
 

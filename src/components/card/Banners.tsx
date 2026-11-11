@@ -42,7 +42,7 @@ export function TrainerBanner() {
 
     const w = readWorking();
     const t = w && Array.isArray(w.trainers) ? w.trainers.find((x) => x.id === ctx.trainerId) : null;
-    const tname = (t && t.data && t.data.name) ? t.data.name : 'a trainer';
+    const tname = (t && t.data && typeof t.data.name === 'string' && t.data.name) ? t.data.name : 'a trainer';
     /* Say where it actually lives — a stored Pokémon is not on the team */
     const inBox = !!(ctx.monUid && t && t.data && Array.isArray(t.data.boxes)
         && t.data.boxes.some((b) => b && Array.isArray(b.mons)

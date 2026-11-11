@@ -11,6 +11,7 @@ import { registerServiceWorker } from '../pwa/register';
 import { UpdatePrompt } from '../pwa/UpdatePrompt';
 
 import '../styles/rolling-table.css';
+import { PageBoundary } from '../components/common/PageBoundary';
 
 /* Built before React mounts, like the other pages' stores, so the first render
    already knows whether a saved session is being restored. */
@@ -44,7 +45,7 @@ initDevice();
 /* UpdatePrompt sits OUTSIDE Root: it has to render while the page is still
    booting, and it reads its own store rather than any provider. */
 createRoot(document.getElementById('root')!).render(
-    <StrictMode><Root /><UpdatePrompt /></StrictMode>,
+    <StrictMode><PageBoundary page="The Rolling Table"><Root /></PageBoundary><UpdatePrompt /></StrictMode>,
 );
 
 installTooltips();

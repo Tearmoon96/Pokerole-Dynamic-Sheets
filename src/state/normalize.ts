@@ -8,12 +8,15 @@ import type {
 } from './types';
 
 import { HOMEBREW_FIELD, adoptHomebrew } from '../data/homebrew';
+import { coerceMon, coerceTrainer } from './coerce';
 
 type Loose = Record<string, any>;
 
 export function normalizeTeam(team: unknown, pool = new Set<string>()): TeamSlot[] {
     const out: TeamSlot[] = (Array.isArray(team) ? team : []).slice(0, 6).map((e: Loose, i: number) => {
-        if (!e || typeof e !== 'object') return { dexId: '', sheet: null, preview: null };
+        /* Kinds first (coerce.ts): a slot whose species is not text is an
+           empty slot, a sheet that is not a sheet is none. */
+        if (!coerceMon(e)) return { dexId: '', sheet: null, preview: null };
         const dexId = e.dexId !== undefined ? e.dexId : (e.id || '');
         /* An occupied slot always carries a uid; an empty one is reset to the
            canonical shape, which also clears the legacy {id,rank,item,chp}
@@ -51,7 +54,7 @@ export function normalizeBoxes(boxes: unknown, pool = new Set<string>()): BoxEnt
     const overflow: MonEntry[] = [];
     src.forEach((b, bi) => {
         ((b && Array.isArray(b.mons)) ? b.mons : [])
-            .filter((m: Loose) => m && typeof m === 'object' && (m.dexId || m.id))
+            .filter((m: Loose) => coerceMon(m) && (m.dexId || m.id))
             .forEach((m: Loose, mi: number) => {
                 const mon: MonEntry = {
                     uid: takeUid(m.uid, 'b' + bi + '-' + mi, pool),
@@ -74,7 +77,9 @@ export function normalizeBoxes(boxes: unknown, pool = new Set<string>()): BoxEnt
 /** Merge a parsed object (working set, or a loaded trainer file) onto a fresh
     default so older / partial sheets get any missing keys back. */
 export function normalizeState(parsed: unknown): TrainerState {
-    const p: Loose = (parsed && typeof parsed === 'object') ? parsed as Loose : {};
+    /* Every value of the kind the pages expect before anything reads one
+       (coerce.ts): a name that is an object blanked the page that drew it. */
+    const p: Loose = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? coerceTrainer(parsed as Loose) : {};
     /* A file's homebrew species go to the library; the trainer does not keep
        them (trainerJson writes them out afresh). */
     adoptHomebrew(p[HOMEBREW_FIELD]);
