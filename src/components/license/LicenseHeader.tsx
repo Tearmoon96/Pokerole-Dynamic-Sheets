@@ -38,7 +38,7 @@ export function LicenseHeader({ onOpenTheme, onOpenInfo, hasUpdate, updateVersio
                 </button>
                 <button
                     className="type-eff-btn"
-                    onClick={session.openWorkingFolder}
+                    onClick={() => session.openWorkingFolder()}
                     title="Open a working folder and load all trainers in it"
                 >
                     <i className="fa-solid fa-folder-open"></i>

@@ -15,7 +15,7 @@ import type { TrainerState } from './types';
    one wins, rather than the app silently picking. */
 
 export interface StoredSession {
-    trainers: { id: string; name: string; fileName: string | null; data: TrainerState }[];
+    trainers: { id: string; name: string; fileName: string | null; data: TrainerState; saved?: string }[];
     active: number;
 }
 
@@ -46,6 +46,7 @@ export function sessionToTrainers(w: StoredSession): WorkingTrainer[] {
         fileName: t.fileName || null,
         data: normalizeState(t.data),
         savedJson: undefined,
+        ...(typeof t.saved === 'string' ? { storedMark: t.saved } : {}),
     }));
 }
 

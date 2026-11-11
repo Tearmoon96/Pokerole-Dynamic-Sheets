@@ -2,8 +2,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 import { useStore } from './SheetContext';
 import { defaultState } from './defaults';
-import { anyDirty, markSaved } from './workingSet';
-import type { WorkingTrainer } from './workingSet';
+import { anyDirty, isDirty, markSaved, readWorkingSet, savedMark, trainerJson } from './workingSet';
+import type { StoredTrainer, WorkingTrainer } from './workingSet';
+import { normalizeState } from './normalize';
+import { noteBackup, requestPersistence } from '../lib/storageUse';
 import {
     adoptLoadedTrainers, downloadAllTrainers, pickWorkingFolder, readTrainerFiles,
     saveAllTrainers, writeTrainerFile,
@@ -29,7 +31,11 @@ export interface SessionValue {
     restoreLastSession: () => Promise<void>;
     startBlank: () => void;
 
-    openWorkingFolder: () => void;
+    /** `discard`: the unsaved-changes question has been answered "discard",
+        so nothing is asked again and the folder's files simply load. */
+    openWorkingFolder: (discard?: boolean) => void;
+    /** Answers the folder-or-browser question (see `adopt`). */
+    resolveFolderConflict: (keepBrowser: boolean) => void;
     saveAll: () => Promise<void>;
     backupAll: () => void;
     newTrainer: () => void;
@@ -48,11 +54,13 @@ export interface DialogState {
     newTrainerName: string | null;
     noTrainers: FolderDiagnostics | null;
     conflict: { conflicts: RestoreConflict[]; disk: DiskTrainer[] } | null;
+    /** A folder just opened holds older copies than this browser does. */
+    folderConflict: RestoreConflict[] | null;
     closeTrainer: number | null;
 }
 
 const EMPTY_DIALOGS: DialogState = {
-    discardOpen: false, newTrainerName: null, noTrainers: null, conflict: null, closeTrainer: null,
+    discardOpen: false, newTrainerName: null, noTrainers: null, conflict: null, folderConflict: null, closeTrainer: null,
 };
 
 const Ctx = createContext<SessionValue | null>(null);
@@ -110,15 +118,84 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [store, toast]);
 
+    /* A folder waiting on the question below: its trainers, and what the
+       browser holds that the files do not. */
+    const folderPending = useRef<{
+        trainers: WorkingTrainer[];
+        newer: { id: string; data: WorkingTrainer['data'] }[];
+        extra: WorkingTrainer[];
+    } | null>(null);
+    /** Set by "Discard & open": the next folder loads without the question. */
+    const discardNext = useRef(false);
+
+    const show = useCallback((trainers: WorkingTrainer[]) => {
+        /* There is something here worth keeping now. */
+        requestPersistence();
+        store.setTrainers(trainers, 0);
+        if (trainers.length > 1) setTrainerPickerOpen(true);
+    }, [store]);
+
+    /* Opening a folder replaces what the browser holds with the files. The
+       browser's copy is where everything goes until Save All — and not only
+       from this page: the cards, the GM screen and the rolling table's
+       character panel all write there. Loading the files over it without a
+       word threw away a whole session at the table (HP, Will, status,
+       experience) for anyone who came back and pressed "Open working folder"
+       rather than "Restore last session". So the two are compared first, and
+       where the browser's is not what the files hold, the user chooses. */
     const adopt = useCallback((loaded: WorkingTrainer[], diag?: FolderDiagnostics) => {
         if (!loaded.length) {
             setDialogs((d) => ({ ...d, noTrainers: diag ?? { json: 0, marked: 0, skipped: [] } }));
             return;
         }
         const trainers = adoptLoadedTrainers(loaded);
-        store.setTrainers(trainers, 0);
-        if (trainers.length > 1) setTrainerPickerOpen(true);
-    }, [store]);
+        const stored = discardNext.current ? null : readWorkingSet();
+        discardNext.current = false;
+        const conflicts: RestoreConflict[] = [];
+        const newer: { id: string; data: WorkingTrainer['data'] }[] = [];
+        const extra: WorkingTrainer[] = [];
+        for (const st of (stored?.trainers ?? []) as StoredTrainer[]) {
+            const data = normalizeState(st.data);
+            const json = trainerJson({ data });
+            const onDisk = trainers.find((t) => t.id === st.id);
+            if (onDisk) {
+                if (json === trainerJson(onDisk)) continue;
+                newer.push({ id: st.id, data });
+                conflicts.push({ name: data.name || onDisk.fileName || 'Unnamed', reason: 'changed in this browser since its file was saved' });
+                continue;
+            }
+            /* Not in this folder. Worth a word only when it holds work no
+               file has: changed since its last save, or never saved at all
+               and no longer a blank sheet. One from another folder, saved,
+               is simply elsewhere. */
+            const entry: WorkingTrainer = { id: st.id, handle: null, fileName: st.fileName || null, data, savedJson: undefined };
+            const unsaved = st.saved ? savedMark(json) !== st.saved : (!st.fileName && isDirty(entry));
+            if (!unsaved) continue;
+            extra.push(entry);
+            conflicts.push({ name: data.name || st.fileName || 'Unnamed', reason: 'not in this folder, with changes no file holds' });
+        }
+        if (!conflicts.length) { show(trainers); return; }
+        folderPending.current = { trainers, newer, extra };
+        setDialogs((d) => ({ ...d, folderConflict: conflicts }));
+    }, [show]);
+
+    const resolveFolderConflict = useCallback((keepBrowser: boolean) => {
+        const pending = folderPending.current;
+        folderPending.current = null;
+        setDialogs((d) => ({ ...d, folderConflict: null }));
+        if (!pending) return;
+        if (keepBrowser) {
+            /* The file's handle and its saved text stay, so these show as
+               unsaved and Save All writes them to their own files. */
+            for (const n of pending.newer) {
+                const t = pending.trainers.find((x) => x.id === n.id);
+                if (t) t.data = n.data;
+            }
+            show([...pending.trainers, ...pending.extra]);
+        } else {
+            show(pending.trainers);
+        }
+    }, [show]);
 
     const doOpenWorkingFolder = useCallback(async () => {
         if (!window.showDirectoryPicker) {
@@ -127,17 +204,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             return;
         }
         const { loaded, diag, error, cancelled } = await pickWorkingFolder();
-        if (cancelled) return;
-        if (error) { void showAlert(error); return; }
+        if (cancelled) { discardNext.current = false; return; }
+        if (error) { discardNext.current = false; void showAlert(error); return; }
         adopt(loaded, diag);
     }, [adopt]);
 
     const folderInputRef = useRef<HTMLInputElement>(null);
 
-    const openWorkingFolder = useCallback(() => {
+    const openWorkingFolder = useCallback((discard = false) => {
         /* Opening a different folder replaces the working set, so warn first
            when any loaded trainer has changes not written to disk. */
-        if (anyDirty(store.trainers)) { setDialogs((d) => ({ ...d, discardOpen: true })); return; }
+        if (!discard && anyDirty(store.trainers)) { setDialogs((d) => ({ ...d, discardOpen: true })); return; }
+        discardNext.current = discard;
         doOpenWorkingFolder();
     }, [store, doOpenWorkingFolder]);
 
@@ -148,12 +226,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         store.notify();
         if (!outcome.ok && !outcome.downloaded) { void showAlert(outcome.message); return; }
         if (!outcome.ok && outcome.downloaded) { void showAlert(outcome.message); return; }
+        noteBackup();
         toast(outcome.message);
     }, [store, toast]);
 
     const backupAll = useCallback(() => {
         store.syncFromStorage();          // pull in Pokémon edits from card tabs
         downloadAllTrainers(store.trainers, false);
+        noteBackup();
         const n = store.trainers.length;
         toast('<i class="fa-solid fa-download"></i> Backed up ' + n
             + ' trainer file' + (n === 1 ? '' : 's'));
@@ -168,6 +248,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const w = pendingRestore.current;
         if (!w || !w.trainers.length) { store.startBlank(); return; }
         const trainers = sessionToTrainers(w);
+        requestPersistence();
         store.setTrainers(trainers, Math.min(Math.max(0, w.active || 0), trainers.length - 1));
         await verify(trainers);
     }, [store, verify]);
@@ -179,6 +260,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         restoreLastSession,
         startBlank: () => { setLandingOpen(false); store.startBlank(); },
         openWorkingFolder,
+        resolveFolderConflict,
         saveAll,
         backupAll,
         newTrainer,
@@ -192,7 +274,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         },
         dialogs,
         setDialogs,
-    }), [landingOpen, restoreLastSession, openWorkingFolder, saveAll, backupAll, newTrainer,
+    }), [landingOpen, restoreLastSession, openWorkingFolder, resolveFolderConflict, saveAll, backupAll, newTrainer,
         trainerPickerOpen, dialogs, store]);
 
     return (
@@ -210,6 +292,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
                 onChange={async (e) => {
                     const files = Array.from(e.currentTarget.files || []);
                     e.currentTarget.value = '';
+                    if (!files.length) discardNext.current = false;
                     adopt(await readTrainerFiles(files));
                 }}
             />
@@ -220,11 +303,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 /** Shared by the landing and the new-trainer dialog: create a file-backed
     trainer, or say why it could not be created. */
 export async function createTrainerFile(
-    fileName: string, toast: (html: string) => void,
+    fileName: string, toast: (html: string) => void, loaded: Pick<WorkingTrainer, 'fileName'>[] = [],
 ): Promise<WorkingTrainer | null> {
     let fname = fileName.trim();
-    if (!fname) { void showAlert('Please name the file.'); return null; }
+    if (!fname || fname.toLowerCase() === '.json') { void showAlert('Please name the file.'); return null; }
     if (!fname.toLowerCase().endsWith('.json')) fname += '.json';
+    /* A trainer already open has that file: two on one file overwrite each
+       other at every Save All. */
+    if (loaded.some((t) => (t.fileName || '').toLowerCase() === fname.toLowerCase())) {
+        void showAlert('A trainer that is open here is already saved as ' + fname + '.\nChoose another name.',
+            { title: 'Name already used', icon: 'fa-triangle-exclamation' });
+        return null;
+    }
 
     const fresh = defaultState();
     /* The file's own name is the trainer's name to start with — naming the
@@ -243,6 +333,8 @@ export async function createTrainerFile(
     const result = await writeTrainerFile(entry, fname);
     if (!result) return null;
     markSaved(entry);
+    requestPersistence();
+    noteBackup();
     toast(result.message);
     return entry;
 }

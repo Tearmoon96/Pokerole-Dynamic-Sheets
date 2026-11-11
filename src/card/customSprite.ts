@@ -9,9 +9,16 @@ import type { CardSheet } from './types';
    the original is filed in Custom Images/Pokemons when a working folder is
    open — preferred on load whenever that folder is reachable. */
 
-/** Downscale for the embedded fallback in localStorage; PNG (not JPEG) so a
-    transparent sprite background survives. */
+/** Downscale for the embedded fallback in localStorage. WebP where the
+    browser can write it, PNG otherwise — never JPEG, so a transparent sprite
+    background survives.
+
+    It was always PNG, and a 512px PNG is several hundred KB as text: five or
+    six Pokémon with art of their own filled the browser's whole storage, and
+    past that nothing saves. The same picture as WebP is about a tenth of
+    that. The full-size original still goes to the working folder. */
 const MAX_EMBEDDED_EDGE = 512;
+const WEBP_QUALITY = 0.9;
 
 export function genImgId(): string {
     return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -32,7 +39,10 @@ function downscaleToPng(img: HTMLImageElement): string {
     canvas.width = w;
     canvas.height = h;
     canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-    return canvas.toDataURL('image/png');
+    const png = canvas.toDataURL('image/png');
+    /* A browser that cannot encode WebP answers with a PNG instead. */
+    const webp = canvas.toDataURL('image/webp', WEBP_QUALITY);
+    return webp.startsWith('data:image/webp') && webp.length < png.length ? webp : png;
 }
 
 /** Secure folder permission before the async decode spends the click gesture. */

@@ -37,6 +37,13 @@ export class SheetStore {
        first trips, and a toast storm would bury the message it carries. */
     private quotaWarned = false;
     onToast: ((html: string) => void) | null = null;
+    /** The last write to browser storage was refused: what is on screen is
+        newer than what is stored. While that holds, nothing is read back
+        from storage — it would put the older copy on screen, and Save All
+        would then write THAT to the files. */
+    storageBehind = false;
+    /** Told when storage refuses a write, once per run of refusals. */
+    onStorageFull: (() => void) | null = null;
 
     constructor(initial?: WorkingTrainer[], active = 0) {
         const first = initial && initial.length
@@ -93,12 +100,15 @@ export class SheetStore {
         try {
             writeWorkingSet(this.trainers, this.active);
             this.quotaWarned = false;
+            this.storageBehind = false;
         } catch (e) {
             if (!(e instanceof WorkingSetQuotaError)) throw e;
+            this.storageBehind = true;
             if (!this.quotaWarned) {
                 this.quotaWarned = true;
                 this.onToast?.('<i class="fa-solid fa-triangle-exclamation"></i> Browser storage is '
                     + 'full — changes are NOT being kept. Save All now, then close a trainer.');
+                this.onStorageFull?.();
             }
         }
     }
@@ -166,6 +176,7 @@ export class SheetStore {
     /** A Pokémon card edited in another tab writes the working set; pull those
         changes back in when this tab regains focus. */
     syncFromStorage(): void {
+        if (this.storageBehind) return;
         const merged = mergeFromStorage(this.trainers);
         if (!merged) return;
         this.trainers = merged;

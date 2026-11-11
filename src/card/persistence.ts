@@ -7,6 +7,7 @@ import type { CardSheet, Specialty } from './types';
 import type { PokedexEntry } from '../data/types';
 import type { MonEntry, TrainerState } from '../state/types';
 import { coerceSheet } from '../state/coerce';
+import { showAlert } from '../lib/dialog';
 
 /* Where a card sheet is read from and written to: inside the trainer's working
    set when the card was opened from a licence, else its own localStorage key. */
@@ -143,7 +144,11 @@ export function loadCardSheet(p: PokedexEntry, ctx: CardContext): CardSheet {
     }
 }
 
-export function saveCardSheet(p: PokedexEntry, ctx: CardContext, sheet: CardSheet): void {
+/** False when the browser refused the write — its storage is full — and the
+    sheet on screen is therefore NOT kept. The caller says so: this used to
+    swallow the failure, and a card went on showing edits that were gone at
+    the next reload. */
+export function saveCardSheet(p: PokedexEntry, ctx: CardContext, sheet: CardSheet): boolean {
     if (ctx.inTrainerMode) {
         const w = readWorking();
         const entry = trainerMonEntry(w, ctx);
@@ -151,10 +156,23 @@ export function saveCardSheet(p: PokedexEntry, ctx: CardContext, sheet: CardShee
             entry.sheet = sheet;
             /* Keep the trainer's species in sync if it was changed */
             entry.dexId = p._id;
-            try { localStorage.setItem(WORKING_KEY, JSON.stringify(w)); } catch { /* quota */ }
+            try { localStorage.setItem(WORKING_KEY, JSON.stringify(w)); } catch { return false; }
         }
-    } else {
-        try { localStorage.setItem(cardStorageKey(ctx, p._id), JSON.stringify(sheet)); }
-        catch { /* private mode / full quota */ }
+        return true;
     }
+    try { localStorage.setItem(cardStorageKey(ctx, p._id), JSON.stringify(sheet)); }
+    catch { return false; }
+    return true;
+}
+
+let fullTold = false;
+
+/** Says, once per page, that a change could not be kept. */
+export function tellStorageFull(): void {
+    if (fullTold) return;
+    fullTold = true;
+    void showAlert('This browser\u2019s storage is full, so changes to this card are not being kept.\n\n'
+        + 'Open the Trainer\u2019s License and press Save All, then close trainers you are not using, or remove '
+        + 'maps and custom art you no longer need. Changes made here until then will be lost on reload.',
+        { title: 'Browser storage is full', icon: 'fa-triangle-exclamation', danger: true });
 }

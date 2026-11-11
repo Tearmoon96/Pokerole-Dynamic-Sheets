@@ -1,4 +1,4 @@
-import { loadCardSheet, readWorking, saveCardSheet, trainerMonEntry } from './persistence';
+import { loadCardSheet, readWorking, saveCardSheet, tellStorageFull, trainerMonEntry } from './persistence';
 import { cardStorageKey } from './cardContext';
 import type { CardContext } from './cardContext';
 import type { CardSheet } from './types';
@@ -90,7 +90,14 @@ export class CardStore {
 
     save(): void {
         if (npcReadOnly()) return;
-        saveCardSheet(this.pokemon, this.ctx, this.sheet);
+        if (!saveCardSheet(this.pokemon, this.ctx, this.sheet)) {
+            /* Not kept. Storage still has the older sheet, and reading it
+               back (syncFromStorage) would put that on screen: remember what
+               is there as seen, so this tab keeps showing its own. */
+            this.remember();
+            tellStorageFull();
+            return;
+        }
         this.remember();
     }
 

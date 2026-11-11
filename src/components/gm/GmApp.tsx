@@ -25,12 +25,32 @@ import type { PokedexEntry } from '../../data/types';
 import { useTour } from '../../lib/tour';
 import { GuidedTour, useFirstTimeTour } from '../common/Tour';
 import { GM_STEPS, GM_TOUR_INTRO } from './tourSteps';
+import { useToast } from '../common/Toast';
+import { showAlert } from '../../lib/dialog';
+import { warnIfNearlyFull } from '../../lib/storageUse';
 
 /* The board: six panels side by side, in whatever order and at whatever widths
    the GM has left them. */
 
 export function GmApp({ dataOk }: { dataOk: boolean }) {
     const { state, store } = useGm();
+    /* The store's warning needs somewhere to go: nothing set this before, and
+       a full storage dropped every change to the board without a word. */
+    const toast = useToast();
+    useEffect(() => {
+        let told = false;
+        store.onToast = (html) => {
+            toast(html);
+            if (told) return;
+            told = true;
+            void showAlert('This browser\u2019s storage is full, so changes to the GM Screen are no longer being kept.\n\n'
+                + 'Save the session to a file now (the disk button in the top bar), then free some room: close '
+                + 'trainers you are not using in the Trainer\u2019s License, or remove maps you no longer need.',
+                { title: 'Browser storage is full', icon: 'fa-triangle-exclamation', danger: true });
+        };
+        warnIfNearlyFull(toast);
+        return () => { store.onToast = null; };
+    }, [store, toast]);
     const { data } = useAppData();
     /* One popup at a time: a token opens its move panel, `statsKey(token)`
        its stats popup (StatTip.tsx). */

@@ -35,6 +35,11 @@ import { GuidedTour, useFirstTimeTour } from '../common/Tour';
 import { LICENSE_STEPS, LICENSE_TOUR_INTRO } from './tourSteps';
 import { NpcBanner } from '../common/NpcBanner';
 import { NPC_ID, WORKING_KEY } from '../../state/constants';
+import { useToast } from '../common/Toast';
+import { showAlert } from '../../lib/dialog';
+import { hasFileSystemAccess } from '../../lib/fileSystem';
+import { backupIsStale, daysSinceBackup, warnIfNearlyFull } from '../../lib/storageUse';
+import { useSession } from '../../state/SessionContext';
 
 /* The four quadrants of the licence, plus the notepad under them.
 
@@ -88,6 +93,35 @@ export function LicenseApp() {
     }, [store]);
 
     const healingItem = (sheet.stats.clever || 0) + (sheet.skills.medicine || 0);
+
+    /* The store's warnings need somewhere to go. Nothing set this before, so
+       a full storage dropped every change without a word; and it is said in
+       a dialog as well, since a toast is gone in two seconds and this is the
+       one message that must be read. */
+    const toast = useToast();
+    const pending = useSession().pendingRestore;
+    useEffect(() => {
+        store.onToast = toast;
+        store.onStorageFull = () => {
+            void showAlert('This browser\u2019s storage is full, so your changes are no longer being kept in it.\n\n'
+                + 'They are still on this page. Press Save All now to write them to your files (or the download '
+                + 'button for a backup), then close trainers you are not using, or remove maps and custom art you no '
+                + 'longer need.', { title: 'Browser storage is full', icon: 'fa-triangle-exclamation', danger: true });
+        };
+        warnIfNearlyFull(toast);
+        /* Where the folder cannot be written the download is the only copy
+           that lasts: say so when there is none, or an old one. */
+        const n = pending?.trainers.length || 0;
+        if (!NPC_ID && !hasFileSystemAccess() && n > 0 && backupIsStale()) {
+            const days = daysSinceBackup();
+            toast('<i class="fa-solid fa-download"></i> ' + (days === null
+                ? 'No backup of your trainers has been downloaded from this browser yet.'
+                : 'Your last backup was ' + days + ' days ago.')
+                + ' Use the download button to keep a copy.');
+        }
+        return () => { store.onToast = null; store.onStorageFull = null; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [store, toast, pending]);
 
     useFirstTimeTour('license');
 

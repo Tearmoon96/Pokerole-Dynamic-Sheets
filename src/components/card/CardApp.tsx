@@ -28,7 +28,7 @@ import type { EvolutionTarget } from '../../card/evolution';
 import { megaEvolveSheet, megaRevertSheet } from '../../card/mega';
 import { activeMegaRules } from '../../lib/megaRules';
 import type { CardSheet } from '../../card/types';
-import { readWorking, trainerMonEntry } from '../../card/persistence';
+import { readWorking, tellStorageFull, trainerMonEntry } from '../../card/persistence';
 import { cardStorageKey, WORKING_KEY } from '../../card/cardContext';
 import { npcReadOnly } from '../../state/npcMode';
 import {
@@ -168,7 +168,9 @@ export function CardApp() {
             if (entry) {
                 entry.sheet = adjusted;
                 entry.dexId = targetId;
-                try { localStorage.setItem(WORKING_KEY, JSON.stringify(w)); } catch { /* quota */ }
+                /* Not kept: stay here. Going on would open the new species
+                   on a sheet that was never written. */
+                try { localStorage.setItem(WORKING_KEY, JSON.stringify(w)); } catch { tellStorageFull(); return; }
             }
         } else {
             try {
@@ -179,7 +181,7 @@ export function CardApp() {
                     ? wildSheetKey(ctx.wildId)
                     : cardStorageKey({ ...ctx, wildMode: false }, targetId);
                 localStorage.setItem(key, JSON.stringify(adjusted));
-            } catch { /* quota */ }
+            } catch { tellStorageFull(); return; }
             if (ctx.wildMode) addWildOpen(ctx.wildId, targetId);
         }
         gotoPokemon(targetId);

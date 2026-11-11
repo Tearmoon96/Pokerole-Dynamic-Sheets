@@ -15,11 +15,53 @@ import { HOMEBREW_FIELD, homebrewFor } from '../data/homebrew';
 export interface WorkingTrainer extends TrainerEntry {
     /** The last on-disk snapshot; undefined for a trainer never written out. */
     savedJson?: string;
+    /** The saved mark this trainer was stored with (`StoredTrainer.saved`),
+        carried while `savedJson` is not known — a session restored and not
+        yet checked against the folder. */
+    storedMark?: string;
+}
+
+export interface StoredTrainer {
+    id: string;
+    name: string;
+    fileName: string | null;
+    data: TrainerState;
+    /** A mark of the trainer as last written to its file (`savedMark`).
+        The cards, the GM screen and the rolling table change `data` and
+        leave this alone, so a stored trainer whose data no longer gives this
+        mark has changes no file holds — which is what opening a folder
+        checks before it replaces the browser's copy. Absent for a trainer
+        never saved, or stored before the mark existed. */
+    saved?: string;
 }
 
 interface StoredWorkingSet {
-    trainers: { id: string; name: string; fileName: string | null; data: TrainerState }[];
+    trainers: StoredTrainer[];
     active: number;
+}
+
+/** A short mark of a trainer's file text: two 32-bit FNV-1a sums. Not a
+    secret and not a signature, only a cheap "is this still that text". */
+export function savedMark(json: string): string {
+    let a = 0x811c9dc5, b = 0x01000193;
+    for (let i = 0; i < json.length; i++) {
+        const c = json.charCodeAt(i);
+        a = Math.imul(a ^ c, 0x01000193);
+        b = Math.imul(b ^ (c + i), 0x811c9dc5);
+    }
+    return (a >>> 0).toString(36) + (b >>> 0).toString(36) + json.length.toString(36);
+}
+
+/* The mark of each trainer's saved text, worked out once per text: the
+   working set is written on every keystroke. */
+const marks = new Map<string, { json: string; mark: string }>();
+function markOf(t: WorkingTrainer): string | undefined {
+    if (t.savedJson == null) return t.storedMark;
+    const had = marks.get(t.id);
+    if (had && had.json === t.savedJson) return had.mark;
+    const mark = savedMark(t.savedJson);
+    marks.set(t.id, { json: t.savedJson, mark });
+    return mark;
 }
 
 export function readWorkingSet(): StoredWorkingSet | null {
@@ -49,7 +91,10 @@ export class WorkingSetQuotaError extends Error {}
 export function writeWorkingSet(trainers: WorkingTrainer[], active: number): void {
     try {
         localStorage.setItem(WORKING_KEY, JSON.stringify({
-            trainers: trainers.map((t) => ({ id: t.id, name: t.data.name, fileName: t.fileName, data: t.data })),
+            trainers: trainers.map((t) => {
+                const saved = markOf(t);
+                return { id: t.id, name: t.data.name, fileName: t.fileName, data: t.data, ...(saved ? { saved } : {}) };
+            }),
             active,
         } satisfies StoredWorkingSet));
     } catch (e) {

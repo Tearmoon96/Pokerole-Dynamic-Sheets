@@ -3,7 +3,8 @@ import { Modal, ModalClose, ModalTitle } from '../common/Modal';
 import { useSession, createTrainerFile } from '../../state/SessionContext';
 import { useStore } from '../../state/SheetContext';
 import { useToast } from '../common/Toast';
-import { adoptLoadedTrainers } from '../../state/trainerIO';
+import { adoptLoadedTrainers, freeTrainerBase } from '../../state/trainerIO';
+import { needsHomeScreen } from '../../lib/storageUse';
 import type { WorkingTrainer } from '../../state/workingSet';
 
 /* Every dialog that belongs to the session rather than to the sheet: the
@@ -57,6 +58,36 @@ export function SessionDialogs() {
                 </div>
             </Modal>
 
+            {/* A folder just opened, and this browser holds newer work than its files */}
+            <Modal
+                open={!!s.dialogs.folderConflict}
+                onClose={() => s.setDialogs({ ...s.dialogs, folderConflict: null })}
+                id="folder-conflict-modal"
+            >
+                <ModalTitle icon="fa-triangle-exclamation" centered={false}>This browser has newer changes</ModalTitle>
+                <p className="modal-text">
+                    Changes made since the last <strong>Save All</strong> — on this page, a Pokémon card,
+                    the GM Screen or the Rolling Table — are kept in this browser, not in the files:
+                </p>
+                <ul className="modal-text" id="folder-conflict-list" style={{ margin: '0 0 4px 0', paddingLeft: '20px' }}>
+                    {s.dialogs.folderConflict?.map((c, i) => (
+                        <li key={i}><strong>{c.name}</strong> — {c.reason}</li>
+                    ))}
+                </ul>
+                <p className="modal-text">
+                    Keep the browser's version (it loads as unsaved; Save All then writes it to the files),
+                    or load the files as they are and discard those changes?
+                </p>
+                <div className="modal-actions">
+                    <button className="form-btn save" id="folder-keep-browser" onClick={() => s.resolveFolderConflict(true)}>
+                        Keep browser version
+                    </button>
+                    <button className="form-btn danger" id="folder-use-files" onClick={() => s.resolveFolderConflict(false)}>
+                        Use the files
+                    </button>
+                </div>
+            </Modal>
+
             {/* Discard warning before replacing the working set with a new folder */}
             <Modal
                 open={s.dialogs.discardOpen}
@@ -88,8 +119,7 @@ export function SessionDialogs() {
                         onClick={() => {
                             s.setDialogs({ ...s.dialogs, discardOpen: false });
                             /* The guard has been answered; go straight to the picker. */
-                            store.trainers.forEach((t) => { t.savedJson = store.json(t); });
-                            s.openWorkingFolder();
+                            s.openWorkingFolder(true);
                         }}
                     >
                         Discard &amp; open
@@ -217,7 +247,9 @@ function NewTrainerModal() {
 
     useEffect(() => {
         if (!open) return;
-        setBase(stripExt(s.dialogs.newTrainerName || 'trainer-new.json'));
+        /* The first name no open trainer has: the same one offered twice
+           put the second trainer on the first one's file. */
+        setBase(freeTrainerBase(store.trainers, stripExt(s.dialogs.newTrainerName || 'trainer-new.json')));
         const id = window.setTimeout(() => { ref.current?.focus(); ref.current?.select(); }, 0);
         return () => clearTimeout(id);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -260,7 +292,7 @@ function NewTrainerModal() {
                 <button
                     className="form-btn save"
                     onClick={async () => {
-                        const entry = await createTrainerFile(fileName, toast);
+                        const entry = await createTrainerFile(fileName, toast, store.trainers);
                         if (!entry) return;
                         store.addTrainer(entry);
                         s.setDialogs({ ...s.dialogs, newTrainerName: null });
@@ -285,6 +317,13 @@ function LandingModal() {
                 called <strong>Trainers</strong>. Open that folder to load them — your edits are kept
                 there whenever you <strong>Save All</strong>.
             </p>
+            {needsHomeScreen() && (
+                <p className="modal-text" id="landing-homescreen-note">
+                    <i className="fa-solid fa-triangle-exclamation"></i> On iPhone and iPad, Safari may erase a
+                    site's saved data after a week without a visit. Add this page to your <strong>Home Screen</strong>
+                    {' '}(Share, then Add to Home Screen) and keep a backup with the download button.
+                </p>
+            )}
             <div className="modal-actions" style={{ flexDirection: 'column', gap: '10px' }}>
                 <button
                     className="form-btn save"

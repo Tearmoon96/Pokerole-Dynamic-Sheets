@@ -110,6 +110,53 @@ function download(json: string, fileName: string): void {
     URL.revokeObjectURL(url);
 }
 
+/* A name in the folder is free for a trainer when no file has it, or the
+   file that has it is that trainer's own.
+
+   `getFileHandle(name, { create: true })` hands back an existing file as
+   readily as a new one, and writing to it empties it first. So a new trainer
+   given a name already in the folder — `trainer-new` is offered every time —
+   silently replaced whoever's file that was, and from then on both trainers
+   were written to the one file, the last over the first. */
+async function heldByAnother(dir: FileSystemDirectoryHandle, name: string, id: string): Promise<boolean> {
+    let file: File;
+    try {
+        file = await (await dir.getFileHandle(name)).getFile();
+    } catch {
+        return false;   // no such file
+    }
+    if (file.size === 0) return false;
+    try {
+        const parsed = JSON.parse(await file.text());
+        return !(parsed && parsed[TRAINER_MARKER] && parsed.id === id);
+    } catch {
+        return true;    // something else's file: not ours to replace
+    }
+}
+
+/** Whether the folder already has a file of this name, whatever is in it. */
+export async function nameInFolder(dir: FileSystemDirectoryHandle, name: string): Promise<boolean> {
+    try { await dir.getFileHandle(name); return true; } catch { return false; }
+}
+
+/** `ash.json`, then `ash-2.json`, `ash-3.json`… until `taken` says no. */
+async function firstFree(wanted: string, taken: (name: string) => Promise<boolean> | boolean): Promise<string> {
+    const base = wanted.replace(/\.json$/i, '');
+    for (let n = 1; ; n++) {
+        const name = (n === 1 ? base : base + '-' + n) + '.json';
+        if (!await taken(name)) return name;
+    }
+}
+
+/** The first of `trainer-new`, `trainer-new-2`… no loaded trainer uses. */
+export function freeTrainerBase(trainers: Pick<WorkingTrainer, 'fileName'>[], wanted = 'trainer-new'): string {
+    const used = new Set(trainers.map((t) => (t.fileName || '').toLowerCase()));
+    for (let n = 1; ; n++) {
+        const base = n === 1 ? wanted : wanted + '-' + n;
+        if (!used.has(base + '.json')) return base;
+    }
+}
+
 export interface SaveOutcome {
     ok: boolean;
     /** True when the files went to the Downloads folder instead. */
@@ -135,10 +182,28 @@ export async function saveAllTrainers(trainers: WorkingTrainer[]): Promise<SaveO
                     return { ok: false, downloaded: false, message: 'Write permission was denied.' };
                 }
             }
+            /* One file a trainer. Two that ended up on the same file (see
+               heldByAnother) are parted here: the first keeps it, the other
+               is given a file of its own below. */
+            const moved: string[] = [];
+            for (let i = 0; i < trainers.length; i++) {
+                const h = trainers[i].handle;
+                if (!h) continue;
+                for (let j = 0; j < i; j++) {
+                    const other = trainers[j].handle;
+                    if (other && await h.isSameEntry(other)) { trainers[i].handle = null; break; }
+                }
+            }
+            const names = new Set(trainers.filter((t) => t.handle).map((t) => (t.fileName || '').toLowerCase()));
             for (const t of trainers) {
                 if (!t.handle) {
-                    t.handle = await dir.getFileHandle(trainerFileName(t), { create: true });
+                    const wanted = trainerFileName(t);
+                    const name = await firstFree(wanted,
+                        async (n) => names.has(n.toLowerCase()) || await heldByAnother(dir!, n, t.id));
+                    if (name !== wanted) moved.push(escapeHtml(t.data.name || 'A trainer') + ' is now in ' + escapeHtml(name));
+                    t.handle = await dir.getFileHandle(name, { create: true });
                     t.fileName = t.handle.name;
+                    names.add(name.toLowerCase());
                 }
                 const writable = await t.handle.createWritable();
                 await writable.write(trainerJson(t));
@@ -148,13 +213,17 @@ export async function saveAllTrainers(trainers: WorkingTrainer[]): Promise<SaveO
             return {
                 ok: true, downloaded: false,
                 message: '<i class="fa-solid fa-circle-check"></i> Saved ' + trainers.length
-                    + ' trainer' + plural(trainers.length) + ' to the folder',
+                    + ' trainer' + plural(trainers.length) + ' to the folder'
+                    + (moved.length ? ' — ' + moved.join('; ') + '.' : ''),
             };
         } catch (e) {
             console.error(e);
             /* The folder refused the write; the data still has to land
-               somewhere, so it goes to Downloads and the user is told. */
-            downloadAllTrainers(trainers, true);
+               somewhere, so it goes to Downloads and the user is told. The
+               trainers stay marked unsaved: a browser may hold back all but
+               the first of several downloads, and "saved" would then be a
+               claim nothing checked. */
+            downloadAllTrainers(trainers, false);
             return {
                 ok: false, downloaded: true,
                 message: 'Could not write to the folder (' + (e as Error).message
@@ -195,6 +264,12 @@ export async function writeTrainerFile(
             if (dir.requestPermission) {
                 const perm = await dir.requestPermission({ mode: 'readwrite' });
                 if (perm !== 'granted') { void showAlert('Write permission was denied.', { title: 'Not saved', icon: 'fa-lock' }); return null; }
+            }
+            /* Never over a file that is already there (see heldByAnother). */
+            if (await nameInFolder(dir, fname)) {
+                void showAlert('The folder already has a file named ' + fname + '.\nChoose another name: creating this one would replace it.',
+                    { title: 'Name already used', icon: 'fa-triangle-exclamation' });
+                return null;
             }
             const h = await dir.getFileHandle(fname, { create: true });
             const w = await h.createWritable();
