@@ -135,6 +135,14 @@ const REARM_MS = 5 * 60 * 1000;
    and with everything else in an idle wipe. */
 const STATS_KEY = 'stats';
 
+/* Set once a room has held two sockets at once: a table with someone at it
+   besides its GM. Only such a room's claim is kept for CLAIM_KEEP_MS — it is
+   there so nobody else at that table can take the file store between two
+   sessions. A claim on a room nobody ever sat in is a request from a script,
+   and goes with the first idle wipe: kept, a script could leave one behind
+   for 90 days with every request it made. */
+const SAT_KEY = 'sat';
+
 interface RoomStats {
     /** When the session's first socket opened. */
     start: number;
@@ -342,6 +350,7 @@ export class TableRoom implements DurableObject {
     }
 
     private async track(n: number, now: number): Promise<void> {
+        if (n === 2 && !await this.state.storage.get(SAT_KEY)) await this.state.storage.put(SAT_KEY, 1);
         let stats = await this.state.storage.get<RoomStats>(STATS_KEY);
         /* Alone in a room that still has a session: the last one ended
            without a close reaching us (a redeploy, an eviction). Count it
@@ -462,7 +471,8 @@ export class TableRoom implements DurableObject {
         }
         const expire = this.sql.exec<{ v: string }>("SELECT v FROM meta WHERE k = 'expire'").toArray()[0];
         const claimed = this.sql.exec("SELECT v FROM meta WHERE k = 'key'").toArray().length > 0;
-        if (!claimed || (expire && now >= Number(expire.v))) {
+        const sat = !!await this.state.storage.get(SAT_KEY);
+        if (!claimed || !sat || (expire && now >= Number(expire.v))) {
             /* Nothing worth keeping, or kept long enough: all of it goes. */
             await this.state.storage.deleteAll();
             return;
@@ -501,7 +511,48 @@ export class TableRoom implements DurableObject {
         return !!row && row.v === await sha256Hex(presented);
     }
 
+    /** Whether this room has a file store at all. A look, never a write. */
+    private hasStore(): boolean {
+        try {
+            return this.sql.exec("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'blobs'").toArray().length > 0;
+        } catch {
+            return false;
+        }
+    }
+
+    /** What a read of a room with no file store gets: the same answers an
+        empty store gives, without making one. */
+    private nothingHere(rest: string[], url: URL): Response {
+        const json = (body: unknown) => new Response(JSON.stringify(body), {
+            headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...CORS },
+        });
+        if (rest[0] === 'blobs') return json({ files: {} });
+        if (rest[0] === 'claim') return text('method not allowed', 405);
+        if (rest.length === 2 && !url.searchParams.has('from')) return json({ parts: [] });
+        return text('no such part', 404);
+    }
+
     private async files(req: Request, rest: string[]): Promise<Response> {
+        /* A read must never be what fills a room's storage. It used to:
+           every route came through `schema()`, so one GET of any address made
+           two tables in a new object (24 KB) — and nothing set an alarm for
+           it, so they were never wiped. A script walking made-up addresses
+           could fill the account's storage that way, a request a room, and
+           with it every table's maps and music.
+
+           A room with no file store is answered as an empty one, with no
+           tables made. Even looking leaves a little behind (the runtime's
+           own 8 KB), so every path that can be the first to touch a room
+           also puts it on the clock: the idle wipe is set if no alarm is,
+           without counting the request as activity — it may be from someone
+           with no key at all. */
+        const reading = req.method === 'GET' && !this.hasStore();
+        if (reading || req.method !== 'GET') {
+            try {
+                if (await this.state.storage.getAlarm() === null) await this.state.storage.setAlarm(Date.now() + IDLE_MS);
+            } catch { /* storage refusing writes: an upload below says so */ }
+        }
+        if (reading) return this.nothingHere(rest, new URL(req.url));
         this.schema();
         /* Read before anything can answer — see the note in the Worker. */
         let data: ArrayBuffer | null = null;

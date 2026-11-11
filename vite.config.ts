@@ -91,8 +91,12 @@ function devPageAliases(pages: string[]) {
    built page blocks it — the app then falls back to 'app-data/', which is
    what the line says anyway. `npm run dev` gets no policy: Vite's dev server
    injects inline scripts of its own. */
+/* YouTube's player, by its two paths and not the whole of www.youtube.com:
+   `iframe_api` is the loader the page asks for, and it fetches the player
+   itself from under `/s/player/`. A whole large site in a script policy is
+   only as tight as that site's loosest endpoint. */
 const PAGE_SCRIPT_SOURCES: Record<string, string[]> = {
-    'rolling-table': ['https://www.youtube.com'],
+    'rolling-table': ['https://www.youtube.com/iframe_api', 'https://www.youtube.com/s/player/'],
 };
 
 function withCsp(html: string, page: string): string {
@@ -101,6 +105,10 @@ function withCsp(html: string, page: string): string {
     const policy = [
         "script-src 'self' " + [...hashes, ...(PAGE_SCRIPT_SOURCES[page] ?? [])].join(' '),
         "base-uri 'none'",
+        /* No plugin content anywhere, and a form injected into a page could
+           only ever post back to the site. */
+        "object-src 'none'",
+        "form-action 'self'",
     ].join('; ');
     const meta = '<meta http-equiv="Content-Security-Policy" content="' + policy.trim() + '">';
     /* Right after the charset: a policy covers only what comes after it. */
@@ -254,6 +262,23 @@ export default defineConfig(({ command }) => {
                         delete bundle[key];
                         bundle[out.fileName] = out;
                     }
+                },
+            },
+            {
+                /* The landing page is not built: it is copied from public/ as
+                   it is, so it never passed through the hook above and had no
+                   policy at all. It gets the same one here, once the copy is
+                   in the output and before the service worker's file list is
+                   made from it. */
+                name: 'pokerole-landing-csp',
+                apply: 'build' as const,
+                async writeBundle(opts: any) {
+                    const { readFile, writeFile } = await import('node:fs/promises');
+                    const file = join(opts.dir || join(root, 'dist-pwa'), 'index.html');
+                    try {
+                        const html = await readFile(file, 'utf8');
+                        if (!html.includes('Content-Security-Policy')) await writeFile(file, withCsp(html, 'index'));
+                    } catch { /* no landing page in this build */ }
                 },
             },
             {

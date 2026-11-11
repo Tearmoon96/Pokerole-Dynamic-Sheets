@@ -87,6 +87,19 @@ five-person table playing for four hours, heartbeats included, runs to a few
 thousand — so the ceiling is somewhere around a hundred simultaneous tables all
 day, every day, which is a different order of problem from the one this solves.
 
+The allowance is also what a script hammering the relay would use up: past it
+every table is offline until midnight UTC, and nothing in the Worker can stop
+that, since a refused request is still a counted one. So have Cloudflare tell
+you before the players do: in the dashboard, **Notifications > Add**, product
+**Workers**, "Usage Report" (or a billing/usage alert), sent to your email.
+
+Storage is the other limit (5 GB of Durable Object storage on the free plan).
+A room is wiped six hours after its last activity; only the claim of a table
+that has had two people at it is kept longer (90 days), and a read never
+creates a room's tables. `npx wrangler d1`-style tooling cannot list Durable
+Objects, so if the storage figure in the dashboard ever climbs with no tables
+to explain it, that is the place to look.
+
 ---
 
 ## Testing it locally, before anything is deployed
