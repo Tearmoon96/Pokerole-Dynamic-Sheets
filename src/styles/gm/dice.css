@@ -372,23 +372,65 @@ button.will-btn.will-less { padding: 0.25rem 0.35rem; }
 
 .will-have.idle { opacity: 0.45; }
 
-/* The table GM's Ignore pain, drawn as the Will buttons beside it are, in
-   the pain marks' red: a rule for the whole table, not anybody's Will. */
-button.will-btn.pain-switch {
-    margin-left: auto;
-    border-color: #ef444473;
-    background: #ef44441a;
-    color: #fca5a5;
+/* The table's row (`bare`): no Will count, the two buttons share the row. */
+.will-spend.bare { flex-wrap: nowrap; }
+.will-spend.bare > button.will-btn,
+.will-spend.bare > .will-fate { flex: 1 1 0; min-width: 0; }
+.will-spend.bare button.will-btn { justify-content: center; }
+.will-spend.bare .will-fate > button.will-btn.fate { flex: 1 1 auto; }
+
+/* Ignore pain under them, the whole row, and the list it opens
+   (components/table/IgnorePain.tsx). */
+.ignore-pain { display: flex; flex-direction: column; gap: 0.35rem; }
+.ignore-pain > button.will-btn.pain-btn { width: 100%; justify-content: center; }
+
+.ignore-pain-note { margin: 0; font-size: 0.74rem; }
+
+.ignore-pain-list {
+    list-style: none;
+    margin: 0;
+    padding: 0.35rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    border: 1px solid #3c6cf859;
+    border-radius: 8px;
+    background: #3c6cf812;
 }
 
-button.will-btn.pain-switch:hover { border-color: var(--danger); background: #ef44443d; color: #fff; }
-
-button.will-btn.pain-switch.on {
-    border-color: var(--danger);
-    background: #ef444459;
-    color: #fff;
-    box-shadow: 0 0 7px #ef444466;
+.ignore-pain-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.74rem;
 }
+
+.ignore-pain-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ignore-pain-now {
+    flex: none;
+    font: 700 0.68rem/1 'Fira Code', monospace;
+    color: var(--text-muted);
+}
+.ignore-pain-now.hurt { color: #fca5a5; }
+
+.ignore-pain-choices { display: inline-flex; gap: 0.2rem; flex: none; }
+
+button.pain-choice {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.2rem 0.3rem;
+    font: 700 0.7rem/1 'Fira Code', monospace;
+    border: 1px solid #3c6cf873;
+    background: #3c6cf81a;
+    color: #c5d4ff;
+}
+button.pain-choice.open:hover { border-color: var(--will-color); background: #3c6cf83d; color: #fff; }
+button.pain-choice.on { border-color: var(--will-color); background: #3c6cf859; color: #fff; text-decoration: line-through; }
+button.pain-choice.none,
+button.pain-choice.short { opacity: 0.4; cursor: default; }
+button.pain-choice .will-cost { font-size: 0.6rem; padding: 0.08rem 0.2rem; }
 
 /* The GM's switch in the Dice panel's head: Pain Penalization off. */
 button.icon-btn.pain-rule { color: #fca5a5; }

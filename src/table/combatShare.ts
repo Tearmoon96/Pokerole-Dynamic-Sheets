@@ -18,7 +18,7 @@
        screen, which also checks it is their turn. */
 
 import { COMBAT_BEAT_MS, COMBAT_LOST_MS, openCombatLink, parseCombatLink } from '../lib/combatLink';
-import type { CombatLinkMessage, LinkMember, PcOp } from '../lib/combatLink';
+import type { CombatLinkMessage, LinkMember, NpcPain, PcOp } from '../lib/combatLink';
 import { mutateWorkingTrainer, readWorking } from '../gm/workingSet';
 import { normalizeStatus } from '../gm/ailments';
 import type { TrainerState } from '../state/types';
@@ -37,6 +37,8 @@ export interface CombatView {
     linked: boolean;
     /** Player: the trainer whose characters are in the fight. */
     trainerId: string | null;
+    /** GM: the GM's own combatants in that fight, and their pain. */
+    pains: NpcPain[];
 }
 
 /** A player's tie to the fight, kept per lobby so a reload stays in it:
@@ -98,7 +100,7 @@ function forPlayers(t: WireTurns | null): WireTurns | null {
 }
 
 export class CombatShare {
-    view: CombatView = { turns: null, linked: false, trainerId: null };
+    view: CombatView = { turns: null, linked: false, trainerId: null, pains: [] };
 
     private host = false;
     private lobby = '';
@@ -130,7 +132,7 @@ export class CombatShare {
         this.lobby = lobbyId;
         this.rev = 0;
         this.published = '';
-        this.view = { turns: null, linked: false, trainerId: null };
+        this.view = { turns: null, linked: false, trainerId: null, pains: [] };
         if (isHost) {
             this.link = openCombatLink();
             this.link?.addEventListener('message', this.onLink);
@@ -201,8 +203,20 @@ export class CombatShare {
             this.api.changed();
             return;
         }
+        if (m.t === 'pains') {
+            if (JSON.stringify(m.list) === JSON.stringify(this.view.pains)) return;
+            this.view = { ...this.view, pains: m.list };
+            this.api.changed();
+            return;
+        }
         if (m.t === 'op') this.onGmOp(m.member, m.key, m.op);
     };
+
+    /** GM: Power Through the Pain for one of the GM's combatants; the GM
+        screen checks it, charges the Will and sends the new pains back. */
+    ignorePain(id: string, off: number): void {
+        if (this.host) this.post({ t: 'painoff', id, off });
+    }
 
     /** The strip to everyone, when it changed. */
     private publish(force = false): void {

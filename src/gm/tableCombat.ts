@@ -8,7 +8,9 @@ import type { WireTurnEntry, WireTurns } from '../table/protocol';
 import { LIMITS } from '../table/protocol';
 import { IMAGE_RE } from '../table/slim';
 import { initOffset } from './combat';
-import { entityPool, entityRef, monShownName, participantLook, participantToken } from './entities';
+import { entityPain, entityPool, entityRef, monShownName, participantLook, participantToken, resolveToken, setPainOff } from './entities';
+import { painCost } from '../lib/pain';
+import type { NpcPain } from '../lib/combatLink';
 import { uid } from './state';
 import { parsePcToken, pcToken } from './tablePcs';
 import { actedOf, hasActions, passOrderOf, pidOf, usedCount } from './turns';
@@ -143,4 +145,44 @@ export function enterFight(
         parts = at < 0 ? [...parts, made] : [...parts.slice(0, at), made, ...parts.slice(at)];
     }
     return { ...c, participants: parts };
+}
+
+/* ---- Ignore pain for the GM's own combatants, from the table (RollControls).
+   Only the GM's side of the fight on the table — a player's character is
+   theirs to pay for — and only one with HP and Will behind it. */
+
+function npcTarget(state: GmState, dexById: DexById, p: GmCombatant): string | null {
+    if (parsePcToken(String(rec(p).src || ''))) return null;
+    const token = participantToken(state, dexById, p);
+    return resolveToken(state, token) || token;
+}
+
+export function npcPains(state: GmState, c: GmCombat, dexById: DexById): NpcPain[] {
+    const out: NpcPain[] = [];
+    for (const p of c.participants) {
+        const target = npcTarget(state, dexById, p);
+        const ref = target ? entityRef(state, dexById, target) : null;
+        const pain = entityPain(ref);
+        const will = ref ? entityPool(ref, 'will') : null;
+        if (!ref || !pain || !will || pain.ruleOff) continue;
+        const name = String(participantLook(state, dexById, p).label || ref.name || '?').slice(0, 80) || '?';
+        out.push({ id: pidOf(p), name, tiers: pain.tiers, off: pain.off, will: Math.min(999, will.cur) });
+    }
+    return out.slice(0, 64);
+}
+
+/** Power Through the Pain for the GM's combatant `pid`: `off` tiers bought
+    off, its Will charged. False when it is not the GM's, not in that pain,
+    already paid, or short of Will. */
+export function npcPainOff(state: GmState, c: GmCombat, dexById: DexById, pid: string, off: number, save: () => void): boolean {
+    const p = c.participants.find((x) => pidOf(x) === pid);
+    const target = p ? npcTarget(state, dexById, p) : null;
+    const ref = target ? entityRef(state, dexById, target) : null;
+    const pain = entityPain(ref);
+    const will = ref ? entityPool(ref, 'will') : null;
+    if (!target || !pain || !will || pain.ruleOff || off <= pain.off || off > pain.tiers) return false;
+    const cost = painCost(pain.off, off);
+    if (will.cur < cost) return false;
+    setPainOff(state, dexById, target, off, cost, save);
+    return true;
 }

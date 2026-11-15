@@ -99,3 +99,26 @@ export function painCost(from: number, to: number): number {
 export function settledPainOff(mods: CombatMods | null | undefined, cur: number, max: number): number {
     return Math.min(modOf(mods, 'painOff'), painTiers(cur, max));
 }
+
+/** One choice of Power Through the Pain, as the table's Ignore pain offers it:
+    the successes it gives back (−1, −2, −3), the tiers bought off after it and
+    its Will. −1 is the first tier, −2 the second once the first is paid, −3
+    both at once — tiers are bought from the first up, as the marks do. */
+export interface PainChoice {
+    loss: 1 | 2 | 3;
+    to: number;
+    cost: number;
+    /** `on`: already ignored. `open`: can be bought now. `none`: the HP is not
+        in that pain. `short`: not enough Will. */
+    state: 'on' | 'open' | 'none' | 'short';
+}
+
+export function painChoices(view: PainView, will: number): PainChoice[] {
+    const pick = (loss: 1 | 2 | 3, from: number, to: number): PainChoice => {
+        const cost = painCost(from, to);
+        const on = view.off >= to && view.tiers >= to;
+        const fits = view.tiers >= to && view.off === from;
+        return { loss, to, cost, state: on ? 'on' : !fits ? 'none' : will < cost ? 'short' : 'open' };
+    };
+    return [pick(1, 0, 1), pick(2, 1, 2), pick(3, 0, 2)];
+}

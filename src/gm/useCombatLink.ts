@@ -8,7 +8,7 @@ import type { CombatLinkMessage, LinkMember } from '../lib/combatLink';
 import type { PokedexEntry } from '../data/types';
 import type { GmStore } from './store';
 import type { CharKey } from '../table/slim';
-import { buildTurns, canActIn, enterFight, ownedBy, tableCombatOf } from './tableCombat';
+import { buildTurns, canActIn, enterFight, npcPainOff, npcPains, ownedBy, tableCombatOf } from './tableCombat';
 import { onPcEdit, pcToken, pruneTablePcs } from './tablePcs';
 import { addPing } from './rollPings';
 import { delayTurn, passTurn, spendRoll } from './turns';
@@ -142,6 +142,7 @@ function linkRun(store: GmStore, dexRef: { current: (id: string) => PokedexEntry
         if (!ch) return () => { /* no channel in this browser */ };
         let lastBeat = 0;
         let lastSent = '';
+        let lastPains = '';
         let timer: number | null = null;
 
         const post = (m: CombatLinkMessage) => { try { ch.postMessage(m); } catch { /* closed */ } };
@@ -152,6 +153,11 @@ function linkRun(store: GmStore, dexRef: { current: (id: string) => PokedexEntry
             const c = tableCombatOf(s);
             const turns = c ? buildTurns(s, c, dexRef.current) : null;
             const text = JSON.stringify(turns);
+            /* The GM's own combatants' pain, for Ignore pain on the table:
+               a message of its own, so it never rides the strip players get. */
+            const list = c ? npcPains(s, c, dexRef.current) : [];
+            const pains = JSON.stringify(list);
+            if (force || pains !== lastPains) { lastPains = pains; post({ t: 'pains', list }); }
             if (!force && text === lastSent) return;
             lastSent = text;
             post({ t: 'turns', turns });
@@ -244,6 +250,11 @@ function linkRun(store: GmStore, dexRef: { current: (id: string) => PokedexEntry
                 case 'next':
                     onTable((c, s) => passTurn(c, canActIn(s, dexById)));
                     break;
+                case 'painoff': {
+                    const c = tableCombatOf(store.state);
+                    if (c && npcPainOff(store.state, c, dexById, m.id, m.off, () => store.save())) store.refresh();
+                    break;
+                }
                 default:
                     break;
             }

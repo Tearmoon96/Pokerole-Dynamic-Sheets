@@ -16,7 +16,7 @@ import type { ReactNode } from 'react';
 
 export const MAX_FATE = 5;
 
-export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc, idle, children }: {
+export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc, idle, bare, children }: {
     /** Will the character has now. */
     will: number;
     /** Pushing Fates set on this roll, not yet paid. */
@@ -31,14 +31,18 @@ export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc, 
     onTyc: (on: boolean) => void;
     /** No Will to spend on this roll: both buttons off, and this is why. */
     idle?: string;
+    /** No Will count in front: the buttons fill the row (the table's). */
+    bare?: boolean;
     children?: ReactNode;
 }) {
     if (idle) {
         return (
-            <div className="will-spend" data-will-spend="idle">
-                <span className="will-have idle" title={idle}>
-                    <i className="fa-solid fa-star"></i> –
-                </span>
+            <div className={'will-spend' + (bare ? ' bare' : '')} data-will-spend="idle">
+                {!bare && (
+                    <span className="will-have idle" title={idle}>
+                        <i className="fa-solid fa-star"></i> –
+                    </span>
+                )}
                 <button type="button" data-will="tyc" className="will-btn tyc" aria-disabled title={idle}>
                     <i className="fa-solid fa-rotate-right"></i> Take your chances
                     <span className="will-cost">1</span>
@@ -70,10 +74,12 @@ export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc, 
             : 'Pushing Fate: 1 Will each, taken when you roll. An automatic success that pain and Low Accuracy cannot remove.';
 
     return (
-        <div className="will-spend" data-will-spend="">
-            <span className="will-have" title="Will this character has">
-                <i className="fa-solid fa-star"></i> {will}
-            </span>
+        <div className={'will-spend' + (bare ? ' bare' : '')} data-will-spend="">
+            {!bare && (
+                <span className="will-have" title="Will this character has">
+                    <i className="fa-solid fa-star"></i> {will}
+                </span>
+            )}
             <button
                 type="button" data-will="tyc"
                 className={'will-btn tyc' + (tyc ? ' on' : '')}

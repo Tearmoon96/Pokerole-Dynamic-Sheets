@@ -56,7 +56,22 @@ export type CombatLinkMessage =
         it; the table strips what players may not see. */
     | { t: 'turns'; turns: WireTurns | null }
     /** GM screen → table: the GM changed a player's character. */
-    | { t: 'op'; member: string; key: CharKey; op: PcOp };
+    | { t: 'op'; member: string; key: CharKey; op: PcOp }
+    /** GM screen → table: where the GM's own combatants in the fight stand
+        with pain, for the table's Ignore pain. Never leaves the GM's browser. */
+    | { t: 'pains'; list: NpcPain[] }
+    /** Table → GM screen: Power Through the Pain for the GM's combatant `id`,
+        `off` tiers bought off from now on. The GM screen checks and charges it. */
+    | { t: 'painoff'; id: string; off: number };
+
+/** One of the GM's combatants in the fight on the table, with pain. */
+export interface NpcPain {
+    id: string;
+    name: string;
+    tiers: number;
+    off: number;
+    will: number;
+}
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
     typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -138,6 +153,24 @@ export function parseCombatLink(raw: unknown): CombatLinkMessage | null {
                 op.mods = mods;
             }
             return { t: 'op', member, key: raw.key, op };
+        }
+        case 'pains': {
+            if (!Array.isArray(raw.list) || raw.list.length > 64) return null;
+            const list: NpcPain[] = [];
+            for (const x of raw.list) {
+                if (!isRecord(x)) return null;
+                const id = str(x.id, 80), name = str(x.name, 80);
+                const n = (v: unknown, max: number) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= max ? v as number : null);
+                const tiers = n(x.tiers, 2), off = n(x.off, 2), will = n(x.will, 999);
+                if (id === null || name === null || tiers === null || off === null || will === null) return null;
+                list.push({ id, name, tiers, off, will });
+            }
+            return { t: 'pains', list };
+        }
+        case 'painoff': {
+            const id = str(raw.id, 80);
+            if (id === null || !Number.isInteger(raw.off) || (raw.off as number) < 0 || (raw.off as number) > 2) return null;
+            return { t: 'painoff', id, off: raw.off as number };
         }
         default: return null;
     }

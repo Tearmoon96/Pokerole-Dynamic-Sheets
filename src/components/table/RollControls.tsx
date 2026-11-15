@@ -11,6 +11,7 @@ import { saveSuccessesFirst, type PreparedRoll } from '../../table/session';
 import { charWill, spendCharWill, useWorkingSet } from '../../table/character';
 import { FREE, notePushedFate, roundWill, setTakeChances, useRoundWillVersion } from '../../lib/willRound';
 import { WillSpend } from '../gm/WillSpend';
+import { IgnorePain } from './IgnorePain';
 
 const QUICK_DICE = [4, 6, 8, 10, 12, 20, 100];
 
@@ -168,18 +169,18 @@ export function RollControls() {
                         if (on) { spendCharWill(w.trainerId, w.token, 1, w.have); refreshSheets(); }
                         setTakeChances(w.key, w.stamp, on);
                     }}
-                >
-                    {isHost && <IgnorePain />}
-                </WillSpend>
+                    bare
+                />
             ) : (
                 <WillSpend
                     will={0} fate={0} roundFate={0} tyc={false} inFight={false}
                     onFate={() => {}} onTyc={() => {}}
                     idle={idleWill(isHost, prep, sides)}
-                >
-                    {isHost && <IgnorePain />}
-                </WillSpend>
+                    bare
+                />
             )}
+
+            <IgnorePain />
 
             <button
                 id="roll-btn"
@@ -224,25 +225,6 @@ function idleWill(isHost: boolean, prep: PreparedRoll | null, sides: number): st
     if (prep && (prep.enter || prep.extras.bonus !== undefined)) return 'Not on an initiative.';
     if (prep) return 'Not on a damage roll.';
     return 'Set up the roll from your character (its Accuracy, a skill, Evasion\u2026) to spend its Will on it.';
-}
-
-/** The GM's table rule, beside the Will buttons and drawn like them:
-    Pain Penalization ignored by everybody at the table. */
-function IgnorePain() {
-    const { session, state } = useTable();
-    return (
-        <button
-            type="button" data-pain-rule={state.painOff ? 'off' : 'on'}
-            className={'will-btn pain-switch' + (state.painOff ? ' on' : '')}
-            aria-pressed={state.painOff}
-            title={state.painOff
-                ? 'Pain is ignored by everybody at the table, on your GM screen too. Click to count it again.'
-                : 'Ignore Pain Penalization for everybody at the table: no successes lost at half HP or at 1 HP, on your GM screen too.'}
-            onClick={() => session.setPainOff(!state.painOff)}
-        >
-            <i className="fa-solid fa-heart-crack"></i> Ignore pain
-        </button>
-    );
 }
 
 /** Display only, this browser only: the GM and every player choose it alike. */
@@ -293,6 +275,14 @@ function HostOptions() {
 
                 <SuccessesFirst />
 
+                <label className="check" title="Pain Penalization is switched off for everybody at the table: no successes lost at half HP or at 1 HP, on your GM screen too.">
+                    <input
+                        type="checkbox" data-pain-rule=""
+                        checked={state.painOff}
+                        onChange={(e) => session.setPainOff(e.currentTarget.checked)}
+                    />
+                    <span><i className="fa-solid fa-heart"></i> No pain rule</span>
+                </label>
             </div>
 
             {state.scripted && (
