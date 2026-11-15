@@ -54,10 +54,13 @@ export function IgnorePain() {
                 aria-disabled={ruleOff}
                 title={ruleOff
                     ? 'Pain is switched off at this table: there is nothing to ignore.'
-                    : 'Power Through the Pain: spend Will so a character ignores its pain penalty.'}
+                    : 'Power Through the Pain: 1 Will to ignore −1, 2 Will for −2, 3 Will for −3.'}
                 onClick={() => { if (!ruleOff) setOpen(!open); }}
             >
                 <i className="fa-solid fa-heart-crack"></i> Ignore pain
+                {/* The same chip as the Will buttons beside it: what it costs
+                    (1 for −1, 2 for −2, 3 for −3), and the same height. */}
+                <span className="will-cost">1–3</span>
             </button>
             {open && !ruleOff && (isHost ? <GmChoices /> : <PlayerChoices />)}
         </div>
