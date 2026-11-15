@@ -370,6 +370,26 @@ button.will-btn.on[aria-disabled="true"] {
 .will-fate { display: inline-flex; align-items: center; gap: 0.15rem; flex: none; }
 button.will-btn.will-less { padding: 0.25rem 0.35rem; }
 
+.will-have.idle { opacity: 0.45; }
+
+/* The table GM's Ignore pain, drawn as the Will buttons beside it are, in
+   the pain marks' red: a rule for the whole table, not anybody's Will. */
+button.will-btn.pain-switch {
+    margin-left: auto;
+    border-color: #ef444473;
+    background: #ef44441a;
+    color: #fca5a5;
+}
+
+button.will-btn.pain-switch:hover { border-color: var(--danger); background: #ef44443d; color: #fff; }
+
+button.will-btn.pain-switch.on {
+    border-color: var(--danger);
+    background: #ef444459;
+    color: #fff;
+    box-shadow: 0 0 7px #ef444466;
+}
+
 /* The GM's switch in the Dice panel's head: Pain Penalization off. */
 button.icon-btn.pain-rule { color: #fca5a5; }
 
@@ -422,25 +442,24 @@ button.die-face.reroll:hover {
     white-space: nowrap;
 }
 
-/* Used: what the die was, an arrow, what it became. */
+/* Used: what the die was, an arrow, what it became. Both faces keep the
+   size and corners of every other die in the row, so the row still lines
+   up: the old one is the same box, dashed in the Will colour and struck,
+   and no frame goes around the pair. */
 .die-rerolled {
     display: inline-flex;
     align-items: center;
     gap: 0.2rem;
-    padding: 0 0.2rem 0 0;
-    border-radius: 9px;
-    background: #3c6cf81f;
-    outline: 1px solid #3c6cf873;
 }
 
 .die-rerolled > i { font-size: 0.6rem; color: #a9c0ff; }
 
 .die-face.was {
-    min-width: 1.3rem;
-    font-size: 0.7rem;
-    opacity: 0.6;
-    border-style: dashed;
+    border: 1px dashed var(--will-color);
+    color: #a9c0ff;
+    background: #3c6cf81f;
     text-decoration: line-through;
+    text-decoration-color: #a9c0ffb3;
 }
 
 /* Pushing Fate: a success that was bought, not rolled. */

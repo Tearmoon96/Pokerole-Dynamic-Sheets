@@ -7,7 +7,7 @@
 import { useTable } from '../../table/TableContext';
 import { LIMITS } from '../../table/protocol';
 import { totalRange } from '../../table/scripted';
-import { saveSuccessesFirst } from '../../table/session';
+import { saveSuccessesFirst, type PreparedRoll } from '../../table/session';
 import { charWill, spendCharWill, useWorkingSet } from '../../table/character';
 import { FREE, notePushedFate, roundWill, setTakeChances, useRoundWillVersion } from '../../lib/willRound';
 import { WillSpend } from '../gm/WillSpend';
@@ -159,7 +159,7 @@ export function RollControls() {
                 </div>
             )}
 
-            {w && prep && (
+            {w && prep ? (
                 <WillSpend
                     will={will} fate={fate} roundFate={spent.fate} tyc={spent.tyc}
                     inFight={w.stamp !== FREE}
@@ -168,7 +168,17 @@ export function RollControls() {
                         if (on) { spendCharWill(w.trainerId, w.token, 1, w.have); refreshSheets(); }
                         setTakeChances(w.key, w.stamp, on);
                     }}
-                />
+                >
+                    {isHost && <IgnorePain />}
+                </WillSpend>
+            ) : (
+                <WillSpend
+                    will={0} fate={0} roundFate={0} tyc={false} inFight={false}
+                    onFate={() => {}} onTyc={() => {}}
+                    idle={idleWill(isHost, prep, sides)}
+                >
+                    {isHost && <IgnorePain />}
+                </WillSpend>
             )}
 
             <button
@@ -204,6 +214,34 @@ export function RollControls() {
                 <p className="muted">Reachable totals for {count}d{sides}: {range.min}–{range.max}.</p>
             )}
         </div>
+    );
+}
+
+/** Why the Will buttons are greyed out. */
+function idleWill(isHost: boolean, prep: PreparedRoll | null, sides: number): string {
+    if (isHost) return 'Will is spent by the player whose roll it is, from their own character.';
+    if (prep?.will && sides !== 6) return 'Will goes on a pool of d6 only.';
+    if (prep && (prep.enter || prep.extras.bonus !== undefined)) return 'Not on an initiative.';
+    if (prep) return 'Not on a damage roll.';
+    return 'Set up the roll from your character (its Accuracy, a skill, Evasion\u2026) to spend its Will on it.';
+}
+
+/** The GM's table rule, beside the Will buttons and drawn like them:
+    Pain Penalization ignored by everybody at the table. */
+function IgnorePain() {
+    const { session, state } = useTable();
+    return (
+        <button
+            type="button" data-pain-rule={state.painOff ? 'off' : 'on'}
+            className={'will-btn pain-switch' + (state.painOff ? ' on' : '')}
+            aria-pressed={state.painOff}
+            title={state.painOff
+                ? 'Pain is ignored by everybody at the table, on your GM screen too. Click to count it again.'
+                : 'Ignore Pain Penalization for everybody at the table: no successes lost at half HP or at 1 HP, on your GM screen too.'}
+            onClick={() => session.setPainOff(!state.painOff)}
+        >
+            <i className="fa-solid fa-heart-crack"></i> Ignore pain
+        </button>
     );
 }
 
@@ -255,14 +293,6 @@ function HostOptions() {
 
                 <SuccessesFirst />
 
-                <label className="check" title="Pain Penalization is ignored by everybody at the table: no successes lost at half HP or at 1 HP, on your GM screen too.">
-                    <input
-                        type="checkbox" data-pain-rule=""
-                        checked={state.painOff}
-                        onChange={(e) => session.setPainOff(e.currentTarget.checked)}
-                    />
-                    <span><i className="fa-solid fa-heart-crack"></i> Ignore pain</span>
-                </label>
             </div>
 
             {state.scripted && (

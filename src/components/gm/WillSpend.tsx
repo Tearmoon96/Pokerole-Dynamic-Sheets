@@ -6,13 +6,17 @@
      Pushing Fate        counted up here, 1 Will each, and paid when the roll
                          is thrown: that many automatic successes on it.
 
-   Shown only for a roll set up from a character's sheet — it is that
-   character's Will — and never for a damage roll or an initiative. The two
-   exclude each other within a Round, and each says so on the other. */
+   They spend the Will of a roll set up from a character's sheet, and never
+   on a damage roll or an initiative. The table shows them all the same,
+   greyed out with `idle` saying why, so they are always where a player
+   looks for them. The two exclude each other within a Round, and each says
+   so on the other. `children` follows them on the same row. */
+
+import type { ReactNode } from 'react';
 
 export const MAX_FATE = 5;
 
-export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc }: {
+export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc, idle, children }: {
     /** Will the character has now. */
     will: number;
     /** Pushing Fates set on this roll, not yet paid. */
@@ -25,7 +29,30 @@ export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc }
     inFight: boolean;
     onFate: (n: number) => void;
     onTyc: (on: boolean) => void;
+    /** No Will to spend on this roll: both buttons off, and this is why. */
+    idle?: string;
+    children?: ReactNode;
 }) {
+    if (idle) {
+        return (
+            <div className="will-spend" data-will-spend="idle">
+                <span className="will-have idle" title={idle}>
+                    <i className="fa-solid fa-star"></i> –
+                </span>
+                <button type="button" data-will="tyc" className="will-btn tyc" aria-disabled title={idle}>
+                    <i className="fa-solid fa-rotate-right"></i> Take your chances
+                    <span className="will-cost">1</span>
+                </button>
+                <span className="will-fate">
+                    <button type="button" data-will="fate" className="will-btn fate" aria-disabled title={idle}>
+                        <i className="fa-solid fa-wand-sparkles"></i> Pushing fate
+                        <span className="will-cost">1</span>
+                    </button>
+                </span>
+                {children}
+            </div>
+        );
+    }
     const left = will - fate;
     const fateBlocked = tyc;
     const tycBlocked = !tyc && (fate > 0 || roundFate > 0);
@@ -81,6 +108,7 @@ export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc }
                     </button>
                 )}
             </span>
+            {children}
         </div>
     );
 }
