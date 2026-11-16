@@ -44,6 +44,8 @@ import type { NoteHit } from '../../map/notes';
 import type { Box } from '../../map/world/placed';
 import type { MapDoc, MapNote, MapSketch, NoteTarget, Selection, Tool } from '../../map/types';
 import { sameSel } from '../../map/store';
+import { pickAt } from '../../map/pick';
+import type { DomHit } from '../../map/pick';
 
 /* The map itself: a canvas for the ground, and the world layer on top of it
    holding paths, stamps, labels and tokens as real elements.
@@ -190,6 +192,9 @@ function union(a: Selection[], b: Selection[]): Selection[] {
     return [...a, ...b.filter((x) => !a.some((y) => sameSel(x, y)))];
 }
 
+/** Things on the map that take a press themselves, over whatever is under them. */
+const CONTROLS = '.map-note-pin, .map-handle, .map-vertex, .map-note-corner, .map-room-corner, .map-room-add';
+
 function capture(el: HTMLElement, pointerId: number): void {
     try { el.setPointerCapture(pointerId); } catch { /* not capturable: carry on without */ }
 }
@@ -262,6 +267,10 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     const [noteHover, setNoteHover] = useState<NoteHit | null>(null);
     const noteHoverRef = useRef<NoteHit | null>(null);
     const [noteDraft, setNoteDraft] = useState<Box | null>(null);
+    /* What a click would take right now, under Select and Erase (pick.ts):
+       lit up so overlapping things are never a guess. */
+    const [objHover, setObjHover] = useState<Selection | null>(null);
+    const objHoverRef = useRef<Selection | null>(null);
     /* The drag box of a Select drag on empty ground, corners in cell units. */
     const [box, setBox] = useState<[Pt, Pt] | null>(null);
     const gesture = useRef<Gesture | null>(null);
@@ -394,6 +403,37 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     };
     const inside = ([x, y]: Pt) => x >= 0 && y >= 0 && x <= store.doc.cols && y <= store.doc.rows;
 
+    /** What a press here takes (pick.ts), or null: bare ground, or a
+        marker or handle on top, which takes the press itself. */
+    const pickHere = (e: { clientX: number; clientY: number }): Selection | null => {
+        const stage = stageRef.current;
+        if (!stage) return null;
+        const els = document.elementsFromPoint(e.clientX, e.clientY);
+        const first = els[0];
+        if (!first || !stage.contains(first) || first.closest(CONTROLS)) return null;
+        const k = viewRef.current.zoom * CELL;
+        const dom: DomHit[] = [];
+        const seen = new Set<string>();
+        for (const el of els) {
+            if (!stage.contains(el)) break;
+            const tag = el.closest('[data-obj]')?.getAttribute('data-obj');
+            if (!tag || seen.has(tag)) continue;
+            seen.add(tag);
+            const [kind, id] = tag.split(':');
+            if (kind !== 'label' && kind !== 'placed') continue;
+            const r = el.getBoundingClientRect();
+            dom.push({ sel: { kind, id }, area: (r.width * r.height) / (k * k) });
+        }
+        return pickAt(store.doc, toCell(e), k, dom);
+    };
+
+    const lightUp = (sel: Selection | null) => {
+        const was = objHoverRef.current;
+        if (sel === was || (sel && was && sameSel(sel, was))) return;
+        objHoverRef.current = sel;
+        setObjHover(sel);
+    };
+
     /* A double-click on a landmark that opens a map steps into it. Tested by
        geometry rather than by the event's target, which pointer capture
        may have moved to the stage; only under Select and Pan, so a quick
@@ -402,6 +442,11 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         const t = store.ui.tool;
         if ((t !== 'select' && t !== 'pan') || spaceHeld) return;
         const [x, y] = toCell(e);
+        /* What a click there takes, if it opens a map: the one lit up. */
+        const p = t === 'select' ? pickHere(e) : null;
+        const own = p?.kind === 'placed' ? store.doc.placed.find((o) => o.id === p.id)
+            : p?.kind === 'stamp' ? store.doc.stamps.find((o) => o.id === p.id) : undefined;
+        if (own?.link && linkedDoc(store.maps, own)) { e.preventDefault(); store.enter(own.id); return; }
         /* A building first: they stand over the landmarks. */
         const building = [...store.doc.placed].reverse().find((o) => {
             if (!o.link || !linkedDoc(store.maps, o)) return false;
@@ -501,9 +546,8 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     };
 
     const eraseAt = (e: { clientX: number; clientY: number }) => {
-        const el = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement | SVGElement>('[data-obj]');
-        const tag = el?.getAttribute('data-obj');
-        if (tag) store.live((m) => { removeObject(m, tag); });
+        const p = pickHere(e);
+        if (p) store.live((m) => { removeObject(m, p.kind + ':' + p.id); });
     };
 
     /* Rubs out every sketch the pointer touches, whole. */
@@ -576,6 +620,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             return;
         }
         if (e.button !== 0) return;
+        lightUp(null);
         const at = toCell(e);
         /* A touch has no hover: a tap shows the marker of what it lands on. */
         if (e.pointerType !== 'mouse') hoverNote(at);
@@ -750,15 +795,10 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 return;
             }
             case 'select': {
-                /* Nothing took the press: paths are hit on their stroke only, so
-                   try a looser distance test before calling it empty ground. */
-                const hitTol = 0.5;
-                const tol = 6 / (viewRef.current.zoom * CELL);
-                const sketch = [...store.doc.sketches].reverse()
-                    .find((k) => distToPolyline(at, k.points as Pt[]) < Math.max(tol, k.width / 2));
-                if (sketch) { startObjectGesture(e, { kind: 'sketch', id: sketch.id }, 'move'); return; }
-                const hit = [...store.doc.paths].reverse().find((p) => distToPolyline(at, p.points as Pt[]) < Math.max(hitTol, p.width / 2));
-                if (hit) { startObjectGesture(e, { kind: 'path', id: hit.id }, 'move'); return; }
+                /* Nothing took the press itself: the picker still may find
+                   something here (a speck of a landmark, a path's edge). */
+                const hit = pickHere(e);
+                if (hit) { startObjectGesture(e, hit, 'move'); return; }
                 /* Empty ground: a drag box. With Ctrl or Cmd it adds to what is
                    already selected; without, a click that never becomes a
                    drag just clears the selection. */
@@ -916,6 +956,15 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
        the press bubbles to the stage, which erases what is under it. */
     const onObjectDown: ObjectDown = (e, sel, grab) => {
         if (store.ui.tool !== 'select' || spaceHeld || e.button !== 0) return;
+        if (grab === 'move') {
+            /* The element on top is not always the thing meant: the picker
+               decides. Nothing there (a landmark's empty corner): the stage
+               takes it as bare ground. */
+            const hit = pickHere(e);
+            if (!hit) return;
+            sel = hit;
+        }
+        lightUp(null);
         e.stopPropagation();
         const stage = stageRef.current!;
         pointers.current.set(e.pointerId, local(e));
@@ -929,6 +978,8 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         const g = gesture.current;
         if (!g) {
             hoverNote(at);
+            const t = store.ui.tool;
+            lightUp((t === 'select' || t === 'erase') && !spaceHeld && e.pointerType === 'mouse' ? pickHere(e) : null);
             if (brushTool(store.ui.tool, store.ui.eraseMode) || store.ui.tool === 'fill' || store.ui.tool === 'build' || store.ui.tool === 'room') setHover(at);
             return;
         }
@@ -1221,7 +1272,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         if (g.kind !== 'pan') store.settle();
     };
 
-    const onPointerLeave = () => { if (!gesture.current) { setHover(null); hoverNote(null); } };
+    const onPointerLeave = () => { if (!gesture.current) { setHover(null); hoverNote(null); lightUp(null); } };
 
     /** Which note the pointer is over, worked out by geometry so it works
         under every tool. Nothing to do with markers hidden. */
@@ -1262,6 +1313,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     const slot = brushTool(ui.tool, ui.eraseMode) ? slotOf(ui.tool) : null;
     const showBrush = hover && (slot || ui.tool === 'fill') && !spaceHeld && !(ui.tool === 'paint' && ui.paintLayer === 'single');
     const cursorTool = spaceHeld ? 'pan' : ui.tool;
+    const lit = !spaceHeld && (ui.tool === 'select' || ui.tool === 'erase') ? objHover : null;
 
     return (
         <div
@@ -1281,17 +1333,17 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             <canvas ref={canvasRef} className="map-canvas" style={{ width: size.w, height: size.h }} />
             <div
                 className={'map-world' + (style.pixelated ? ' pixelated' : '')}
-                style={{ width: W, height: H, transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}
+                style={{ width: W, height: H, transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, '--inv-zoom': 1 / view.zoom } as CSSProperties}
             >
                 {/* An interior's walls and floor, over the ground and under everything on it. */}
                 {doc.room && (
                     <RoomLayer room={doc.room} look={doc.look} cols={doc.cols} rows={doc.rows} res={res}
                         grid={doc.grid.show ? doc.grid.opacity || 0.5 : 0} />
                 )}
-                <PathsLayer doc={doc} style={style} selection={ui.selection} draft={draft} onDown={onObjectDown} />
-                <StampsLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} maps={store.maps} />
+                <PathsLayer doc={doc} style={style} selection={ui.selection} draft={draft} onDown={onObjectDown} hover={lit} />
+                <StampsLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} maps={store.maps} hover={lit} />
                 {/* A city or interior: buildings and tokens in one layer, back to front, under the labels. */}
-                {city && <DepthLayer doc={doc} style={style} selection={ui.selection} res={res} maps={store.maps} onDown={onObjectDown} />}
+                {city && <DepthLayer doc={doc} style={style} selection={ui.selection} res={res} maps={store.maps} onDown={onObjectDown} hover={lit} />}
                 {city && ui.tool === 'build' && hover && !spaceHeld && !runShapeOf(itemOf(ui.buildItem), ui.buildShape) && (
                     <BuildGhost doc={doc} item={ui.buildItem} rot={ui.buildRot} variant={ui.buildVariant} flip={ui.buildFlip} at={hover} res={res} />
                 )}
@@ -1299,9 +1351,9 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                     <RunCursor at={snapRun(hover, doc.grid.snap)} zoom={view.zoom} />
                 )}
                 {runDraft && <RunDraft draft={runDraft} zoom={view.zoom} />}
-                <LabelsLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} />
-                <SketchesLayer doc={doc} selection={ui.selection} draft={sketchDraft} onDown={onObjectDown} />
-                {!city && <TokensLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} />}
+                <LabelsLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} hover={lit} />
+                <SketchesLayer doc={doc} selection={ui.selection} draft={sketchDraft} onDown={onObjectDown} hover={lit} />
+                {!city && <TokensLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} hover={lit} />}
                 {(!ui.fogHidden || ui.tool === 'fog' || ui.tool === 'unfog') && <FogLayer doc={doc} />}
                 {/* The GM's notes: over the fog, in the editor only — never in a picture. */}
                 <NotesLayer doc={doc} zoom={view.zoom} hover={noteHover} draft={noteDraft} onGrab={onNoteGrab} />

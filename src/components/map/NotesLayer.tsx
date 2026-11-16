@@ -97,7 +97,7 @@ export function NotesLayer({ doc, zoom, hover, draft, onGrab }: {
                     }}
                     onClick={() => { if (!(noteTool && !note.on)) toggle(note); }}
                 >
-                    <i className="fa-solid fa-note-sticky"></i>
+                    <span className="map-note-disc"><i className="fa-solid fa-note-sticky"></i></span>
                 </button>
             ))}
             {open && (

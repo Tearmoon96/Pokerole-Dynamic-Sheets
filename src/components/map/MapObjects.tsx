@@ -31,6 +31,8 @@ export type Grab = 'move' | 'resize' | 'rotate' | { vertex: number };
 export type ObjectDown = (e: ReactPointerEvent, sel: Selection, grab: Grab) => void;
 
 const isSel = (sel: Selection[], kind: Selection['kind'], id: string) => sel.some((x) => x.kind === kind && x.id === id);
+/** Whether `hover` (what a click would take, lit up) is this thing. */
+export const isLit = (hover: Selection | null | undefined, kind: Selection['kind'], id: string) => !!hover && hover.kind === kind && hover.id === id;
 
 /* ------------------------------------------------------------------ paths */
 
@@ -77,8 +79,9 @@ function PathShape({ path, style }: { path: MapPath; style: MapStyle }) {
     );
 }
 
-export function PathsLayer({ doc, style, selection, draft, onDown }: {
+export function PathsLayer({ doc, style, selection, draft, onDown, hover }: {
     doc: MapDoc; style: MapStyle; selection: Selection[]; draft: Pt[] | null; onDown: ObjectDown;
+    hover?: Selection | null;
 }) {
     const W = doc.cols * CELL, H = doc.rows * CELL;
     const town = style.label.route;
@@ -116,6 +119,9 @@ export function PathsLayer({ doc, style, selection, draft, onDown }: {
                                 </text>
                             </g>
                         )}
+                        {isLit(hover, 'path', p.id) && (
+                            <path className="map-lit-line" d={d} fill="none" strokeWidth={hitW} strokeLinecap="round" strokeLinejoin="round" />
+                        )}
                         <path className="map-hit" data-obj={'path:' + p.id} d={d} fill="none" stroke="transparent"
                             strokeWidth={hitW} strokeLinecap="round"
                             onPointerDown={(e) => onDown(e, { kind: 'path', id: p.id }, 'move')} />
@@ -140,8 +146,10 @@ export function PathsLayer({ doc, style, selection, draft, onDown }: {
 
 /* ----------------------------------------------------------------- stamps */
 
-function StampView({ stamp, style, selected, alone, onDown, opens }: {
+function StampView({ stamp, style, selected, lit, alone, onDown, opens }: {
     stamp: MapStamp; style: MapStyle; selected: boolean;
+    /** What a click would take: lit up. */
+    lit?: boolean;
     /** Selected on its own: only then does it get resize and turn handles. */
     alone: boolean;
     onDown: ObjectDown;
@@ -160,7 +168,7 @@ function StampView({ stamp, style, selected, alone, onDown, opens }: {
     const lab = style.label.small;
     return (
         <div
-            className={'map-obj map-stamp' + (selected ? ' selected' : '') + (stamp.label && stamp.labelShow === 'hover' ? ' label-hover' : '')}
+            className={'map-obj map-stamp' + (selected ? ' selected' : '') + (lit ? ' lit' : '') + (stamp.label && stamp.labelShow === 'hover' ? ' label-hover' : '')}
             data-obj={'stamp:' + stamp.id}
             style={{
                 left: stamp.x * CELL, top: stamp.y * CELL, width: px, height: px,
@@ -168,6 +176,7 @@ function StampView({ stamp, style, selected, alone, onDown, opens }: {
             }}
             onPointerDown={(e) => onDown(e, sel, 'move')}
         >
+            {lit && <span className="map-lit-ring" />}
             {filler && fillerArt ? (
                 <img
                     src={fillerArt} alt="" draggable={false}
@@ -216,8 +225,9 @@ function StampView({ stamp, style, selected, alone, onDown, opens }: {
     );
 }
 
-export function StampsLayer({ doc, style, selection, onDown, maps = [] }: {
+export function StampsLayer({ doc, style, selection, onDown, maps = [], hover }: {
     doc: MapDoc; style: MapStyle; selection: Selection[]; onDown: ObjectDown;
+    hover?: Selection | null;
     /** Every map, to find what a landmark opens. */
     maps?: MapDoc[];
 }) {
@@ -225,7 +235,7 @@ export function StampsLayer({ doc, style, selection, onDown, maps = [] }: {
         <>
             {doc.stamps.map((s) => (
                 <StampView
-                    key={s.id} stamp={s} style={style} selected={isSel(selection, 'stamp', s.id)}
+                    key={s.id} stamp={s} style={style} selected={isSel(selection, 'stamp', s.id)} lit={isLit(hover, 'stamp', s.id)}
                     alone={selection.length === 1} onDown={onDown} opens={linkedDoc(maps, s)}
                 />
             ))}
@@ -235,8 +245,8 @@ export function StampsLayer({ doc, style, selection, onDown, maps = [] }: {
 
 /* ----------------------------------------------------------------- labels */
 
-function LabelText({ label, style, selected, onDown }: {
-    label: MapLabel; style: MapStyle; selected: boolean; onDown: ObjectDown;
+function LabelText({ label, style, selected, lit, onDown }: {
+    label: MapLabel; style: MapStyle; selected: boolean; lit?: boolean; onDown: ObjectDown;
 }) {
     const t = labelType(label, style, CELL);
     const measure = measureWith(fontOf(t));
@@ -262,7 +272,7 @@ function LabelText({ label, style, selected, onDown }: {
            own, so the shadow falls the same way however the label is turned —
            as it does in the PNG export. */
         <g
-            className={'map-obj map-label' + (selected ? ' selected' : '')}
+            className={'map-obj map-label' + (selected ? ' selected' : '') + (lit ? ' lit' : '')}
             data-obj={'label:' + label.id}
             opacity={t.opacity < 1 ? t.opacity : undefined}
             style={sh ? { filter: `drop-shadow(${sh.dx}px ${sh.dy}px ${sh.blur}px ${sh.color})` } : undefined}
@@ -303,8 +313,8 @@ function LabelText({ label, style, selected, onDown }: {
     );
 }
 
-export function LabelsLayer({ doc, style, selection, onDown }: {
-    doc: MapDoc; style: MapStyle; selection: Selection[]; onDown: ObjectDown;
+export function LabelsLayer({ doc, style, selection, onDown, hover }: {
+    doc: MapDoc; style: MapStyle; selection: Selection[]; onDown: ObjectDown; hover?: Selection | null;
 }) {
     const W = doc.cols * CELL, H = doc.rows * CELL;
     /* Bent labels are measured on a canvas, which measures with whatever has
@@ -329,7 +339,7 @@ export function LabelsLayer({ doc, style, selection, onDown }: {
     return (
         <svg className="map-svg map-labels" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
             {doc.labels.map((l) => (
-                <LabelText key={l.id} label={l} style={style} selected={isSel(selection, 'label', l.id)} onDown={onDown} />
+                <LabelText key={l.id} label={l} style={style} selected={isSel(selection, 'label', l.id)} lit={isLit(hover, 'label', l.id)} onDown={onDown} />
             ))}
         </svg>
     );
@@ -358,8 +368,8 @@ export function SketchShape({ sketch }: { sketch: Pick<MapSketch, 'brush' | 'poi
     );
 }
 
-export function SketchesLayer({ doc, selection, draft, onDown }: {
-    doc: MapDoc; selection: Selection[]; draft: MapSketch | null; onDown: ObjectDown;
+export function SketchesLayer({ doc, selection, draft, onDown, hover }: {
+    doc: MapDoc; selection: Selection[]; draft: MapSketch | null; onDown: ObjectDown; hover?: Selection | null;
 }) {
     const W = doc.cols * CELL, H = doc.rows * CELL;
     return (
@@ -369,6 +379,10 @@ export function SketchesLayer({ doc, selection, draft, onDown }: {
                 const selected = isSel(selection, 'sketch', k.id);
                 return (
                     <g key={k.id}>
+                        {isLit(hover, 'sketch', k.id) && (
+                            <path className="map-lit-line" d={d} fill="none" strokeWidth={Math.max(k.width * CELL, 8) + 6}
+                                strokeLinecap="round" strokeLinejoin="round" />
+                        )}
                         <SketchShape sketch={k} />
                         <path className="map-hit" data-obj={'sketch:' + k.id} d={d} fill="none" stroke="transparent"
                             strokeWidth={Math.max(k.width * CELL, 12)} strokeLinecap="round"
@@ -384,8 +398,8 @@ export function SketchesLayer({ doc, selection, draft, onDown }: {
 
 /* ----------------------------------------------------------------- tokens */
 
-export function TokenView({ token, style, selected, onDown }: {
-    token: MapToken; style: MapStyle; selected: boolean; onDown: ObjectDown;
+export function TokenView({ token, style, selected, lit, onDown }: {
+    token: MapToken; style: MapStyle; selected: boolean; lit?: boolean; onDown: ObjectDown;
 }) {
     const px = token.size * CELL;
     const candidates = token.kind === 'pokemon' && token.image
@@ -399,7 +413,7 @@ export function TokenView({ token, style, selected, onDown }: {
     } as CSSProperties : null;
     return (
         <div
-            className={'map-obj map-token map-token-' + token.kind + (look ? ' inked' : '') + (selected ? ' selected' : '')}
+            className={'map-obj map-token map-token-' + token.kind + (look ? ' inked' : '') + (selected ? ' selected' : '') + (lit ? ' lit' : '')}
             data-obj={'token:' + token.id}
             style={{ left: token.x * CELL, top: token.y * CELL, width: px, height: px, borderColor: ring, borderWidth: Math.max(2, px * (look ? 0.05 : 0.07)), ...inked }}
             onPointerDown={(e) => onDown(e, { kind: 'token', id: token.id }, 'move')}
@@ -419,13 +433,13 @@ export function TokenView({ token, style, selected, onDown }: {
     );
 }
 
-export function TokensLayer({ doc, style, selection, onDown }: {
-    doc: MapDoc; style: MapStyle; selection: Selection[]; onDown: ObjectDown;
+export function TokensLayer({ doc, style, selection, onDown, hover }: {
+    doc: MapDoc; style: MapStyle; selection: Selection[]; onDown: ObjectDown; hover?: Selection | null;
 }) {
     return (
         <>
             {doc.tokens.map((t) => (
-                <TokenView key={t.id} token={t} style={style} selected={isSel(selection, 'token', t.id)} onDown={onDown} />
+                <TokenView key={t.id} token={t} style={style} selected={isSel(selection, 'token', t.id)} lit={isLit(hover, 'token', t.id)} onDown={onDown} />
             ))}
         </>
     );

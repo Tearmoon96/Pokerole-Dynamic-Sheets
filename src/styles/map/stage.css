@@ -264,6 +264,49 @@ img.pixelated { image-rendering: pixelated; }
     vector-effect: non-scaling-stroke;
 }
 
+/* ---------------- What a click would take (pick.ts) ---------------- */
+
+/* Under Select and Erase, the one thing a click would take glows, so
+   overlapping things are never a guess: blue under Select (not the accent,
+   which the selection's dashes use and which is red in the default theme),
+   red under the eraser. Widths are in screen px: `--inv-zoom` on
+   .map-world undoes the view's scale. */
+.map-stage { --lit: #4cc2ff; }
+.map-stage[data-tool="erase"] { --lit: #ff5a5a; }
+
+/* Raised over its neighbours while lit, so a small landmark half under a
+   big one shows whole. Placed things keep their depth: it is the picture. */
+.map-stamp.lit, .map-token.lit { z-index: 2; }
+.map-stamp.lit .map-stamp-art,
+.map-placed.lit .map-placed-art {
+    filter: drop-shadow(0 0 calc(1.5px * var(--inv-zoom, 1)) var(--lit)) drop-shadow(0 0 calc(5px * var(--inv-zoom, 1)) var(--lit)) brightness(1.06);
+    transition: filter 0.1s;
+}
+.map-token.lit {
+    filter: drop-shadow(0 0 calc(2px * var(--inv-zoom, 1)) var(--lit)) drop-shadow(0 0 calc(6px * var(--inv-zoom, 1)) var(--lit));
+}
+/* The landmark's hit circle: what the pointer is inside of. */
+.map-lit-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: calc(2px * var(--inv-zoom, 1)) solid var(--lit);
+    background: color-mix(in srgb, var(--lit) 22%, transparent);
+    box-shadow: 0 0 calc(8px * var(--inv-zoom, 1)) color-mix(in srgb, var(--lit) 70%, transparent);
+    box-sizing: border-box;
+    pointer-events: none;
+    animation: map-lit-in 0.12s ease-out;
+}
+@keyframes map-lit-in { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: none; } }
+.map-placed.lit .map-placed-hit { background: color-mix(in srgb, var(--lit) 20%, transparent); }
+.map-label.lit .map-label-hit {
+    fill: color-mix(in srgb, var(--lit) 18%, transparent);
+    stroke: var(--lit);
+    stroke-width: 2px;
+    vector-effect: non-scaling-stroke;
+}
+.map-lit-line { stroke: var(--lit); stroke-opacity: 0.5; pointer-events: none; }
+
 /* ---------------- Brush and readout ---------------- */
 
 /* Drawn as an SVG of the brush's own shape (MapCanvas BrushOutline). */
@@ -386,12 +429,31 @@ img.pixelated { image-rendering: pixelated; }
 /* Over everything, the fog included: the GM's own view. DOM only, so no
    picture of the map ever has them. Only the markers take the pointer. */
 .map-notes { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 6; pointer-events: none; }
+/* The button is a ring of empty space round the marker's disc, which takes
+   the press too: the disc is small, and the pointer coming from the thing
+   it belongs to lands on its edge (PIN_REACH in notes.ts). */
 .map-note-pin {
     position: absolute;
-    width: 24px;
-    height: 24px;
+    width: 38px;
+    height: 38px;
     min-height: 0;
     padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    box-shadow: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    cursor: pointer;
+    transform-origin: 50% 50%;
+    animation: map-note-pop 0.12s ease-out;
+}
+.map-note-disc {
+    width: 24px;
+    height: 24px;
+    flex: none;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -401,12 +463,17 @@ img.pixelated { image-rendering: pixelated; }
     background: #f6c945;
     border: 2px solid #fff;
     box-shadow: 0 1px 5px #0008;
-    pointer-events: auto;
-    cursor: pointer;
-    transform-origin: 50% 50%;
-    animation: map-note-pop 0.12s ease-out;
+    box-sizing: border-box;
+    transition: box-shadow 0.1s, background 0.1s;
 }
-.map-note-pin:hover, .map-note-pin.open { background: #ffd95e; box-shadow: 0 0 0 3px #f6c94566, 0 1px 5px #0008; }
+/* The shared `button:hover` would fill the ring. */
+.map-note-pin:hover, .map-note-pin:focus { background: none; border: 0; box-shadow: none; }
+.map-note-pin:hover .map-note-disc, .map-note-pin.open .map-note-disc {
+    background: #ffd95e;
+    box-shadow: 0 0 0 3px #f6c945aa, 0 0 10px 2px #f6c94599, 0 1px 5px #0008;
+}
+.map-note-disc i { transition: transform 0.1s; }
+.map-note-pin:hover .map-note-disc i { transform: scale(1.18); }
 @keyframes map-note-pop { from { opacity: 0; } to { opacity: 1; } }
 /* The eraser rubs out what is under the pointer: a marker must not hide it. */
 .map-stage[data-tool="erase"] .map-note-pin { pointer-events: none; }

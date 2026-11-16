@@ -5,7 +5,7 @@ import type { LookId, MapDoc, MapPlaced, Selection } from '../../map/types';
 import { PAD, clashes, depthOrder, dims, footprint, renderSprite, segOutline, spriteBox, variantOf } from '../../map/world/placed';
 import { itemOf } from '../../map/world/catalog';
 import { linkedDoc } from '../../map/world';
-import { TokenView } from './MapObjects';
+import { TokenView, isLit } from './MapObjects';
 import type { ObjectDown } from './MapObjects';
 
 /* A city's buildings, trees and benches, and its tokens, as ONE layer drawn
@@ -32,8 +32,10 @@ export function resFor(zoom: number): number {
     return CELL * step;
 }
 
-export const PlacedView = memo(function PlacedView({ p, look, res, selected, clash, opens, ghost, onDown }: {
+export const PlacedView = memo(function PlacedView({ p, look, res, selected, lit, clash, opens, ghost, onDown }: {
     p: MapPlaced; look: LookId | undefined; res: number; selected: boolean; clash: boolean;
+    /** What a click would take: lit up. */
+    lit?: boolean;
     /** The interior it opens, if any: a door badge in the editor. */
     opens?: string;
     /** The Build tool's preview under the pointer. */
@@ -60,7 +62,7 @@ export const PlacedView = memo(function PlacedView({ p, look, res, selected, cla
     const clip = hull ? `polygon(${hull.map(([x, y]) => `${((x - b.x) * CELL).toFixed(1)}px ${((y - b.y) * CELL).toFixed(1)}px`).join(', ')})` : undefined;
     return (
         <div
-            className={'map-placed' + (selected ? ' selected' : '') + (hull ? ' piece' : '') + (ghost ? ' ghost' : '') + (clash ? ' clash' : '')
+            className={'map-placed' + (selected ? ' selected' : '') + (lit ? ' lit' : '') + (hull ? ' piece' : '') + (ghost ? ' ghost' : '') + (clash ? ' clash' : '')
                 + (p.label && p.labelShow === 'hover' ? ' label-hover' : '')}
             style={{ left: ox, top: oy, width: W, height: H }}
             data-placed={p.id}
@@ -93,8 +95,9 @@ export const PlacedView = memo(function PlacedView({ p, look, res, selected, cla
 });
 
 /** Buildings and tokens of a city or interior, back to front. */
-export function DepthLayer({ doc, style, selection, res, maps, onDown }: {
+export function DepthLayer({ doc, style, selection, res, maps, onDown, hover }: {
     doc: MapDoc; style: MapStyle; selection: Selection[]; res: number; maps: MapDoc[]; onDown: ObjectDown;
+    hover?: Selection | null;
 }) {
     const order = depthOrder(doc.placed, doc.tokens);
     return (
@@ -104,13 +107,14 @@ export function DepthLayer({ doc, style, selection, res, maps, onDown }: {
                     <PlacedView
                         key={'p:' + e.obj.id} p={e.obj} look={doc.look} res={res}
                         selected={isSel(selection, 'placed', e.obj.id)}
+                        lit={isLit(hover, 'placed', e.obj.id)}
                         clash={isSel(selection, 'placed', e.obj.id) && clashes(doc, e.obj)}
                         opens={linkedDoc(maps, e.obj)?.id}
                         onDown={onDown}
                     />
                 )
                 : (
-                    <TokenView key={'t:' + e.obj.id} token={e.obj} style={style} selected={isSel(selection, 'token', e.obj.id)} onDown={onDown} />
+                    <TokenView key={'t:' + e.obj.id} token={e.obj} style={style} selected={isSel(selection, 'token', e.obj.id)} lit={isLit(hover, 'token', e.obj.id)} onDown={onDown} />
                 )))}
         </>
     );

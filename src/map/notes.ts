@@ -115,14 +115,23 @@ export function noteBox(doc: MapDoc, n: MapNote): Box | null {
     return hull ? boxOfPoints(hull) : spriteBox(top);
 }
 
-/** The middle of the marker in a box, in cells: its top-right corner, kept
-    inside it so the pointer can go from the thing to the marker without
-    leaving the thing. `r` is the marker's radius in cells. */
+/** The middle of the marker in a box, in cells. `r` is the marker's
+    radius in cells. A point note's marker sits on its point. In a box with
+    room for it, inside the top-right corner; a smaller thing would be
+    covered whole by it (a click meant for it opened the note), so there the
+    marker hangs off its top-right corner, still over the corner so the
+    pointer can go from the thing to the marker without leaving both. */
 export function markerAt(box: Box, r: number): [number, number] {
-    const x = box.w >= 2 * r ? box.x + box.w - r : box.x + box.w / 2;
-    const y = box.h >= 2 * r ? box.y + r : box.y + box.h / 2;
-    return [x, y];
+    if (box.w <= 0 && box.h <= 0) return [box.x, box.y];
+    if (box.w >= 3 * r && box.h >= 3 * r) return [box.x + box.w - r, box.y + r];
+    const k = r * 0.55;
+    return [box.x + box.w + k, box.y - k];
 }
+
+/** How far from a marker's middle the pointer still counts as on it, in
+    marker radii: the disc and the ring round it that takes presses
+    (`.map-note-pin` is 38 px across round a 24 px disc). */
+export const PIN_REACH = 1.6;
 
 export interface NoteHit { id: string; box: Box }
 
@@ -136,7 +145,7 @@ export function noteAt(doc: MapDoc, at: [number, number], r: number, keep?: Note
     if (!notes.length) return null;
     if (keep && notes.some((n) => n.id === keep.id)) {
         const [mx, my] = markerAt(keep.box, r);
-        if (Math.hypot(x - mx, y - my) <= r * 1.15) return keep;
+        if (Math.hypot(x - mx, y - my) <= r * PIN_REACH) return keep;
     }
     for (const hit of objectsAt(doc, x, y)) {
         const n = notes.find((o) => o.on && o.on.kind === hit.on.kind && o.on.id === hit.on.id);
@@ -147,7 +156,7 @@ export function noteAt(doc: MapDoc, at: [number, number], r: number, keep?: Note
         if (n.on) continue;
         const b = freeBox(n);
         const area = b.w * b.h;
-        const hit = area > 0 ? inBox(b, x, y) : Math.hypot(x - b.x, y - b.y) <= r * 1.15;
+        const hit = area > 0 ? inBox(b, x, y) : Math.hypot(x - b.x, y - b.y) <= r * PIN_REACH;
         if (hit && area < bestArea) { best = { id: n.id, box: b }; bestArea = area; }
     }
     return best;
