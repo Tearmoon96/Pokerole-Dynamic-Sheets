@@ -345,24 +345,6 @@ img.pixelated { image-rendering: pixelated; }
     image-rendering: auto;
 }
 
-/* A landmark that opens a map of its own (World Builder): a door in the
-   corner opposite a Gym's type badge. The editor's only; pictures leave it out. */
-.map-link-badge {
-    position: absolute;
-    left: 2%;
-    top: 2%;
-    min-width: 1.7em;
-    height: 1.7em;
-    border-radius: 0.5em;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    background: #2563ebdd;
-    border: 1.5px solid #fff;
-    box-shadow: 0 1px 4px #0006;
-    pointer-events: none;
-}
 
 /* ---------------- City builder: placed buildings and props ---------------- */
 
@@ -384,7 +366,6 @@ img.pixelated { image-rendering: pixelated; }
 /* Overlapping another standing thing, or off the map: allowed, but said. */
 .map-placed.clash .map-placed-foot { border-color: #ff4d4d; background: #ff4d4d26; }
 .map-placed.ghost { opacity: 0.68; }
-.map-placed-door { position: absolute; transform: translate(-25%, -25%); }
 .map-placed-label {
     position: absolute;
     left: 50%;
@@ -429,13 +410,15 @@ img.pixelated { image-rendering: pixelated; }
 /* Over everything, the fog included: the GM's own view. DOM only, so no
    picture of the map ever has them. Only the markers take the pointer. */
 .map-notes { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 6; pointer-events: none; }
-/* The button is a ring of empty space round the marker's disc, which takes
-   the press too: the disc is small, and the pointer coming from the thing
-   it belongs to lands on its edge (PIN_REACH in notes.ts). */
+/* The GM's markers, a note's and a door, are one size, `--marker` (world
+   px, set by NotesLayer from markerPx: they zoom with the map). The note's
+   button is a ring of empty space round its disc, which takes the press too:
+   the pointer coming from the thing it belongs to lands on its edge
+   (PIN_REACH in notes.ts). */
 .map-note-pin {
     position: absolute;
-    width: 38px;
-    height: 38px;
+    width: calc(var(--marker, 30px) * 1.5);
+    height: calc(var(--marker, 30px) * 1.5);
     min-height: 0;
     padding: 0;
     border: 0;
@@ -447,30 +430,41 @@ img.pixelated { image-rendering: pixelated; }
     justify-content: center;
     pointer-events: auto;
     cursor: pointer;
-    transform-origin: 50% 50%;
+    transform: translate(-50%, -50%);
     animation: map-note-pop 0.12s ease-out;
 }
-.map-note-disc {
-    width: 24px;
-    height: 24px;
+.map-note-disc, .map-door {
+    width: var(--marker, 30px);
+    height: var(--marker, 30px);
     flex: none;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 11px;
+    font-size: calc(var(--marker, 30px) * 0.44);
+    border: calc(var(--marker, 30px) * 0.075) solid #fff;
+    box-shadow: 0 calc(var(--marker, 30px) * 0.04) calc(var(--marker, 30px) * 0.2) #0008;
+    box-sizing: border-box;
+}
+.map-note-disc {
     color: #3b2a00;
     background: #f6c945;
-    border: 2px solid #fff;
-    box-shadow: 0 1px 5px #0008;
-    box-sizing: border-box;
     transition: box-shadow 0.1s, background 0.1s;
+}
+/* A thing that opens a map: a sign only, the thing under it takes the pointer. */
+.map-door {
+    position: absolute;
+    color: #fff;
+    background: #2563eb;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    animation: map-note-pop 0.12s ease-out;
 }
 /* The shared `button:hover` would fill the ring. */
 .map-note-pin:hover, .map-note-pin:focus { background: none; border: 0; box-shadow: none; }
 .map-note-pin:hover .map-note-disc, .map-note-pin.open .map-note-disc {
     background: #ffd95e;
-    box-shadow: 0 0 0 3px #f6c945aa, 0 0 10px 2px #f6c94599, 0 1px 5px #0008;
+    box-shadow: 0 0 0 calc(var(--marker, 30px) * 0.11) #f6c945aa, 0 0 calc(var(--marker, 30px) * 0.4) calc(var(--marker, 30px) * 0.07) #f6c94599, 0 1px 5px #0008;
 }
 .map-note-disc i { transition: transform 0.1s; }
 .map-note-pin:hover .map-note-disc i { transform: scale(1.18); }

@@ -230,7 +230,7 @@ await key('Escape');
 s = await settle();
 check('Esc goes back to the city', s.activeId === cityId);
 check('with the house selected', await evalIn(`!!document.querySelector('.map-placed.selected[data-placed="${house.id}"]')`));
-check('the house wears a door badge', await evalIn(`!!document.querySelector('[data-placed="${house.id}"] .map-placed-door')`));
+check('the house wears a door badge', await evalIn(`!!document.querySelector('.map-door[data-door="placed:${house.id}"]')`));
 await key('Escape');
 await mouse('mouseMoved', await at(1, 1), { buttons: 0 });
 const hb2 = await evalIn(`(() => { const r = document.querySelector('[data-obj="placed:${house.id}"]').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height * 0.4]; })()`);

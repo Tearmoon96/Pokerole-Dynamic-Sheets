@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { useMap } from '../../map/MapContext';
 import { Popover } from './Popover';
 import { useGmConfirm } from '../gm/ConfirmDialog';
 import { CELL } from '../../map/render/patterns';
-import { NOTE_TEXT_MAX, NOTE_TITLE_MAX, freeBox, isEmptyNote, liveNotes, markerAt, noteBox, noteFor } from '../../map/notes';
+import { NOTE_TEXT_MAX, NOTE_TITLE_MAX, doorAt, freeBox, isEmptyNote, liveNotes, markerAt, markerPx, noteBox, noteFor } from '../../map/notes';
 import type { NoteHit } from '../../map/notes';
+import { spriteBox } from '../../map/world/placed';
 import type { Box } from '../../map/world/placed';
+import { linkedDoc } from '../../map/world';
 import { uid } from '../../map/doc';
 import type { NotesShow } from '../../map/store';
 import type { MapDoc, MapNote, NoteTarget } from '../../map/types';
@@ -20,17 +22,22 @@ import type { MapDoc, MapNote, NoteTarget } from '../../map/types';
 
    Which markers show: every one while the Note tool is out or with "Always";
    with "On hover" the one under the pointer (MapCanvas works out which, by
-   geometry, under every tool); with "Hidden" none. The note whose window is
-   open always keeps its marker, which the window hangs from. */
+   geometry, under every tool); with "Never" none. The note whose window is
+   open always keeps its marker, which the window hangs from.
 
-/** The marker's radius on screen, in px. */
-export const NOTE_PIN_PX = 12;
+   The doors live here too: the badge on a landmark or building that opens
+   a map of its own. The same choice shows them (on hover: the thing under
+   the pointer, or selected), the same size, on the other shoulder. They
+   are a sign only and never take the pointer: the thing under one does. */
 
-export function NotesLayer({ doc, zoom, hover, draft, onGrab }: {
+export function NotesLayer({ doc, zoom, hover, door, draft, onGrab }: {
     doc: MapDoc;
     zoom: number;
     /** The note under the pointer, and the box its marker sits in. */
     hover: NoteHit | null;
+    /** The thing under the pointer that opens a map ("stamp:<id>" or
+        "placed:<id>"), for "On hover". */
+    door: string | null;
     /** An area being dragged out with the Note tool. */
     draft: Box | null;
     /** A press on a free note's marker (move) or its area's corner
@@ -43,7 +50,8 @@ export function NotesLayer({ doc, zoom, hover, draft, onGrab }: {
     const noteTool = ui.tool === 'note';
     const notes = liveNotes(doc);
     if (open?.draft && !notes.some((n) => n.id === open.id)) notes.push(open.draft);
-    const r = NOTE_PIN_PX / (zoom * CELL);
+    const px = markerPx(zoom);
+    const r = px / 2 / CELL;
     const all = noteTool || ui.notesShow === 'always';
 
     const pins: { note: MapNote; at: [number, number] }[] = [];
@@ -52,7 +60,25 @@ export function NotesLayer({ doc, zoom, hover, draft, onGrab }: {
         const isHover = hover?.id === n.id;
         if (!all && !isOpen && !(isHover && ui.notesShow === 'hover')) continue;
         const box = isHover ? hover!.box : noteBox(doc, n);
-        if (box) pins.push({ note: n, at: markerAt(box, r) });
+        if (box) pins.push({ note: n, at: markerAt(box, r, isHover ? hover!.free : !n.on) });
+    }
+
+    const doors: { tag: string; name: string; at: [number, number] }[] = [];
+    if (ui.notesShow !== 'hidden') {
+        const shown = (tag: string, kind: 'stamp' | 'placed', id: string) => ui.notesShow === 'always' || door === tag
+            || ui.selection.some((x) => x.kind === kind && x.id === id);
+        for (const st of doc.stamps) {
+            const to = st.link ? linkedDoc(store.maps, st) : undefined;
+            const tag = 'stamp:' + st.id;
+            if (to && shown(tag, 'stamp', st.id)) {
+                doors.push({ tag, name: to.name, at: doorAt({ x: st.x - st.size / 2, y: st.y - st.size / 2, w: st.size, h: st.size }, r) });
+            }
+        }
+        for (const p of doc.placed) {
+            const to = p.link && !p.run ? linkedDoc(store.maps, p) : undefined;
+            const tag = 'placed:' + p.id;
+            if (to && shown(tag, 'placed', p.id)) doors.push({ tag, name: to.name, at: doorAt(spriteBox(p), r) });
+        }
     }
     const areas = notes.filter((n) => !n.on && (n.w ?? 0) > 0 && (n.h ?? 0) > 0
         && (noteTool || open?.id === n.id || (hover?.id === n.id && ui.notesShow !== 'hidden')));
@@ -63,7 +89,13 @@ export function NotesLayer({ doc, zoom, hover, draft, onGrab }: {
     };
 
     return (
-        <div className="map-notes" aria-hidden={false}>
+        <div className="map-notes" aria-hidden={false} style={{ '--marker': px + 'px' } as CSSProperties}>
+            {doors.map((d) => (
+                <span key={d.tag} className="map-door" data-door={d.tag} aria-label={'Opens ' + (d.name || 'a map')}
+                    style={{ left: d.at[0] * CELL, top: d.at[1] * CELL }}>
+                    <i className="fa-solid fa-door-open"></i>
+                </span>
+            ))}
             {areas.map((n) => {
                 const b = freeBox(n);
                 return (
@@ -89,7 +121,7 @@ export function NotesLayer({ doc, zoom, hover, draft, onGrab }: {
                     className={'map-note-pin' + (open?.id === note.id ? ' open' : '')}
                     data-note={note.id}
                     title={note.title.trim() || 'GM note'}
-                    style={{ left: at[0] * CELL, top: at[1] * CELL, transform: `translate(-50%, -50%) scale(${1 / zoom})` }}
+                    style={{ left: at[0] * CELL, top: at[1] * CELL }}
                     onPointerDown={(e) => {
                         e.stopPropagation();
                         if (e.button !== 0) return;
@@ -222,9 +254,9 @@ export function NoteFields({ doc, on }: { doc: MapDoc; on: NoteTarget }) {
 }
 
 const SHOW_CHOICES: { v: NotesShow; icon: string; name: string; hint: string }[] = [
-    { v: 'always', icon: 'fa-eye', name: 'Always', hint: 'Every note\'s marker is on the map' },
-    { v: 'hover', icon: 'fa-arrow-pointer', name: 'On hover', hint: 'A marker shows while the pointer is over the place or the thing' },
-    { v: 'hidden', icon: 'fa-eye-slash', name: 'Hidden', hint: 'No markers (the Note tool still shows them all)' },
+    { v: 'always', icon: 'fa-eye', name: 'Always', hint: 'Every note marker and door is on the map' },
+    { v: 'hover', icon: 'fa-arrow-pointer', name: 'On hover', hint: 'A note marker or a door shows while the pointer is over its place or thing' },
+    { v: 'hidden', icon: 'fa-eye-slash', name: 'Never', hint: 'No note markers or doors (the Note tool still shows every note)' },
 ];
 
 /** Always / On hover / Hidden — this browser's choice for every map. */

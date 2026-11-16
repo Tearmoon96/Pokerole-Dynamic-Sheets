@@ -115,25 +115,57 @@ export function noteBox(doc: MapDoc, n: MapNote): Box | null {
     return hull ? boxOfPoints(hull) : spriteBox(top);
 }
 
-/** The middle of the marker in a box, in cells. `r` is the marker's
-    radius in cells. A point note's marker sits on its point. In a box with
-    room for it, inside the top-right corner; a smaller thing would be
-    covered whole by it (a click meant for it opened the note), so there the
-    marker hangs off its top-right corner, still over the corner so the
-    pointer can go from the thing to the marker without leaving both. */
-export function markerAt(box: Box, r: number): [number, number] {
+/** The GM's markers on the map (a note's, and the door of a thing that
+    opens a map) are one size, in WORLD px, so they zoom with the map like
+    everything on it (2026-11-16, the owner's ask: the note stayed one size
+    on screen while the door grew and shrank). Held between 18 and 60 px on
+    screen, so far out they can still be clicked and close in they do not
+    cover what they mark. */
+export const MARKER_PX = 30;
+export function markerPx(zoom: number): number {
+    return Math.min(Math.max(MARKER_PX, 18 / zoom), 60 / zoom);
+}
+/** A marker's radius in cells at a zoom. */
+export const markerRadius = (zoom: number, cell: number) => markerPx(zoom) / 2 / cell;
+
+/** The middle of a note's marker, in cells. `r` is its radius in cells.
+    A point note's sits on its point; a free area's inside its top-right
+    corner. On a thing, it hugs its top-right shoulder (2026-11-16, the
+    owner's ask: it sat in the far corner of the box, away from a round
+    landmark): 35% of the way out from the middle, where a round landmark's
+    edge is, but never so close that it covers the middle, so a click on
+    the thing still takes the thing. It overlaps the thing either way, so
+    the pointer goes from one to the other without leaving both. */
+export function markerAt(box: Box, r: number, free = false): [number, number] {
     if (box.w <= 0 && box.h <= 0) return [box.x, box.y];
-    if (box.w >= 3 * r && box.h >= 3 * r) return [box.x + box.w - r, box.y + r];
-    const k = r * 0.55;
-    return [box.x + box.w + k, box.y - k];
+    if (free) {
+        return [box.w >= 2 * r ? box.x + box.w - r : box.x + box.w / 2, box.h >= 2 * r ? box.y + r : box.y + box.h / 2];
+    }
+    const [dx, dy] = shoulder(box, r);
+    return [box.x + box.w / 2 + dx, box.y + box.h / 2 - dy];
+}
+
+/** The door of a thing that opens a map: the other shoulder, top-left. */
+export function doorAt(box: Box, r: number): [number, number] {
+    const [dx, dy] = shoulder(box, r);
+    return [box.x + box.w / 2 - dx, box.y + box.h / 2 - dy];
+}
+
+/* 1.3 r on each axis puts the marker's middle 1.84 r from the thing's: its
+   click ring (PIN_REACH, 1.5 r) stays clear of the middle of a small thing,
+   with room for Chrome's round hit test, which reaches a little past the
+   circle. */
+function shoulder(box: Box, r: number): [number, number] {
+    return [Math.max(box.w * 0.35, r * 1.3), Math.max(box.h * 0.35, r * 1.3)];
 }
 
 /** How far from a marker's middle the pointer still counts as on it, in
     marker radii: the disc and the ring round it that takes presses
-    (`.map-note-pin` is 38 px across round a 24 px disc). */
-export const PIN_REACH = 1.6;
+    (`.map-note-pin` is 1.5 times the disc across). */
+export const PIN_REACH = 1.5;
 
-export interface NoteHit { id: string; box: Box }
+/** `free`: a free note's own area, whose marker sits in its corner. */
+export interface NoteHit { id: string; box: Box; free?: boolean }
 
 /** The note under the pointer: the topmost object there that has one, then
     the free notes (the smallest area first; a point within `r`). `keep` is
@@ -144,7 +176,7 @@ export function noteAt(doc: MapDoc, at: [number, number], r: number, keep?: Note
     const notes = liveNotes(doc);
     if (!notes.length) return null;
     if (keep && notes.some((n) => n.id === keep.id)) {
-        const [mx, my] = markerAt(keep.box, r);
+        const [mx, my] = markerAt(keep.box, r, keep.free);
         if (Math.hypot(x - mx, y - my) <= r * PIN_REACH) return keep;
     }
     for (const hit of objectsAt(doc, x, y)) {
@@ -157,7 +189,7 @@ export function noteAt(doc: MapDoc, at: [number, number], r: number, keep?: Note
         const b = freeBox(n);
         const area = b.w * b.h;
         const hit = area > 0 ? inBox(b, x, y) : Math.hypot(x - b.x, y - b.y) <= r * PIN_REACH;
-        if (hit && area < bestArea) { best = { id: n.id, box: b }; bestArea = area; }
+        if (hit && area < bestArea) { best = { id: n.id, box: b, free: true }; bestArea = area; }
     }
     return best;
 }

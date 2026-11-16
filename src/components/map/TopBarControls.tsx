@@ -406,27 +406,33 @@ export function GridControl() {
     );
 }
 
-/* ------------------------------------------------------------- GM notes */
+/* ------------------------------------------------------------- GM markers */
 
-/** When the GM's note markers show: Always, On hover, Hidden — this
-    browser's choice for every map. */
+/** When the GM's own markers show on the map — note markers and the doors
+    of things that open a map: Always, On hover, Never. This browser's choice
+    for every map. */
 export function NotesControl() {
     const { ui } = useMap();
     const pop = usePopover();
-    const icon = ui.notesShow === 'hidden' ? 'fa-eye-slash' : 'fa-note-sticky';
+    const icon = ui.notesShow === 'hidden' ? 'fa-eye-slash' : ui.notesShow === 'hover' ? 'fa-arrow-pointer' : 'fa-eye';
+    const state = ui.notesShow === 'hidden' ? 'never' : ui.notesShow === 'hover' ? 'on hover' : 'always';
     return (
         <>
             <button
                 ref={pop.anchor} className="icon-btn" aria-expanded={pop.open} data-notes-control=""
                 aria-pressed={ui.notesShow !== 'hidden'}
-                title="GM notes: when their markers show on the map (only you ever see them)"
+                title={'GM markers (notes and doors): shown ' + state + ' — only you ever see them'}
                 onClick={() => pop.setOpen((o) => !o)}
             >
-                <i className={'fa-solid ' + icon}></i><span className="map-btn-text"> Notes</span>
+                <i className={'fa-solid ' + icon}></i><span className="map-btn-text"> Markers</span>
             </button>
             <Popover anchor={pop.anchor} open={pop.open} onClose={pop.close}>
-                <div className="map-popover-title">GM notes</div>
-                <p className="map-hint">Only you see them: never the players, never a picture of the map.</p>
+                <div className="map-popover-title">GM markers</div>
+                <p className="map-hint">
+                    <i className="fa-solid fa-note-sticky" style={{ color: '#f6c945' }}></i> notes and{' '}
+                    <i className="fa-solid fa-door-open" style={{ color: '#4f8bff' }}></i> doors to the maps inside.
+                    Only you see them: never the players, never a picture of the map.
+                </p>
                 <NotesShowChoice />
             </Popover>
         </>

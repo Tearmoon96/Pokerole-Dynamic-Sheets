@@ -38,8 +38,8 @@ import { LabelsLayer, PathsLayer, SketchesLayer, StampsLayer, TokensLayer } from
 import { cleanSketchWidth, finishTrack, shapeTrack } from '../../map/sketch';
 import type { Grab, ObjectDown } from './MapObjects';
 import { useToast } from '../common/Toast';
-import { NOTE_PIN_PX, NotesLayer, closeNote } from './NotesLayer';
-import { NOTE_MIN_AREA_SIDE, freeBox, noteAt, noteFor, objectsAt } from '../../map/notes';
+import { NotesLayer, closeNote } from './NotesLayer';
+import { NOTE_MIN_AREA_SIDE, freeBox, markerRadius, noteAt, noteFor, objectsAt } from '../../map/notes';
 import type { NoteHit } from '../../map/notes';
 import type { Box } from '../../map/world/placed';
 import type { MapDoc, MapNote, MapSketch, NoteTarget, Selection, Tool } from '../../map/types';
@@ -266,6 +266,10 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
        far more often than it crosses from one thing to another. */
     const [noteHover, setNoteHover] = useState<NoteHit | null>(null);
     const noteHoverRef = useRef<NoteHit | null>(null);
+    /* The thing under the pointer that opens a map: its door shows with
+       "On hover". */
+    const [doorHover, setDoorHover] = useState<string | null>(null);
+    const doorHoverRef = useRef<string | null>(null);
     const [noteDraft, setNoteDraft] = useState<Box | null>(null);
     /* What a click would take right now, under Select and Erase (pick.ts):
        lit up so overlapping things are never a guess. */
@@ -276,6 +280,13 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     const gesture = useRef<Gesture | null>(null);
     const pointers = useRef(new Map<number, Pt>());
     const fitted = useRef('');
+
+    /* Another map: what the pointer was over belongs to the last one. */
+    useEffect(() => {
+        noteHoverRef.current = null; setNoteHover(null);
+        doorHoverRef.current = null; setDoorHover(null);
+        objHoverRef.current = null; setObjHover(null);
+    }, [doc.id]);
 
     /* ---------------------------------------------------------------- sizing */
 
@@ -907,7 +918,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             store.setUi({ noteOpen: { doc: d.id, id: draft.id, edit: true, draft } });
             return;
         }
-        const free = noteAt(d, g.start, NOTE_PIN_PX / (viewRef.current.zoom * CELL));
+        const free = noteAt(d, g.start, markerRadius(viewRef.current.zoom, CELL));
         if (free) { store.setUi({ noteOpen: { doc: d.id, id: free.id, edit: false } }); return; }
         const draft: MapNote = { id: uid(), title: '', text: '', x: g.start[0], y: g.start[1], w: 0, h: 0 };
         store.setUi({ noteOpen: { doc: d.id, id: draft.id, edit: true, draft } });
@@ -1279,12 +1290,29 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     const hoverNote = (at: Pt | null) => {
         const ui = store.ui, d = store.doc;
         const look = at && d.notes?.length && (ui.notesShow !== 'hidden' || ui.tool === 'note');
-        const hit = look ? noteAt(d, at, NOTE_PIN_PX / (viewRef.current.zoom * CELL), noteHoverRef.current) : null;
+        const hit = look ? noteAt(d, at, markerRadius(viewRef.current.zoom, CELL), noteHoverRef.current) : null;
         const was = noteHoverRef.current;
+        hoverDoor(at);
         if (hit === was || (hit && was && hit.id === was.id && hit.box.x === was.box.x && hit.box.y === was.box.y
             && hit.box.w === was.box.w && hit.box.h === was.box.h)) return;
         noteHoverRef.current = hit;
         setNoteHover(hit);
+    };
+
+    /** The topmost thing under the pointer that opens a map, for its door. */
+    const hoverDoor = (at: Pt | null) => {
+        const d = store.doc;
+        let tag: string | null = null;
+        if (at && store.ui.notesShow === 'hover') {
+            for (const { on } of objectsAt(d, at[0], at[1])) {
+                const obj = on.kind === 'stamp' ? d.stamps.find((o) => o.id === on.id)
+                    : on.kind === 'placed' ? d.placed.find((o) => o.id === on.id) : undefined;
+                if (obj?.link && linkedDoc(store.maps, obj)) { tag = on.kind + ':' + on.id; break; }
+            }
+        }
+        if (tag === doorHoverRef.current) return;
+        doorHoverRef.current = tag;
+        setDoorHover(tag);
     };
 
     /** A press on a free note's marker (move) or corner (resize), Note tool. */
@@ -1341,9 +1369,9 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                         grid={doc.grid.show ? doc.grid.opacity || 0.5 : 0} />
                 )}
                 <PathsLayer doc={doc} style={style} selection={ui.selection} draft={draft} onDown={onObjectDown} hover={lit} />
-                <StampsLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} maps={store.maps} hover={lit} />
+                <StampsLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} hover={lit} />
                 {/* A city or interior: buildings and tokens in one layer, back to front, under the labels. */}
-                {city && <DepthLayer doc={doc} style={style} selection={ui.selection} res={res} maps={store.maps} onDown={onObjectDown} hover={lit} />}
+                {city && <DepthLayer doc={doc} style={style} selection={ui.selection} res={res} onDown={onObjectDown} hover={lit} />}
                 {city && ui.tool === 'build' && hover && !spaceHeld && !runShapeOf(itemOf(ui.buildItem), ui.buildShape) && (
                     <BuildGhost doc={doc} item={ui.buildItem} rot={ui.buildRot} variant={ui.buildVariant} flip={ui.buildFlip} at={hover} res={res} />
                 )}
@@ -1356,7 +1384,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 {!city && <TokensLayer doc={doc} style={style} selection={ui.selection} onDown={onObjectDown} hover={lit} />}
                 {(!ui.fogHidden || ui.tool === 'fog' || ui.tool === 'unfog') && <FogLayer doc={doc} />}
                 {/* The GM's notes: over the fog, in the editor only — never in a picture. */}
-                <NotesLayer doc={doc} zoom={view.zoom} hover={noteHover} draft={noteDraft} onGrab={onNoteGrab} />
+                <NotesLayer doc={doc} zoom={view.zoom} hover={noteHover} door={doorHover} draft={noteDraft} onGrab={onNoteGrab} />
                 {doc.room && ui.tool === 'room' && ui.roomMode === 'shape' && <RoomHandles store={store} room={doc.room} cols={doc.cols} rows={doc.rows} zoom={view.zoom} />}
                 {doc.room && ui.tool === 'room' && ui.roomMode !== 'shape' && hover && !spaceHeld && (
                     <RoomCursor room={doc.room} at={hover} ui={ui} cols={doc.cols} rows={doc.rows} zoom={view.zoom} />
