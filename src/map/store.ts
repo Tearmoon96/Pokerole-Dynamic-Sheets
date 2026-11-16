@@ -10,6 +10,7 @@ import type { ShapeFill, ShapeKind } from './shapes';
 import { DEFAULT_SKETCH } from './sketch';
 import type { SketchSettings } from './sketch';
 import type { DocKind, EdgeKind, FloorFinish, LabelRole, MapDoc, MapNote, PathKind, Selection, Tool, WallFinish } from './types';
+import type { RoomWallShape } from './world/room';
 import { NOTE_TEXT_MAX, NOTE_TITLE_MAX, isEmptyNote } from './notes';
 
 /* One mutable store behind the Map Maker, in the same shape as the GM screen's
@@ -139,6 +140,8 @@ export interface MapUi {
     roomMode: 'shape' | 'walls' | 'floor' | 'wallpaper';
     /** Walls: rub inner walls out instead of drawing them. */
     roomErase: boolean;
+    /** How a drag lays inner walls (world/room.ts RoomWallShape). */
+    roomWallShape: RoomWallShape;
     /** The floor and wallpaper laid down; null puts back the room's own. */
     roomFloor: FloorFinish | null;
     roomWall: WallFinish | null;
@@ -213,7 +216,7 @@ export class MapStore {
         smartPaint: false, lockedTerrains: [], stayOnStart: false,
         fogColor: 'dark', fogStrength: 100, fogHidden: false,
         landmark: 'mountain', buildItem: 'house', buildRot: undefined, buildVariant: 0, buildEra: 'all', buildFlip: false, buildShape: 'piece', fillerVariant: 0,
-        roomMode: 'shape', roomErase: false, roomFloor: { kind: 'grass', color: '#6aa84a' }, roomWall: { kind: 'brick', color: '#b0644a' }, roomFill: false, roomBrush: 1, pathKind: 'road', labelRole: 'town', sketch: DEFAULT_SKETCH, sketchErase: false, sketchShape: false, token: null, selection: [],
+        roomMode: 'shape', roomErase: false, roomWallShape: 'free', roomFloor: { kind: 'grass', color: '#6aa84a' }, roomWall: { kind: 'brick', color: '#b0644a' }, roomFill: false, roomBrush: 1, pathKind: 'road', labelRole: 'town', sketch: DEFAULT_SKETCH, sketchErase: false, sketchShape: false, token: null, selection: [],
         notesShow: readNotesShow(), noteOpen: null,
     };
 

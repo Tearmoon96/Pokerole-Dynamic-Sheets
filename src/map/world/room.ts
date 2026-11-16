@@ -1,5 +1,5 @@
 import { Pen, darken, lighten, lookOf } from './looks';
-import type { FloorFinish, LookId, MapRoom, WallFinish } from '../types';
+import type { FloorFinish, LookId, MapRoom, RoomCurve, WallFinish } from '../types';
 
 /* An interior's floor plan (owner's request, 2026-11-08): the room is any
    outline of corners on the grid, inside the rectangular map. Outside it is
@@ -84,7 +84,7 @@ export const WALL_T = 0.35;
 export type Pt = [number, number];
 
 /** The room presets, fitted to a map of `cols` x `rows` with a cell of margin. */
-export function presetShape(kind: 'rect' | 'L' | 'T' | 'U' | 'plus', cols: number, rows: number): Pt[] {
+export function presetShape(kind: 'rect' | 'L' | 'T' | 'U' | 'plus' | 'round', cols: number, rows: number): Pt[] {
     const x0 = 1, y0 = 1, x1 = Math.max(x0 + 3, cols - 1), y1 = Math.max(y0 + 3, rows - 1);
     const w = x1 - x0, h = y1 - y0;
     const mx = (t: number) => x0 + Math.round(w * t), my = (t: number) => y0 + Math.round(h * t);
@@ -93,8 +93,30 @@ export function presetShape(kind: 'rect' | 'L' | 'T' | 'U' | 'plus', cols: numbe
         case 'T': return [[x0, y0], [x1, y0], [x1, my(0.45)], [mx(0.68), my(0.45)], [mx(0.68), y1], [mx(0.32), y1], [mx(0.32), my(0.45)], [x0, my(0.45)]];
         case 'U': return [[x0, y0], [mx(0.35), y0], [mx(0.35), my(0.55)], [mx(0.65), my(0.55)], [mx(0.65), y0], [x1, y0], [x1, y1], [x0, y1]];
         case 'plus': return [[mx(0.33), y0], [mx(0.67), y0], [mx(0.67), my(0.33)], [x1, my(0.33)], [x1, my(0.67)], [mx(0.67), my(0.67)], [mx(0.67), y1], [mx(0.33), y1], [mx(0.33), my(0.67)], [x0, my(0.67)], [x0, my(0.33)], [mx(0.33), my(0.33)]];
+        case 'round': return roundOutline(x0, y0, x1, y1);
         default: return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
     }
+}
+
+/** A round room: an ellipse in the box, as a polygon with its corners on
+    whole cells (as every outline's are) — 24 sides, fewer where rounding
+    puts two on one point or three on one line. */
+function roundOutline(x0: number, y0: number, x1: number, y1: number): Pt[] {
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, rx = (x1 - x0) / 2, ry = (y1 - y0) / 2;
+    const pts: Pt[] = [];
+    for (let i = 0; i < 24; i++) {
+        const t = -Math.PI / 2 + (i / 24) * Math.PI * 2;
+        const p: Pt = [Math.round(cx + rx * Math.cos(t)), Math.round(cy + ry * Math.sin(t))];
+        const last = pts[pts.length - 1];
+        if (!last || last[0] !== p[0] || last[1] !== p[1]) pts.push(p);
+    }
+    while (pts.length > 1 && pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1]) pts.pop();
+    /* Three in a row on one line: the middle one is no corner. */
+    for (let i = 0; i < pts.length && pts.length > 3;) {
+        const a = pts[(i + pts.length - 1) % pts.length], b = pts[i], c = pts[(i + 1) % pts.length];
+        if ((b[0] - a[0]) * (c[1] - a[1]) === (b[1] - a[1]) * (c[0] - a[0])) pts.splice(i, 1); else i++;
+    }
+    return pts;
 }
 
 /** A new interior's room: a rectangle a cell in from the edges. */
@@ -156,6 +178,143 @@ export function backWalls(pts: Pt[]): [Pt, Pt][] {
     return out.sort((p, q) => Math.min(p[0][1], p[1][1]) - Math.min(q[0][1], q[1][1]));
 }
 
+/* ----------------------------------------------------------- curved walls
+
+   Inner walls off the grid (`room.curves`): each a line of points in cells,
+   every segment a piece of wall that stands as an inner `h` does — its face
+   hanging down from it, its top a band along it — and keyed `c<id>:<j>` for
+   its own wallpaper. Floors are filled cell by cell, so a curve stops a fill
+   at the unit edges it crosses (`Geo.block`). */
+
+export const MAX_CURVES = 80;
+export const MAX_CURVE_PTS = 360;
+const CURVE_KEY_RE = /^c([a-z0-9]{1,12}):(\d{1,3})$/;
+export const curveKey = (id: string, j: number) => `c${id}:${j}`;
+
+export interface CurveSeg { key: string; id: string; a: Pt; b: Pt }
+
+function curveSegsOf(curves: RoomCurve[] | undefined): CurveSeg[] {
+    const out: CurveSeg[] = [];
+    for (const c of curves ?? []) {
+        const n = c.pts.length;
+        const last = c.closed && n > 2 ? n : n - 1;
+        for (let j = 0; j < last; j++) out.push({ key: curveKey(c.id, j), id: c.id, a: c.pts[j], b: c.pts[(j + 1) % n] });
+    }
+    return out;
+}
+
+/** Whether segments p1-p2 and p3-p4 cross or touch. */
+function segsMeet(p1: Pt, p2: Pt, p3: Pt, p4: Pt): boolean {
+    const d = (a: Pt, b: Pt, c: Pt) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+    const d1 = d(p3, p4, p1), d2 = d(p3, p4, p2), d3 = d(p1, p2, p3), d4 = d(p1, p2, p4);
+    return ((d1 > 0) !== (d2 > 0) || d1 === 0 || d2 === 0) && ((d3 > 0) !== (d4 > 0) || d3 === 0 || d4 === 0)
+        && Math.min(p1[0], p2[0]) <= Math.max(p3[0], p4[0]) + 1e-9 && Math.min(p3[0], p4[0]) <= Math.max(p1[0], p2[0]) + 1e-9
+        && Math.min(p1[1], p2[1]) <= Math.max(p3[1], p4[1]) + 1e-9 && Math.min(p3[1], p4[1]) <= Math.max(p1[1], p2[1]) + 1e-9;
+}
+
+/** The steps between neighbouring cells the curves cross, by the unit
+    edge between the two cells: where a fill stops. */
+function blockedEdges(segs: CurveSeg[]): Set<string> {
+    const out = new Set<string>();
+    for (const { a, b } of segs) {
+        const x0 = Math.floor(Math.min(a[0], b[0])) - 1, x1 = Math.ceil(Math.max(a[0], b[0])) + 1;
+        const y0 = Math.floor(Math.min(a[1], b[1])) - 1, y1 = Math.ceil(Math.max(a[1], b[1])) + 1;
+        for (let y = y0; y <= y1; y++) {
+            for (let x = x0; x <= x1; x++) {
+                /* The step a fill takes from one cell's centre to the next:
+                   a ring crosses every such step from inside to out. */
+                if (segsMeet(a, b, [x + 0.5, y - 0.5], [x + 0.5, y + 0.5])) out.add(pieceKey('h', x, y));
+                if (segsMeet(a, b, [x - 0.5, y + 0.5], [x + 0.5, y + 0.5])) out.add(pieceKey('v', x, y));
+            }
+        }
+    }
+    return out;
+}
+
+const dist2Seg = (p: Pt, a: Pt, b: Pt): number => {
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy;
+    const t = L ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L)) : 0;
+    return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+};
+
+/** The curve piece whose top is under a point, if any. */
+export function curveAt(room: MapRoom, x: number, y: number, reach = WALL_T / 2 + 0.08): CurveSeg | null {
+    let best: CurveSeg | null = null, bestD = reach;
+    for (const s of roomGeo(room).curves) {
+        const d = dist2Seg([x, y], s.a, s.b);
+        if (d <= bestD) { best = s; bestD = d; }
+    }
+    return best;
+}
+
+const round2 = (v: number) => Math.round(v * 100) / 100;
+
+/** The room with one more curved wall: points kept on the map, a bare
+    point or two on one spot dropped. The same object when it is no wall. */
+export function withCurve(room: MapRoom, cols: number, rows: number, pts: Pt[], closed: boolean): MapRoom {
+    if ((room.curves?.length ?? 0) >= MAX_CURVES) return room;
+    const clean: Pt[] = [];
+    for (const [x, y] of pts.slice(0, MAX_CURVE_PTS)) {
+        const p: Pt = [round2(Math.max(0, Math.min(cols, x))), round2(Math.max(0, Math.min(rows, y)))];
+        const last = clean[clean.length - 1];
+        if (!last || Math.hypot(p[0] - last[0], p[1] - last[1]) >= 0.05) clean.push(p);
+    }
+    if (closed && clean.length > 2) {
+        const [f, l] = [clean[0], clean[clean.length - 1]];
+        if (Math.hypot(f[0] - l[0], f[1] - l[1]) < 0.05) clean.pop();
+    }
+    if (clean.length < 2 || (closed && clean.length < 3)) return room;
+    const used = new Set((room.curves ?? []).map((c) => c.id));
+    let id = '';
+    do id = Math.random().toString(36).slice(2, 8); while (!id || used.has(id));
+    const curve: RoomCurve = closed ? { id, pts: clean, closed: true } : { id, pts: clean };
+    return { ...room, curves: [...(room.curves ?? []), curve] };
+}
+
+/** The room without the curved wall under a point (the whole of it), and
+    its wallpaper; the same object when there is none there. */
+export function withoutCurveAt(room: MapRoom, x: number, y: number): MapRoom {
+    const hit = curveAt(room, x, y, 0.45);
+    if (!hit) return room;
+    const next: MapRoom = { ...room, curves: (room.curves ?? []).filter((c) => c.id !== hit.id) };
+    if (!next.curves!.length) delete next.curves;
+    if (next.wallPaints) {
+        const paints = Object.fromEntries(Object.entries(next.wallPaints).filter(([k]) => !k.startsWith('c' + hit.id + ':')));
+        if (Object.keys(paints).length) next.wallPaints = paints; else delete next.wallPaints;
+    }
+    return next;
+}
+
+/** A line drawn by hand made into a wall: points about half a cell apart,
+    rounded twice (Chaikin), then about a cell a piece. */
+export function handCurve(raw: Pt[]): Pt[] {
+    const spaced: Pt[] = [];
+    for (const p of raw) {
+        const last = spaced[spaced.length - 1];
+        if (!last || Math.hypot(p[0] - last[0], p[1] - last[1]) >= 0.5) spaced.push(p);
+    }
+    const end = raw[raw.length - 1];
+    if (end && spaced.length && spaced[spaced.length - 1] !== end) spaced.push(end);
+    let pts = spaced;
+    for (let k = 0; k < 2 && pts.length > 2; k++) {
+        const next: Pt[] = [pts[0]];
+        for (let i = 0; i < pts.length - 1; i++) {
+            const [a, b] = [pts[i], pts[i + 1]];
+            next.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]);
+        }
+        next.push(pts[pts.length - 1]);
+        pts = next;
+    }
+    const out: Pt[] = [];
+    for (const p of pts) {
+        const last = out[out.length - 1];
+        if (!last || Math.hypot(p[0] - last[0], p[1] - last[1]) >= 0.9) out.push(p);
+    }
+    const tail = pts[pts.length - 1];
+    if (tail && out[out.length - 1] !== tail) out.push(tail);
+    return out;
+}
+
 /* ----------------------------------------------------------- wall pieces */
 
 export type PieceKind = 'h' | 'v' | 'd';
@@ -173,7 +332,7 @@ export interface OutlinePiece { key: string; o: PieceKind; x: number; y: number;
     front end of an inner wall running down the map (`cap`). In cells. */
 export interface Face { key: string; x0: number; x1: number; ya: number; yb: number; h: number; inner: boolean; cap?: boolean }
 
-interface Geo { inner: Set<string>; outline: OutlinePiece[]; faces: Face[] }
+interface Geo { inner: Set<string>; outline: OutlinePiece[]; faces: Face[]; curves: CurveSeg[]; block: Set<string> }
 const GEO = new WeakMap<MapRoom, Geo>();
 
 /** The look of a wall piece: its own, or the room's. */
@@ -229,9 +388,17 @@ export function roomGeo(room: MapRoom): Geo {
             faces.push({ key, x0: k.x - WALL_T / 2, x1: k.x + WALL_T / 2, ya: k.y + 1, yb: k.y + 1, h: faceHeight(room, wallLook(room, key).kind), inner: true, cap: true });
         }
     }
+    /* A curve's pieces stand as an inner `h` does, slanted: the face hangs
+       down from the piece. One running straight up the map shows its top. */
+    const curves = curveSegsOf(room.curves);
+    for (const c of curves) {
+        if (Math.abs(c.b[0] - c.a[0]) < 0.02) continue;
+        const [l, r] = c.a[0] < c.b[0] ? [c.a, c.b] : [c.b, c.a];
+        faces.push({ key: c.key, x0: l[0], x1: r[0], ya: l[1], yb: r[1], h: faceHeight(room, wallLook(room, c.key).kind), inner: true });
+    }
     /* Back to front; at one depth, left to right. */
     faces.sort((p, q) => Math.min(p.ya, p.yb) - Math.min(q.ya, q.yb) || (p.cap ? 1 : 0) - (q.cap ? 1 : 0) || p.x0 - q.x0);
-    const geo = { inner, outline, faces };
+    const geo = { inner, outline, faces, curves, block: blockedEdges(curves) };
     GEO.set(room, geo);
     return geo;
 }
@@ -255,7 +422,8 @@ export function onFloor(room: MapRoom, f: { x: number; y: number; w: number; h: 
         }
     }
     const e = 0.01;
-    for (const key of roomGeo(room).inner) {
+    const g = roomGeo(room);
+    for (const key of [...g.inner, ...g.block]) {
         const k = parseKey(key);
         if (!k) continue;
         if (k.o === 'h' ? k.x < f.x + f.w - e && k.x + 1 > f.x + e && k.y > f.y + e && k.y < f.y + f.h - e
@@ -320,6 +488,28 @@ export function edgesBetween(a: Pt, b: Pt): ['h' | 'v', number, number][] {
     return out;
 }
 
+/** How a drag in the Room tool's Walls mode lays walls: along the pointer
+    (`free`, corner to corner, on the grid), as a straight line (on the grid
+    when it runs along it, slanted otherwise), a box on the grid, or off the
+    grid as a circle, an ellipse or a curve drawn by hand (`room.curves`). */
+export type RoomWallShape = 'free' | 'line' | 'rect' | 'circle' | 'ellipse' | 'curve';
+
+/** The unit edges of a line or a box dragged from grid corner `a` to `b`:
+    a line along whichever axis the drag went further on, a box its sides. */
+export function wallShapeEdges(shape: 'line' | 'rect', a: Pt, b: Pt): ['h' | 'v', number, number][] {
+    if (shape === 'line') {
+        const end: Pt = Math.abs(b[0] - a[0]) >= Math.abs(b[1] - a[1]) ? [b[0], a[1]] : [a[0], b[1]];
+        return edgesBetween(a, end);
+    }
+    const [x0, x1] = [Math.min(a[0], b[0]), Math.max(a[0], b[0])];
+    const [y0, y1] = [Math.min(a[1], b[1]), Math.max(a[1], b[1])];
+    if (x0 === x1 || y0 === y1) return edgesBetween([x0, y0], [x1, y1]);
+    return [
+        ...edgesBetween([x0, y0], [x1, y0]), ...edgesBetween([x1, y0], [x1, y1]),
+        ...edgesBetween([x1, y1], [x0, y1]), ...edgesBetween([x0, y1], [x0, y0]),
+    ];
+}
+
 /** The unit edge nearest a point: a click's wall. */
 export function nearestEdge(x: number, y: number): ['h' | 'v', number, number] {
     const dh = Math.abs(y - Math.round(y)), dv = Math.abs(x - Math.round(x));
@@ -341,6 +531,8 @@ export function pieceAt(room: MapRoom, x: number, y: number): string | null {
         if (!k) continue;
         if (k.o === 'h' ? x >= k.x && x <= k.x + 1 && y >= k.y - T && y <= k.y + 0.05 : y >= k.y && y <= k.y + 1 && Math.abs(x - k.x) <= T / 2 + 0.05) return key;
     }
+    const c = curveAt(room, x, y);
+    if (c) return c.key;
     for (const p of g.outline) {
         const r = bandRect(p, 0);
         if (x >= r[0] - 0.05 && x <= r[0] + r[2] + 0.05 && y >= r[1] - 0.05 && y <= r[1] + r[3] + 0.05) return p.key;
@@ -360,6 +552,12 @@ export function pieceOutline(room: MapRoom, key: string): Pt[] | null {
     if (g.inner.has(key)) {
         const k = parseKey(key)!;
         return rect(k.o === 'h' ? [k.x, k.y - WALL_T, 1, WALL_T] : [k.x - WALL_T / 2, k.y, WALL_T, 1]);
+    }
+    const c = g.curves.find((x) => x.key === key);
+    if (c) {
+        const L = Math.hypot(c.b[0] - c.a[0], c.b[1] - c.a[1]) || 1;
+        const n: Pt = [-(c.b[1] - c.a[1]) / L * WALL_T / 2, (c.b[0] - c.a[0]) / L * WALL_T / 2];
+        return [[c.a[0] + n[0], c.a[1] + n[1]], [c.b[0] + n[0], c.b[1] + n[1]], [c.b[0] - n[0], c.b[1] - n[1]], [c.a[0] - n[0], c.a[1] - n[1]]];
     }
     const o = g.outline.find((x) => x.key === key);
     return o ? rect(bandRect(o, 0)) : null;
@@ -382,7 +580,8 @@ function bandRect(p: OutlinePiece, grow: number): [number, number, number, numbe
     crossing an inner wall or the outline. Cell indices, row by row. */
 export function regionOf(room: MapRoom, cols: number, rows: number, cx: number, cy: number): number[] {
     if (cx < 0 || cy < 0 || cx >= cols || cy >= rows || !groundCell(room, cx, cy)) return [];
-    const inner = roomGeo(room).inner;
+    const geo = roomGeo(room);
+    const inner = { has: (k: string) => geo.inner.has(k) || geo.block.has(k) };
     const inRoom = (x: number, y: number) => insidePoly(room.pts, x + 0.5, y + 0.5);
     const startIn = inRoom(cx, cy);
     const seen = new Uint8Array(cols * rows);
@@ -552,11 +751,30 @@ export function normalizeRoom(raw: unknown, cols: number, rows: number): MapRoom
             if (compact.paints.length) { out.floorGrid = compact.grid; out.floorPaints = compact.paints; }
         }
     }
+    if (Array.isArray(r.curves)) {
+        const curves: RoomCurve[] = [];
+        const ids = new Set<string>();
+        for (const c of r.curves.slice(0, MAX_CURVES)) {
+            const o = c as Record<string, unknown> | null;
+            if (!o || typeof o !== 'object' || typeof o.id !== 'string' || !/^[a-z0-9]{1,12}$/.test(o.id) || ids.has(o.id) || !Array.isArray(o.pts)) continue;
+            const pts: Pt[] = [];
+            for (const q of o.pts.slice(0, MAX_CURVE_PTS)) {
+                if (!Array.isArray(q) || typeof q[0] !== 'number' || typeof q[1] !== 'number' || !isFinite(q[0]) || !isFinite(q[1])) continue;
+                pts.push([round2(Math.max(0, Math.min(cols, q[0]))), round2(Math.max(0, Math.min(rows, q[1])))]);
+            }
+            const closed = o.closed === true && pts.length > 2;
+            if (pts.length < 2) continue;
+            ids.add(o.id);
+            curves.push(closed ? { id: o.id, pts, closed } : { id: o.id, pts });
+        }
+        if (curves.length) out.curves = curves;
+    }
     if (r.wallPaints && typeof r.wallPaints === 'object') {
         const paints: Record<string, WallFinish> = {};
+        const curveKeys = new Set(curveSegsOf(out.curves).map((c) => c.key));
         for (const [k, v] of Object.entries(r.wallPaints as Record<string, unknown>)) {
             const f = wallFinish(v);
-            if (f && parseKey(k)) paints[k] = f;
+            if (f && (parseKey(k) || (CURVE_KEY_RE.test(k) && curveKeys.has(k)))) paints[k] = f;
         }
         if (Object.keys(paints).length) out.wallPaints = paints;
     }
@@ -571,6 +789,9 @@ export function resizeRoom(room: MapRoom | undefined, cols: number, rows: number
     if (room.walls) {
         next.walls = room.walls.filter((k) => { const p = parseKey(k); return !!p && (p.o === 'h' ? p.x < cols && p.y < rows : p.x < cols && p.y < rows); });
         if (!next.walls.length) delete next.walls;
+    }
+    if (room.curves) {
+        next.curves = room.curves.map((c) => ({ ...c, pts: c.pts.map(([x, y]) => [Math.min(x, cols), Math.min(y, rows)] as Pt) }));
     }
     if (room.floorGrid && oldCols && oldRows && room.floorGrid.length === oldCols * oldRows) {
         let g = '';
@@ -715,6 +936,48 @@ export function drawRoom(ctx: CanvasRenderingContext2D, room: MapRoom, u: number
         drawInnerBands(p, room, out);
         ctx.restore();
     }
+
+    /* The curved walls' tops, clipped to the room like the others (to the
+       map, when the outside is a ground). */
+    if (geo.curves.length) {
+        ctx.save();
+        if (!ground) { outline(); ctx.clip('evenodd'); }
+        drawCurveBands(p, room);
+        ctx.restore();
+    }
+}
+
+/** The curved walls' top bands: a wide stroke along each, in the trim (a
+    hedge's leaves, a fence's rail), ink round it, joins and ends rounded so
+    the pieces of a ring read as one wall. */
+function drawCurveBands(p: Pen, room: MapRoom): void {
+    const u = p.u, ctx = p.ctx;
+    const path = (c: RoomCurve) => {
+        ctx.beginPath();
+        c.pts.forEach(([x, y], i) => (i ? ctx.lineTo(x * u, y * u) : ctx.moveTo(x * u, y * u)));
+        if (c.closed) ctx.closePath();
+    };
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    for (const c of room.curves ?? []) {
+        const look = wallLook(room, curveKey(c.id, 0));
+        const fence = look.kind === 'fence', hedge = look.kind === 'hedge';
+        const w = (fence ? 0.12 : WALL_T) * u;
+        path(c);
+        ctx.lineWidth = w + Math.max(1.5, u * p.look.line * 2.4);
+        ctx.strokeStyle = p.look.ink ?? darken(p.c(hedge ? look.color : fence ? look.color : room.trim), 0.5);
+        ctx.stroke();
+        ctx.lineWidth = w;
+        ctx.strokeStyle = p.c(hedge ? look.color : fence ? lighten(look.color, 0.1) : room.trim);
+        ctx.stroke();
+        if (!fence) {
+            ctx.lineWidth = 0.08 * u;
+            ctx.strokeStyle = p.c(lighten(hedge ? look.color : room.trim, 0.22));
+            ctx.stroke();
+        }
+    }
+    ctx.restore();
 }
 
 /** Runs of face columns that look alike, merged so patterns run on; an

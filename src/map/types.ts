@@ -166,6 +166,10 @@ export interface MapRoom {
         grid, `h<x>,<y>` from (x,y) to (x+1,y) and `v<x>,<y>` from (x,y) to
         (x,y+1). A horizontal one stands like a back wall over the room below it. */
     walls?: string[];
+    /** Inner walls that leave the grid (owner's request, 2026-11-16): curves,
+        circles, ellipses and slanted lines, each a line of points in cells.
+        Each segment `j` is a piece, keyed `c<id>:<j>` for its wallpaper. */
+    curves?: RoomCurve[];
     /** Floors painted over parts of the map: `cols * rows` characters, row
         by row; '.' keeps the room's own floor (or the outside's), any other
         is an index into `floorPaints` (room.ts FINISH_CHARS). */
@@ -177,6 +181,13 @@ export interface MapRoom {
     /** What lies outside the walls: a ground (a garden, a yard) people can
         walk and build on; absent, nothing (dark). */
     outside?: FloorFinish;
+}
+
+export interface RoomCurve {
+    id: string;
+    pts: [number, number][];
+    /** The last point joins the first: a ring. */
+    closed?: boolean;
 }
 
 export interface FloorFinish { kind: import('./world/room').FloorKind; color: string }

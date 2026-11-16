@@ -6,7 +6,9 @@ import { itemOf, runShapeOf } from '../../map/world/catalog';
 import { runPath, splitRun, underGate } from '../../map/world/walls';
 import type { RunShape } from '../../map/world/walls';
 import { RoomCursor, RoomHandles, RoomLayer } from './RoomLayer';
-import { edgesBetween, nearestEdge, pieceAt, regionOf, wallsOfRegion, withFloor, withWallpaper, withWalls } from '../../map/world/room';
+import { edgesBetween, handCurve, nearestEdge, pieceAt, regionOf, wallShapeEdges, wallsOfRegion, withCurve, withFloor, withWallpaper, withWalls, withoutCurveAt } from '../../map/world/room';
+import type { RoomWallShape } from '../../map/world/room';
+import type { MapRoom } from '../../map/types';
 import { lookOf } from '../../map/world/looks';
 import { BuildGhost, DepthLayer, resFor } from './PlacedLayer';
 import { useMap } from '../../map/MapContext';
@@ -89,7 +91,9 @@ type Gesture =
     | { kind: 'pinch'; dist: number; mid: Pt; view: View }
     /* The Room tool drawing walls (from grid corner to grid corner), or
        painting floors or wallpaper under the pointer. */
-    | { kind: 'room'; mode: 'walls' | 'floor' | 'wallpaper'; vertex: Pt | null; start: Pt; moved: boolean }
+    | { kind: 'room'; mode: 'walls' | 'floor' | 'wallpaper'; vertex: Pt | null; start: Pt; moved: boolean;
+        /* A wall drawn as a shape: the room before it, and a hand-drawn curve's points. */
+        shape?: Exclude<RoomWallShape, 'free'>; base?: MapRoom; pts?: Pt[] }
     /* A wall or fence dragged as a line, a rectangle, a circle or an ellipse. */
     | { kind: 'wall'; shape: RunShape; item: string; start: Pt; end: Pt }
     /* The Note tool: a press that opens the note of what is under it, or
@@ -685,8 +689,15 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                 store.checkpoint();
                 const v: Pt = [Math.round(at[0]), Math.round(at[1])];
                 const g: Extract<Gesture, { kind: 'room' }> = { kind: 'room', mode, vertex: Math.hypot(at[0] - v[0], at[1] - v[1]) <= 0.4 ? v : null, start: at, moved: false };
+                const shape = store.ui.roomWallShape;
+                if (mode === 'walls' && shape !== 'free' && !store.ui.roomErase) {
+                    g.shape = shape;
+                    g.base = store.doc.room;
+                    g.pts = [at];
+                }
                 gesture.current = g;
                 if (mode !== 'walls') roomPaint(mode, at);
+                else if (store.ui.roomErase) eraseCurve(at);
                 return;
             }
             case 'build': {
@@ -759,6 +770,32 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     };
 
     const wallPoint = (at: Pt): Pt => snapRun(at, store.doc.grid.snap);
+
+    /** Rub out: the curved wall under the pointer goes, whole. */
+    const eraseCurve = (at: Pt) => {
+        const room = store.doc.room;
+        if (!room?.curves) return;
+        const next = withoutCurveAt(room, at[0], at[1]);
+        if (next !== room) store.live((d) => { d.room = next; });
+    };
+
+    /** The room with a wall shape dragged from `a` to `b` added to `base`:
+        a line or a box on the grid (a line that slants is a curve of two
+        points), a circle or an ellipse off it, or the hand-drawn curve. */
+    const shapedRoom = (base: MapRoom, shape: Exclude<RoomWallShape, 'free'>, a: Pt, b: Pt, pts: Pt[]): MapRoom => {
+        const { cols, rows } = store.doc;
+        const corner = (p: Pt): Pt => [Math.round(p[0]), Math.round(p[1])];
+        const half = (p: Pt): Pt => [Math.round(p[0] * 2) / 2, Math.round(p[1] * 2) / 2];
+        if (shape === 'line' || shape === 'rect') {
+            const [p, q] = [corner(a), corner(b)];
+            if (p[0] === q[0] && p[1] === q[1]) return base;
+            if (shape === 'line' && p[0] !== q[0] && p[1] !== q[1]) return withCurve(base, cols, rows, [p, q], false);
+            return withWalls(base, cols, rows, wallShapeEdges(shape, p, q), true);
+        }
+        if (shape === 'curve') return pts.length > 1 ? withCurve(base, cols, rows, handCurve([...pts, b]), false) : base;
+        const path = runPath(shape, half(a), shape === 'circle' ? b : half(b));
+        return path ? withCurve(base, cols, rows, path.pts, true) : base;
+    };
 
     /** Lays a dragged wall down as pieces of one run; a gate takes out the
         wall it is drawn across. A click (no drag) on a line lays a straight
@@ -932,6 +969,17 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
                     if (!store.ui.roomFill) roomPaint(g.mode, at);
                     return;
                 }
+                if (g.shape && g.base) {
+                    g.moved = true;
+                    if (g.pts) {
+                        const last = g.pts[g.pts.length - 1];
+                        if (Math.hypot(at[0] - last[0], at[1] - last[1]) >= 0.15) g.pts.push(at);
+                    }
+                    const room = shapedRoom(g.base, g.shape, g.start, at, g.pts ?? []);
+                    store.live((d) => { d.room = room; });
+                    return;
+                }
+                if (store.ui.roomErase) eraseCurve(at);
                 /* A new grid corner only once the pointer is near it, so a
                    hand wobbling between two corners draws nothing. */
                 const v: Pt = [Math.round(at[0]), Math.round(at[1])];
@@ -1158,7 +1206,7 @@ export function MapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             store.setUi({ selection: [g.narrow] });
         }
         if (g.kind === 'paint') publish(g);
-        if (g.kind === 'room' && g.mode === 'walls' && !g.moved) {
+        if (g.kind === 'room' && g.mode === 'walls' && !g.moved && !g.shape) {
             /* A click: the one piece of wall nearest it. */
             const edge = nearestEdge(g.start[0], g.start[1]);
             const on = !store.ui.roomErase;

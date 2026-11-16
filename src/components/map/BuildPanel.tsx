@@ -298,7 +298,7 @@ export function RoomPanel() {
 function RoomOutlineFields({ room }: { room: MapRoom }) {
     const { store, doc } = useMap();
     const set = (patch: Partial<MapRoom>, coalesce?: string) => store.edit((d) => { if (d.room) d.room = { ...d.room, ...patch }; }, coalesce);
-    const shapes = [['rect', 'Rectangle'], ['L', 'L'], ['T', 'T'], ['U', 'U'], ['plus', 'Cross']] as const;
+    const shapes = [['rect', 'Rectangle'], ['L', 'L'], ['T', 'T'], ['U', 'U'], ['plus', 'Cross'], ['round', 'Round']] as const;
     return (
         <>
             <p className="map-hint">
@@ -385,18 +385,41 @@ function RoomOutlineFields({ room }: { room: MapRoom }) {
     );
 }
 
+const ROOM_WALL_SHAPES = [
+    ['free', 'Free', 'fa-pen', 'Along the grid lines: click near a line for one piece, drag for a run of them'],
+    ['line', 'Line', 'fa-minus', 'Drag from one end to the other: along the grid, or slanted'],
+    ['rect', 'Rectangle', 'fa-vector-square', 'Drag from one corner to the opposite one'],
+    ['circle', 'Circle', 'fa-circle', 'Drag from the centre out to the wall'],
+    ['ellipse', 'Ellipse', 'fa-egg', 'Drag the box the ellipse fits in'],
+    ['curve', 'Curve', 'fa-bezier-curve', 'Draw the wall by hand: it is smoothed into a curve'],
+] as const;
+
 function RoomWallsFields({ room }: { room: MapRoom }) {
     const { store, ui } = useMap();
-    const count = room.walls?.length ?? 0;
+    const count = (room.walls?.length ?? 0) + (room.curves?.length ?? 0);
     return (
         <>
             <div className="map-segmented" role="group" aria-label="Draw or rub out walls" data-room-erase="">
                 <button aria-pressed={!ui.roomErase} onClick={() => store.setUi({ roomErase: false })}><i className="fa-solid fa-pen"></i> Draw</button>
                 <button aria-pressed={ui.roomErase} onClick={() => store.setUi({ roomErase: true })}><i className="fa-solid fa-eraser"></i> Rub out</button>
             </div>
+            {!ui.roomErase && (
+                <div className="map-field">
+                    <span>Draw it as</span>
+                    <div className="map-segmented map-run-shapes" role="group" aria-label="Draw walls as" data-room-wall-shapes="">
+                        {ROOM_WALL_SHAPES.map(([k, label, icon, tip]) => (
+                            <button key={k} aria-pressed={ui.roomWallShape === k} data-room-wall-shape={k} title={tip}
+                                onClick={() => store.setUi({ roomWallShape: k })}>
+                                <i className={'fa-solid ' + icon}></i> {label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
             <p className="map-hint">
-                Walls run along the grid lines. Click near a line for one piece of wall; hold the button and drag to
-                draw a run of them. Leave a gap for a doorway. A wall running across stands up over the room below it.
+                {ui.roomErase ? 'Click or drag over a wall to rub it out; a curved wall goes whole.'
+                    : ROOM_WALL_SHAPES.find(([k]) => k === ui.roomWallShape)?.[3]}
+                {' '}Leave a gap for a doorway. A wall running across stands up over the room below it.
             </p>
             <p className="map-hint">Hedges and fences are wallpapers: paint them on in Wallpaper.</p>
             {count > 0 && (
@@ -404,6 +427,11 @@ function RoomWallsFields({ room }: { room: MapRoom }) {
                     if (!d.room) return;
                     const next = { ...d.room };
                     delete next.walls;
+                    delete next.curves;
+                    if (next.wallPaints) {
+                        const paints = Object.fromEntries(Object.entries(next.wallPaints).filter(([k]) => !/^c/.test(k)));
+                        if (Object.keys(paints).length) next.wallPaints = paints; else delete next.wallPaints;
+                    }
                     d.room = next;
                 })}>
                     <i className="fa-solid fa-trash-can"></i> Remove every inner wall ({count})
