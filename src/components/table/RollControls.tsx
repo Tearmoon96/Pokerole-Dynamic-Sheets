@@ -16,7 +16,7 @@ import { actionOf } from '../../gm/turns';
 import { MAX_ACTIONS } from '../../gm/combat';
 import type { AppData } from '../../data/types';
 import type { TableSession } from '../../table/session';
-import { WillSpend } from '../gm/WillSpend';
+import { MAX_FATE, WillSpend } from '../gm/WillSpend';
 import { IgnorePain } from './IgnorePain';
 import { useTableData } from './useTableData';
 
@@ -45,7 +45,7 @@ export function RollControls() {
     const w = prep && sides === 6 && bonus === undefined ? prep.will || null : null;
     const will = w ? charWill(w.trainerId, w.token, w.have) : 0;
     const spent = w ? roundWill(w.key, w.stamp) : { tyc: false, fate: 0 };
-    const fate = w && !w.dmg ? Math.max(0, Math.min(prep!.extras.fate || 0, will)) : 0;
+    const fate = w && !w.dmg ? Math.max(0, Math.min(prep!.extras.fate || 0, will, MAX_FATE)) : 0;
     /* The pain and the target number as they are NOW, not as they were when
        the roll was set up: an Ignore pain, a blow taken or a pip filled in
        between would otherwise leave the roll a success short, or measured

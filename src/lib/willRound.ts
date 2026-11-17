@@ -7,11 +7,12 @@
                          rule): one failed die of that roll is thrown again,
                          and for the rest of the Round every roll of that
                          character, damage included, may throw ONE again.
-     Pushing Fate        1 Will each, set BEFORE a roll: an automatic success
-                         on it, which pain and Low Accuracy cannot strike.
+     Pushing Fate        1 Will, set BEFORE a roll: one automatic success on
+                         it (never more than one a roll), which pain and Low
+                         Accuracy cannot strike.
                          Never on damage.
 
-   They exclude each other within a Round; several Pushing Fates are fine.
+   They exclude each other within a Round; Pushing Fate on several rolls of a Round is fine.
 
    So what a character has done this Round has to be remembered until the
    Round ends, and by both pages. It is kept here, in localStorage, under a

@@ -5,12 +5,13 @@
                          1 Will: one failed die of that roll is thrown again,
                          and for the rest of the Round every roll of that
                          character — damage included — may throw one again.
-     Pushing Fate        counted up BEFORE a roll, 1 Will each, and paid when
-                         the roll is thrown: that many automatic successes.
+     Pushing Fate        set BEFORE a roll, 1 Will, and paid when the roll
+                         is thrown: one automatic success, never more than
+                         one on a roll (the owner's rule, 2026-11-17).
 
    So the buttons have two phases. `before`: a roll is set up and not thrown;
    Take Your Chances only shows whether it is already on this Round, and
-   Pushing Fate can be counted up. `after`: the character has just rolled;
+   Pushing Fate can be switched on (click again to switch it off). `after`: the character has just rolled;
    Take Your Chances lights up (`ready`) when it can be bought for that roll,
    and Pushing Fate is over for it.
 
@@ -23,7 +24,8 @@
 
 import type { ReactNode } from 'react';
 
-export const MAX_FATE = 5;
+/** Automatic successes Pushing Fate may put on one roll. */
+export const MAX_FATE = 1;
 
 export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc, idle, bare, phase = 'before', noReroll, noFate, children }: {
     /** Will the character has now. */
@@ -77,7 +79,7 @@ export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc, 
     const left = will - fate;
     const fateBlocked = tyc;
     const tycBlocked = !tyc && (fate > 0 || roundFate > 0);
-    /* Pushing Fate is counted up before the dice are thrown, never after. */
+    /* Pushing Fate is set before the dice are thrown, never after. */
     const canAdd = !after && !noFate && !fateBlocked && left >= 1 && fate < MAX_FATE;
     /* Take Your Chances is bought for a roll already made. */
     const ready = after && !tyc && !tycBlocked && !noReroll && will >= 1;
@@ -95,7 +97,8 @@ export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc, 
         : after ? 'Pushing Fate is set before the roll.'
             : noFate ? noFate
                 : !canAdd && !fate ? 'Pushing Fate needs 1 Will.'
-                    : 'Pushing Fate: 1 Will each, taken when you roll. An automatic success that pain and Low Accuracy cannot remove.';
+                    : fate ? 'Pushing Fate is on: 1 Will, taken when you roll. Click to take it off.'
+                        : 'Pushing Fate: 1 Will, taken when you roll. One automatic success that pain and Low Accuracy cannot remove.';
 
     return (
         <div className={'will-spend' + (bare ? ' bare' : '')} data-will-spend={phase}>
@@ -122,21 +125,14 @@ export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc, 
                 <button
                     type="button" data-will="fate"
                     className={'will-btn fate' + (fate ? ' on' : '')}
-                    aria-disabled={!canAdd}
+                    aria-pressed={fate > 0}
+                    aria-disabled={!canAdd && !fate}
                     title={fateTitle}
-                    onClick={() => { if (canAdd) onFate(fate + 1); }}
+                    onClick={() => { if (fate) onFate(0); else if (canAdd) onFate(1); }}
                 >
                     <i className="fa-solid fa-wand-sparkles"></i> Pushing fate
                     {fate ? <span className="will-count">+{fate}</span> : <span className="will-cost">1</span>}
                 </button>
-                {fate > 0 && (
-                    <button
-                        type="button" className="will-btn will-less" data-will="fate-less"
-                        aria-label="One Pushing Fate fewer" onClick={() => onFate(fate - 1)}
-                    >
-                        <i className="fa-solid fa-minus"></i>
-                    </button>
-                )}
             </span>
             {children}
         </div>

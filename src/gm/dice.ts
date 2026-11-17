@@ -35,7 +35,7 @@ export interface RollEntry {
     /** Carried so a hit can roll the damage in one more click. `what` names
         the damage roll; older entries without it fall back to the accuracy's. */
     dmg?: { token: string; mi: number; dice: number; what?: string } | null;
-    /** Pushing Fate: automatic successes bought with Will, one each. Added
+    /** Pushing Fate: one automatic success bought with Will, at most one a roll. Added
         after pain and Low Accuracy have struck theirs, so nothing removes
         them. Never on a damage roll. */
     fate?: number;

@@ -55,7 +55,7 @@ export interface WireRoll {
         (High Critical, a crit offset, a move that always crits). Only with
         `need`. */
     crit?: number;
-    /** Pushing Fate: automatic successes bought with Will, added after pain
+    /** Pushing Fate: one automatic success bought with Will (never more), added after pain
         and Low Accuracy have struck theirs. */
     fate?: number;
     /** Take Your Chances was on: one failed die may be rolled again. */
@@ -331,8 +331,8 @@ export const LIMITS = {
     MAX_PAIN: 5,
     /* The dataset's largest Low Accuracy is 5. */
     MAX_LOW: 5,
-    /** Pushing Fates on one roll. */
-    MAX_FATE: 5,
+    /** Pushing Fate on one roll: one success at most. */
+    MAX_FATE: 1,
     MAX_NEED: 5,
     /** The usual critical margin, the most a roll may say it needs. */
     MAX_CRIT: 3,

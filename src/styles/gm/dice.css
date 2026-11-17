@@ -386,7 +386,6 @@ button.will-btn.ready {
 .will-count { background: var(--crit); color: #1a1205; }
 
 .will-fate { display: inline-flex; align-items: center; gap: 0.15rem; flex: none; }
-button.will-btn.will-less { padding: 0.25rem 0.35rem; }
 
 .will-have.idle { opacity: 0.45; }
 

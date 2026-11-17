@@ -7,7 +7,7 @@ import { adjustPool, entityPain, entityPool, entityRef } from '../../gm/entities
 import { willRoundOf } from '../../gm/willSpend';
 import { FREE, notePushedFate, roundWill, setTakeChances, useRoundWillVersion } from '../../lib/willRound';
 import { PAIN_OFF_KEY, readGmPainOff, writeGmPainOff } from '../../lib/pain';
-import { WillSpend } from './WillSpend';
+import { MAX_FATE, WillSpend } from './WillSpend';
 import { DieFaces } from './DieFaces';
 import { useEffect, useState } from 'react';
 import type { PokedexEntry } from '../../data/types';
@@ -53,7 +53,7 @@ export function DicePanel({ onReorder }: {
     const willPool = subject ? entityPool(subject, 'will') : null;
     const round = src ? willRoundOf(state, dexById, src) : null;
     const spent = round ? roundWill(round.key, round.stamp) : { tyc: false, fate: 0 };
-    const fate = src && willPool && !prep!.isDmg ? Math.max(0, Math.min(prep!.fate || 0, willPool.cur)) : 0;
+    const fate = src && willPool && !prep!.isDmg ? Math.max(0, Math.min(prep!.fate || 0, willPool.cur, MAX_FATE)) : 0;
     /* The pain and the target number as they are now, not when the roll was
        set up (see liveMeta). */
     const live = prep ? liveMeta(state, dexById, prep, sides, state.dice.prepUse) : null;
