@@ -9,6 +9,8 @@ import { CHANNELS } from '../../table/protocol';
 import { FoldTitle, useFold } from './Fold';
 import type { MemberMusic } from '../../table/music/music';
 import { colorVars } from '../../table/colors';
+import { useState } from 'react';
+import { CompareDialog } from './CompareDialog';
 
 /** The GM's view of one player's music: in time, catching up, or silent. */
 function syncDot(stat: MemberMusic | undefined, playing: boolean): { cls: string; text: string } | null {
@@ -30,6 +32,7 @@ export function MemberList() {
     const music = session.music.view;
     const playing = isHost && CHANNELS.some((c) => music.decks[c].playing);
     const [open, toggle] = useFold('members');
+    const [comparing, setComparing] = useState<string | null>(null);
 
     return (
         <div className="member-list" data-tour="members">
@@ -61,6 +64,16 @@ export function MemberList() {
                         })()}
                         {isHost && !m.host && (
                             <button
+                                className="icon-btn"
+                                title={'Compare ' + m.name + '\u2019s sheet with yours'}
+                                data-compare={m.id}
+                                onClick={() => setComparing(m.id)}
+                            >
+                                <i className="fa-solid fa-scale-balanced"></i>
+                            </button>
+                        )}
+                        {isHost && !m.host && (
+                            <button
                                 className="icon-btn danger"
                                 title={'Remove ' + m.name + ' from the table'}
                                 onClick={() => session.kick(m.id)}
@@ -71,6 +84,8 @@ export function MemberList() {
                     </li>
                 ))}
             </ul>}
+
+            {comparing && <CompareDialog member={comparing} onClose={() => setComparing(null)} />}
 
             {open && isHost && removed.length > 0 && (
                 <div className="removed-list">

@@ -280,6 +280,11 @@ export type Body =
         message of its own, not a field on `hello`, so an older GM's page
         drops it and still lets the player in. */
     | { k: 'key'; dh: string }
+    /** Player to host: their own trainer for the GM's sheet watch (watch.ts),
+        deflated and cut into `n` pieces, this one the `i`th of set `set`. */
+    | { k: 'wsh'; tid: string; set: string; i: number; n: number; z: string }
+    /** Player to host: leaving the table now (Leave), not just gone quiet. */
+    | { k: 'bye' }
     /** Host only. The GM changed the password: each member's copy of the new
         one, sealed to their key with the GM's one-off `dh`. Whoever follows
         joins the new room; anyone not listed stays behind with the old one. */

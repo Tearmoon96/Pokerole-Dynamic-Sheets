@@ -659,12 +659,13 @@ export class NpcShare {
         void this.api.publish({ k: 'gift', to: g.to, oid: g.oid, name, z });
     }
 
-    onGiftReply(member: string, body: Extract<Body, { k: 'giftr' }>, who: string): void {
-        if (!this.host) return;
+    /** True when it was a real answer that took the Pokémon. */
+    onGiftReply(member: string, body: Extract<Body, { k: 'giftr' }>, who: string): boolean {
+        if (!this.host) return false;
         this.readGm();
         const g = this.gifts.find((x) => x.oid === body.oid);
         const done = readGiftResults();
-        if (!g || g.to !== member || done[body.oid]) return;
+        if (!g || g.to !== member || done[body.oid]) return false;
         /* A week of answers is plenty for the GM screen to have read them. */
         const cutoff = Date.now() - 7 * 86_400_000;
         const kept = Object.fromEntries(Object.entries(done).filter(([, r]) => r.at > cutoff));
@@ -672,6 +673,7 @@ export class NpcShare {
         this.api.notify(body.ok
             ? who + ' took the Pokémon you gave' + (body.where === 'box' ? ' (team full: it went to a PC box).' : '.')
             : who + ' turned down the Pokémon you offered.');
+        return body.ok;
     }
 
     /* ==================================================== player's table */

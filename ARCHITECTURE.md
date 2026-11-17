@@ -563,6 +563,29 @@ too). The answer (`giftr`) is kept in `pokerole_table_gift_results` until the
 GM screen applies it: accepted, the wild leaves the roster. The relay is
 unchanged.
 
+### The sheet watch
+
+**The GM sees what players do to their own trainers**
+([`watch.ts`](src/table/watch.ts), [`watchSheet.ts`](src/table/watchSheet.ts)).
+A player's page sends the trainer it plays at the table (and the one in a
+fight) as a cut-down copy — no pictures, notes or screen preferences —
+deflated, in one or two `wsh` frames, after 3 s without a further change
+(10 s at most), when the GM's page starts again, and before a Leave, which
+now sends `bye`. Nothing goes at rest. The GM's table keeps the latest copy
+of each in `pokerole_table_watch_sheets` and diffs every new one against it:
+a rise is a warning unless the GM's own `pcop`, a potion spent (2 / 4 / 14
+HP, a charge 1), a gift or a Mega Evolution explains it; a fall is
+information. Each line says whether it happened in a fight (with its Round),
+out of one, or away from the table — the first copy after a return is
+compared with the last one seen. The log is `pokerole_table_watch`, forgotten
+with Close table; the GM screen's bell ([`WatchBell.tsx`](src/components/gm/WatchBell.tsx))
+reads it from storage. **Compare** sets a player's latest copy beside the
+GM's roster trainer with the same id (else the same name, else the one the
+GM picks); it also runs when a player arrives and when they leave. Nothing
+is written to either sheet, and players are shown nothing. The copy is the
+player's browser's word: it catches edits made with the app, not an altered
+page. The relay is unchanged.
+
 The table's guided tour (one for the GM, one for players) is the shared one
 described under [Guided tours](#guided-tours); its steps are in
 [`tour/steps.tsx`](src/components/table/tour/steps.tsx), and the GM's map and

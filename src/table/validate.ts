@@ -678,6 +678,18 @@ export function parseBody(raw: unknown): Body | null {
             const oid = idText(raw.oid);
             return oid ? { k: 'giftoff', oid } : null;
         }
+        case 'wsh': {
+            if (!exactly(raw, ['k', 'tid', 'set', 'i', 'n', 'z'])) return null;
+            const tid = idText(raw.tid), set = idText(raw.set);
+            const n = int(raw.n, 1, 8);
+            const i = n === null ? null : int(raw.i, 0, n - 1);
+            const z = zText(raw.z);
+            return tid && set && n !== null && i !== null && z ? { k: 'wsh', tid, set, i, n, z } : null;
+        }
+        case 'bye': {
+            if (!exactly(raw, ['k'])) return null;
+            return { k: 'bye' };
+        }
         case 'giftr': {
             if (!exactly(raw, ['k', 'oid', 'ok', 'where'])) return null;
             const oid = idText(raw.oid);

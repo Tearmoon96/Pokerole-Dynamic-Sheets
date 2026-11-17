@@ -116,6 +116,9 @@ export class CombatShare {
     /** member -> key -> the GM's latest change, under its id, until the
         player's sheet acknowledges that id. */
     private owed = new Map<string, Map<string, { oid: string; op: PcOp }>>();
+    /** member -> the GM's latest changes to their characters, for the sheet
+        watch: a rise the GM made is not a player's. */
+    private opLog = new Map<string, { key: CharKey; op: PcOp; at: number }[]>();
 
     /* player's table */
     private binding: Binding | null = null;
@@ -161,6 +164,7 @@ export class CombatShare {
         }
         this.sheets.clear();
         this.owed.clear();
+        this.opLog.clear();
         this.sent.clear();
         this.entering.clear();
         this.binding = null;
@@ -307,7 +311,14 @@ export class CombatShare {
         this.post({ t: 'act', member, op: body.op, pid: body.id, after: body.after ?? null, move: body.mv ?? null });
     }
 
+    /** The GM's changes to `member`'s characters, oldest first. */
+    recentOps(member: string): { key: CharKey; op: PcOp; at: number }[] {
+        return this.opLog.get(member) ?? [];
+    }
+
     private onGmOp(member: string, key: CharKey, op: PcOp): void {
+        const log = [...(this.opLog.get(member) ?? []), { key, op, at: Date.now() }].slice(-24);
+        this.opLog.set(member, log);
         let keys = this.owed.get(member);
         if (!keys) this.owed.set(member, keys = new Map());
         /* Merged with one not yet acknowledged, under a new id: the player

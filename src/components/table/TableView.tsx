@@ -14,6 +14,7 @@ import { CharacterPanel } from './CharacterPanel';
 import { NpcSheets } from './NpcSheets';
 import { GiftDialog } from './GiftDialog';
 import { TurnStrip } from './TurnStrip';
+import { WatchFlash, WatchPanel } from './WatchPanel';
 import { CHANNELS } from '../../table/protocol';
 import { useTour } from '../../lib/tour';
 import { GuidedTour, TourButton, useFirstTimeTour } from '../common/Tour';
@@ -95,7 +96,7 @@ export function TableView() {
                         <i className="fa-solid fa-door-closed"></i> Close table
                     </button>
                 ) : (
-                    <button className="danger" onClick={() => session.leave()}>
+                    <button className="danger" onClick={() => { void session.leaveTable(); }}>
                         <i className="fa-solid fa-right-from-bracket"></i> Leave table
                     </button>
                 )}
@@ -142,6 +143,7 @@ export function TableView() {
                 <aside className="table-side">
                     <Credentials />
                     <MemberList />
+                    {isHost && <WatchPanel />}
                     {!isHost && <CharacterPanel />}
                     {!isHost && <NpcSheets />}
                     {isHost && <MapControls />}
@@ -192,6 +194,7 @@ export function TableView() {
             </div>
 
             {!isHost && <GiftDialog />}
+            {isHost && <WatchFlash />}
 
             <GuidedTour
                 id={tourId}

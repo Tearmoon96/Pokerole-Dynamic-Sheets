@@ -5,6 +5,7 @@ import { HomeButton } from '../common/HomeButton';
 import { TourButton } from '../common/Tour';
 import { useGmConfirm } from './ConfirmDialog';
 import { SettingsDialog } from './SettingsDialog';
+import { WatchBell } from './WatchBell';
 import { useToast } from '../common/Toast';
 import { useAppData } from '../../data/AppDataContext';
 import { upsertWorkingTrainer } from '../../gm/workingSet';
@@ -108,6 +109,7 @@ export function TopBar() {
             <div className="topbar">
                 <HomeButton className="icon-btn" />
                 <TourButton id="gm" className="icon-btn" />
+                <WatchBell />
                 <span className="logo"><i className="fa-solid fa-chess-board"></i> Pokerole GM Screen</span>
 
                 {/* One toggle per board section, lit while the section is on.

@@ -43,6 +43,7 @@ import type { TableApi } from './link';
 import { MapShare } from './mapShare';
 import { CombatShare } from './combatShare';
 import { NpcShare } from './npcShare';
+import { SheetWatch, forgetWatch } from './watch';
 import { Porter, dropFromMoved, loadMoved, rememberMove, saveMoved } from './porter';
 import { RULES_KEY, readGmMegaRules, writeTableMegaRules } from '../lib/megaRules';
 import { PAIN_OFF_KEY, painRuleOff, readGmPainOff, writeGmPainOff, writeTablePainOff } from '../lib/pain';
@@ -565,6 +566,11 @@ export class TableSession {
     readonly music = new MusicController(this.api);
     readonly combat = new CombatShare(this.api);
     readonly npcs = new NpcShare(this.api);
+    readonly watch = new SheetWatch(this.api, {
+        strip: () => this.combat.view.turns,
+        boundTrainer: () => this.combat.view.trainerId,
+        recentOps: (member) => this.combat.recentOps(member),
+    });
 
     /* ------------------------------------------------------------- joining */
 
@@ -725,6 +731,7 @@ export class TableSession {
         this.transport.start();
         this.combat.begin(isHost, lobbyId);
         this.npcs.begin(isHost, lobbyId);
+        this.watch.begin(isHost, lobbyId);
         if (isHost) window.addEventListener('storage', this.onRulesSaved);
 
         this.heartbeat = window.setInterval(() => this.tick(), HEARTBEAT_MS);
@@ -808,6 +815,7 @@ export class TableSession {
         this.music.end();
         this.combat.end(moved);
         this.npcs.end();
+        this.watch.end();
         window.removeEventListener('storage', this.onRulesSaved);
         this.publishedRules = '';
         this.clock.stop();
@@ -853,13 +861,33 @@ export class TableSession {
         await this.joinLobby(s.lobbyId, s.password, s.myName, saved);
     }
 
+    /** A player's Leave button: their sheet's last changes and a goodbye go
+        first (the GM's sheet watch compares what it has at once), waiting a
+        moment at most. */
+    async leaveTable(): Promise<void> {
+        if (!this.store.state.isHost && this.room) {
+            await Promise.race([
+                this.watch.leaving(),
+                new Promise((resolve) => window.setTimeout(resolve, 1500)),
+            ]);
+        }
+        this.leave();
+    }
+
+    /** A player said goodbye: gone now, not 80 s from now. */
+    private onBye(id: string): void {
+        this.watch.left(id, 'bye');
+        this.lastSeenAt.set(id, 0);
+        this.prunePresence();
+    }
+
     /** Leaves for good: stops the socket, forgets the saved session, and resets.
         The host's keypair is deliberately kept, so the same lobby can be hosted
         again later — see identity.ts. */
     leave(): void {
         /* A player's table rules go with the table; a GM's own stay theirs. */
         if (!this.store.state.isHost) { writeTableMegaRules('', null); writeTablePainOff(null); this.npcs.forgetAll(); }
-        else { forgetFeed(); saveLock('', null); saveMoved(null); saveRemoved('', new Map()); }
+        else { forgetFeed(); forgetWatch(); saveLock('', null); saveMoved(null); saveRemoved('', new Map()); }
         this.teardown();
         clearSession();
         this.store.state = initialState();
@@ -1102,7 +1130,11 @@ export class TableSession {
             else if (body.k === 'key') this.dhKeys.set(inner.f, body.dh);
             else if (body.k === 'npcset') void this.npcs.onSet(inner.f, body);
             else if (body.k === 'npcwant') this.npcs.onWant(inner.f, body.id);
-            else if (body.k === 'giftr') this.npcs.onGiftReply(inner.f, body, this.names.get(inner.f)!);
+            else if (body.k === 'giftr') {
+                if (this.npcs.onGiftReply(inner.f, body, this.names.get(inner.f)!)) this.watch.giftTaken(inner.f);
+            }
+            else if (body.k === 'wsh') void this.watch.onPart(inner.f, this.names.get(inner.f)!, body);
+            else if (body.k === 'bye') this.onBye(inner.f);
             else if (body.k === 'mstat') {
                 this.music.onStat(inner.f, body);
                 if (body.failed.some((id) => this.map.missing(id))) this.map.checkSoon();
@@ -1124,6 +1156,8 @@ export class TableSession {
         if (inner.sid !== this.hostSid) {
             this.hostSid = inner.sid;
             void this.announce();
+            /* ...and it has no copy of our sheet to watch against yet. */
+            this.watch.resend();
         }
 
         switch (body.k) {
@@ -1513,6 +1547,7 @@ export class TableSession {
         for (const [id, at] of this.lastSeenAt) {
             if (id === this.store.state.myId) continue;
             if (at < cutoff) {
+                this.watch.left(id, 'gone');
                 this.lastSeenAt.delete(id);
                 this.names.delete(id);
                 this.greeted.delete(id);
@@ -1712,6 +1747,7 @@ export class TableSession {
         this.removed.set(id, this.names.get(id) || 'Someone');
         while (this.removed.size > MAX_REMOVED) this.removed.delete(this.removed.keys().next().value!);
         this.syncRemoved();
+        this.watch.left(id, 'removed');
         this.names.delete(id);
         this.lastSeenAt.delete(id);
         this.greeted.delete(id);

@@ -1,0 +1,344 @@
+/* The sheet watch (table/watch.ts): the GM's panel on the table, the Compare
+   dialog, the line that says a warning came in, and the GM screen's bell.
+   Shared by the rolling table and the GM screen; both use the GM palette. */
+
+.watch-panel {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--card-bg);
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.watch-badge {
+    flex: 0 0 auto;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: var(--crit);
+    color: #1b1404;
+    font: 700 0.68rem/1.25rem 'Fira Code', monospace;
+    text-align: center;
+}
+
+.side-title .watch-badge { margin-left: auto; }
+
+.watch-panel button.mini-btn,
+.watch-pop button.mini-btn,
+.watch-entry button.mini-btn {
+    padding: 0.15rem 0.4rem;
+    font-size: 0.66rem;
+}
+
+/* ----------------------------------------------------------- players */
+
+.watch-players {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.watch-players li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    min-width: 0;
+}
+
+.watch-players .watch-trainer {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+}
+
+.watch-online {
+    flex: 0 0 auto;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--text-muted);
+    opacity: 0.5;
+}
+
+.watch-online.on { background: var(--ok); opacity: 1; }
+
+.watch-who { color: var(--who, var(--text-primary)); font-weight: 600; white-space: nowrap; }
+
+/* ------------------------------------------------------------- tools */
+
+.watch-tools,
+.watch-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.watch-tools select {
+    flex: 1 1 8rem;
+    min-width: 0;
+    background: var(--panel-solid);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.25rem 0.4rem;
+    font: inherit;
+    font-size: 0.76rem;
+}
+
+.watch-tools select option,
+.compare-pick select option { background: var(--panel-solid); color: var(--text-primary); }
+
+.watch-only { display: flex; align-items: center; gap: 0.3rem; font-size: 0.74rem; color: var(--text-secondary); }
+
+.watch-scroll {
+    max-height: 22rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+/* --------------------------------------------------------------- log */
+
+.watch-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.watch-entry {
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--who-border, var(--border-color));
+    border-radius: 8px;
+    padding: 0.35rem 0.45rem;
+    font-size: 0.74rem;
+    background: #00000022;
+}
+
+.watch-entry.warn { border-color: #f0b42955; border-left-color: var(--crit); }
+.watch-entry.fresh { box-shadow: 0 0 6px var(--crit-glow); }
+.watch-entry.ok { opacity: 0.6; }
+
+.watch-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.15rem 0.4rem;
+}
+
+.watch-head > i { color: var(--text-muted); font-size: 0.66rem; }
+.watch-time { font-family: 'Fira Code', monospace; color: var(--text-muted); }
+.watch-entry .watch-trainer { color: var(--text-secondary); }
+
+.watch-ctx {
+    font-size: 0.64rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+.watch-ctx.ctx-fight { border-color: var(--accent-border); color: var(--accent); }
+.watch-ctx.ctx-away { border-color: #f0b42966; color: var(--crit); }
+
+.watch-ok { margin-left: auto; }
+
+.watch-note { margin: 0.2rem 0 0; color: var(--text-secondary); }
+
+.watch-changes {
+    list-style: none;
+    margin: 0.25rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.watch-change {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.1rem 0.35rem;
+    color: var(--text-secondary);
+}
+
+.watch-change.sev-warn { color: var(--text-primary); }
+.watch-change.sev-warn > i { color: var(--crit); font-size: 0.66rem; }
+.watch-char { font-weight: 600; }
+.watch-values { display: inline-flex; align-items: baseline; gap: 0.3rem; font-family: 'Fira Code', monospace; }
+.watch-values i { font-size: 0.6rem; color: var(--text-muted); }
+.watch-from { color: var(--text-muted); }
+.watch-delta.up { color: var(--crit); }
+.watch-delta.down { color: var(--text-muted); }
+.watch-why { color: var(--ok); font-size: 0.68rem; }
+
+button.watch-more {
+    margin-top: 0.2rem;
+    padding: 0.05rem 0.4rem;
+    font-size: 0.66rem;
+    background: none;
+}
+
+/* ------------------------------------------- a warning just came in */
+
+.watch-flash {
+    position: fixed;
+    left: 50%;
+    bottom: 1rem;
+    transform: translateX(-50%);
+    z-index: 170;
+    width: max-content;
+    max-width: min(30rem, calc(100vw - 2rem));
+    animation: watch-flash-in 0.2s ease-out;
+}
+
+.watch-flash button {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    text-align: left;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.76rem;
+    line-height: 1.35;
+    background: var(--panel-strong);
+    border: 1px solid var(--crit);
+    border-radius: 10px;
+    box-shadow: 0 6px 18px #0000008c, 0 0 8px var(--crit-glow);
+}
+
+.watch-flash button > i { color: var(--crit); }
+
+@keyframes watch-flash-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ------------------------------------------------- the GM screen's bell */
+
+.watch-bell { position: relative; display: inline-flex; }
+
+.watch-bell > button.lit { color: var(--crit); border-color: var(--crit); }
+
+.watch-bell > button .watch-badge {
+    position: absolute;
+    top: -0.45rem;
+    right: -0.45rem;
+    min-width: 1rem;
+    height: 1rem;
+    font-size: 0.6rem;
+    line-height: 1rem;
+}
+
+.watch-flash.in-bar {
+    position: absolute;
+    left: 0;
+    transform: none;
+    top: calc(100% + 0.4rem);
+    bottom: auto;
+    width: max-content;
+}
+
+.watch-pop {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 0.4rem);
+    z-index: 300;
+    width: min(26rem, calc(100vw - 2rem));
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.6rem;
+    background: var(--panel-strong);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 10px 28px #000000a0;
+}
+
+.watch-pop-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.watch-pop .muted { margin: 0; font-size: 0.7rem; color: var(--text-muted); }
+
+/* ------------------------------------------------------------ Compare */
+
+.compare-dialog {
+    width: min(38rem, 94vw);
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.compare-pick { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+.compare-pick label {
+    flex: 1 1 12rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+}
+
+.compare-pick select {
+    background: var(--panel-solid);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.3rem 0.45rem;
+    font: inherit;
+    font-size: 0.82rem;
+}
+
+.compare-meta { margin: 0; font-size: 0.78rem; color: var(--text-secondary); }
+.compare-same { margin: 0; color: var(--ok); font-size: 0.85rem; }
+
+.compare-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+}
+
+.compare-group h3 {
+    margin: 0 0 0.15rem;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+}
+
+.compare-dialog .gm-dialog-actions { flex-wrap: wrap; }
+
+html[data-device="phone"] .watch-tools select,
+html[data-device="phone"] .compare-pick select { font-size: 16px; }
+
+/* On a narrow screen the bell sits mid-bar: its popup and line take the
+   screen's width rather than run off its right edge. */
+@media (max-width: 640px) {
+    .watch-pop,
+    .watch-flash.in-bar {
+        position: fixed;
+        left: 0.75rem;
+        right: 0.75rem;
+        top: 3.25rem;
+        width: auto;
+        max-width: none;
+    }
+    .watch-pop { max-height: 80vh; }
+    .watch-pop .watch-scroll { max-height: none; flex: 1 1 auto; min-height: 0; }
+}
