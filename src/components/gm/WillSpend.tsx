@@ -28,10 +28,12 @@ import type { ReactNode } from 'react';
 export const MAX_FATE = 1;
 
 /** What a Will button costs: the Will star with the number inside it, the
-    way a burn's degree sits inside its flame. Also the table's Ignore pain. */
+    way a burn's degree sits inside its flame. Also the table's Ignore pain,
+    and the Will a character has, in front of the buttons. */
 export function WillCost({ n }: { n: number | string }) {
+    /* Two characters or more (10 Will, Ignore pain's 1–3) take a smaller figure. */
     return (
-        <span className="will-cost" data-cost={n}>
+        <span className={'will-cost' + (String(n).length > 1 ? ' wide' : '')} data-cost={n}>
             <i className="fa-solid fa-star" aria-hidden="true"></i>
             <span className="will-cost-n">{n}</span>
         </span>
@@ -69,7 +71,7 @@ export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc, 
             <div className={'will-spend' + (bare ? ' bare' : '')} data-will-spend="idle">
                 {!bare && (
                     <span className="will-have idle" title={idle}>
-                        <i className="fa-solid fa-star"></i> –
+                        <WillCost n="–" />
                     </span>
                 )}
                 <button type="button" data-will="tyc" className="will-btn tyc" aria-disabled title={idle}>
@@ -115,7 +117,7 @@ export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc, 
         <div className={'will-spend' + (bare ? ' bare' : '')} data-will-spend={phase}>
             {!bare && (
                 <span className="will-have" title="Will this character has">
-                    <i className="fa-solid fa-star"></i> {will}
+                    <WillCost n={will} />
                 </span>
             )}
             <button
