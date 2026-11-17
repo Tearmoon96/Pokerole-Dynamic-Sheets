@@ -374,16 +374,37 @@ button.will-btn.ready {
     button.will-btn.ready { animation: none; box-shadow: 0 0 6px var(--will-glow); }
 }
 
-.will-cost,
-.will-count {
-    font: 700 0.66rem/1 'Fira Code', monospace;
-    padding: 0.1rem 0.25rem;
-    border-radius: 4px;
-    background: #00000059;
+/* The cost: the Will star with the number knocked out of it, as a burn's
+   degree sits in its flame (WillCost). */
+.will-cost {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    line-height: 1;
+    /* Bigger than the label's text, but the button keeps its height. */
+    margin: -0.2rem 0;
 }
 
-.will-cost::before { content: '\2605\00a0'; font-size: 0.56rem; }
-.will-count { background: var(--crit); color: #1a1205; }
+.will-cost > i { font-size: 1.2rem; color: #a9c0ff; }
+
+.will-cost-n {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* The star's body sits a little below its box's middle. */
+    padding-top: 0.14rem;
+    font: 800 0.56rem/1 'Fira Code', monospace;
+    color: #101a3f;
+    pointer-events: none;
+}
+
+/* A range (Ignore pain's 1–3) is too wide for the star's body: a smaller,
+   tighter figure in the same star. */
+.will-cost[data-cost*="–"] > .will-cost-n { font-size: 0.42rem; letter-spacing: -0.12em; }
 
 .will-fate { display: inline-flex; align-items: center; gap: 0.15rem; flex: none; }
 
@@ -447,7 +468,9 @@ button.pain-choice.open:hover { border-color: var(--will-color); background: #3c
 button.pain-choice.on { border-color: var(--will-color); background: #3c6cf859; color: #fff; text-decoration: line-through; }
 button.pain-choice.none,
 button.pain-choice.short { opacity: 0.4; cursor: default; }
-button.pain-choice .will-cost { font-size: 0.6rem; padding: 0.08rem 0.2rem; }
+button.pain-choice .will-cost { margin: -0.25rem 0; }
+button.pain-choice .will-cost > i { font-size: 0.95rem; }
+button.pain-choice .will-cost-n { font-size: 0.48rem; padding-top: 0.1rem; }
 
 /* The GM's switch in the Dice panel's head: Pain Penalization off. */
 button.icon-btn.pain-rule { color: #fca5a5; }

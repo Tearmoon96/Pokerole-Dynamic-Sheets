@@ -16,6 +16,7 @@ import { useState } from 'react';
 import { useTable } from '../../table/TableContext';
 import type { PokedexEntry } from '../../data/types';
 import { useTableData } from './useTableData';
+import { WillCost } from '../gm/WillSpend';
 import { entityPain, entityPool, entityRef, setPainOff } from '../../gm/entities';
 import { painChoices } from '../../lib/pain';
 import type { PainChoice } from '../../lib/pain';
@@ -62,7 +63,7 @@ export function IgnorePain({ onBought }: { onBought?: () => void } = {}) {
                 <i className="fa-solid fa-heart-crack"></i> Ignore pain
                 {/* The same chip as the Will buttons beside it: what it costs
                     (1 for −1, 2 for −2, 3 for −3), and the same height. */}
-                <span className="will-cost">1–3</span>
+                <WillCost n="1–3" />
             </button>
             {open && !ruleOff && (isHost ? <GmChoices /> : <PlayerChoices onBought={onBought} />)}
         </div>
@@ -160,7 +161,7 @@ function PainList({ rows, empty }: { rows: Row[]; empty: string }) {
                                                 : c.state === 'short' ? ' Not enough Will (' + r.will + ').' : '')}
                                     onClick={() => { if (c.state === 'open') r.buy(c.to, c.cost); }}
                                 >
-                                    {'−' + c.loss}<span className="will-cost">{c.cost}</span>
+                                    {'−' + c.loss}<WillCost n={c.cost} />
                                 </button>
                             ))}
                         </span>

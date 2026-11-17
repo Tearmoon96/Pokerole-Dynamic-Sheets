@@ -27,6 +27,17 @@ import type { ReactNode } from 'react';
 /** Automatic successes Pushing Fate may put on one roll. */
 export const MAX_FATE = 1;
 
+/** What a Will button costs: the Will star with the number inside it, the
+    way a burn's degree sits inside its flame. Also the table's Ignore pain. */
+export function WillCost({ n }: { n: number | string }) {
+    return (
+        <span className="will-cost" data-cost={n}>
+            <i className="fa-solid fa-star" aria-hidden="true"></i>
+            <span className="will-cost-n">{n}</span>
+        </span>
+    );
+}
+
 export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc, idle, bare, phase = 'before', noReroll, noFate, children }: {
     /** Will the character has now. */
     will: number;
@@ -63,12 +74,12 @@ export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc, 
                 )}
                 <button type="button" data-will="tyc" className="will-btn tyc" aria-disabled title={idle}>
                     <i className="fa-solid fa-rotate-right"></i> Take your chances
-                    <span className="will-cost">1</span>
+                    <WillCost n={1} />
                 </button>
                 <span className="will-fate">
                     <button type="button" data-will="fate" className="will-btn fate" aria-disabled title={idle}>
                         <i className="fa-solid fa-wand-sparkles"></i> Pushing fate
-                        <span className="will-cost">1</span>
+                        <WillCost n={1} />
                     </button>
                 </span>
                 {children}
@@ -119,7 +130,7 @@ export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc, 
                 }}
             >
                 <i className="fa-solid fa-rotate-right"></i> Take your chances
-                {!tyc && <span className="will-cost">1</span>}
+                {!tyc && <WillCost n={1} />}
             </button>
             <span className={'will-fate' + (fate ? ' on' : '')}>
                 <button
@@ -131,7 +142,7 @@ export function WillSpend({ will, fate, roundFate, tyc, inFight, onFate, onTyc, 
                     onClick={() => { if (fate) onFate(0); else if (canAdd) onFate(1); }}
                 >
                     <i className="fa-solid fa-wand-sparkles"></i> Pushing fate
-                    {fate ? <span className="will-count">+{fate}</span> : <span className="will-cost">1</span>}
+                    <WillCost n={1} />
                 </button>
             </span>
             {children}
