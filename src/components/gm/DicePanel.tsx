@@ -3,7 +3,7 @@ import { useGm } from '../../gm/GmContext';
 import { CRIT_DAMAGE, CRIT_MARGIN } from '../../gm/constants';
 import { HISTORY_LIMIT, VERDICTS, faceOrder, rerollEntry, roll, struckOff, struckText } from '../../gm/dice';
 import { useAppData } from '../../data/AppDataContext';
-import { adjustPool, entityPool, entityRef } from '../../gm/entities';
+import { adjustPool, entityPain, entityPool, entityRef } from '../../gm/entities';
 import { willRoundOf } from '../../gm/willSpend';
 import { FREE, notePushedFate, roundWill, setTakeChances, useRoundWillVersion } from '../../lib/willRound';
 import { PAIN_OFF_KEY, readGmPainOff, writeGmPainOff } from '../../lib/pain';
@@ -12,7 +12,9 @@ import { DieFaces } from './DieFaces';
 import { useEffect, useState } from 'react';
 import type { PokedexEntry } from '../../data/types';
 import type { RollEntry, RollMeta } from '../../gm/dice';
-import { spendRoll } from '../../gm/turns';
+import { actionOf, pidOf, spendRoll } from '../../gm/turns';
+import { MAX_ACTIONS } from '../../gm/combat';
+import type { GmState } from '../../gm/types';
 
 /* The dice roller: quick d-chips, a count/sides stepper, the last roll in full
    and a compact history behind it. */
@@ -44,13 +46,25 @@ export function DicePanel({ onReorder }: {
     }, [store]);
 
     /* The Will buttons: only for a pool set up from a character's sheet, and
-       never for a damage roll or a sum (an initiative). */
-    const src = prep && sides === 6 && prep.bonus == null && !prep.isDmg ? prep.src || null : null;
+       never for a sum (an initiative). A damage roll takes Take Your Chances,
+       never Pushing Fate. */
+    const src = prep && sides === 6 && prep.bonus == null ? prep.src || null : null;
     const subject = src ? entityRef(state, dexById, src) : null;
     const willPool = subject ? entityPool(subject, 'will') : null;
     const round = src ? willRoundOf(state, dexById, src) : null;
     const spent = round ? roundWill(round.key, round.stamp) : { tyc: false, fate: 0 };
-    const fate = src && willPool ? Math.max(0, Math.min(prep!.fate || 0, willPool.cur)) : 0;
+    const fate = src && willPool && !prep!.isDmg ? Math.max(0, Math.min(prep!.fate || 0, willPool.cur)) : 0;
+    /* The pain and the target number as they are now, not when the roll was
+       set up (see liveMeta). */
+    const live = prep ? liveMeta(state, dexById, prep, sides, state.dice.prepUse) : null;
+
+    /* Take Your Chances is bought AFTER the roll: with nothing set up, the
+       buttons are about the roll just made, if it came from a sheet. */
+    const lastSrc = !prep && latest && latest.src && latest.succ != null && latest.bonus == null ? latest.src : null;
+    const lastSubject = lastSrc ? entityRef(state, dexById, lastSrc) : null;
+    const lastWill = lastSubject ? entityPool(lastSubject, 'will') : null;
+    const lastRound = lastSrc ? willRoundOf(state, dexById, lastSrc) : null;
+    const lastSpent = lastRound ? roundWill(lastRound.key, lastRound.stamp) : { tyc: false, fate: 0 };
 
     /* Rolls whatever is set up — a move panel's roll, with its count as the GM
        may have changed it — or plain dice. */
@@ -62,7 +76,8 @@ export function DicePanel({ onReorder }: {
         }
         const tyc = !!src && spent.tyc;
         store.update((s) => {
-        const meta: RollMeta = { ...((s.dice.prep || {}) as RollMeta) };
+        const prepNow = (s.dice.prep || {}) as RollMeta;
+        const meta: RollMeta = s.dice.prep ? liveMeta(s, dexById, prepNow, s.dice.sides, s.dice.prepUse) : { ...prepNow };
         delete meta.fate;
         if (fate > 0) meta.fate = fate;
         if (tyc) meta.tyc = true;
@@ -73,6 +88,18 @@ export function DicePanel({ onReorder }: {
         const use = s.dice.prep ? s.dice.prepUse : null;
         if (use) s.combats = s.combats.map((c) => spendRoll(c, use.pid, use.op || 'acc', use.move));
         s.dice = { ...s.dice, prep: null, prepUse: null, history: [entry, ...s.dice.history].slice(0, HISTORY_LIMIT) };
+        });
+    };
+
+    /* Take Your Chances, bought for the roll just made: 1 Will, on for the
+       rest of the Round, and that roll's failed dice turn into buttons. */
+    const buyChances = () => {
+        if (!lastSrc || !lastRound) return;
+        adjustPool(state, dexById, lastSrc, 'will', -1, () => store.save());
+        setTakeChances(lastRound.key, lastRound.stamp, true);
+        store.update((s) => {
+            const first = s.dice.history[0] as RollEntry | undefined;
+            if (first) s.dice = { ...s.dice, history: [{ ...first, tyc: true }, ...s.dice.history.slice(1)] };
         });
     };
 
@@ -95,8 +122,11 @@ export function DicePanel({ onReorder }: {
         /* Set up, like every roll from a move: Roll throws it. */
         store.update((s) => {
             s.dice = { ...s.dice, count: d.dice + extra, sides: 6,
-                prep: { who: from.who, what: what + (extra ? ' (critical)' : ''), pain: from.pain,
-                    isDmg: true, ...(from.src ? { src: from.src } : {}) },
+                /* The pain is read again from the sheet when Roll is pressed
+                   (liveMeta); an entry with no sheet behind it keeps its own. */
+                prep: { who: from.who, what: what + (extra ? ' (critical)' : ''),
+                    ...(from.src ? { src: from.src } : { pain: from.pain }),
+                    isDmg: true },
                 prepUse: null };
         });
     };
@@ -207,10 +237,10 @@ export function DicePanel({ onReorder }: {
                         <i className="fa-solid fa-hand-pointer"></i>
                         <span className="dice-prep-text">
                             {[prep.who, prep.what].filter(Boolean).join(' · ') || 'Roll set up'}
-                            {prep.need != null && <> · needs {prep.need}</>}
-                            {prep.need != null && prep.crit != null && <> · crit at +{prep.crit}</>}
-                            {!!prep.low && <> · low accuracy −{prep.low}</>}
-                            {!!prep.pain && <> · pain −{prep.pain}</>}
+                            {live!.need != null && <> · needs {live!.need}</>}
+                            {live!.need != null && live!.crit != null && <> · crit at +{live!.crit}</>}
+                            {!!live!.low && <> · low accuracy −{live!.low}</>}
+                            {!!live!.pain && <> · pain −{live!.pain}</>}
                             {fate > 0 && <> · fate +{fate}</>}
                             {!!src && spent.tyc && <> · reroll 1</>}
                         </span>
@@ -227,12 +257,27 @@ export function DicePanel({ onReorder }: {
                     <WillSpend
                         will={willPool.cur} fate={fate} roundFate={spent.fate} tyc={spent.tyc}
                         inFight={round.stamp !== FREE}
+                        noFate={prep!.isDmg ? 'Pushing Fate never goes on a damage roll.' : undefined}
                         onFate={(n) => store.update((s) => {
                             s.dice = { ...s.dice, prep: { ...(s.dice.prep || {}), fate: n } };
                         })}
                         onTyc={(on) => {
-                            if (on) adjustPool(state, dexById, src, 'will', -1, () => store.save());
-                            setTakeChances(round.key, round.stamp, on);
+                            if (!on) { setTakeChances(round.key, round.stamp, false); store.refresh(); }
+                        }}
+                    />
+                )}
+                {lastSrc && lastRound && lastWill && latest && (
+                    <WillSpend
+                        phase="after"
+                        will={lastWill.cur} fate={0} roundFate={lastSpent.fate + (latest.fate || 0)} tyc={lastSpent.tyc}
+                        inFight={lastRound.stamp !== FREE}
+                        noReroll={latest.rr ? 'A die of this roll was already thrown again.'
+                            : !latest.vals.some((v) => v < 4) ? 'No die of this roll failed: nothing to throw again.'
+                                : undefined}
+                        onFate={() => {}}
+                        onTyc={(on) => {
+                            if (on) { buyChances(); return; }
+                            setTakeChances(lastRound.key, lastRound.stamp, false);
                             store.refresh();
                         }}
                     />
@@ -343,4 +388,31 @@ function RollOutput({ entry, sorted, onRollDamage, onReroll }: {
             )}
         </div>
     );
+}
+
+/** A set-up roll's meta with the pain and the target number read again from
+    the sheet and the fight as they are now: an Ignore pain, a blow taken or
+    a pip filled after the roll was set up would otherwise leave it a success
+    short, or measured against the wrong action — and its critical with it. */
+function liveMeta(
+    state: GmState, dexById: (id: string) => PokedexEntry | null, prep: RollMeta, sides: number,
+    use: { pid: string; op?: string } | null | undefined,
+): RollMeta {
+    const out: RollMeta = { ...prep };
+    if (prep.src && sides === 6 && prep.bonus == null) {
+        const pain = entityPain(entityRef(state, dexById, prep.src));
+        if (pain) {
+            if (pain.penalty) out.pain = pain.penalty; else delete out.pain;
+        }
+    }
+    if (use && (use.op || 'acc') === 'acc' && out.need != null) {
+        for (const c of state.combats) {
+            const p = c.participants.find((x) => pidOf(x) === use.pid);
+            if (!p) continue;
+            const act = actionOf((p.acted as number) || 0);
+            if (act <= MAX_ACTIONS) out.need = act;
+            break;
+        }
+    }
+    return out;
 }

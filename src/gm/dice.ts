@@ -46,7 +46,7 @@ export interface RollEntry {
     /** Whose roll it is, as an entity token, so the Will buttons beside Roll
         know whose Will to spend. Absent on plain dice. */
     src?: string;
-    /** A damage roll: no Pushing Fate, no Take Your Chances. */
+    /** A damage roll: no Pushing Fate (Take Your Chances, yes). */
     isDmg?: boolean;
 }
 

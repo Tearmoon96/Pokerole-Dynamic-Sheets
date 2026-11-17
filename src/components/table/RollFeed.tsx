@@ -16,9 +16,12 @@ import { colorVars } from '../../table/colors';
 /** How long a roll that just came in stays lit. */
 const FRESH_MS = 3000;
 
-export function RollFeed({ rolls, myName, members, sorted, onReroll }: {
+export function RollFeed({ rolls, myName, members, sorted, onReroll, armed }: {
     /** Take Your Chances on one of this player's own rolls: roll id, die. */
     onReroll?: (id: string, i: number) => void;
+    /** The roll Take Your Chances was just bought for, after it was thrown:
+        drawn as if it had carried it, so its failed dice are buttons. */
+    armed?: string | null;
     rolls: LocalRoll[];
     myName: string;
     members: WireMember[];
@@ -41,7 +44,7 @@ export function RollFeed({ rolls, myName, members, sorted, onReroll }: {
                 const by = members.find((m) => m.name === r.who);
                 return (
                     <FeedRow
-                        key={r.id} roll={r} mine={r.who === myName} color={by ? by.color : undefined} sorted={sorted}
+                        key={r.id} roll={armed && r.id === armed && !r.tyc ? { ...r, tyc: true } : r} mine={r.who === myName} color={by ? by.color : undefined} sorted={sorted}
                         onReroll={onReroll && r.who === myName ? (i) => onReroll(r.id, i) : undefined}
                     />
                 );

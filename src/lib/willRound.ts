@@ -3,10 +3,13 @@
    Both are bought with Will next to the Roll button (the GM screen's Dice
    panel, the table's dice controls), and both are about ONE Round:
 
-     Take Your Chances   1 Will: for the rest of the Round, every action roll
-                         may throw ONE of its failed dice again.
-     Pushing Fate        1 Will each: an automatic success on one roll, which
-                         pain and Low Accuracy cannot strike. Never on damage.
+     Take Your Chances   1 Will, bought AFTER a roll (2026-11-17, the owner's
+                         rule): one failed die of that roll is thrown again,
+                         and for the rest of the Round every roll of that
+                         character, damage included, may throw ONE again.
+     Pushing Fate        1 Will each, set BEFORE a roll: an automatic success
+                         on it, which pain and Low Accuracy cannot strike.
+                         Never on damage.
 
    They exclude each other within a Round; several Pushing Fates are fine.
 

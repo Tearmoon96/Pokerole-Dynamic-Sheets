@@ -7,11 +7,18 @@
 import { useTable } from '../../table/TableContext';
 import { LIMITS } from '../../table/protocol';
 import { totalRange } from '../../table/scripted';
-import { saveSuccessesFirst, type PreparedRoll } from '../../table/session';
-import { charWill, spendCharWill, useWorkingSet } from '../../table/character';
+import { saveSuccessesFirst, type PreparedRoll, type RollWill } from '../../table/session';
+import type { RollExtras } from '../../table/protocol';
+import { charWill, soloState, spendCharWill, useWorkingSet } from '../../table/character';
 import { FREE, notePushedFate, roundWill, setTakeChances, useRoundWillVersion } from '../../lib/willRound';
+import { entityPain, entityRef } from '../../gm/entities';
+import { actionOf } from '../../gm/turns';
+import { MAX_ACTIONS } from '../../gm/combat';
+import type { AppData } from '../../data/types';
+import type { TableSession } from '../../table/session';
 import { WillSpend } from '../gm/WillSpend';
 import { IgnorePain } from './IgnorePain';
+import { useTableData } from './useTableData';
 
 const QUICK_DICE = [4, 6, 8, 10, 12, 20, 100];
 
@@ -33,27 +40,42 @@ export function RollControls() {
     /* The Will buttons: for a pool set up from a character's sheet, never a
        damage roll or an initiative (CharacterPanel leaves `will` out). */
     const [, refreshSheets] = useWorkingSet();
+    const data = useTableData();
     useRoundWillVersion();
     const w = prep && sides === 6 && bonus === undefined ? prep.will || null : null;
     const will = w ? charWill(w.trainerId, w.token, w.have) : 0;
     const spent = w ? roundWill(w.key, w.stamp) : { tyc: false, fate: 0 };
-    const fate = w ? Math.max(0, Math.min(prep!.extras.fate || 0, will)) : 0;
+    const fate = w && !w.dmg ? Math.max(0, Math.min(prep!.extras.fate || 0, will)) : 0;
+    /* The pain and the target number as they are NOW, not as they were when
+       the roll was set up: an Ignore pain, a blow taken or a pip filled in
+       between would otherwise leave the roll a success short, or measured
+       against the wrong action — and its critical with it. */
+    const live = prep ? liveExtras(prep, sides, data, session, state.myId) : null;
+
+    /* The roll just made, for Take Your Chances, which is bought after the
+       throw. Only while nothing new is set up: a roll set up is the one the
+       buttons are about. */
+    const own = !isHost && !prep ? state.lastOwn : null;
+    const ownRoll = own ? state.rolls.find((r) => r.id === own.id) || null : null;
+    const turns = session.combat.view.turns;
+    const after = own && ownRoll ? afterRoll(own.will, ownRoll, turns ? turns.name + ':' + turns.round : null) : null;
 
     /* Pushing Fate is paid as the roll is asked for; Take Your Chances, if
-       it is on, rides along so the GM's page lets one failed die go again. */
+       it is on this Round, rides along so the GM's page lets one failed die
+       go again. */
     const throwIt = () => {
         if (waiting) return;
-        if (w && prep) {
-            const extras = { ...prep.extras };
+        if (prep && live) {
+            const extras = { ...live };
             delete extras.fate;
             delete extras.tyc;
-            if (fate > 0) {
+            if (w && fate > 0) {
                 extras.fate = fate;
                 spendCharWill(w.trainerId, w.token, fate, w.have);
                 notePushedFate(w.key, w.stamp, fate);
                 refreshSheets();
             }
-            if (spent.tyc) extras.tyc = true;
+            if (w && spent.tyc) extras.tyc = true;
             session.set('prep', { ...prep, extras });
         }
         session.requestRoll();
@@ -136,10 +158,10 @@ export function RollControls() {
                     <i className="fa-solid fa-hand-pointer"></i>
                     <span className="dice-prep-text">
                         {state.note || 'Roll set up'}
-                        {prep.extras.need !== undefined && <> · needs {prep.extras.need}</>}
-                        {prep.extras.crit !== undefined && <> · crit at +{prep.extras.crit}</>}
-                        {!!prep.extras.low && <> · low accuracy −{prep.extras.low}</>}
-                        {!!prep.extras.pain && <> · pain −{prep.extras.pain}</>}
+                        {live!.need !== undefined && <> · needs {live!.need}</>}
+                        {live!.crit !== undefined && <> · crit at +{live!.crit}</>}
+                        {!!live!.low && <> · low accuracy −{live!.low}</>}
+                        {!!live!.pain && <> · pain −{live!.pain}</>}
                         {fate > 0 && <> · fate +{fate}</>}
                         {!!w && spent.tyc && <> · reroll 1</>}
                     </span>
@@ -164,10 +186,27 @@ export function RollControls() {
                 <WillSpend
                     will={will} fate={fate} roundFate={spent.fate} tyc={spent.tyc}
                     inFight={w.stamp !== FREE}
+                    noFate={w.dmg ? 'Pushing Fate never goes on a damage roll.' : undefined}
                     onFate={(n) => session.set('prep', { ...prep, extras: { ...prep.extras, fate: n } })}
+                    onTyc={(on) => { if (!on) setTakeChances(w.key, w.stamp, false); }}
+                    bare
+                />
+            ) : own && after ? (
+                <WillSpend
+                    phase="after"
+                    will={after.will} fate={0} roundFate={after.roundFate} tyc={after.tyc}
+                    inFight={own.will.stamp !== FREE}
+                    noReroll={after.noReroll}
+                    onFate={() => {}}
                     onTyc={(on) => {
-                        if (on) { spendCharWill(w.trainerId, w.token, 1, w.have); refreshSheets(); }
-                        setTakeChances(w.key, w.stamp, on);
+                        const ow = own.will;
+                        if (!on) { setTakeChances(ow.key, ow.stamp, false); return; }
+                        /* Bought for the roll just made: 1 Will, on for the
+                           Round, and that roll's failed dice turn into buttons. */
+                        spendCharWill(ow.trainerId, ow.token, 1, ow.have);
+                        setTakeChances(ow.key, ow.stamp, true);
+                        session.set('tycArmed', own.id);
+                        refreshSheets();
                     }}
                     bare
                 />
@@ -180,7 +219,7 @@ export function RollControls() {
                 />
             )}
 
-            <IgnorePain />
+            <IgnorePain onBought={refreshSheets} />
 
             <button
                 id="roll-btn"
@@ -223,8 +262,52 @@ function idleWill(isHost: boolean, prep: PreparedRoll | null, sides: number): st
     if (isHost) return 'Will is spent by the player whose roll it is, from their own character.';
     if (prep?.will && sides !== 6) return 'Will goes on a pool of d6 only.';
     if (prep && (prep.enter || prep.extras.bonus !== undefined)) return 'Not on an initiative.';
-    if (prep) return 'Not on a damage roll.';
-    return 'Set up the roll from your character (its Accuracy, a skill, Evasion\u2026) to spend its Will on it.';
+    if (prep) return 'Not on this roll.';
+    return 'Roll from your character (its Accuracy, a skill, Evasion\u2026) to spend its Will: '
+        + 'Pushing Fate before the roll, Take Your Chances after it.';
+}
+
+/** A prepared roll's extras with the pain and the target number read again
+    from the sheet and the fight as they are now. While the dataset is still
+    loading, the pain stays what it was when the roll was set up. */
+function liveExtras(prep: PreparedRoll, sides: number, data: AppData | null, session: TableSession, myId: string): RollExtras {
+    const out: RollExtras = { ...prep.extras };
+    const w = prep.will;
+    if (w && data && sides === 6 && out.bonus === undefined) {
+        const dexById = (id: string) => data.pokemon.find((p) => p._id === id) || null;
+        const pain = entityPain(entityRef(soloState(w.trainerId), dexById, w.token));
+        if (pain) {
+            if (pain.penalty) out.pain = pain.penalty; else delete out.pain;
+        }
+    }
+    const q = prep.quick;
+    const turns = session.combat.view.turns;
+    if (q && q.op === 'acc' && out.need !== undefined && turns) {
+        const e = turns.order.find((x) => x.id === q.id && x.own === myId);
+        const act = e ? actionOf(e.acted ?? 0) : 0;
+        if (act >= 1 && act <= MAX_ACTIONS) out.need = act;
+    }
+    return out;
+}
+
+/** Where Take Your Chances stands for the roll just made. `now` is the
+    fight's Round as it is now, or null with no fight on the table. */
+function afterRoll(
+    w: RollWill, r: { tyc?: boolean; rr?: [number, number]; succ: number | null; vals: number[]; fate?: number },
+    now: string | null,
+): { will: number; tyc: boolean; roundFate: number; noReroll?: string } {
+    const spent = roundWill(w.key, w.stamp);
+    const noReroll = w.stamp !== FREE && w.stamp !== now ? 'That roll was made in an earlier Round.'
+        : r.succ == null ? 'Not on this roll.'
+            : r.rr ? 'A die of this roll was already thrown again.'
+                : !r.vals.some((v) => v < 4) ? 'No die of this roll failed: nothing to throw again.'
+                    : undefined;
+    return {
+        will: charWill(w.trainerId, w.token, w.have),
+        tyc: spent.tyc,
+        roundFate: spent.fate + (r.fate || 0),
+        noReroll,
+    };
 }
 
 /** Display only, this browser only: the GM and every player choose it alike. */

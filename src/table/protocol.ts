@@ -206,8 +206,9 @@ export type Body =
     /** Host only. The result, for everyone. A roll already in the feed comes
         again, under the same id, once its Take Your Chances die is rerolled. */
     | { k: 'result'; rid?: string; roll: WireRoll }
-    /** Player to host: Take Your Chances on my roll `id`, die `i`. */
-    | { k: 'reroll'; id: string; i: number }
+    /** Player to host: Take Your Chances on my roll `id`, die `i`. `tyc`:
+        it was bought for this roll after the throw, so the roll lacks it. */
+    | { k: 'reroll'; id: string; i: number; tyc?: true }
     /** Host only. Recent public rolls, sent to someone who just joined. */
     | { k: 'sync'; rolls: WireRoll[] }
     /** Host only. */

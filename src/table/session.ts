@@ -82,8 +82,23 @@ export interface PreparedRoll {
     /** Whose Will the buttons beside Roll spend (Pushing Fate, Take Your
         Chances): the character, the Will it had when the roll was set up —
         for a sheet that never stored one — and its Round (lib/willRound.ts).
-        Absent for a damage roll or an initiative, which take neither. */
-    will?: { trainerId: string; token: string; have: number; key: string; stamp: string } | null;
+        Absent for an initiative, which takes neither. A damage roll has it
+        with `dmg`: Take Your Chances, never Pushing Fate. Its pain is read
+        again from the sheet when Roll is pressed (RollControls). */
+    will?: RollWill | null;
+}
+
+/** Whose roll it is, for the Will buttons and the pain read at the throw. */
+export interface RollWill {
+    trainerId: string;
+    token: string;
+    /** The Will it had when the roll was set up, for a sheet that never stored one. */
+    have: number;
+    /** Its key and Round in lib/willRound.ts. */
+    key: string;
+    stamp: string;
+    /** A damage roll: no Pushing Fate. */
+    dmg?: boolean;
 }
 
 export interface TableState {
@@ -115,6 +130,12 @@ export interface TableState {
     sides: number;
     note: string;
     prep: PreparedRoll | null;
+    /** This player's last roll from a character's sheet, once it is back:
+        Take Your Chances is bought for it after the throw. Local only. */
+    lastOwn: { id: string; will: RollWill } | null;
+    /** The roll Take Your Chances was just bought for: its failed dice are
+        buttons here before the GM's page has heard of it. Local only. */
+    tycArmed: string | null;
     /** Pain Penalization is off for the whole table: the GM's switch, and
         for a player what the GM's page last said. */
     painOff: boolean;
@@ -165,6 +186,8 @@ function initialState(): TableState {
            checkbox starts in. Making it opt-in would mean the first roll of
            every session leaks by accident. */
         prep: null,
+        lastOwn: null,
+        tycArmed: null,
         painOff: painRuleOff(),
         locked: false,
         lockBusyUntil: 0,
@@ -496,6 +519,10 @@ export class TableSession {
        on the way out — an old signature would fall outside the replay window by
        the time the GM came back. */
     private queue: Body[] = [];
+
+    /* A player's own requests from a character's sheet: request id -> whose
+       roll it is, until the result comes back and becomes `lastOwn`. */
+    private ridWill = new Map<string, RollWill>();
 
     /* A new password reaches each member sealed to them alone (crypto.ts).
        A player's page makes its ECDH pair on every join and announces the
@@ -1120,12 +1147,21 @@ export class TableSession {
                            rerolled. It keeps its place in the feed. */
                         if (body.roll.rr && !s.rolls[at].rr) {
                             s.rolls = s.rolls.map((r, i) => (i === at ? { ...body.roll, seenAt: r.seenAt } : r));
+                            if (s.tycArmed === body.roll.id) s.tycArmed = null;
                         }
                         return;
                     }
                     s.rolls = [{ ...body.roll, seenAt: Date.now() }, ...s.rolls].slice(0, LIMITS.HISTORY);
                     if (body.rid) s.pending = s.pending.filter((p) => p.rid !== body.rid);
                     s.hostOnline = true;
+                    /* One of this player's rolls from a sheet: Take Your
+                       Chances may now be bought for it. */
+                    const w = body.rid ? this.ridWill.get(body.rid) : undefined;
+                    if (w) {
+                        this.ridWill.delete(body.rid!);
+                        s.lastOwn = { id: body.roll.id, will: w };
+                        s.tycArmed = null;
+                    }
                 });
                 break;
 
@@ -1366,13 +1402,18 @@ export class TableSession {
         const r = this.store.state.rolls.find((x) => x.id === body.id);
         /* Names are unique at the table (`uniqueName`), so the name on a roll
            says whose it is — and still does after this page reloads. */
-        if (!r || r.hidden || r.who !== who || !canReroll(r) || !(r.vals[body.i] < 4)) return;
+        /* `tyc` on the request: Take Your Chances was bought for this roll
+           after it was thrown (the owner's rule), so the roll did not carry
+           it. The Will is the player's to spend, as the dice count of a
+           request always was theirs to say. */
+        const tyc = r ? !!r.tyc || body.tyc === true : false;
+        if (!r || r.hidden || r.who !== who || !canReroll({ ...r, tyc }) || !(r.vals[body.i] < 4)) return;
         const vals = r.vals.slice();
         const was = vals[body.i];
         vals[body.i] = face(6);
         const succ = vals.filter((v) => v >= 4).length;
         const next: LocalRoll = {
-            ...r, vals, succ, total: vals.reduce((a, b) => a + b, 0), rr: [body.i, was],
+            ...r, vals, succ, total: vals.reduce((a, b) => a + b, 0), rr: [body.i, was], tyc: true,
         };
         next.net = netOf(succ, next);
         this.store.update((s) => { s.rolls = s.rolls.map((x) => (x.id === next.id ? next : x)); });
@@ -1382,8 +1423,11 @@ export class TableSession {
 
     /** A player asks for that reroll. */
     reroll(id: string, i: number): void {
-        if (this.store.state.isHost) return;
-        void this.publish({ k: 'reroll', id, i });
+        const s = this.store.state;
+        if (s.isHost) return;
+        const r = s.rolls.find((x) => x.id === id);
+        const armed = s.tycArmed === id && !!r && !r.tyc;
+        void this.publish(armed ? { k: 'reroll', id, i, tyc: true } : { k: 'reroll', id, i });
     }
 
     private onRequest(
@@ -1576,7 +1620,7 @@ export class TableSession {
             /* Pain and a target number are about successes, which only d6 have. */
             const extras: RollExtras = sides === 6 ? prep.extras
                 : prep.extras.bonus !== undefined ? { bonus: prep.extras.bonus } : {};
-            this.rollFor(count, sides, note || '', extras);
+            this.rollFor(count, sides, note || '', extras, sides === 6 ? prep.will || null : null);
             if (prep.quick) this.combat.act(prep.quick.op, prep.quick.id, undefined, prep.quick.move);
             return;
         }
@@ -1602,12 +1646,16 @@ export class TableSession {
         GM, published for the whole table: a player's character panel is never
         on the host's page. `who` is still the player's own name; the note says
         which character and what for. */
-    rollFor(count: number, sides: number, note: string, extras: RollExtras = {}): void {
+    rollFor(count: number, sides: number, note: string, extras: RollExtras = {}, will: RollWill | null = null): void {
         const s = this.store.state;
         if (s.isHost) return;
         count = clamp(count, LIMITS.MIN_COUNT, LIMITS.MAX_COUNT);
         sides = clamp(sides, LIMITS.MIN_SIDES, LIMITS.MAX_SIDES);
         const rid = randomId(8);
+        if (will && extras.bonus === undefined) {
+            this.ridWill.set(rid, will);
+            while (this.ridWill.size > 32) this.ridWill.delete(this.ridWill.keys().next().value!);
+        }
         const body: Body = {
             k: 'request', rid, count, sides,
             note: cleanText(note, LIMITS.MAX_NOTE) || undefined,

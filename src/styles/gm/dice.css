@@ -356,6 +356,24 @@ button.will-btn.on[aria-disabled="true"] {
     box-shadow: 0 0 7px var(--will-glow);
 }
 
+/* Ready: Take Your Chances can be bought for the roll just made. A soft
+   glow that breathes, lighter than `on`, so it is noticed without shouting. */
+button.will-btn.ready {
+    border-color: var(--will-color);
+    background: #3c6cf833;
+    color: #fff;
+    animation: will-ready 1.8s ease-in-out infinite;
+}
+
+@keyframes will-ready {
+    0%, 100% { box-shadow: 0 0 2px var(--will-glow); }
+    50% { box-shadow: 0 0 9px var(--will-glow); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    button.will-btn.ready { animation: none; box-shadow: 0 0 6px var(--will-glow); }
+}
+
 .will-cost,
 .will-count {
     font: 700 0.66rem/1 'Fira Code', monospace;

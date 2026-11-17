@@ -34,7 +34,9 @@ interface Row {
     buy: (to: number, cost: number) => void;
 }
 
-export function IgnorePain() {
+/** `onBought`: the dice controls around it re-read the sheets at once, so a
+    roll set up shows its pain gone straight away. */
+export function IgnorePain({ onBought }: { onBought?: () => void } = {}) {
     const { session, state } = useTable();
     const [open, setOpen] = useState(false);
     const isHost = state.isHost;
@@ -62,7 +64,7 @@ export function IgnorePain() {
                     (1 for −1, 2 for −2, 3 for −3), and the same height. */}
                 <span className="will-cost">1–3</span>
             </button>
-            {open && !ruleOff && (isHost ? <GmChoices /> : <PlayerChoices />)}
+            {open && !ruleOff && (isHost ? <GmChoices /> : <PlayerChoices onBought={onBought} />)}
         </div>
     );
 }
@@ -83,8 +85,7 @@ function GmChoices() {
     );
 }
 
-function PlayerChoices() {
-    const { session, state } = useTable();
+function PlayerChoices({ onBought }: { onBought?: () => void }) {
     const [, refresh] = useWorkingSet();
     const data = useTableData();
 
@@ -115,18 +116,11 @@ function PlayerChoices() {
         rows.push({
             key: token, name: ref.name || '?', tiers: pain.tiers, off: pain.off, will: will.cur,
             buy: (to, cost) => {
+                /* A roll already set up reads its pain again when Roll is
+                   pressed (RollControls' liveExtras), so it needs no patch. */
                 setPainOff(solo, dexById, token, to, cost, () => {});
                 refresh();
-                /* A roll already set up for this character carries the pain it
-                   had then: it loses what was just bought off. */
-                const prep = state.prep;
-                if (prep && prep.will && prep.will.trainerId === trainerId && prep.will.token === token && prep.extras.pain) {
-                    const now = entityPain(entityRef(solo, dexById, token));
-                    const left = Math.max(0, Math.min(prep.extras.pain, now ? now.penalty : 0));
-                    const extras = { ...prep.extras };
-                    if (left) extras.pain = left; else delete extras.pain;
-                    session.set('prep', { ...prep, extras });
-                }
+                onBought?.();
             },
         });
     }

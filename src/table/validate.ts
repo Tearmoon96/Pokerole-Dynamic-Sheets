@@ -437,11 +437,12 @@ export function parseBody(raw: unknown): Body | null {
             return { k: 'result', rid: raw.rid as string | undefined, roll };
         }
         case 'reroll': {
-            if (!exactly(raw, ['k', 'id', 'i'])) return null;
+            if (!exactly(raw, ['k', 'id', 'i', 'tyc'])) return null;
             const id = idText(raw.id);
             const i = int(raw.i, 0, LIMITS.MAX_COUNT - 1);
             if (!id || i === null) return null;
-            return { k: 'reroll', id, i };
+            if (raw.tyc !== undefined && raw.tyc !== true) return null;
+            return raw.tyc ? { k: 'reroll', id, i, tyc: true } : { k: 'reroll', id, i };
         }
         case 'sync': {
             if (!exactly(raw, ['k', 'rolls'])) return null;

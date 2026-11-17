@@ -23,7 +23,7 @@ const CAT_COLORS: Record<string, string> = {
     Clash (once a Round, and an action in a fight with turns), an attack's
     accuracy (the GM screen flags the action), or the initiative (which the
     rolling table turns into a way into the fight), or a damage roll (which
-    takes neither Pushing Fate nor Take Your Chances). */
+    takes Take Your Chances but never Pushing Fate). */
 export type RollKind = 'eva' | 'clash' | 'acc' | 'init' | 'dmg';
 /** `move`: the move an Accuracy is for, so the fight can mark it used. */
 export type DoRoll = (dice: number, meta: RollMeta, quick?: RollKind, move?: string) => void;

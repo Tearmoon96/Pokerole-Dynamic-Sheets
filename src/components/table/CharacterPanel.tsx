@@ -232,14 +232,16 @@ function CharacterBody() {
         const note = [meta.who, meta.what].filter(Boolean).join(' · ');
         const s = seat(token);
         /* Whose Will the buttons beside Roll spend, and in which Round: the
-           fight's, for a character seated in it. A damage roll takes neither
-           Pushing Fate nor Take Your Chances. */
-        const ref = quick === 'dmg' ? null : entityRef(solo, dexById, token);
+           fight's, for a character seated in it. A damage roll takes Take Your
+           Chances (it lasts the Round, every roll), never Pushing Fate. The
+           same pointer is how the pain is read again when Roll is pressed. */
+        const ref = entityRef(solo, dexById, token);
         const wp = ref ? entityPool(ref, 'will') : null;
         session.prepare(dice, 6, note, {
             will: wp ? {
                 trainerId, token, have: wp.cur, key: 'tb:' + trainerId + ':' + token,
                 stamp: s && turns ? turns.name + ':' + turns.round : FREE,
+                ...(quick === 'dmg' ? { dmg: true } : {}),
             } : null,
             extras: {
                 ...(meta.bonus != null ? { bonus: meta.bonus } : {}),

@@ -55,6 +55,7 @@ export function TableView() {
             <RollFeed
                 rolls={state.rolls} myName={shownName} members={state.members} sorted={state.successesFirst}
                 onReroll={state.isHost ? undefined : (id, i) => session.reroll(id, i)}
+                armed={state.isHost ? null : state.tycArmed}
             />
         </div>
     );
