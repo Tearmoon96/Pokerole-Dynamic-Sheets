@@ -1,7 +1,8 @@
 import type { PokedexEntry } from '../data/types';
 import type { MegaRules } from '../lib/megaRules';
-import { buildEvolvedSheet } from './evolution';
-import { getPoolMax } from './pools';
+import { ALL_STAT_KEYS, COMBAT_STAT_KEYS, defaultStats } from './defaults';
+import { buildEvolvedSheet, offsetLimits } from './evolution';
+import { getPoolMax, getStatBase, getStatMax } from './pools';
 import type { StatSource } from './pools';
 import type { CardSheet, StatusState } from './types';
 import type { CombatMods } from '../lib/combatMods';
@@ -15,7 +16,9 @@ import type { CombatMods } from '../lib/combatMods';
    (`megaStash`), so the revert can give it back: its HP, Will and status when
    the original form is unaffected, and always its own attributes — a Mega's
    carried-over points may be past its limits, and must not be cut on the way
-   back. A Mega that keeps its own moveset (`megaMoves`) files its pins under
+   back. Its hand-edited bases and limits are offsets the Pokémon keeps in
+   every form (offsetLimits): they carry onto the Mega, and one edited on the
+   Mega comes back with the revert. A Mega that keeps its own moveset (`megaMoves`) files its pins under
    `megaPinned[<mega id>]` on revert, and finds them there next time. */
 
 export interface MegaStash {
@@ -30,6 +33,10 @@ export interface MegaStash {
     /** Absent on a stash made before combat offsets existed. */
     combatMods?: CombatMods;
     pinnedMoves: string[];
+    /** Every attribute's base and limit on the Mega as it came out, so the
+        revert can tell what was edited on it. Absent on an older stash. */
+    megaBase?: Record<string, number>;
+    megaMax?: Record<string, number>;
 }
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -127,6 +134,8 @@ export function megaEvolveSheet(
     } else {
         delete s.megaMoves;
     }
+    stash.megaBase = Object.fromEntries(ALL_STAT_KEYS.map((k) => [k, getStatBase(mega, k)]));
+    stash.megaMax = Object.fromEntries(ALL_STAT_KEYS.map((k) => [k, getStatMax(mega, k)]));
     s.megaFrom = src.pokemon._id;
     s.megaStash = stash;
     return { sheet: s };
@@ -142,6 +151,7 @@ export function megaRevertSheet(src: StatSource, base: PokedexEntry, rules: Mega
         s.trainedStats = clone(stash.trainedStats);
         s.customBaseStats = clone(stash.customBaseStats);
         s.customMaxStats = clone(stash.customMaxStats);
+        if (stash.megaBase && stash.megaMax) carryMegaEdits(src, base, s, stash);
         s.defBonus = stash.defBonus;
         s.spDefBonus = stash.spDefBonus;
         if (stash.combatMods) s.combatMods = clone(stash.combatMods);
@@ -171,4 +181,32 @@ export function megaRevertSheet(src: StatSource, base: PokedexEntry, rules: Mega
     delete s.megaMoves;
     s.megaFrom = '';
     return s;
+}
+
+/** A base or limit edited on the Mega moves the original form's by as much.
+    Its trained points come back as they were, cut only where an edit lowered
+    the room they have. Untouched, the original's maps stay exactly as stashed. */
+function carryMegaEdits(mega: StatSource, base: PokedexEntry, s: CardSheet, stash: MegaStash): void {
+    const edits = ALL_STAT_KEYS.map((k) => ({
+        k,
+        base: getStatBase(mega, k) - (stash.megaBase![k] ?? getStatBase(mega, k)),
+        max: getStatMax(mega, k) - (stash.megaMax![k] ?? getStatMax(mega, k)),
+    }));
+    if (edits.every((e) => !e.base && !e.max)) return;
+    const orig: StatSource = { pokemon: base, sheet: s };
+    const def = defaultStats(base);
+    const bases: Record<string, number> = {}, caps: Record<string, number> = {};
+    edits.forEach(({ k, base: db, max: dm }) => {
+        const combat = (COMBAT_STAT_KEYS as readonly string[]).includes(k);
+        const was = { base: getStatBase(orig, k), max: getStatMax(orig, k) };
+        const lim = offsetLimits(def[k], was.base - def[k].base + db, was.max - def[k].max + dm, combat);
+        if (lim.base !== was.base || lim.max !== was.max) {
+            const room = Math.max(0, lim.max - lim.base);
+            if ((s.trainedStats[k] || 0) > room) s.trainedStats[k] = room;
+        }
+        if (lim.base !== def[k].base) bases[k] = lim.base;
+        if (lim.max !== def[k].max) caps[k] = lim.max;
+    });
+    s.customBaseStats = bases;
+    s.customMaxStats = caps;
 }
