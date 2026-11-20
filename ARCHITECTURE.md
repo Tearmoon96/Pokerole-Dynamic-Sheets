@@ -581,8 +581,13 @@ compared with the last one seen. The log is `pokerole_table_watch`, forgotten
 with Close table; the GM screen's bell ([`WatchBell.tsx`](src/components/gm/WatchBell.tsx))
 reads it from storage. **Compare** sets a player's latest copy beside the
 GM's roster trainer with the same id (else the same name, else the one the
-GM picks); it also runs when a player arrives and when they leave. Nothing
-is written to either sheet, and players are shown nothing. The copy is the
+GM picks); it also runs when a player arrives and when they leave. Players are shown nothing. **Sync**, from Compare,
+writes the player's copy into the GM's trainer
+([`watchSync.ts`](src/table/watchSync.ts)): only what came whole — a field
+equal to the GM's is untouched, so pictures and notes stay; one that may have
+been cut on the way is left and named; team Pokémon are matched by uid, and
+one on only one team is named, not added or removed. The panel shows the log
+as one folded row per trainer (name and count), scrolling inside past 18rem. The copy is the
 player's browser's word: it catches edits made with the app, not an altered
 page. The relay is unchanged.
 

@@ -1,7 +1,8 @@
 /* The sheet watch's log as a list: on the GM's table (Sheet watch panel) and
    in the GM screen's bell. Every text in it came from a player's browser, so
    it is rendered as text children only. No table context is read here: the
-   GM screen has none. */
+   GM screen has none. The table's panel shows it one trainer at a time
+   (WatchGroups); the bell shows it as it came. */
 
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
@@ -90,6 +91,57 @@ export function WatchList({ entries, seen, onOk }: {
                         </div>
                         {e.note && <p className="watch-note">{e.note}</p>}
                         {e.changes.length > 0 && <Changes list={e.changes} />}
+                    </li>
+                );
+            })}
+        </ul>
+    );
+}
+
+export interface WatchGroup {
+    key: string;
+    member: string;
+    trainer: string;
+    color?: number;
+    entries: WatchEntry[];
+}
+
+/** One row per trainer, every one of them always there and folded: the
+    name, a caret, and how many changes were seen. Open, its own log. */
+export function WatchGroups({ groups, seen, onOk }: {
+    groups: WatchGroup[];
+    seen: number;
+    onOk?: (id: string, ok: boolean) => void;
+}) {
+    const [open, setOpen] = useState<Set<string>>(() => new Set());
+    const flip = (key: string) => setOpen((o) => {
+        const n = new Set(o);
+        if (n.has(key)) n.delete(key); else n.add(key);
+        return n;
+    });
+    return (
+        <ul className="watch-groups">
+            {groups.map((g) => {
+                const isOpen = open.has(g.key);
+                /* Changes seen, not the differences an arrival or a Leave compared. */
+                const count = g.entries.reduce((n, e) => n + (e.kind === 'change' ? e.changes.length : 0), 0);
+                const warn = g.entries.some((e) => e.warn && !e.ok);
+                const fresh = g.entries.some((e) => e.warn && !e.ok && e.at > seen);
+                return (
+                    <li key={g.key} className={'watch-group' + (warn ? ' warn' : '') + (fresh ? ' fresh' : '')}
+                        style={colorVars(g.color) as CSSProperties}>
+                        <button type="button" className="watch-group-head" aria-expanded={isOpen}
+                            data-watch-group={g.member} onClick={() => flip(g.key)}>
+                            <i className={'fa-solid fa-caret-' + (isOpen ? 'down' : 'right')}></i>
+                            <span className="watch-group-name">{g.trainer}</span>
+                            <span className="watch-group-count"
+                                title={count + ' change' + (count === 1 ? '' : 's') + ' seen' + (warn ? ', with warnings' : '')}>
+                                {count}
+                            </span>
+                        </button>
+                        {isOpen && (g.entries.length
+                            ? <WatchList entries={g.entries} seen={seen} onOk={onOk} />
+                            : <p className="muted watch-group-none">No changes seen.</p>)}
                     </li>
                 );
             })}

@@ -20,7 +20,7 @@ import { DEX_ID_RE } from './slim';
 type Rec = Record<string, unknown>;
 type Scalar = number | string | boolean;
 
-const isRec = (v: unknown): v is Rec => typeof v === 'object' && v !== null && !Array.isArray(v);
+export const isRec = (v: unknown): v is Rec => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 export interface WatchMon { uid: string; dexId: string; s: Rec }
 export interface WatchBoxed { uid: string; dexId: string; nick: string }
@@ -34,31 +34,31 @@ export interface WatchSheet {
 }
 
 /** A trainer's fields that say nothing about what the character can do. */
-const T_SKIP = new Set([
+export const T_SKIP = new Set([
     'id', 'team', 'boxes', 'activeBox', 'photo', 'photoFile', 'photoAdjust', 'themeType', 'boxSpriteType',
     'boxUseCustom', 'notes', 'manualBookmarks', 'manualVersions', 'hpMax', 'willMax',
 ]);
 /** The same for a Pokémon's card. The Mega stash is the form it reverts to,
     not what it is now. */
-const M_SKIP = new Set([
+export const M_SKIP = new Set([
     'customImage', 'customImageFile', 'imageId', 'spriteType', 'spriteScales', 'spriteOffsets', 'notes',
     'activeFilters', 'moveOrder', 'themeType', 'pageTheme', 'categoryEnabled', 'socialBaseZeroMigrated',
     'megaStash', 'megaPinned', 'hpMax', 'willMax', 'name', 'dexId', 'preview',
 ]);
 /** What Will bought off pain is Will spent, already seen as Will going down. */
-const MODS_SKIP = new Set(['painOff', 'noPain']);
+export const MODS_SKIP = new Set(['painOff', 'noPain']);
 const POISON = new Set(['__proto__', 'constructor', 'prototype']);
 
-const MAX_TEXT = 120;
-const MAX_LIST = 60;
-const MAX_KEYS = 80;
+export const MAX_TEXT = 120;
+export const MAX_LIST = 60;
+export const MAX_KEYS = 80;
 const MAX_DEPTH = 4;
 const MAX_BOXED = 600;
 export const ID_RE = /^[A-Za-z0-9_-]{1,48}$/;
 
 /** A JSON value cut to size: text short, lists and objects capped, nesting
     shallow. Anything else (a function, NaN) is dropped. */
-function clean(v: unknown, depth = 0): unknown {
+export function clean(v: unknown, depth = 0): unknown {
     if (typeof v === 'number') return Number.isFinite(v) ? Math.round(v * 100) / 100 : undefined;
     if (typeof v === 'string') return v.length > MAX_TEXT ? v.slice(0, MAX_TEXT) : v;
     if (typeof v === 'boolean' || v === null) return v;
@@ -76,7 +76,7 @@ function clean(v: unknown, depth = 0): unknown {
     return undefined;
 }
 
-function cleanMods(v: unknown): Rec | undefined {
+export function cleanMods(v: unknown): Rec | undefined {
     if (!isRec(v)) return undefined;
     const out: Rec = {};
     for (const [k, x] of Object.entries(v)) if (!MODS_SKIP.has(k) && typeof x === 'number' && x !== 0) out[k] = x;
@@ -305,7 +305,7 @@ const NAMES: Record<string, string> = {
     power: 'power', accOffset: 'accuracy offset', powOffset: 'power offset',
 };
 
-const words = (k: string): string => NAMES[k]
+export const words = (k: string): string => NAMES[k]
     ?? k.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
 
 function label(path: string[]): string {
@@ -322,7 +322,7 @@ const show = (v: Scalar | undefined): string => (v === undefined ? '—' : v ===
 export const speciesName = (dexId: string): string =>
     dexId.split('-').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
 
-function monName(m: WatchMon | WatchBoxed): string {
+export function monName(m: WatchMon | WatchBoxed): string {
     const nick = 's' in m ? str(m.s.nickname) : m.nick;
     return nick || speciesName(m.dexId);
 }

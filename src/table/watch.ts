@@ -20,13 +20,14 @@
    And it sets a player's copy beside the GM's own trainer with the same id
    (or the same name, or the one the GM picked) — on the GM's Compare, when a
    player arrives, and when they leave, by Leave or by going quiet, from the
-   last copy they sent. Nothing is ever written to either sheet.
+   last copy they sent. Nothing is written to either sheet, except when the
+   GM asks for Sync (watchSync.ts): the copy into the GM's own trainer.
 
    The GM screen in the same browser reads the log from storage (WatchBell).
    What a player's browser sends is that browser's word: this sees changes made
    with the app, not a page altered in the developer tools. */
 
-import { readWorking } from '../gm/workingSet';
+import { mutateWorkingTrainer, readWorking } from '../gm/workingSet';
 import { WORKING_KEY } from '../state/constants';
 import type { TrainerState } from '../state/types';
 import type { PcOp } from '../lib/combatLink';
@@ -39,6 +40,8 @@ import { ID_RE, diffSheets, parseWatchSheet, watchSheet } from './watchSheet';
 import type { Change, WatchSheet } from './watchSheet';
 import { packPart, unpackPart } from './zpart';
 import { headline } from './watchText';
+import { syncTrainer } from './watchSync';
+import type { SyncResult } from './watchSync';
 
 const QUIET_MS = 3000;
 const MAX_HOLD_MS = 10_000;
@@ -535,6 +538,24 @@ export class SheetWatch {
             player: kept.player, trainer: mine.name, tid: id, at: mine.at, gm: data ? gm : null, by: data ? by : null,
             changes: data ? diffSheets(watchSheet(data), mine.sheet) : [],
         };
+    }
+
+    /** The player's latest copy written into the GM's trainer it is matched
+        with; null when there is none, or the GM's storage is full. */
+    sync(member: string, tid?: string): SyncResult | null {
+        const c = this.compare(member, tid);
+        const mine = this.store.by[member]?.t[c?.tid ?? ''];
+        if (!c || !c.gm || !mine) return null;
+        let res: SyncResult = { changed: 0, skipped: [] };
+        if (!mutateWorkingTrainer(c.gm.id, (d) => { res = syncTrainer(d, mine.sheet); })) return null;
+        if (res.changed) {
+            this.add({
+                kind: 'change', member, player: c.player, ...this.context(member), trainer: c.trainer,
+                gm: c.gm.name, note: 'Synced into your sheet "' + c.gm.name + '".', changes: [],
+            });
+        }
+        this.api.changed();
+        return res;
     }
 
     /** The GM picked which trainer of theirs a player's copy is. */

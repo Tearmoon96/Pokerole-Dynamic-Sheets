@@ -10,12 +10,32 @@ import { colorVars } from '../../table/colors';
 import { readSeen } from '../../table/watch';
 import { fileStamp, logText, saveText } from '../../table/watchText';
 import { FoldTitle, useFold } from './Fold';
-import { WatchList } from './WatchList';
+import { WatchGroups } from './WatchList';
+import type { WatchGroup } from './WatchList';
 import { CompareDialog } from './CompareDialog';
 import { TableConfirm } from './TableConfirm';
 import type { TableAsk } from './TableConfirm';
+import type { WatchEntry, WatchPlayer } from '../../table/watch';
 
 const FLASH_MS = 6000;
+
+/** Every trainer a player has brought, with a log or not, then any the log
+    still names that is no longer kept. */
+function groupLog(players: WatchPlayer[], list: WatchEntry[], who: string): WatchGroup[] {
+    const groups: WatchGroup[] = [];
+    const by = new Map<string, WatchGroup>();
+    const add = (member: string, trainer: string, color?: number) => {
+        const key = member + '\u0000' + trainer;
+        let g = by.get(key);
+        if (!g) { g = { key, member, trainer, color, entries: [] }; by.set(key, g); groups.push(g); }
+        return g;
+    };
+    players.forEach((p) => {
+        if (!who || p.member === who) p.trainers.forEach((t) => add(p.member, t.name, p.color));
+    });
+    list.forEach((e) => add(e.member, e.trainer, e.color).entries.push(e));
+    return groups;
+}
 
 export function WatchPanel() {
     const { session, state } = useTable();
@@ -28,6 +48,7 @@ export function WatchPanel() {
     const seen = readSeen();
 
     const list = view.log.filter((e) => (!who || e.member === who) && (!warnOnly || (e.warn && !e.ok)));
+    const groups = groupLog(view.players, list, who);
     const online = new Set(state.members.map((m) => m.id));
 
     return (
@@ -93,9 +114,9 @@ export function WatchPanel() {
                         </button>
                     </div>
 
-                    {list.length ? (
+                    {groups.length ? (
                         <div className="watch-scroll">
-                            <WatchList entries={list} seen={seen} onOk={(id, ok) => session.watch.setOk(id, ok)} />
+                            <WatchGroups groups={groups} seen={seen} onOk={(id, ok) => session.watch.setOk(id, ok)} />
                         </div>
                     ) : (
                         <p className="muted">

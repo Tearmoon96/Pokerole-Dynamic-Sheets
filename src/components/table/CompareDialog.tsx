@@ -1,6 +1,8 @@
 /* The GM's Compare: a player's own trainer, as their browser last sent it,
-   beside the GM's copy of it in the GM screen's roster. Read only — nothing
-   is written to either sheet; the GM decides what to do about a difference.
+   beside the GM's copy of it in the GM screen's roster. Nothing is written to
+   either sheet unless the GM asks for Sync, which writes the player's copy
+   into the GM's (table/watchSync.ts), after a confirmation inside this dialog
+   rather than a second one over it.
    Mounted only while open (a role="dialog" in the DOM tells the tours one is
    up). */
 
@@ -10,22 +12,33 @@ import { gmTrainers } from '../../table/watch';
 import { clockTime, comparisonText, fileStamp, saveText } from '../../table/watchText';
 import { ChangeLine } from './WatchList';
 import type { Change } from '../../table/watchSheet';
+import type { SyncResult } from '../../table/watchSync';
 
 export function CompareDialog({ member, onClose }: { member: string; onClose: () => void }) {
     const { session } = useTable();
     const [tid, setTid] = useState<string | undefined>(undefined);
     const [, bump] = useState(0);
+    const [asking, setAsking] = useState(false);
+    const [done, setDone] = useState<SyncResult | 'failed' | null>(null);
 
     useEffect(() => {
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== 'Escape') return;
+            e.preventDefault();
+            if (asking) setAsking(false); else onClose();
+        };
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);
-    }, [onClose]);
+    }, [onClose, asking]);
 
     const player = session.watch.view.players.find((p) => p.member === member);
     const c = session.watch.compare(member, tid);
     const roster = gmTrainers();
     const warns = c ? c.changes.filter((x) => x.sev === 'warn').length : 0;
+    const sync = () => {
+        setAsking(false);
+        setDone(c ? session.watch.sync(member, c.tid) ?? 'failed' : 'failed');
+    };
 
     /* Grouped by character, in the order they come (trainer, team, boxes). */
     const groups: { who: string; list: Change[] }[] = [];
@@ -102,13 +115,55 @@ export function CompareDialog({ member, onClose }: { member: string; onClose: ()
                     </>
                 )}
 
+                {done && (
+                    <div className={'compare-synced' + (done === 'failed' ? ' failed' : '')} role="status" data-sync-result>
+                        {done === 'failed' ? (
+                            <p>Nothing was written: your sheet could not be saved (the browser's storage may be full).</p>
+                        ) : (
+                            <>
+                                <p>
+                                    <i className="fa-solid fa-circle-check"></i>{' '}
+                                    {done.changed ? 'Synced: ' + done.changed + ' field' + (done.changed === 1 ? '' : 's') + ' of your sheet updated.' : 'Nothing to take: your sheet already had it.'}
+                                </p>
+                                {done.skipped.length > 0 && (
+                                    <>
+                                        <p>Left as they were:</p>
+                                        <ul>{done.skipped.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                                    </>
+                                )}
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {asking && c?.gm && (
+                    <div className="compare-ask" role="group" aria-label="Sync into your sheet">
+                        <p>
+                            Write their copy of <b>{c.trainer}</b> into your sheet <b>{c.gm.name}</b>? Every difference
+                            above becomes theirs. Pictures, notes and anything too long to travel stay as you have them.
+                            If it is open on the Trainer License, reload it there afterwards.
+                        </p>
+                        <div className="compare-ask-actions">
+                            <button onClick={() => setAsking(false)}>Cancel</button>
+                            <button className="go" data-sync-ok autoFocus onClick={sync}>
+                                <i className="fa-solid fa-arrows-rotate"></i> Sync
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 <div className="gm-dialog-actions">
+                    {c?.gm && c.changes.length > 0 && !asking && (
+                        <button data-sync title="Write their copy into your sheet" onClick={() => { setDone(null); setAsking(true); }}>
+                            <i className="fa-solid fa-arrows-rotate"></i> Sync to your sheet
+                        </button>
+                    )}
                     {c && (
                         <button onClick={() => saveText('compare-' + (c.player || 'player') + '-' + fileStamp() + '.txt', comparisonText(c))}>
                             <i className="fa-solid fa-file-arrow-down"></i> Save as text
                         </button>
                     )}
-                    <button onClick={() => bump((n) => n + 1)} title="Compare again with the latest copies">
+                    <button onClick={() => { setDone(null); bump((n) => n + 1); }} title="Compare again with the latest copies">
                         <i className="fa-solid fa-rotate"></i> Refresh
                     </button>
                     <button className="go" autoFocus onClick={onClose}>Close</button>
